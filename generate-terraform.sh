@@ -2,7 +2,7 @@
 
 set +e
 
-go install gitlab.authwise.io/authwise/protoc-gen-terraform@4da09ef586317991d077293dfa2757cd6e327b2d
+go install gitlab.authwise.io/authwise/protoc-gen-terraform@0493db90035fafc145b5568f15542d7add4c00f8
 
 rm -fr build || true
 mkdir build || true

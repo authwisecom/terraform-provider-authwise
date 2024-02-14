@@ -4,6 +4,8 @@ package v1alpha1
 import (
 	"context"
 	schema "github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	planmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	stringplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
 )
 
@@ -360,9 +362,10 @@ func GenSchemaRealm(ctx context.Context) schema.Schema {
 			Optional:    true,
 		},
 		"id": schema.StringAttribute{
-			Computed: true,
-			Optional: false,
-			Required: false,
+			Computed:      true,
+			Optional:      false,
+			PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			Required:      false,
 		},
 		"name": schema.StringAttribute{
 			Description: "",
