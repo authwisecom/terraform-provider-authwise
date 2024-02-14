@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	v1alpha12 "gitlab.authwise.io/authwise/api-client-go/authwise/management/v1alpha1"
+	v1alpha13 "gitlab.authwise.io/authwise/api-client-go/authwise/types/core/v1alpha1"
 	"terraform-provider-authwise/internal/model/authwise/types/core/v1alpha1"
 
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -73,14 +74,36 @@ func (r *RealmResource) Create(ctx context.Context, req resource.CreateRequest, 
 	//     resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to create realm, got error: %s", err))
 	//     return
 	// }
+	realmReq := &v1alpha12.CreateRealmRequest{
+		Realm: &v1alpha13.Realm{
+			Id:               data.Id.String(),
+			UserDatabaseType: data.UserDatabaseType.String(),
+			Name:             data.Name.String(),
+			Description:      data.Description.String(),
+		},
+		CreateDefaultProviders: false,
+	}
+
+	realmResp, err := r.client.CreateRealm(ctx, realmReq, nil)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error Creating Realm",
+			err.Error(),
+		)
+		return
+	}
 
 	// For the purposes of this realm code, hardcoding a response value to
 	// save into the Terraform state.
-	data.Id = types.StringValue("realm-id")
+	data.Id = types.StringValue(realmResp.Id)
+	data.Name = types.StringValue(realmResp.Name)
+	data.UserDatabaseType = types.StringValue(realmResp.UserDatabaseType)
+	data.Description = types.StringValue(realmResp.Description)
+	data.TenantId = types.StringValue(realmResp.TenantId)
 
 	// Write logs using the tflog package
 	// Documentation: https://terraform.io/plugin/log
-	tflog.Trace(ctx, "created a resource")
+	tflog.Trace(ctx, "created realm")
 
 	// Save data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
