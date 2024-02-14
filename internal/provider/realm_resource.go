@@ -76,15 +76,16 @@ func (r *RealmResource) Create(ctx context.Context, req resource.CreateRequest, 
 	// }
 	realmReq := &v1alpha12.CreateRealmRequest{
 		Realm: &v1alpha13.Realm{
-			Id:               data.Id.String(),
-			UserDatabaseType: data.UserDatabaseType.String(),
-			Name:             data.Name.String(),
-			Description:      data.Description.String(),
+			Id:               data.Id.ValueString(),
+			TenantId:         data.Id.ValueString(),
+			UserDatabaseType: data.UserDatabaseType.ValueString(),
+			Name:             data.Name.ValueString(),
+			Description:      data.Description.ValueString(),
 		},
 		CreateDefaultProviders: false,
 	}
 
-	realmResp, err := r.client.CreateRealm(ctx, realmReq, nil)
+	realmResp, err := r.client.CreateRealm(ctx, realmReq)
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error Creating Realm",
@@ -126,6 +127,24 @@ func (r *RealmResource) Read(ctx context.Context, req resource.ReadRequest, resp
 	//     resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read realm, got error: %s", err))
 	//     return
 	// }
+	realmReq := &v1alpha12.GetRealmRequest{
+		Name: "realms/" + data.Id.ValueString(),
+	}
+
+	realmResp, err := r.client.GetRealm(ctx, realmReq)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error Fetching Realm",
+			err.Error(),
+		)
+		return
+	}
+
+	data.Id = types.StringValue(realmResp.Id)
+	data.Name = types.StringValue(realmResp.Name)
+	data.UserDatabaseType = types.StringValue(realmResp.UserDatabaseType)
+	data.Description = types.StringValue(realmResp.Description)
+	data.TenantId = types.StringValue(realmResp.TenantId)
 
 	// Save updated data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -148,6 +167,31 @@ func (r *RealmResource) Update(ctx context.Context, req resource.UpdateRequest, 
 	//     resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to update realm, got error: %s", err))
 	//     return
 	// }
+	realmReq := &v1alpha12.UpdateRealmRequest{
+		Name: "realms/" + data.Id.ValueString(),
+		Realm: &v1alpha13.Realm{
+			Id:               data.Id.ValueString(),
+			TenantId:         data.Id.ValueString(),
+			UserDatabaseType: data.UserDatabaseType.ValueString(),
+			Name:             data.Name.ValueString(),
+			Description:      data.Description.ValueString(),
+		},
+	}
+
+	realmResp, err := r.client.UpdateRealm(ctx, realmReq)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error Updating Realm",
+			err.Error(),
+		)
+		return
+	}
+
+	data.Id = types.StringValue(realmResp.Id)
+	data.Name = types.StringValue(realmResp.Name)
+	data.UserDatabaseType = types.StringValue(realmResp.UserDatabaseType)
+	data.Description = types.StringValue(realmResp.Description)
+	data.TenantId = types.StringValue(realmResp.TenantId)
 
 	// Save updated data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)

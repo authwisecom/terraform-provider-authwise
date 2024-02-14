@@ -359,6 +359,7 @@ func GenSchemaRealm(ctx context.Context) schema.Schema {
 	return schema.Schema{Attributes: map[string]schema.Attribute{
 		"description": schema.StringAttribute{
 			Description: "",
+			Computed: true,
 			Optional:    true,
 		},
 		"id": schema.StringAttribute{
@@ -369,14 +370,17 @@ func GenSchemaRealm(ctx context.Context) schema.Schema {
 		},
 		"name": schema.StringAttribute{
 			Description: "",
+			Computed: true,
 			Optional:    true,
 		},
 		"tenant_id": schema.StringAttribute{
 			Description: "",
+			Computed: true,
 			Optional:    true,
 		},
 		"user_database_type": schema.StringAttribute{
 			Description: "",
+			Computed: true,
 			Optional:    true,
 		},
 	}}

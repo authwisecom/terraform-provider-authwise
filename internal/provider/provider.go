@@ -59,7 +59,7 @@ func (p *AuthwiseProvider) Configure(ctx context.Context, req provider.Configure
 
 	// Realm client configuration for data sources and resources
 
-	client, err := management.NewDefaultClient("localhost:9989", true)
+	client, err := management.NewDefaultClient("localhost:8899", true)
 
 	if err != nil {
 		resp.Diagnostics.AddError(

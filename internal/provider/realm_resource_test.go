@@ -19,8 +19,10 @@ func TestAccRealmResource(t *testing.T) {
 			{
 				Config: testAccRealmResourceConfig("one"),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("authwise_realm.test", "id", "realm-id"),
 					resource.TestCheckResourceAttr("authwise_realm.test", "name", "one"),
+					resource.TestCheckResourceAttr("authwise_realm.test", "tenant_id", ""),
+					resource.TestCheckResourceAttr("authwise_realm.test", "description", ""),
+					resource.TestCheckResourceAttr("authwise_realm.test", "user_database_type", ""),
 				),
 			},
 			// ImportState testing
@@ -33,8 +35,10 @@ func TestAccRealmResource(t *testing.T) {
 			{
 				Config: testAccRealmResourceConfig("two"),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("authwise_realm.test", "id", "realm-id"),
 					resource.TestCheckResourceAttr("authwise_realm.test", "name", "two"),
+					resource.TestCheckResourceAttr("authwise_realm.test", "tenant_id", ""),
+					resource.TestCheckResourceAttr("authwise_realm.test", "description", ""),
+					resource.TestCheckResourceAttr("authwise_realm.test", "user_database_type", ""),
 				),
 			},
 			// Delete testing automatically occurs in TestCase
