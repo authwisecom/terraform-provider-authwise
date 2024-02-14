@@ -6,7 +6,7 @@ package provider
 import (
 	"context"
 	"fmt"
-	"net/http"
+	v1alpha12 "gitlab.authwise.io/authwise/api-client-go/authwise/management/v1alpha1"
 	"terraform-provider-authwise/internal/model/authwise/types/core/v1alpha1"
 
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -16,40 +16,33 @@ import (
 )
 
 // Ensure provider defined types fully satisfy framework interfaces.
-var _ resource.Resource = &ExampleResource{}
-var _ resource.ResourceWithImportState = &ExampleResource{}
+var _ resource.Resource = &RealmResource{}
+var _ resource.ResourceWithImportState = &RealmResource{}
 
-func NewExampleResource() resource.Resource {
-	return &ExampleResource{}
+func NewRealmResource() resource.Resource {
+	return &RealmResource{}
 }
 
-// ExampleResource defines the resource implementation.
-type ExampleResource struct {
-	client *http.Client
+// RealmResource defines the resource implementation.
+type RealmResource struct {
+	client *v1alpha12.AuthwiseManagementServiceClient
 }
 
-// ExampleResourceModel describes the resource data model.
-type ExampleResourceModel struct {
-	ConfigurableAttribute types.String `tfsdk:"configurable_attribute"`
-	Defaulted             types.String `tfsdk:"defaulted"`
-	Id                    types.String `tfsdk:"id"`
+func (r *RealmResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_realm"
 }
 
-func (r *ExampleResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
-	resp.TypeName = req.ProviderTypeName + "_example"
+func (r *RealmResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
+	resp.Schema = v1alpha1.GenSchemaRealm(ctx)
 }
 
-func (r *ExampleResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
-	resp.Schema = v1alpha1.GenSchemaClient(ctx)
-}
-
-func (r *ExampleResource) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
+func (r *RealmResource) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
 	// Prevent panic if the provider has not been configured.
 	if req.ProviderData == nil {
 		return
 	}
 
-	client, ok := req.ProviderData.(*http.Client)
+	client, ok := req.ProviderData.(*v1alpha12.AuthwiseManagementServiceClient)
 
 	if !ok {
 		resp.Diagnostics.AddError(
@@ -63,8 +56,8 @@ func (r *ExampleResource) Configure(ctx context.Context, req resource.ConfigureR
 	r.client = client
 }
 
-func (r *ExampleResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-	var data ExampleResourceModel
+func (r *RealmResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	var data v1alpha1.RealmModel
 
 	// Read Terraform plan data into the model
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
@@ -77,13 +70,13 @@ func (r *ExampleResource) Create(ctx context.Context, req resource.CreateRequest
 	// provider client data and make a call using it.
 	// httpResp, err := r.client.Do(httpReq)
 	// if err != nil {
-	//     resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to create example, got error: %s", err))
+	//     resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to create realm, got error: %s", err))
 	//     return
 	// }
 
-	// For the purposes of this example code, hardcoding a response value to
+	// For the purposes of this realm code, hardcoding a response value to
 	// save into the Terraform state.
-	data.Id = types.StringValue("example-id")
+	data.Id = types.StringValue("realm-id")
 
 	// Write logs using the tflog package
 	// Documentation: https://terraform.io/plugin/log
@@ -93,8 +86,8 @@ func (r *ExampleResource) Create(ctx context.Context, req resource.CreateRequest
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
-func (r *ExampleResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-	var data ExampleResourceModel
+func (r *RealmResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	var data v1alpha1.RealmModel
 
 	// Read Terraform prior state data into the model
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
@@ -107,7 +100,7 @@ func (r *ExampleResource) Read(ctx context.Context, req resource.ReadRequest, re
 	// provider client data and make a call using it.
 	// httpResp, err := r.client.Do(httpReq)
 	// if err != nil {
-	//     resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read example, got error: %s", err))
+	//     resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read realm, got error: %s", err))
 	//     return
 	// }
 
@@ -115,8 +108,8 @@ func (r *ExampleResource) Read(ctx context.Context, req resource.ReadRequest, re
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
-func (r *ExampleResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var data ExampleResourceModel
+func (r *RealmResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+	var data v1alpha1.RealmModel
 
 	// Read Terraform plan data into the model
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
@@ -129,7 +122,7 @@ func (r *ExampleResource) Update(ctx context.Context, req resource.UpdateRequest
 	// provider client data and make a call using it.
 	// httpResp, err := r.client.Do(httpReq)
 	// if err != nil {
-	//     resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to update example, got error: %s", err))
+	//     resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to update realm, got error: %s", err))
 	//     return
 	// }
 
@@ -137,8 +130,8 @@ func (r *ExampleResource) Update(ctx context.Context, req resource.UpdateRequest
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
-func (r *ExampleResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-	var data ExampleResourceModel
+func (r *RealmResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+	var data v1alpha1.RealmModel
 
 	// Read Terraform prior state data into the model
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
@@ -151,11 +144,11 @@ func (r *ExampleResource) Delete(ctx context.Context, req resource.DeleteRequest
 	// provider client data and make a call using it.
 	// httpResp, err := r.client.Do(httpReq)
 	// if err != nil {
-	//     resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to delete example, got error: %s", err))
+	//     resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to delete realm, got error: %s", err))
 	//     return
 	// }
 }
 
-func (r *ExampleResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+func (r *RealmResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
 }

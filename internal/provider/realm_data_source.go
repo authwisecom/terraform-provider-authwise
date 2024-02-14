@@ -15,46 +15,46 @@ import (
 )
 
 // Ensure provider defined types fully satisfy framework interfaces.
-var _ datasource.DataSource = &ExampleDataSource{}
+var _ datasource.DataSource = &RealmDataSource{}
 
-func NewExampleDataSource() datasource.DataSource {
-	return &ExampleDataSource{}
+func NewRealmDataSource() datasource.DataSource {
+	return &RealmDataSource{}
 }
 
-// ExampleDataSource defines the data source implementation.
-type ExampleDataSource struct {
+// RealmDataSource defines the data source implementation.
+type RealmDataSource struct {
 	client *http.Client
 }
 
-// ExampleDataSourceModel describes the data source data model.
-type ExampleDataSourceModel struct {
+// RealmDataSourceModel describes the data source data model.
+type RealmDataSourceModel struct {
 	ConfigurableAttribute types.String `tfsdk:"configurable_attribute"`
 	Id                    types.String `tfsdk:"id"`
 }
 
-func (d *ExampleDataSource) Metadata(ctx context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
-	resp.TypeName = req.ProviderTypeName + "_example"
+func (d *RealmDataSource) Metadata(ctx context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_realm"
 }
 
-func (d *ExampleDataSource) Schema(ctx context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
+func (d *RealmDataSource) Schema(ctx context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		// This description is used by the documentation generator and the language server.
-		MarkdownDescription: "Example data source",
+		MarkdownDescription: "Realm data source",
 
 		Attributes: map[string]schema.Attribute{
 			"configurable_attribute": schema.StringAttribute{
-				MarkdownDescription: "Example configurable attribute",
+				MarkdownDescription: "Realm configurable attribute",
 				Optional:            true,
 			},
 			"id": schema.StringAttribute{
-				MarkdownDescription: "Example identifier",
+				MarkdownDescription: "Realm identifier",
 				Computed:            true,
 			},
 		},
 	}
 }
 
-func (d *ExampleDataSource) Configure(ctx context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
+func (d *RealmDataSource) Configure(ctx context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
 	// Prevent panic if the provider has not been configured.
 	if req.ProviderData == nil {
 		return
@@ -74,8 +74,8 @@ func (d *ExampleDataSource) Configure(ctx context.Context, req datasource.Config
 	d.client = client
 }
 
-func (d *ExampleDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
-	var data ExampleDataSourceModel
+func (d *RealmDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
+	var data RealmDataSourceModel
 
 	// Read Terraform configuration data into the model
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
@@ -88,13 +88,13 @@ func (d *ExampleDataSource) Read(ctx context.Context, req datasource.ReadRequest
 	// provider client data and make a call using it.
 	// httpResp, err := d.client.Do(httpReq)
 	// if err != nil {
-	//     resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read example, got error: %s", err))
+	//     resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read realm, got error: %s", err))
 	//     return
 	// }
 
-	// For the purposes of this example code, hardcoding a response value to
+	// For the purposes of this realm code, hardcoding a response value to
 	// save into the Terraform state.
-	data.Id = types.StringValue("example-id")
+	data.Id = types.StringValue("realm-id")
 
 	// Write logs using the tflog package
 	// Documentation: https://terraform.io/plugin/log
