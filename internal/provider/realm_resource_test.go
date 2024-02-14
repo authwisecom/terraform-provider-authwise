@@ -50,7 +50,7 @@ func TestAccRealmResource(t *testing.T) {
 func testAccRealmResourceConfig(configurableAttribute string) string {
 	return fmt.Sprintf(`
 resource "authwise_realm" "test" {
-  configurable_attribute = %[1]q
+  name = %[1]q
 }
 `, configurableAttribute)
 }
