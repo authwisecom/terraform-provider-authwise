@@ -25,20 +25,15 @@ func TestAccRealmResource(t *testing.T) {
 			},
 			// ImportState testing
 			{
-				ResourceName:            "authwise_realm.test",
-				ImportState:             true,
-				ImportStateVerify:       true,
-				ImportStateVerifyIgnore: []string{"name", "defaulted"},
+				ResourceName:      "authwise_realm.test",
+				ImportState:       true,
+				ImportStateVerify: true,
 			},
 			// Update and Read testing
 			{
 				Config: testAccRealmResourceConfig("two"),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					// id field in schema needs for tests to pass:
-					//				PlanModifiers: []planmodifier.String{
-					//					stringplanmodifier.UseStateForUnknown(),
-					//				},
-					// resource.TestCheckResourceAttr("authwise_realm.test", "id", "realm-id"),
+					resource.TestCheckResourceAttr("authwise_realm.test", "id", "realm-id"),
 					resource.TestCheckResourceAttr("authwise_realm.test", "name", "two"),
 				),
 			},
