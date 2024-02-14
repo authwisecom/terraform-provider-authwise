@@ -5,13 +5,14 @@ package provider
 
 import (
 	"context"
-	"net/http"
-
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/provider"
 	"github.com/hashicorp/terraform-plugin-framework/provider/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"gitlab.authwise.io/authwise/api-client-go/authwise/management"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 // Ensure AuthwiseProvider satisfies various provider interfaces.
@@ -59,7 +60,17 @@ func (p *AuthwiseProvider) Configure(ctx context.Context, req provider.Configure
 	// if data.Endpoint.IsNull() { /* ... */ }
 
 	// Realm client configuration for data sources and resources
-	client := http.DefaultClient
+
+	client, err := management.NewDefaultClient("localhost:9989", grpc.WithTransportCredentials(insecure.NewCredentials()))
+
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Unable to create client",
+			err.Error(),
+		)
+		return
+	}
+
 	resp.DataSourceData = client
 	resp.ResourceData = client
 }

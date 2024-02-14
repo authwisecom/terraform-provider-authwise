@@ -25,7 +25,7 @@ func NewRealmResource() resource.Resource {
 
 // RealmResource defines the resource implementation.
 type RealmResource struct {
-	client *v1alpha12.AuthwiseManagementServiceClient
+	client v1alpha12.AuthwiseManagementServiceClient
 }
 
 func (r *RealmResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -42,12 +42,12 @@ func (r *RealmResource) Configure(ctx context.Context, req resource.ConfigureReq
 		return
 	}
 
-	client, ok := req.ProviderData.(*v1alpha12.AuthwiseManagementServiceClient)
+	client, ok := req.ProviderData.(v1alpha12.AuthwiseManagementServiceClient)
 
 	if !ok {
 		resp.Diagnostics.AddError(
 			"Unexpected Resource Configure Type",
-			fmt.Sprintf("Expected *http.Client, got: %T. Please report this issue to the provider developers.", req.ProviderData),
+			fmt.Sprintf("Expected *v1alpha12.AuthwiseManagementServiceClient, got: %T. Please report this issue to the provider developers.", req.ProviderData),
 		)
 
 		return

@@ -19,8 +19,6 @@ func TestAccRealmResource(t *testing.T) {
 			{
 				Config: testAccRealmResourceConfig("one"),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("authwise_realm.test", "configurable_attribute", "one"),
-					resource.TestCheckResourceAttr("authwise_realm.test", "defaulted", "realm value when not configured"),
 					resource.TestCheckResourceAttr("authwise_realm.test", "id", "realm-id"),
 				),
 			},
@@ -29,17 +27,12 @@ func TestAccRealmResource(t *testing.T) {
 				ResourceName:      "authwise_realm.test",
 				ImportState:       true,
 				ImportStateVerify: true,
-				// This is not normally necessary, but is here because this
-				// realm code does not have an actual upstream service.
-				// Once the Read method is able to refresh information from
-				// the upstream service, this can be removed.
-				ImportStateVerifyIgnore: []string{"configurable_attribute", "defaulted"},
 			},
 			// Update and Read testing
 			{
 				Config: testAccRealmResourceConfig("two"),
-				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("authwise_realm.test", "configurable_attribute", "two"),
+				Check:  resource.ComposeAggregateTestCheckFunc(
+				//resource.TestCheckResourceAttr("authwise_realm.test", "id", "realm-id"),
 				),
 			},
 			// Delete testing automatically occurs in TestCase
