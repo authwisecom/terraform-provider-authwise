@@ -360,8 +360,9 @@ func GenSchemaRealm(ctx context.Context) schema.Schema {
 			Optional:    true,
 		},
 		"id": schema.StringAttribute{
-			Description: "",
-			Optional:    true,
+			Computed: true,
+			Optional: false,
+			Required: false,
 		},
 		"name": schema.StringAttribute{
 			Description: "",
