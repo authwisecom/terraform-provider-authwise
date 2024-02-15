@@ -77,7 +77,7 @@ func (r *RealmResource) Create(ctx context.Context, req resource.CreateRequest, 
 	realmReq := &v1alpha12.CreateRealmRequest{
 		Realm: &v1alpha13.Realm{
 			Id:               data.Id.ValueString(),
-			TenantId:         data.Id.ValueString(),
+			TenantId:         data.TenantId.ValueString(),
 			UserDatabaseType: data.UserDatabaseType.ValueString(),
 			Name:             data.Name.ValueString(),
 			Description:      data.Description.ValueString(),
@@ -171,7 +171,7 @@ func (r *RealmResource) Update(ctx context.Context, req resource.UpdateRequest, 
 		Name: "realms/" + data.Id.ValueString(),
 		Realm: &v1alpha13.Realm{
 			Id:               data.Id.ValueString(),
-			TenantId:         data.Id.ValueString(),
+			TenantId:         data.TenantId.ValueString(),
 			UserDatabaseType: data.UserDatabaseType.ValueString(),
 			Name:             data.Name.ValueString(),
 			Description:      data.Description.ValueString(),

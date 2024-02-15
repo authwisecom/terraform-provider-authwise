@@ -498,14 +498,17 @@ func GenSchemaClient(ctx context.Context) schema.Schema {
 		"alias": schema.StringAttribute{
 			Description: "",
 			Optional:    true,
+			Computed: true,
 		},
 		"appearance_profile_id": schema.StringAttribute{
 			Description: "",
 			Optional:    true,
+			Computed: true,
 		},
 		"audience_id": schema.StringAttribute{
 			Description: "",
 			Optional:    true,
+			Computed: true,
 		},
 		"config": schema.SingleNestedAttribute{
 			Attributes: map[string]schema.Attribute{
@@ -524,21 +527,29 @@ func GenSchemaClient(ctx context.Context) schema.Schema {
 		"grant_type": schema.StringAttribute{
 			Description: "",
 			Optional:    true,
+			Computed: true,
 		},
 		"id": schema.StringAttribute{
 			Description: "",
 			Optional:    true,
+			Computed: true,
 		},
 		"login_url": schema.StringAttribute{
 			Description: "",
 			Optional:    true,
+			Computed: true,
 		},
 		"logo_id": schema.StringAttribute{
 			Description: "",
 			Optional:    true,
+			Computed: true,
 		},
 		"metadata": schema.SingleNestedAttribute{
-			Attributes:  map[string]schema.Attribute{"fields": schema.MapAttribute{Description: "Unordered map of dynamically typed values."}},
+			Attributes:  map[string]schema.Attribute{"fields": schema.MapAttribute{
+				Description: "Unordered map of dynamically typed values.",
+				ElementType: types.StringType,
+				Optional: true,
+			}},
 			Description: "",
 			Optional:    true,
 		},

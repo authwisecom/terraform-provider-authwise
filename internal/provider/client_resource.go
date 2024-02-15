@@ -6,11 +6,8 @@ package provider
 import (
 	"context"
 	"fmt"
-	structpb "github.com/golang/protobuf/ptypes/struct"
-	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	v1alpha12 "gitlab.authwise.io/authwise/api-client-go/authwise/management/v1alpha1"
 	v1alpha13 "gitlab.authwise.io/authwise/api-client-go/authwise/types/core/v1alpha1"
-	"google.golang.org/protobuf/types/known/anypb"
 	"terraform-provider-authwise/internal/model/authwise/types/core/v1alpha1"
 
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -78,34 +75,6 @@ func (r *ClientResource) Create(ctx context.Context, req resource.CreateRequest,
 	//     return
 	// }
 
-	c := &structpb.Struct{}
-
-	diags := data.Config.As(ctx, c, basetypes.ObjectAsOptions{})
-
-	resp.Diagnostics.Append(diags...)
-	if diags.HasError() {
-		return
-	}
-
-	config, err := anypb.New(c)
-
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error Creating Client",
-			err.Error(),
-		)
-		return
-	}
-
-	metadata := &structpb.Struct{}
-
-	diags2 := data.Config.As(ctx, metadata, basetypes.ObjectAsOptions{})
-
-	resp.Diagnostics.Append(diags2...)
-	if diags2.HasError() {
-		return
-	}
-
 	clientReq := &v1alpha12.CreateClientRequest{
 		Client: &v1alpha13.Client{
 			Id:                  data.Id.ValueString(),
@@ -116,8 +85,8 @@ func (r *ClientResource) Create(ctx context.Context, req resource.CreateRequest,
 			GrantType:           data.GrantType.ValueString(),
 			LoginUrl:            data.LoginUrl.ValueString(),
 			LogoId:              data.LogoId.ValueString(),
-			Config:              config,
-			Metadata:            metadata,
+			Config:              nil,
+			Metadata:            nil,
 		},
 	}
 
@@ -181,6 +150,12 @@ func (r *ClientResource) Read(ctx context.Context, req resource.ReadRequest, res
 
 	data.Id = types.StringValue(clientResp.Id)
 	data.Name = types.StringValue(clientResp.Name)
+	data.Alias = types.StringValue(clientResp.Alias)
+	data.LoginUrl = types.StringValue(clientResp.LoginUrl)
+	data.GrantType = types.StringValue(clientResp.GrantType)
+	data.LogoId = types.StringValue(clientResp.LogoId)
+	data.AudienceId = types.StringValue(clientResp.AudienceId)
+	data.AppearanceProfileId = types.StringValue(clientResp.AppearanceProfileId)
 
 	// Save updated data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -206,8 +181,16 @@ func (r *ClientResource) Update(ctx context.Context, req resource.UpdateRequest,
 	clientReq := &v1alpha12.UpdateClientRequest{
 		Name: "clients/" + data.Id.ValueString(),
 		Client: &v1alpha13.Client{
-			Id:   data.Id.ValueString(),
-			Name: data.Name.ValueString(),
+			Id:                  data.Id.ValueString(),
+			AudienceId:          data.AudienceId.ValueString(),
+			AppearanceProfileId: data.AppearanceProfileId.ValueString(),
+			Name:                data.Name.ValueString(),
+			Alias:               data.Alias.ValueString(),
+			GrantType:           data.GrantType.ValueString(),
+			LoginUrl:            data.LoginUrl.ValueString(),
+			LogoId:              data.LogoId.ValueString(),
+			Config:              nil,
+			Metadata:            nil,
 		},
 	}
 
@@ -222,6 +205,12 @@ func (r *ClientResource) Update(ctx context.Context, req resource.UpdateRequest,
 
 	data.Id = types.StringValue(clientResp.Id)
 	data.Name = types.StringValue(clientResp.Name)
+	data.Alias = types.StringValue(clientResp.Alias)
+	data.LoginUrl = types.StringValue(clientResp.LoginUrl)
+	data.GrantType = types.StringValue(clientResp.GrantType)
+	data.LogoId = types.StringValue(clientResp.LogoId)
+	data.AudienceId = types.StringValue(clientResp.AudienceId)
+	data.AppearanceProfileId = types.StringValue(clientResp.AppearanceProfileId)
 
 	// Save updated data into Terraform state
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)

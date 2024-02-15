@@ -20,6 +20,12 @@ func TestAccClientResource(t *testing.T) {
 				Config: testAccClientResourceConfig("one"),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("authwise_client.test", "name", "one"),
+					resource.TestCheckResourceAttr("authwise_client.test", "alias", ""),
+					resource.TestCheckResourceAttr("authwise_client.test", "login_url", ""),
+					resource.TestCheckResourceAttr("authwise_client.test", "grant_type", ""),
+					resource.TestCheckResourceAttr("authwise_client.test", "logo_id", ""),
+					resource.TestCheckResourceAttr("authwise_client.test", "audience_id", ""),
+					resource.TestCheckResourceAttr("authwise_client.test", "appearance_profile_id", ""),
 				),
 			},
 			// ImportState testing
@@ -33,6 +39,12 @@ func TestAccClientResource(t *testing.T) {
 				Config: testAccClientResourceConfig("two"),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("authwise_client.test", "name", "two"),
+					resource.TestCheckResourceAttr("authwise_client.test", "alias", ""),
+					resource.TestCheckResourceAttr("authwise_client.test", "login_url", ""),
+					resource.TestCheckResourceAttr("authwise_client.test", "grant_type", ""),
+					resource.TestCheckResourceAttr("authwise_client.test", "logo_id", ""),
+					resource.TestCheckResourceAttr("authwise_client.test", "audience_id", ""),
+					resource.TestCheckResourceAttr("authwise_client.test", "appearance_profile_id", ""),
 				),
 			},
 			// Delete testing automatically occurs in TestCase
