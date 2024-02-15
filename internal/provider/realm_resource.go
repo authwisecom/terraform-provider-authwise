@@ -214,6 +214,19 @@ func (r *RealmResource) Delete(ctx context.Context, req resource.DeleteRequest, 
 	//     resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to delete realm, got error: %s", err))
 	//     return
 	// }
+	realmReq := &v1alpha12.DeleteRealmRequest{
+		Name: "realms/" + data.Id.ValueString(),
+	}
+
+	_, err := r.client.DeleteRealm(ctx, realmReq)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error Fetching Realm",
+			err.Error(),
+		)
+	}
+
+	return
 }
 
 func (r *RealmResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {

@@ -76,6 +76,7 @@ func (p *AuthwiseProvider) Configure(ctx context.Context, req provider.Configure
 func (p *AuthwiseProvider) Resources(ctx context.Context) []func() resource.Resource {
 	return []func() resource.Resource{
 		NewRealmResource,
+		NewClientResource,
 	}
 }
 
