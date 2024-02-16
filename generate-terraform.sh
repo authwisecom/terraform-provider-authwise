@@ -1,11 +1,13 @@
 #!/bin/bash
 
-set +e
+set -e
 
-go install gitlab.authwise.io/authwise/protoc-gen-terraform@0493db90035fafc145b5568f15542d7add4c00f8
+go build -C ./gen
+mv ./gen/gen $GOPATH/bin/protoc-gen-terraform
 
 rm -fr build || true
 mkdir build || true
+
 pushd build
 
 cp -R $(go list -m -f '{{.Dir}}' gitlab.authwise.io/authwise/api-client-go)/proto/types-core/* .
@@ -24,6 +26,8 @@ plugins:
       - paths=source_relative
 EOF
 
+
 buf generate
+
 popd
 rm -fr build || true

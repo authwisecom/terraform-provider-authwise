@@ -359,7 +359,6 @@ func GenSchemaRealm(ctx context.Context) schema.Schema {
 	return schema.Schema{Attributes: map[string]schema.Attribute{
 		"description": schema.StringAttribute{
 			Description: "",
-			Computed: true,
 			Optional:    true,
 		},
 		"id": schema.StringAttribute{
@@ -370,17 +369,14 @@ func GenSchemaRealm(ctx context.Context) schema.Schema {
 		},
 		"name": schema.StringAttribute{
 			Description: "",
-			Computed: true,
 			Optional:    true,
 		},
 		"tenant_id": schema.StringAttribute{
 			Description: "",
-			Computed: true,
 			Optional:    true,
 		},
 		"user_database_type": schema.StringAttribute{
 			Description: "",
-			Computed: true,
 			Optional:    true,
 		},
 	}}
@@ -498,17 +494,14 @@ func GenSchemaClient(ctx context.Context) schema.Schema {
 		"alias": schema.StringAttribute{
 			Description: "",
 			Optional:    true,
-			Computed: true,
 		},
 		"appearance_profile_id": schema.StringAttribute{
 			Description: "",
 			Optional:    true,
-			Computed: true,
 		},
 		"audience_id": schema.StringAttribute{
 			Description: "",
 			Optional:    true,
-			Computed: true,
 		},
 		"config": schema.SingleNestedAttribute{
 			Attributes: map[string]schema.Attribute{
@@ -527,29 +520,21 @@ func GenSchemaClient(ctx context.Context) schema.Schema {
 		"grant_type": schema.StringAttribute{
 			Description: "",
 			Optional:    true,
-			Computed: true,
 		},
 		"id": schema.StringAttribute{
 			Description: "",
 			Optional:    true,
-			Computed: true,
 		},
 		"login_url": schema.StringAttribute{
 			Description: "",
 			Optional:    true,
-			Computed: true,
 		},
 		"logo_id": schema.StringAttribute{
 			Description: "",
 			Optional:    true,
-			Computed: true,
 		},
 		"metadata": schema.SingleNestedAttribute{
-			Attributes:  map[string]schema.Attribute{"fields": schema.MapAttribute{
-				Description: "Unordered map of dynamically typed values.",
-				ElementType: types.StringType,
-				Optional: true,
-			}},
+			Attributes:  map[string]schema.Attribute{"fields": schema.MapAttribute{Description: "Unordered map of dynamically typed values."}},
 			Description: "",
 			Optional:    true,
 		},

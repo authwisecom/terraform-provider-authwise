@@ -113,8 +113,8 @@ type ClientModel struct {
 	GrantType           types.String     `tfsdk:"grant_type"`
 	LoginUrl            types.String     `tfsdk:"login_url"`
 	LogoId              types.String     `tfsdk:"logo_id"`
-	Config              types.Object 	 `tfsdk:"config"`
-	Metadata            types.Object 	 `tfsdk:"metadata"`
+	Config              types.ObjectType `tfsdk:"config"`
+	Metadata            types.ObjectType `tfsdk:"metadata"`
 }
 
 // RoleModel model
