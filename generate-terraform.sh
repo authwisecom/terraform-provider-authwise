@@ -21,7 +21,7 @@ managed:
   enabled: true
 plugins:
   - plugin: terraform
-    out: ../internal/model
+    out: ../internal/provider
     opt:
       - paths=source_relative
 EOF

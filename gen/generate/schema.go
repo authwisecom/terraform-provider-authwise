@@ -1,17 +1,3 @@
-// Copyright 2022 Liam White
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
 package generate
 
 import (
@@ -29,25 +15,56 @@ import (
 )
 
 type schemaHandler struct {
+	file          *j.File
+	schemas       map[protoreflect.Name]bool
+	packageImport protogen.GoImportPath
+	filename      string
+}
+
+func (s *schemaHandler) Init(p *protogen.Plugin) {
+	s.file = j.NewFile(PackageName)
+}
+
+func (s *schemaHandler) Finish(p *protogen.Plugin) {
+
+	gf := p.NewGeneratedFile(s.filename, s.packageImport)
+	PrintGeneratedHeader(gf)
+	gf.P(s.file.GoString())
 }
 
 func (s *schemaHandler) Handle(m *protogen.Message) error {
 	l := log.With().Str("generator", "Schema").Str("proto", m.GoIdent.GoName).Logger()
+	name := m.Desc.Name()
+	if _, exists := s.schemas[name]; exists {
+		l.Debug().Msg("Schema exists")
+		return nil
+	}
 	l.Debug().Msg("Generating")
+	s.schemas[name] = true
+	s.schema(m)
 	l.Debug().Msg("Finished generating")
 	return nil
 }
 
-func NewSchemaHandler() MessageHandler {
-
-	return &schemaHandler{}
+type SchemaHandlerParams struct {
+	PackageName string
+	Filename    string
 }
 
-func Schema(f *j.File, m *protogen.Message) {
+func NewSchemaHandler(params SchemaHandlerParams) MessageHandler {
+
+	return &schemaHandler{
+		schemas:       map[protoreflect.Name]bool{},
+		packageImport: protogen.GoImportPath(params.PackageName),
+		filename:      params.Filename,
+	}
+}
+
+func (s *schemaHandler) schema(m *protogen.Message) {
 	id := "GenSchema" + m.GoIdent.GoName
 	l := log.With().Str("generator", "Schema").Str("proto", m.GoIdent.GoName).Logger()
 	l.Debug().Msg("Generating schema")
-	f.Commentf("// %v returns tfsdk.Schema definition for %v\n", id, m.GoIdent.GoName).
+	s.file.Commentf("// %v returns tfsdk.Schema definition for %v\n", id, m.GoIdent.GoName).
 		Func().Id(id).Params(j.Id("ctx").Qual("context", "Context")).
 		Params(j.Qual(ResourceSchema, "Schema")).Block(
 		j.Return(j.Qual(ResourceSchema, "Schema").Values(j.Dict{
@@ -56,23 +73,6 @@ func Schema(f *j.File, m *protogen.Message) {
 			),
 		})),
 	)
-	/*
-		l.Debug().Msg("Generating schema")
-		f.Commentf("// %v returns tfsdk.Schema definition for %v\n", id, m.GoIdent.GoName).
-			Func().
-			Id(id).
-
-			Params(j.Id("ctx").Qual("context", "Context")).
-			Params(j.Qual(SDK, "Schema"), j.Qual(Diag, "Diagnostics")).
-			Block(j.Return(
-				j.Qual(SDK, "Schema").Values(j.Dict{
-					j.Id("Attributes"): j.Map(j.String()).Qual(SDK, "Attribute").Values(
-						fieldsDictSchema(l, m),
-					),
-				}),
-				j.Nil(),
-			))
-	*/
 }
 
 func fields(l zerolog.Logger, m *protogen.Message) j.Dict {
@@ -213,61 +213,6 @@ func generateInjectedField(l zerolog.Logger, f injectedField) j.Code {
 
 }
 
-/*
-func schemaType(l zerolog.Logger, d protoreflect.FieldDescriptor) *j.Statement {
-	if d.IsList() {
-		// If the type isnt a primitive then type is nil, we use attributes instead.
-		if _, ok := primitiveTypeMap[d.Kind()]; !ok {
-			return nil
-		}
-		return j.Qual(Types, "ListType").Values(j.Dict{
-			j.Id("ElemType"): primitiveTypeMap[d.Kind()],
-		})
-	}
-	if d.IsMap() {
-		// If the type isnt a primitive then type is nil, we use attributes instead.
-		if _, ok := primitiveTypeMap[d.MapValue().Kind()]; !ok {
-			return nil
-		}
-		return j.Qual(Types, "MapType").Values(j.Dict{
-			j.Id("ElemType"): primitiveTypeMap[d.MapValue().Kind()],
-		})
-	}
-	return primitiveTypeMap[d.Kind()]
-
-	return nil
-}
-
-
-func attributes(l zerolog.Logger, f *protogen.Field) *j.Statement {
-	// If message is not nil it can't be a primitive type (string, bool, etc.).
-	if f.Message == nil {
-		panic("attributes requires a message")
-	}
-	if f.Desc.IsList() {
-		return xNestAttributes(l, "List", f.Message)
-	}
-	if f.Desc.IsMap() {
-		// If the map has a primitive value we use type, not attributes.
-		// TODO - fix
-		if _, ok := attributeTypeMap[f.Desc.MapValue().Kind()]; ok {
-			return nil
-		}
-		// Not sure how safe the assumption that fields[1] is always value and not key ¯\_(ツ)_/¯.
-		return xNestAttributes(l, "Map", f.Message.Fields[1].Message)
-	}
-	// If we've got this far is must be single nested
-	return xNestAttributes(l, "Single", f.Message)
-
-}
-
-func xNestAttributes(l zerolog.Logger, typ string, m *protogen.Message) *j.Statement {
-	return j.Qual(ResourceSchema, typ+"NestedAttributes").Params(
-		j.Map(j.String()).Qual(ResourceSchema, "Attribute").Values(fieldsDictSchema(l, m)),
-	)
-}
-*/
-
 var (
 	newlinePattern  = regexp.MustCompile(`\n//`)
 	variablePattern = regexp.MustCompile(`[ ]*\$[^\/]+[ ]*`)
@@ -281,16 +226,3 @@ func trimComments(c protogen.Comments) string {
 
 	return trimmed
 }
-
-/*
-func snakeCase(s string) string {
-	matchFirstCap := regexp.MustCompile("(.)([A-Z][a-z]+)")
-	matchAllCap := regexp.MustCompile("([a-z0-9])([A-Z])")
-	snake := matchFirstCap.ReplaceAllString(s, "${1}_${2}")
-	snake = matchAllCap.ReplaceAllString(snake, "${1}_${2}")
-	return strings.ToLower(snake)
-}
-
-*/
-
-// func handleStructValue()

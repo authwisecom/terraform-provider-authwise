@@ -25,8 +25,21 @@ import (
 )
 
 type container struct {
+	schemaHandler           generate.MessageHandler
 	standardResourceHandler generate.MessageHandler
 	configResourceHandler   generate.MessageHandler
+}
+
+func (c *container) Init(p *protogen.Plugin) {
+	c.schemaHandler.Init(p)
+	c.standardResourceHandler.Init(p)
+	c.configResourceHandler.Init(p)
+}
+
+func (c *container) Finish(p *protogen.Plugin) {
+	c.schemaHandler.Finish(p)
+	c.standardResourceHandler.Finish(p)
+	c.configResourceHandler.Finish(p)
 }
 
 var (
@@ -36,14 +49,22 @@ var (
 
 func initContainer() {
 
-	schemaHandler := generate.NewSchemaHandler()
+	packageName := "terraform-provider-authwise/internal/provider"
+
+	schemaHandler := generate.NewSchemaHandler(generate.SchemaHandlerParams{
+		PackageName: packageName,
+		Filename:    "schema.go",
+	})
 
 	mainContainer = &container{
+		schemaHandler: schemaHandler,
 		standardResourceHandler: generate.NewStandardResourceHandler(generate.StandardResourceHandlerParams{
 			SchemaHandler: schemaHandler,
+			PackageName:   packageName,
 		}),
 		configResourceHandler: generate.NewConfigResourceHandler(generate.ConfigResourceHandlerParams{
 			SchemaHandler: schemaHandler,
+			PackageName:   packageName,
 		}),
 	}
 }
@@ -56,12 +77,14 @@ func main() {
 		ParamFunc: flags.Set,
 	}.Run(func(gen *protogen.Plugin) error {
 		zerolog.SetGlobalLevel(zerolog.Level(*loglevel))
+		mainContainer.Init(gen)
 		for _, f := range gen.Files {
 			if !f.Generate {
 				continue
 			}
 			generateFile(gen, f)
 		}
+		mainContainer.Finish(gen)
 		return nil
 	})
 }
