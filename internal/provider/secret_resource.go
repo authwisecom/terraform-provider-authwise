@@ -5,26 +5,27 @@ import (
 	resource "github.com/hashicorp/terraform-plugin-framework/resource"
 )
 
-type secret struct{}
+type secretResource struct{}
 
 func NewSecret() resource.Resource {
-	return &secret{}
+	return &secretResource{}
 }
 
-func (*secret) Metadata(ctx context.Context, request resource.MetadataRequest, response *resource.MetadataResponse) {
+func (*secretResource) Metadata(ctx context.Context, request resource.MetadataRequest, response *resource.MetadataResponse) {
 }
 
-func (*secret) Schema(ctx context.Context, request resource.SchemaRequest, response *resource.SchemaResponse) {
+func (*secretResource) Schema(ctx context.Context, request resource.SchemaRequest, response *resource.SchemaResponse) {
+	response.Schema = GenSchemaSecret(ctx)
 }
 
-func (*secret) Create(ctx context.Context, request resource.CreateRequest, response *resource.CreateResponse) {
+func (*secretResource) Create(ctx context.Context, request resource.CreateRequest, response *resource.CreateResponse) {
 }
 
-func (*secret) Read(ctx context.Context, request resource.ReadRequest, response *resource.ReadResponse) {
+func (*secretResource) Read(ctx context.Context, request resource.ReadRequest, response *resource.ReadResponse) {
 }
 
-func (*secret) Update(ctx context.Context, request resource.UpdateRequest, response *resource.UpdateResponse) {
+func (*secretResource) Update(ctx context.Context, request resource.UpdateRequest, response *resource.UpdateResponse) {
 }
 
-func (*secret) Delete(ctx context.Context, request resource.DeleteRequest, response *resource.DeleteResponse) {
+func (*secretResource) Delete(ctx context.Context, request resource.DeleteRequest, response *resource.DeleteResponse) {
 }

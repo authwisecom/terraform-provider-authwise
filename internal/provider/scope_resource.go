@@ -5,26 +5,27 @@ import (
 	resource "github.com/hashicorp/terraform-plugin-framework/resource"
 )
 
-type scope struct{}
+type scopeResource struct{}
 
 func NewScope() resource.Resource {
-	return &scope{}
+	return &scopeResource{}
 }
 
-func (*scope) Metadata(ctx context.Context, request resource.MetadataRequest, response *resource.MetadataResponse) {
+func (*scopeResource) Metadata(ctx context.Context, request resource.MetadataRequest, response *resource.MetadataResponse) {
 }
 
-func (*scope) Schema(ctx context.Context, request resource.SchemaRequest, response *resource.SchemaResponse) {
+func (*scopeResource) Schema(ctx context.Context, request resource.SchemaRequest, response *resource.SchemaResponse) {
+	response.Schema = GenSchemaScope(ctx)
 }
 
-func (*scope) Create(ctx context.Context, request resource.CreateRequest, response *resource.CreateResponse) {
+func (*scopeResource) Create(ctx context.Context, request resource.CreateRequest, response *resource.CreateResponse) {
 }
 
-func (*scope) Read(ctx context.Context, request resource.ReadRequest, response *resource.ReadResponse) {
+func (*scopeResource) Read(ctx context.Context, request resource.ReadRequest, response *resource.ReadResponse) {
 }
 
-func (*scope) Update(ctx context.Context, request resource.UpdateRequest, response *resource.UpdateResponse) {
+func (*scopeResource) Update(ctx context.Context, request resource.UpdateRequest, response *resource.UpdateResponse) {
 }
 
-func (*scope) Delete(ctx context.Context, request resource.DeleteRequest, response *resource.DeleteResponse) {
+func (*scopeResource) Delete(ctx context.Context, request resource.DeleteRequest, response *resource.DeleteResponse) {
 }

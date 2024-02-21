@@ -5,26 +5,27 @@ import (
 	resource "github.com/hashicorp/terraform-plugin-framework/resource"
 )
 
-type audience struct{}
+type audienceResource struct{}
 
 func NewAudience() resource.Resource {
-	return &audience{}
+	return &audienceResource{}
 }
 
-func (*audience) Metadata(ctx context.Context, request resource.MetadataRequest, response *resource.MetadataResponse) {
+func (*audienceResource) Metadata(ctx context.Context, request resource.MetadataRequest, response *resource.MetadataResponse) {
 }
 
-func (*audience) Schema(ctx context.Context, request resource.SchemaRequest, response *resource.SchemaResponse) {
+func (*audienceResource) Schema(ctx context.Context, request resource.SchemaRequest, response *resource.SchemaResponse) {
+	response.Schema = GenSchemaAudience(ctx)
 }
 
-func (*audience) Create(ctx context.Context, request resource.CreateRequest, response *resource.CreateResponse) {
+func (*audienceResource) Create(ctx context.Context, request resource.CreateRequest, response *resource.CreateResponse) {
 }
 
-func (*audience) Read(ctx context.Context, request resource.ReadRequest, response *resource.ReadResponse) {
+func (*audienceResource) Read(ctx context.Context, request resource.ReadRequest, response *resource.ReadResponse) {
 }
 
-func (*audience) Update(ctx context.Context, request resource.UpdateRequest, response *resource.UpdateResponse) {
+func (*audienceResource) Update(ctx context.Context, request resource.UpdateRequest, response *resource.UpdateResponse) {
 }
 
-func (*audience) Delete(ctx context.Context, request resource.DeleteRequest, response *resource.DeleteResponse) {
+func (*audienceResource) Delete(ctx context.Context, request resource.DeleteRequest, response *resource.DeleteResponse) {
 }

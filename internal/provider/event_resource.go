@@ -5,26 +5,27 @@ import (
 	resource "github.com/hashicorp/terraform-plugin-framework/resource"
 )
 
-type event struct{}
+type eventResource struct{}
 
 func NewEvent() resource.Resource {
-	return &event{}
+	return &eventResource{}
 }
 
-func (*event) Metadata(ctx context.Context, request resource.MetadataRequest, response *resource.MetadataResponse) {
+func (*eventResource) Metadata(ctx context.Context, request resource.MetadataRequest, response *resource.MetadataResponse) {
 }
 
-func (*event) Schema(ctx context.Context, request resource.SchemaRequest, response *resource.SchemaResponse) {
+func (*eventResource) Schema(ctx context.Context, request resource.SchemaRequest, response *resource.SchemaResponse) {
+	response.Schema = GenSchemaEvent(ctx)
 }
 
-func (*event) Create(ctx context.Context, request resource.CreateRequest, response *resource.CreateResponse) {
+func (*eventResource) Create(ctx context.Context, request resource.CreateRequest, response *resource.CreateResponse) {
 }
 
-func (*event) Read(ctx context.Context, request resource.ReadRequest, response *resource.ReadResponse) {
+func (*eventResource) Read(ctx context.Context, request resource.ReadRequest, response *resource.ReadResponse) {
 }
 
-func (*event) Update(ctx context.Context, request resource.UpdateRequest, response *resource.UpdateResponse) {
+func (*eventResource) Update(ctx context.Context, request resource.UpdateRequest, response *resource.UpdateResponse) {
 }
 
-func (*event) Delete(ctx context.Context, request resource.DeleteRequest, response *resource.DeleteResponse) {
+func (*eventResource) Delete(ctx context.Context, request resource.DeleteRequest, response *resource.DeleteResponse) {
 }

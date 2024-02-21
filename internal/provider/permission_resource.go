@@ -5,26 +5,27 @@ import (
 	resource "github.com/hashicorp/terraform-plugin-framework/resource"
 )
 
-type permission struct{}
+type permissionResource struct{}
 
 func NewPermission() resource.Resource {
-	return &permission{}
+	return &permissionResource{}
 }
 
-func (*permission) Metadata(ctx context.Context, request resource.MetadataRequest, response *resource.MetadataResponse) {
+func (*permissionResource) Metadata(ctx context.Context, request resource.MetadataRequest, response *resource.MetadataResponse) {
 }
 
-func (*permission) Schema(ctx context.Context, request resource.SchemaRequest, response *resource.SchemaResponse) {
+func (*permissionResource) Schema(ctx context.Context, request resource.SchemaRequest, response *resource.SchemaResponse) {
+	response.Schema = GenSchemaPermission(ctx)
 }
 
-func (*permission) Create(ctx context.Context, request resource.CreateRequest, response *resource.CreateResponse) {
+func (*permissionResource) Create(ctx context.Context, request resource.CreateRequest, response *resource.CreateResponse) {
 }
 
-func (*permission) Read(ctx context.Context, request resource.ReadRequest, response *resource.ReadResponse) {
+func (*permissionResource) Read(ctx context.Context, request resource.ReadRequest, response *resource.ReadResponse) {
 }
 
-func (*permission) Update(ctx context.Context, request resource.UpdateRequest, response *resource.UpdateResponse) {
+func (*permissionResource) Update(ctx context.Context, request resource.UpdateRequest, response *resource.UpdateResponse) {
 }
 
-func (*permission) Delete(ctx context.Context, request resource.DeleteRequest, response *resource.DeleteResponse) {
+func (*permissionResource) Delete(ctx context.Context, request resource.DeleteRequest, response *resource.DeleteResponse) {
 }

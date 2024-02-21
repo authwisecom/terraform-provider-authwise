@@ -43,20 +43,20 @@ func (s *standardResourceHandler) Handle(m *protogen.Message) error {
 func (s *standardResourceHandler) resource(f *j.File, m *protogen.Message) {
 
 	name := m.GoIdent.GoName
-	lowerName := strcase.ToLowerCamel(name)
+	structName := strcase.ToLowerCamel(name) + "Resource"
 
-	f.Type().Id(lowerName).Struct()
+	f.Type().Id(structName).Struct()
 
 	f.Func().Id(fmt.Sprintf("New%s", name)).Params().Qual(Resource, "Resource").Block(
-		j.Return(j.Op("&").Id(lowerName).Values()),
+		j.Return(j.Op("&").Id(structName).Values()),
 	).Line()
 
-	s.metadata(f, m, lowerName)
-	s.schema(f, m, lowerName)
-	s.create(f, m, lowerName)
-	s.read(f, m, lowerName)
-	s.update(f, m, lowerName)
-	s.delete(f, m, lowerName)
+	s.metadata(f, m, structName)
+	s.schema(f, m, structName)
+	s.create(f, m, structName)
+	s.read(f, m, structName)
+	s.update(f, m, structName)
+	s.delete(f, m, structName)
 
 }
 
@@ -76,7 +76,9 @@ func (s *standardResourceHandler) metadata(f *j.File, m *protogen.Message, struc
 }
 
 func (s *standardResourceHandler) schema(f *j.File, m *protogen.Message, structName string) {
-	s.requestResponseMethod(f, structName, "Schema")
+	s.requestResponseMethod(f, structName, "Schema",
+		j.Id("response").Dot("Schema").Op("=").Id(fmt.Sprintf("GenSchema%s", m.GoIdent.GoName)).Call(j.Id("ctx")),
+	)
 }
 
 func (s *standardResourceHandler) create(f *j.File, m *protogen.Message, structName string) {

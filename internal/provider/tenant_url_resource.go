@@ -5,26 +5,27 @@ import (
 	resource "github.com/hashicorp/terraform-plugin-framework/resource"
 )
 
-type tenantUrl struct{}
+type tenantUrlResource struct{}
 
 func NewTenantUrl() resource.Resource {
-	return &tenantUrl{}
+	return &tenantUrlResource{}
 }
 
-func (*tenantUrl) Metadata(ctx context.Context, request resource.MetadataRequest, response *resource.MetadataResponse) {
+func (*tenantUrlResource) Metadata(ctx context.Context, request resource.MetadataRequest, response *resource.MetadataResponse) {
 }
 
-func (*tenantUrl) Schema(ctx context.Context, request resource.SchemaRequest, response *resource.SchemaResponse) {
+func (*tenantUrlResource) Schema(ctx context.Context, request resource.SchemaRequest, response *resource.SchemaResponse) {
+	response.Schema = GenSchemaTenantUrl(ctx)
 }
 
-func (*tenantUrl) Create(ctx context.Context, request resource.CreateRequest, response *resource.CreateResponse) {
+func (*tenantUrlResource) Create(ctx context.Context, request resource.CreateRequest, response *resource.CreateResponse) {
 }
 
-func (*tenantUrl) Read(ctx context.Context, request resource.ReadRequest, response *resource.ReadResponse) {
+func (*tenantUrlResource) Read(ctx context.Context, request resource.ReadRequest, response *resource.ReadResponse) {
 }
 
-func (*tenantUrl) Update(ctx context.Context, request resource.UpdateRequest, response *resource.UpdateResponse) {
+func (*tenantUrlResource) Update(ctx context.Context, request resource.UpdateRequest, response *resource.UpdateResponse) {
 }
 
-func (*tenantUrl) Delete(ctx context.Context, request resource.DeleteRequest, response *resource.DeleteResponse) {
+func (*tenantUrlResource) Delete(ctx context.Context, request resource.DeleteRequest, response *resource.DeleteResponse) {
 }

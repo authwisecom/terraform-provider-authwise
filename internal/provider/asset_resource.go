@@ -5,26 +5,27 @@ import (
 	resource "github.com/hashicorp/terraform-plugin-framework/resource"
 )
 
-type asset struct{}
+type assetResource struct{}
 
 func NewAsset() resource.Resource {
-	return &asset{}
+	return &assetResource{}
 }
 
-func (*asset) Metadata(ctx context.Context, request resource.MetadataRequest, response *resource.MetadataResponse) {
+func (*assetResource) Metadata(ctx context.Context, request resource.MetadataRequest, response *resource.MetadataResponse) {
 }
 
-func (*asset) Schema(ctx context.Context, request resource.SchemaRequest, response *resource.SchemaResponse) {
+func (*assetResource) Schema(ctx context.Context, request resource.SchemaRequest, response *resource.SchemaResponse) {
+	response.Schema = GenSchemaAsset(ctx)
 }
 
-func (*asset) Create(ctx context.Context, request resource.CreateRequest, response *resource.CreateResponse) {
+func (*assetResource) Create(ctx context.Context, request resource.CreateRequest, response *resource.CreateResponse) {
 }
 
-func (*asset) Read(ctx context.Context, request resource.ReadRequest, response *resource.ReadResponse) {
+func (*assetResource) Read(ctx context.Context, request resource.ReadRequest, response *resource.ReadResponse) {
 }
 
-func (*asset) Update(ctx context.Context, request resource.UpdateRequest, response *resource.UpdateResponse) {
+func (*assetResource) Update(ctx context.Context, request resource.UpdateRequest, response *resource.UpdateResponse) {
 }
 
-func (*asset) Delete(ctx context.Context, request resource.DeleteRequest, response *resource.DeleteResponse) {
+func (*assetResource) Delete(ctx context.Context, request resource.DeleteRequest, response *resource.DeleteResponse) {
 }

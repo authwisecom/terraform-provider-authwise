@@ -5,26 +5,27 @@ import (
 	resource "github.com/hashicorp/terraform-plugin-framework/resource"
 )
 
-type role struct{}
+type roleResource struct{}
 
 func NewRole() resource.Resource {
-	return &role{}
+	return &roleResource{}
 }
 
-func (*role) Metadata(ctx context.Context, request resource.MetadataRequest, response *resource.MetadataResponse) {
+func (*roleResource) Metadata(ctx context.Context, request resource.MetadataRequest, response *resource.MetadataResponse) {
 }
 
-func (*role) Schema(ctx context.Context, request resource.SchemaRequest, response *resource.SchemaResponse) {
+func (*roleResource) Schema(ctx context.Context, request resource.SchemaRequest, response *resource.SchemaResponse) {
+	response.Schema = GenSchemaRole(ctx)
 }
 
-func (*role) Create(ctx context.Context, request resource.CreateRequest, response *resource.CreateResponse) {
+func (*roleResource) Create(ctx context.Context, request resource.CreateRequest, response *resource.CreateResponse) {
 }
 
-func (*role) Read(ctx context.Context, request resource.ReadRequest, response *resource.ReadResponse) {
+func (*roleResource) Read(ctx context.Context, request resource.ReadRequest, response *resource.ReadResponse) {
 }
 
-func (*role) Update(ctx context.Context, request resource.UpdateRequest, response *resource.UpdateResponse) {
+func (*roleResource) Update(ctx context.Context, request resource.UpdateRequest, response *resource.UpdateResponse) {
 }
 
-func (*role) Delete(ctx context.Context, request resource.DeleteRequest, response *resource.DeleteResponse) {
+func (*roleResource) Delete(ctx context.Context, request resource.DeleteRequest, response *resource.DeleteResponse) {
 }

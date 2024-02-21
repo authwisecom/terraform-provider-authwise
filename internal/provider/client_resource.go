@@ -5,26 +5,27 @@ import (
 	resource "github.com/hashicorp/terraform-plugin-framework/resource"
 )
 
-type client struct{}
+type clientResource struct{}
 
 func NewClient() resource.Resource {
-	return &client{}
+	return &clientResource{}
 }
 
-func (*client) Metadata(ctx context.Context, request resource.MetadataRequest, response *resource.MetadataResponse) {
+func (*clientResource) Metadata(ctx context.Context, request resource.MetadataRequest, response *resource.MetadataResponse) {
 }
 
-func (*client) Schema(ctx context.Context, request resource.SchemaRequest, response *resource.SchemaResponse) {
+func (*clientResource) Schema(ctx context.Context, request resource.SchemaRequest, response *resource.SchemaResponse) {
+	response.Schema = GenSchemaClient(ctx)
 }
 
-func (*client) Create(ctx context.Context, request resource.CreateRequest, response *resource.CreateResponse) {
+func (*clientResource) Create(ctx context.Context, request resource.CreateRequest, response *resource.CreateResponse) {
 }
 
-func (*client) Read(ctx context.Context, request resource.ReadRequest, response *resource.ReadResponse) {
+func (*clientResource) Read(ctx context.Context, request resource.ReadRequest, response *resource.ReadResponse) {
 }
 
-func (*client) Update(ctx context.Context, request resource.UpdateRequest, response *resource.UpdateResponse) {
+func (*clientResource) Update(ctx context.Context, request resource.UpdateRequest, response *resource.UpdateResponse) {
 }
 
-func (*client) Delete(ctx context.Context, request resource.DeleteRequest, response *resource.DeleteResponse) {
+func (*clientResource) Delete(ctx context.Context, request resource.DeleteRequest, response *resource.DeleteResponse) {
 }
