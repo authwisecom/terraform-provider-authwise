@@ -28,6 +28,21 @@ import (
 	"strings"
 )
 
+type schemaHandler struct {
+}
+
+func (s *schemaHandler) Handle(m *protogen.Message) error {
+	l := log.With().Str("generator", "Schema").Str("proto", m.GoIdent.GoName).Logger()
+	l.Debug().Msg("Generating")
+	l.Debug().Msg("Finished generating")
+	return nil
+}
+
+func NewSchemaHandler() MessageHandler {
+
+	return &schemaHandler{}
+}
+
 func Schema(f *j.File, m *protogen.Message) {
 	id := "GenSchema" + m.GoIdent.GoName
 	l := log.With().Str("generator", "Schema").Str("proto", m.GoIdent.GoName).Logger()
