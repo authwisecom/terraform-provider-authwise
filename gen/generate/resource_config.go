@@ -45,7 +45,7 @@ func (s *configResourceHandler) Handle(m *protogen.Message) error {
 func (s *configResourceHandler) generateResource(m *protogen.Message, name string) error {
 
 	f := j.NewFile(PackageName)
-	gf := s.plugin.NewGeneratedFile(fmt.Sprintf("%s_resource.go", name), s.packageImport)
+	gf := s.plugin.NewGeneratedFile(fmt.Sprintf("config_%s_resource.go", name), s.packageImport)
 	PrintGeneratedHeader(gf)
 	if _, err := gf.Write([]byte(f.GoString())); err != nil {
 		return err
@@ -56,7 +56,7 @@ func (s *configResourceHandler) generateResource(m *protogen.Message, name strin
 func (s *configResourceHandler) generateDataSource(m *protogen.Message, name string) error {
 
 	f := j.NewFile(PackageName)
-	gf := s.plugin.NewGeneratedFile(fmt.Sprintf("%s_data_source.go", name), s.packageImport)
+	gf := s.plugin.NewGeneratedFile(fmt.Sprintf("config_%s_data_source.go", name), s.packageImport)
 	PrintGeneratedHeader(gf)
 	if _, err := gf.Write([]byte(f.GoString())); err != nil {
 		return err
