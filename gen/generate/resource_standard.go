@@ -21,7 +21,6 @@ func (s *standardResourceHandler) Init(p *protogen.Plugin) {
 }
 
 func (s *standardResourceHandler) Finish(p *protogen.Plugin) {
-	s.plugin = p
 }
 
 func (s *standardResourceHandler) Handle(m *protogen.Message) error {
@@ -33,6 +32,7 @@ func (s *standardResourceHandler) Handle(m *protogen.Message) error {
 	s.resource(f, m, l)
 
 	gf := s.plugin.NewGeneratedFile(fmt.Sprintf("%s_resource.go", strcase.ToSnake(string(m.Desc.Name()))), s.packageImport)
+	PrintGeneratedHeader(gf)
 	gf.P(f.GoString())
 
 	if err != nil {
