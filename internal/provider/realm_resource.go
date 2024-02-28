@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	resource "github.com/hashicorp/terraform-plugin-framework/resource"
+	types "github.com/hashicorp/terraform-plugin-framework/types"
 )
 
 type realmResource struct{}
@@ -11,7 +12,16 @@ func NewRealm() resource.Resource {
 	return &realmResource{}
 }
 
+type realmModel struct {
+	Id               types.String `tfsdk:"id"`
+	TenantId         types.String `tfsdk:"tenant_id"`
+	UserDatabaseType types.String `tfsdk:"user_database_type"`
+	Name             types.String `tfsdk:"name"`
+	Description      types.String `tfsdk:"description"`
+}
+
 func (*realmResource) Metadata(ctx context.Context, request resource.MetadataRequest, response *resource.MetadataResponse) {
+	response.TypeName = request.ProviderTypeName + "_realm"
 }
 
 func (*realmResource) Schema(ctx context.Context, request resource.SchemaRequest, response *resource.SchemaResponse) {
@@ -19,6 +29,11 @@ func (*realmResource) Schema(ctx context.Context, request resource.SchemaRequest
 }
 
 func (*realmResource) Create(ctx context.Context, request resource.CreateRequest, response *resource.CreateResponse) {
+	var data realmModel
+	response.Diagnostics.Append(request.Plan.Get(ctx, &data)...)
+	if response.Diagnostics.HasError() {
+		return
+	}
 }
 
 func (*realmResource) Read(ctx context.Context, request resource.ReadRequest, response *resource.ReadResponse) {

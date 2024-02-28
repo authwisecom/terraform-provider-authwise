@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	resource "github.com/hashicorp/terraform-plugin-framework/resource"
+	types "github.com/hashicorp/terraform-plugin-framework/types"
 )
 
 type appearanceProfileResource struct{}
@@ -11,7 +12,17 @@ func NewAppearanceProfile() resource.Resource {
 	return &appearanceProfileResource{}
 }
 
+type appearanceProfileModel struct {
+	Id                   types.String `tfsdk:"id"`
+	Name                 types.String `tfsdk:"name"`
+	TenantId             types.String `tfsdk:"tenant_id"`
+	ThemeId              types.String `tfsdk:"theme_id"`
+	StylesheetAttributes types.Object `tfsdk:"stylesheet_attributes"`
+	Content              types.Object `tfsdk:"content"`
+}
+
 func (*appearanceProfileResource) Metadata(ctx context.Context, request resource.MetadataRequest, response *resource.MetadataResponse) {
+	response.TypeName = request.ProviderTypeName + "_appearance_profile"
 }
 
 func (*appearanceProfileResource) Schema(ctx context.Context, request resource.SchemaRequest, response *resource.SchemaResponse) {
@@ -19,6 +30,11 @@ func (*appearanceProfileResource) Schema(ctx context.Context, request resource.S
 }
 
 func (*appearanceProfileResource) Create(ctx context.Context, request resource.CreateRequest, response *resource.CreateResponse) {
+	var data appearanceProfileModel
+	response.Diagnostics.Append(request.Plan.Get(ctx, &data)...)
+	if response.Diagnostics.HasError() {
+		return
+	}
 }
 
 func (*appearanceProfileResource) Read(ctx context.Context, request resource.ReadRequest, response *resource.ReadResponse) {

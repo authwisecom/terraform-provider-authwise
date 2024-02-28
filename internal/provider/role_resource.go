@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	resource "github.com/hashicorp/terraform-plugin-framework/resource"
+	types "github.com/hashicorp/terraform-plugin-framework/types"
 )
 
 type roleResource struct{}
@@ -11,7 +12,15 @@ func NewRole() resource.Resource {
 	return &roleResource{}
 }
 
+type roleModel struct {
+	Id         types.String `tfsdk:"id"`
+	AudienceId types.String `tfsdk:"audience_id"`
+	Name       types.String `tfsdk:"name"`
+	Auto       types.Bool   `tfsdk:"auto"`
+}
+
 func (*roleResource) Metadata(ctx context.Context, request resource.MetadataRequest, response *resource.MetadataResponse) {
+	response.TypeName = request.ProviderTypeName + "_role"
 }
 
 func (*roleResource) Schema(ctx context.Context, request resource.SchemaRequest, response *resource.SchemaResponse) {
@@ -19,6 +28,11 @@ func (*roleResource) Schema(ctx context.Context, request resource.SchemaRequest,
 }
 
 func (*roleResource) Create(ctx context.Context, request resource.CreateRequest, response *resource.CreateResponse) {
+	var data roleModel
+	response.Diagnostics.Append(request.Plan.Get(ctx, &data)...)
+	if response.Diagnostics.HasError() {
+		return
+	}
 }
 
 func (*roleResource) Read(ctx context.Context, request resource.ReadRequest, response *resource.ReadResponse) {

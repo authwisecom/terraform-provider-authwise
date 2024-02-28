@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	resource "github.com/hashicorp/terraform-plugin-framework/resource"
+	types "github.com/hashicorp/terraform-plugin-framework/types"
 )
 
 type scopeResource struct{}
@@ -11,7 +12,15 @@ func NewScope() resource.Resource {
 	return &scopeResource{}
 }
 
+type scopeModel struct {
+	Id         types.String `tfsdk:"id"`
+	AudienceId types.String `tfsdk:"audience_id"`
+	Kind       types.String `tfsdk:"kind"`
+	Auto       types.Bool   `tfsdk:"auto"`
+}
+
 func (*scopeResource) Metadata(ctx context.Context, request resource.MetadataRequest, response *resource.MetadataResponse) {
+	response.TypeName = request.ProviderTypeName + "_scope"
 }
 
 func (*scopeResource) Schema(ctx context.Context, request resource.SchemaRequest, response *resource.SchemaResponse) {
@@ -19,6 +28,11 @@ func (*scopeResource) Schema(ctx context.Context, request resource.SchemaRequest
 }
 
 func (*scopeResource) Create(ctx context.Context, request resource.CreateRequest, response *resource.CreateResponse) {
+	var data scopeModel
+	response.Diagnostics.Append(request.Plan.Get(ctx, &data)...)
+	if response.Diagnostics.HasError() {
+		return
+	}
 }
 
 func (*scopeResource) Read(ctx context.Context, request resource.ReadRequest, response *resource.ReadResponse) {

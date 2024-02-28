@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	resource "github.com/hashicorp/terraform-plugin-framework/resource"
+	types "github.com/hashicorp/terraform-plugin-framework/types"
 )
 
 type assetResource struct{}
@@ -11,7 +12,15 @@ func NewAsset() resource.Resource {
 	return &assetResource{}
 }
 
+type assetModel struct {
+	Id       types.String `tfsdk:"id"`
+	TenantId types.String `tfsdk:"tenant_id"`
+	Name     types.String `tfsdk:"name"`
+	MimeType types.String `tfsdk:"mime_type"`
+}
+
 func (*assetResource) Metadata(ctx context.Context, request resource.MetadataRequest, response *resource.MetadataResponse) {
+	response.TypeName = request.ProviderTypeName + "_asset"
 }
 
 func (*assetResource) Schema(ctx context.Context, request resource.SchemaRequest, response *resource.SchemaResponse) {
@@ -19,6 +28,11 @@ func (*assetResource) Schema(ctx context.Context, request resource.SchemaRequest
 }
 
 func (*assetResource) Create(ctx context.Context, request resource.CreateRequest, response *resource.CreateResponse) {
+	var data assetModel
+	response.Diagnostics.Append(request.Plan.Get(ctx, &data)...)
+	if response.Diagnostics.HasError() {
+		return
+	}
 }
 
 func (*assetResource) Read(ctx context.Context, request resource.ReadRequest, response *resource.ReadResponse) {
