@@ -2,30 +2,57 @@ package provider
 
 import (
 	"context"
+	"fmt"
 	resource "github.com/hashicorp/terraform-plugin-framework/resource"
+	v1alpha1 "gitlab.authwise.io/authwise/api-client-go/authwise/management/v1alpha1"
+	v1alpha11 "gitlab.authwise.io/authwise/api-client-go/authwise/types/core/v1alpha1"
 )
 
-type providerResource struct{}
+type providerResource struct {
+	client v1alpha1.AuthwiseManagementServiceClient
+}
 
 func NewProvider() resource.Resource {
 	return &providerResource{}
 }
 
-func (*providerResource) Metadata(ctx context.Context, request resource.MetadataRequest, response *resource.MetadataResponse) {
+func (r *providerResource) Configure(ctx context.Context, request resource.ConfigureRequest, response *resource.ConfigureResponse) {
+	if request.ProviderData == nil {
+		return
+	}
+	client, ok := request.ProviderData.(v1alpha1.AuthwiseManagementServiceClient)
+	if !ok {
+		response.Diagnostics.AddError("Unexpected Resource Configure Type", fmt.Sprintf("Expected *v1alpha12.AuthwiseManagementServiceClient, got: %T. Please report this issue to the provider developers.", request.ProviderData))
+		return
+	}
+	r.client = client
 }
 
-func (*providerResource) Schema(ctx context.Context, request resource.SchemaRequest, response *resource.SchemaResponse) {
+func (r *providerResource) Metadata(ctx context.Context, request resource.MetadataRequest, response *resource.MetadataResponse) {
+	response.TypeName = request.ProviderTypeName + "_provider"
+}
+
+func (r *providerResource) Schema(ctx context.Context, request resource.SchemaRequest, response *resource.SchemaResponse) {
 	response.Schema = GenSchemaProvider(ctx)
 }
 
-func (*providerResource) Create(ctx context.Context, request resource.CreateRequest, response *resource.CreateResponse) {
+func (r *providerResource) Create(ctx context.Context, request resource.CreateRequest, response *resource.CreateResponse) {
+	var data v1alpha11.Provider
+
+	response.Diagnostics.Append(request.Plan.Get(ctx, &data)...)
+
+	if response.Diagnostics.HasError() {
+		return
+	}
+
+	cr := &v1alpha1.CreateProviderRequest{}
 }
 
-func (*providerResource) Read(ctx context.Context, request resource.ReadRequest, response *resource.ReadResponse) {
+func (r *providerResource) Read(ctx context.Context, request resource.ReadRequest, response *resource.ReadResponse) {
 }
 
-func (*providerResource) Update(ctx context.Context, request resource.UpdateRequest, response *resource.UpdateResponse) {
+func (r *providerResource) Update(ctx context.Context, request resource.UpdateRequest, response *resource.UpdateResponse) {
 }
 
-func (*providerResource) Delete(ctx context.Context, request resource.DeleteRequest, response *resource.DeleteResponse) {
+func (r *providerResource) Delete(ctx context.Context, request resource.DeleteRequest, response *resource.DeleteResponse) {
 }
