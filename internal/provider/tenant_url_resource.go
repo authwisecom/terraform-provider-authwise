@@ -67,8 +67,8 @@ func (r *tenantUrlResource) Create(ctx context.Context, request resource.CreateR
 		return
 	}
 
-	cr := &v1alpha1.CreateTenantUrlRequest{TenantUrl: r.toProto(&data)}
-	resp, err := r.client.CreateTenantUrl(ctx, cr)
+	req := &v1alpha1.CreateTenantUrlRequest{TenantUrl: r.toProto(&data)}
+	resp, err := r.client.CreateTenantUrl(ctx, req)
 	if err != nil {
 		response.Diagnostics.AddError("Error Creating TenantUrl", err.Error())
 		return
@@ -80,10 +80,64 @@ func (r *tenantUrlResource) Create(ctx context.Context, request resource.CreateR
 }
 
 func (r *tenantUrlResource) Read(ctx context.Context, request resource.ReadRequest, response *resource.ReadResponse) {
+	var data tenantUrlModel
+
+	response.Diagnostics.Append(request.State.Get(ctx, &data)...)
+
+	if response.Diagnostics.HasError() {
+		return
+	}
+
+	req := &v1alpha1.GetTenantUrlRequest{Name: r.toName(data)}
+	resp, err := r.client.GetTenantUrl(ctx, req)
+	if err != nil {
+		response.Diagnostics.AddError("Error Reading TenantUrl", err.Error())
+		return
+	}
+
+	r.toModel(resp, &data)
+	tflog.Trace(ctx, "tenanturl read")
+	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
 }
 
 func (r *tenantUrlResource) Update(ctx context.Context, request resource.UpdateRequest, response *resource.UpdateResponse) {
+	var data tenantUrlModel
+
+	response.Diagnostics.Append(request.Plan.Get(ctx, &data)...)
+
+	if response.Diagnostics.HasError() {
+		return
+	}
+
+	req := &v1alpha1.UpdateTenantUrlRequest{
+		Name:      r.toName(data),
+		TenantUrl: r.toProto(&data),
+	}
+	resp, err := r.client.UpdateTenantUrl(ctx, req)
+	if err != nil {
+		response.Diagnostics.AddError("Error Updating TenantUrl", err.Error())
+		return
+	}
+
+	r.toModel(resp, &data)
+	tflog.Trace(ctx, "tenanturl update")
+	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
 }
 
 func (r *tenantUrlResource) Delete(ctx context.Context, request resource.DeleteRequest, response *resource.DeleteResponse) {
+	var data tenantUrlModel
+
+	response.Diagnostics.Append(request.State.Get(ctx, &data)...)
+
+	if response.Diagnostics.HasError() {
+		return
+	}
+
+	req := &v1alpha1.DeleteTenantUrlRequest{Name: r.toName(data)}
+	_, err := r.client.DeleteTenantUrl(ctx, req)
+	if err != nil {
+		response.Diagnostics.AddError("Error Deleting TenantUrl", err.Error())
+		return
+	}
+	return
 }

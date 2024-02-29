@@ -28,6 +28,9 @@ type audienceModel struct {
 	Config              types.Object `tfsdk:"config"`
 }
 
+func (r *audienceResource) toName(data audienceModel) string {
+	return fmt.Sprintf("audiences/%s", data.Id.ValueString())
+}
 func (r *audienceResource) toProto(m *audienceModel) *v1alpha11.Audience {
 	return &v1alpha11.Audience{
 		AppearanceProfileId: m.AppearanceProfileId.ValueString(),
@@ -76,8 +79,8 @@ func (r *audienceResource) Create(ctx context.Context, request resource.CreateRe
 		return
 	}
 
-	cr := &v1alpha1.CreateAudienceRequest{Audience: r.toProto(&data)}
-	resp, err := r.client.CreateAudience(ctx, cr)
+	req := &v1alpha1.CreateAudienceRequest{Audience: r.toProto(&data)}
+	resp, err := r.client.CreateAudience(ctx, req)
 	if err != nil {
 		response.Diagnostics.AddError("Error Creating Audience", err.Error())
 		return
@@ -89,10 +92,64 @@ func (r *audienceResource) Create(ctx context.Context, request resource.CreateRe
 }
 
 func (r *audienceResource) Read(ctx context.Context, request resource.ReadRequest, response *resource.ReadResponse) {
+	var data audienceModel
+
+	response.Diagnostics.Append(request.State.Get(ctx, &data)...)
+
+	if response.Diagnostics.HasError() {
+		return
+	}
+
+	req := &v1alpha1.GetAudienceRequest{Name: r.toName(data)}
+	resp, err := r.client.GetAudience(ctx, req)
+	if err != nil {
+		response.Diagnostics.AddError("Error Reading Audience", err.Error())
+		return
+	}
+
+	r.toModel(resp, &data)
+	tflog.Trace(ctx, "audience read")
+	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
 }
 
 func (r *audienceResource) Update(ctx context.Context, request resource.UpdateRequest, response *resource.UpdateResponse) {
+	var data audienceModel
+
+	response.Diagnostics.Append(request.Plan.Get(ctx, &data)...)
+
+	if response.Diagnostics.HasError() {
+		return
+	}
+
+	req := &v1alpha1.UpdateAudienceRequest{
+		Audience: r.toProto(&data),
+		Name:     r.toName(data),
+	}
+	resp, err := r.client.UpdateAudience(ctx, req)
+	if err != nil {
+		response.Diagnostics.AddError("Error Updating Audience", err.Error())
+		return
+	}
+
+	r.toModel(resp, &data)
+	tflog.Trace(ctx, "audience update")
+	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
 }
 
 func (r *audienceResource) Delete(ctx context.Context, request resource.DeleteRequest, response *resource.DeleteResponse) {
+	var data audienceModel
+
+	response.Diagnostics.Append(request.State.Get(ctx, &data)...)
+
+	if response.Diagnostics.HasError() {
+		return
+	}
+
+	req := &v1alpha1.DeleteAudienceRequest{Name: r.toName(data)}
+	_, err := r.client.DeleteAudience(ctx, req)
+	if err != nil {
+		response.Diagnostics.AddError("Error Deleting Audience", err.Error())
+		return
+	}
+	return
 }

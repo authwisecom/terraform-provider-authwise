@@ -32,6 +32,9 @@ type clientModel struct {
 	Metadata            types.Object `tfsdk:"metadata"`
 }
 
+func (r *clientResource) toName(data clientModel) string {
+	return fmt.Sprintf("clients/%s", data.Id.ValueString())
+}
 func (r *clientResource) toProto(m *clientModel) *v1alpha11.Client {
 	return &v1alpha11.Client{
 		Alias:               m.Alias.ValueString(),
@@ -87,8 +90,8 @@ func (r *clientResource) Create(ctx context.Context, request resource.CreateRequ
 		return
 	}
 
-	cr := &v1alpha1.CreateClientRequest{Client: r.toProto(&data)}
-	resp, err := r.client.CreateClient(ctx, cr)
+	req := &v1alpha1.CreateClientRequest{Client: r.toProto(&data)}
+	resp, err := r.client.CreateClient(ctx, req)
 	if err != nil {
 		response.Diagnostics.AddError("Error Creating Client", err.Error())
 		return
@@ -100,10 +103,64 @@ func (r *clientResource) Create(ctx context.Context, request resource.CreateRequ
 }
 
 func (r *clientResource) Read(ctx context.Context, request resource.ReadRequest, response *resource.ReadResponse) {
+	var data clientModel
+
+	response.Diagnostics.Append(request.State.Get(ctx, &data)...)
+
+	if response.Diagnostics.HasError() {
+		return
+	}
+
+	req := &v1alpha1.GetClientRequest{Name: r.toName(data)}
+	resp, err := r.client.GetClient(ctx, req)
+	if err != nil {
+		response.Diagnostics.AddError("Error Reading Client", err.Error())
+		return
+	}
+
+	r.toModel(resp, &data)
+	tflog.Trace(ctx, "client read")
+	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
 }
 
 func (r *clientResource) Update(ctx context.Context, request resource.UpdateRequest, response *resource.UpdateResponse) {
+	var data clientModel
+
+	response.Diagnostics.Append(request.Plan.Get(ctx, &data)...)
+
+	if response.Diagnostics.HasError() {
+		return
+	}
+
+	req := &v1alpha1.UpdateClientRequest{
+		Client: r.toProto(&data),
+		Name:   r.toName(data),
+	}
+	resp, err := r.client.UpdateClient(ctx, req)
+	if err != nil {
+		response.Diagnostics.AddError("Error Updating Client", err.Error())
+		return
+	}
+
+	r.toModel(resp, &data)
+	tflog.Trace(ctx, "client update")
+	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
 }
 
 func (r *clientResource) Delete(ctx context.Context, request resource.DeleteRequest, response *resource.DeleteResponse) {
+	var data clientModel
+
+	response.Diagnostics.Append(request.State.Get(ctx, &data)...)
+
+	if response.Diagnostics.HasError() {
+		return
+	}
+
+	req := &v1alpha1.DeleteClientRequest{Name: r.toName(data)}
+	_, err := r.client.DeleteClient(ctx, req)
+	if err != nil {
+		response.Diagnostics.AddError("Error Deleting Client", err.Error())
+		return
+	}
+	return
 }

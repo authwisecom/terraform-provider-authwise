@@ -28,6 +28,9 @@ type appearanceProfileModel struct {
 	Content              types.Object `tfsdk:"content"`
 }
 
+func (r *appearanceProfileResource) toName(data appearanceProfileModel) string {
+	return fmt.Sprintf("appearance_profiles/%s", data.Id.ValueString())
+}
 func (r *appearanceProfileResource) toProto(m *appearanceProfileModel) *v1alpha11.AppearanceProfile {
 	return &v1alpha11.AppearanceProfile{
 		Content:              nil,
@@ -75,8 +78,8 @@ func (r *appearanceProfileResource) Create(ctx context.Context, request resource
 		return
 	}
 
-	cr := &v1alpha1.CreateAppearanceProfileRequest{AppearanceProfile: r.toProto(&data)}
-	resp, err := r.client.CreateAppearanceProfile(ctx, cr)
+	req := &v1alpha1.CreateAppearanceProfileRequest{AppearanceProfile: r.toProto(&data)}
+	resp, err := r.client.CreateAppearanceProfile(ctx, req)
 	if err != nil {
 		response.Diagnostics.AddError("Error Creating AppearanceProfile", err.Error())
 		return
@@ -88,10 +91,64 @@ func (r *appearanceProfileResource) Create(ctx context.Context, request resource
 }
 
 func (r *appearanceProfileResource) Read(ctx context.Context, request resource.ReadRequest, response *resource.ReadResponse) {
+	var data appearanceProfileModel
+
+	response.Diagnostics.Append(request.State.Get(ctx, &data)...)
+
+	if response.Diagnostics.HasError() {
+		return
+	}
+
+	req := &v1alpha1.GetAppearanceProfileRequest{Name: r.toName(data)}
+	resp, err := r.client.GetAppearanceProfile(ctx, req)
+	if err != nil {
+		response.Diagnostics.AddError("Error Reading AppearanceProfile", err.Error())
+		return
+	}
+
+	r.toModel(resp, &data)
+	tflog.Trace(ctx, "appearanceprofile read")
+	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
 }
 
 func (r *appearanceProfileResource) Update(ctx context.Context, request resource.UpdateRequest, response *resource.UpdateResponse) {
+	var data appearanceProfileModel
+
+	response.Diagnostics.Append(request.Plan.Get(ctx, &data)...)
+
+	if response.Diagnostics.HasError() {
+		return
+	}
+
+	req := &v1alpha1.UpdateAppearanceProfileRequest{
+		AppearanceProfile: r.toProto(&data),
+		Name:              r.toName(data),
+	}
+	resp, err := r.client.UpdateAppearanceProfile(ctx, req)
+	if err != nil {
+		response.Diagnostics.AddError("Error Updating AppearanceProfile", err.Error())
+		return
+	}
+
+	r.toModel(resp, &data)
+	tflog.Trace(ctx, "appearanceprofile update")
+	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
 }
 
 func (r *appearanceProfileResource) Delete(ctx context.Context, request resource.DeleteRequest, response *resource.DeleteResponse) {
+	var data appearanceProfileModel
+
+	response.Diagnostics.Append(request.State.Get(ctx, &data)...)
+
+	if response.Diagnostics.HasError() {
+		return
+	}
+
+	req := &v1alpha1.DeleteAppearanceProfileRequest{Name: r.toName(data)}
+	_, err := r.client.DeleteAppearanceProfile(ctx, req)
+	if err != nil {
+		response.Diagnostics.AddError("Error Deleting AppearanceProfile", err.Error())
+		return
+	}
+	return
 }

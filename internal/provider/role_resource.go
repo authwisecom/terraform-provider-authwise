@@ -71,8 +71,8 @@ func (r *roleResource) Create(ctx context.Context, request resource.CreateReques
 		return
 	}
 
-	cr := &v1alpha1.CreateRoleRequest{Role: r.toProto(&data)}
-	resp, err := r.client.CreateRole(ctx, cr)
+	req := &v1alpha1.CreateRoleRequest{Role: r.toProto(&data)}
+	resp, err := r.client.CreateRole(ctx, req)
 	if err != nil {
 		response.Diagnostics.AddError("Error Creating Role", err.Error())
 		return
@@ -84,10 +84,64 @@ func (r *roleResource) Create(ctx context.Context, request resource.CreateReques
 }
 
 func (r *roleResource) Read(ctx context.Context, request resource.ReadRequest, response *resource.ReadResponse) {
+	var data roleModel
+
+	response.Diagnostics.Append(request.State.Get(ctx, &data)...)
+
+	if response.Diagnostics.HasError() {
+		return
+	}
+
+	req := &v1alpha1.GetRoleRequest{Name: r.toName(data)}
+	resp, err := r.client.GetRole(ctx, req)
+	if err != nil {
+		response.Diagnostics.AddError("Error Reading Role", err.Error())
+		return
+	}
+
+	r.toModel(resp, &data)
+	tflog.Trace(ctx, "role read")
+	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
 }
 
 func (r *roleResource) Update(ctx context.Context, request resource.UpdateRequest, response *resource.UpdateResponse) {
+	var data roleModel
+
+	response.Diagnostics.Append(request.Plan.Get(ctx, &data)...)
+
+	if response.Diagnostics.HasError() {
+		return
+	}
+
+	req := &v1alpha1.UpdateRoleRequest{
+		Name: r.toName(data),
+		Role: r.toProto(&data),
+	}
+	resp, err := r.client.UpdateRole(ctx, req)
+	if err != nil {
+		response.Diagnostics.AddError("Error Updating Role", err.Error())
+		return
+	}
+
+	r.toModel(resp, &data)
+	tflog.Trace(ctx, "role update")
+	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
 }
 
 func (r *roleResource) Delete(ctx context.Context, request resource.DeleteRequest, response *resource.DeleteResponse) {
+	var data roleModel
+
+	response.Diagnostics.Append(request.State.Get(ctx, &data)...)
+
+	if response.Diagnostics.HasError() {
+		return
+	}
+
+	req := &v1alpha1.DeleteRoleRequest{Name: r.toName(data)}
+	_, err := r.client.DeleteRole(ctx, req)
+	if err != nil {
+		response.Diagnostics.AddError("Error Deleting Role", err.Error())
+		return
+	}
+	return
 }

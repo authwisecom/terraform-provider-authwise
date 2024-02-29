@@ -73,8 +73,8 @@ func (r *secretResource) Create(ctx context.Context, request resource.CreateRequ
 		return
 	}
 
-	cr := &v1alpha1.CreateSecretRequest{Secret: r.toProto(&data)}
-	resp, err := r.client.CreateSecret(ctx, cr)
+	req := &v1alpha1.CreateSecretRequest{Secret: r.toProto(&data)}
+	resp, err := r.client.CreateSecret(ctx, req)
 	if err != nil {
 		response.Diagnostics.AddError("Error Creating Secret", err.Error())
 		return
@@ -86,10 +86,64 @@ func (r *secretResource) Create(ctx context.Context, request resource.CreateRequ
 }
 
 func (r *secretResource) Read(ctx context.Context, request resource.ReadRequest, response *resource.ReadResponse) {
+	var data secretModel
+
+	response.Diagnostics.Append(request.State.Get(ctx, &data)...)
+
+	if response.Diagnostics.HasError() {
+		return
+	}
+
+	req := &v1alpha1.GetSecretRequest{Name: r.toName(data)}
+	resp, err := r.client.GetSecret(ctx, req)
+	if err != nil {
+		response.Diagnostics.AddError("Error Reading Secret", err.Error())
+		return
+	}
+
+	r.toModel(resp, &data)
+	tflog.Trace(ctx, "secret read")
+	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
 }
 
 func (r *secretResource) Update(ctx context.Context, request resource.UpdateRequest, response *resource.UpdateResponse) {
+	var data secretModel
+
+	response.Diagnostics.Append(request.Plan.Get(ctx, &data)...)
+
+	if response.Diagnostics.HasError() {
+		return
+	}
+
+	req := &v1alpha1.UpdateSecretRequest{
+		Name:   r.toName(data),
+		Secret: r.toProto(&data),
+	}
+	resp, err := r.client.UpdateSecret(ctx, req)
+	if err != nil {
+		response.Diagnostics.AddError("Error Updating Secret", err.Error())
+		return
+	}
+
+	r.toModel(resp, &data)
+	tflog.Trace(ctx, "secret update")
+	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
 }
 
 func (r *secretResource) Delete(ctx context.Context, request resource.DeleteRequest, response *resource.DeleteResponse) {
+	var data secretModel
+
+	response.Diagnostics.Append(request.State.Get(ctx, &data)...)
+
+	if response.Diagnostics.HasError() {
+		return
+	}
+
+	req := &v1alpha1.DeleteSecretRequest{Name: r.toName(data)}
+	_, err := r.client.DeleteSecret(ctx, req)
+	if err != nil {
+		response.Diagnostics.AddError("Error Deleting Secret", err.Error())
+		return
+	}
+	return
 }

@@ -38,6 +38,9 @@ type eventModel struct {
 	CreatedAt     types.Object `tfsdk:"created_at"`
 }
 
+func (r *eventResource) toName(data eventModel) string {
+	return fmt.Sprintf("events/%s", data.Id.ValueString())
+}
 func (r *eventResource) toProto(m *eventModel) *v1alpha11.Event {
 	return &v1alpha11.Event{
 		Attributes:    nil,
@@ -103,8 +106,8 @@ func (r *eventResource) Create(ctx context.Context, request resource.CreateReque
 		return
 	}
 
-	cr := &v1alpha1.CreateEventRequest{Event: r.toProto(&data)}
-	resp, err := r.client.CreateEvent(ctx, cr)
+	req := &v1alpha1.CreateEventRequest{Event: r.toProto(&data)}
+	resp, err := r.client.CreateEvent(ctx, req)
 	if err != nil {
 		response.Diagnostics.AddError("Error Creating Event", err.Error())
 		return
@@ -116,10 +119,64 @@ func (r *eventResource) Create(ctx context.Context, request resource.CreateReque
 }
 
 func (r *eventResource) Read(ctx context.Context, request resource.ReadRequest, response *resource.ReadResponse) {
+	var data eventModel
+
+	response.Diagnostics.Append(request.State.Get(ctx, &data)...)
+
+	if response.Diagnostics.HasError() {
+		return
+	}
+
+	req := &v1alpha1.GetEventRequest{Name: r.toName(data)}
+	resp, err := r.client.GetEvent(ctx, req)
+	if err != nil {
+		response.Diagnostics.AddError("Error Reading Event", err.Error())
+		return
+	}
+
+	r.toModel(resp, &data)
+	tflog.Trace(ctx, "event read")
+	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
 }
 
 func (r *eventResource) Update(ctx context.Context, request resource.UpdateRequest, response *resource.UpdateResponse) {
+	var data eventModel
+
+	response.Diagnostics.Append(request.Plan.Get(ctx, &data)...)
+
+	if response.Diagnostics.HasError() {
+		return
+	}
+
+	req := &v1alpha1.UpdateEventRequest{
+		Event: r.toProto(&data),
+		Name:  r.toName(data),
+	}
+	resp, err := r.client.UpdateEvent(ctx, req)
+	if err != nil {
+		response.Diagnostics.AddError("Error Updating Event", err.Error())
+		return
+	}
+
+	r.toModel(resp, &data)
+	tflog.Trace(ctx, "event update")
+	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
 }
 
 func (r *eventResource) Delete(ctx context.Context, request resource.DeleteRequest, response *resource.DeleteResponse) {
+	var data eventModel
+
+	response.Diagnostics.Append(request.State.Get(ctx, &data)...)
+
+	if response.Diagnostics.HasError() {
+		return
+	}
+
+	req := &v1alpha1.DeleteEventRequest{Name: r.toName(data)}
+	_, err := r.client.DeleteEvent(ctx, req)
+	if err != nil {
+		response.Diagnostics.AddError("Error Deleting Event", err.Error())
+		return
+	}
+	return
 }

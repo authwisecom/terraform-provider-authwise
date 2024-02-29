@@ -27,6 +27,9 @@ type realmModel struct {
 	Description      types.String `tfsdk:"description"`
 }
 
+func (r *realmResource) toName(data realmModel) string {
+	return fmt.Sprintf("realms/%s", data.Id.ValueString())
+}
 func (r *realmResource) toProto(m *realmModel) *v1alpha11.Realm {
 	return &v1alpha11.Realm{
 		Description:      m.Description.ValueString(),
@@ -74,8 +77,8 @@ func (r *realmResource) Create(ctx context.Context, request resource.CreateReque
 		return
 	}
 
-	cr := &v1alpha1.CreateRealmRequest{Realm: r.toProto(&data)}
-	resp, err := r.client.CreateRealm(ctx, cr)
+	req := &v1alpha1.CreateRealmRequest{Realm: r.toProto(&data)}
+	resp, err := r.client.CreateRealm(ctx, req)
 	if err != nil {
 		response.Diagnostics.AddError("Error Creating Realm", err.Error())
 		return
@@ -87,10 +90,64 @@ func (r *realmResource) Create(ctx context.Context, request resource.CreateReque
 }
 
 func (r *realmResource) Read(ctx context.Context, request resource.ReadRequest, response *resource.ReadResponse) {
+	var data realmModel
+
+	response.Diagnostics.Append(request.State.Get(ctx, &data)...)
+
+	if response.Diagnostics.HasError() {
+		return
+	}
+
+	req := &v1alpha1.GetRealmRequest{Name: r.toName(data)}
+	resp, err := r.client.GetRealm(ctx, req)
+	if err != nil {
+		response.Diagnostics.AddError("Error Reading Realm", err.Error())
+		return
+	}
+
+	r.toModel(resp, &data)
+	tflog.Trace(ctx, "realm read")
+	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
 }
 
 func (r *realmResource) Update(ctx context.Context, request resource.UpdateRequest, response *resource.UpdateResponse) {
+	var data realmModel
+
+	response.Diagnostics.Append(request.Plan.Get(ctx, &data)...)
+
+	if response.Diagnostics.HasError() {
+		return
+	}
+
+	req := &v1alpha1.UpdateRealmRequest{
+		Name:  r.toName(data),
+		Realm: r.toProto(&data),
+	}
+	resp, err := r.client.UpdateRealm(ctx, req)
+	if err != nil {
+		response.Diagnostics.AddError("Error Updating Realm", err.Error())
+		return
+	}
+
+	r.toModel(resp, &data)
+	tflog.Trace(ctx, "realm update")
+	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
 }
 
 func (r *realmResource) Delete(ctx context.Context, request resource.DeleteRequest, response *resource.DeleteResponse) {
+	var data realmModel
+
+	response.Diagnostics.Append(request.State.Get(ctx, &data)...)
+
+	if response.Diagnostics.HasError() {
+		return
+	}
+
+	req := &v1alpha1.DeleteRealmRequest{Name: r.toName(data)}
+	_, err := r.client.DeleteRealm(ctx, req)
+	if err != nil {
+		response.Diagnostics.AddError("Error Deleting Realm", err.Error())
+		return
+	}
+	return
 }

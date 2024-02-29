@@ -71,8 +71,8 @@ func (r *scopeResource) Create(ctx context.Context, request resource.CreateReque
 		return
 	}
 
-	cr := &v1alpha1.CreateScopeRequest{Scope: r.toProto(&data)}
-	resp, err := r.client.CreateScope(ctx, cr)
+	req := &v1alpha1.CreateScopeRequest{Scope: r.toProto(&data)}
+	resp, err := r.client.CreateScope(ctx, req)
 	if err != nil {
 		response.Diagnostics.AddError("Error Creating Scope", err.Error())
 		return
@@ -84,10 +84,64 @@ func (r *scopeResource) Create(ctx context.Context, request resource.CreateReque
 }
 
 func (r *scopeResource) Read(ctx context.Context, request resource.ReadRequest, response *resource.ReadResponse) {
+	var data scopeModel
+
+	response.Diagnostics.Append(request.State.Get(ctx, &data)...)
+
+	if response.Diagnostics.HasError() {
+		return
+	}
+
+	req := &v1alpha1.GetScopeRequest{Name: r.toName(data)}
+	resp, err := r.client.GetScope(ctx, req)
+	if err != nil {
+		response.Diagnostics.AddError("Error Reading Scope", err.Error())
+		return
+	}
+
+	r.toModel(resp, &data)
+	tflog.Trace(ctx, "scope read")
+	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
 }
 
 func (r *scopeResource) Update(ctx context.Context, request resource.UpdateRequest, response *resource.UpdateResponse) {
+	var data scopeModel
+
+	response.Diagnostics.Append(request.Plan.Get(ctx, &data)...)
+
+	if response.Diagnostics.HasError() {
+		return
+	}
+
+	req := &v1alpha1.UpdateScopeRequest{
+		Name:  r.toName(data),
+		Scope: r.toProto(&data),
+	}
+	resp, err := r.client.UpdateScope(ctx, req)
+	if err != nil {
+		response.Diagnostics.AddError("Error Updating Scope", err.Error())
+		return
+	}
+
+	r.toModel(resp, &data)
+	tflog.Trace(ctx, "scope update")
+	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
 }
 
 func (r *scopeResource) Delete(ctx context.Context, request resource.DeleteRequest, response *resource.DeleteResponse) {
+	var data scopeModel
+
+	response.Diagnostics.Append(request.State.Get(ctx, &data)...)
+
+	if response.Diagnostics.HasError() {
+		return
+	}
+
+	req := &v1alpha1.DeleteScopeRequest{Name: r.toName(data)}
+	_, err := r.client.DeleteScope(ctx, req)
+	if err != nil {
+		response.Diagnostics.AddError("Error Deleting Scope", err.Error())
+		return
+	}
+	return
 }

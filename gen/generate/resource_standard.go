@@ -57,6 +57,7 @@ func (s *standardResourceHandler) resource(f *j.File, m *protogen.Message, l zer
 	).Line()
 
 	s.model(f, m, l)
+	s.toName(f, m, structName, resourceMetadataMap, l)
 	s.toProto(f, m, structName, l)
 	s.toModel(f, m, structName, l)
 	s.configure(f, m, structName, l)
@@ -67,6 +68,16 @@ func (s *standardResourceHandler) resource(f *j.File, m *protogen.Message, l zer
 	s.update(f, m, structName, l)
 	s.delete(f, m, structName, l)
 
+}
+
+func (s *standardResourceHandler) resourceNameMap(m *protogen.Message) func(id string) string {
+	resourceMap := map[string]func(id string) string{
+		"Client": func(id string) string {
+			return ""
+		},
+	}
+
+	return resourceMap[m.GoIdent.GoName]
 }
 
 func (s *standardResourceHandler) modelName(m *protogen.Message) string {
@@ -101,13 +112,17 @@ func (s *standardResourceHandler) modelFields(fields []*protogen.Field) []j.Code
 	return result
 }
 
-func (s *standardResourceHandler) crudMethodTemplate(m *protogen.Message, operation string, appendState bool, body ...j.Code) []j.Code {
+func (s *standardResourceHandler) crudMethodTemplate(m *protogen.Message, operation string, fromState bool, appendState bool, body ...j.Code) []j.Code {
 	name := m.GoIdent.GoName
+	requestObjName := "Plan"
+	if fromState {
+		requestObjName = "State"
+	}
 	//standard crud method start
 	result := []j.Code{
 		j.Var().Id("data").Qual("", s.modelName(m)).Line(),
 		j.Id("response").Dot("Diagnostics").Dot("Append").Call(
-			j.Id("request").Dot("Plan").Dot("Get").Call(j.Id("ctx"), j.Op("&").Id("data")).Op("..."),
+			j.Id("request").Dot(requestObjName).Dot("Get").Call(j.Id("ctx"), j.Op("&").Id("data")).Op("..."),
 		).Line(),
 		j.If(j.Id("response").Dot("Diagnostics").Dot("HasError").Call().Block(
 			j.Return(),
@@ -141,6 +156,32 @@ func (s *standardResourceHandler) requestResponseMethod(f *j.File,
 		j.Id("request").Qual(Resource, fmt.Sprintf("%sRequest", functionName)),
 		j.Id("response").Op("*").Qual(Resource, fmt.Sprintf("%sResponse", functionName)),
 	).Block(statements...).Line()
+}
+
+func (s *standardResourceHandler) toName(f *j.File, m *protogen.Message, structName string, metadata resourceMap, l zerolog.Logger) {
+
+	val, ok := metadata[m.GoIdent.GoName]
+	if !ok {
+		return
+	}
+
+	var fmtParams []j.Code
+	for _, id := range val.nameFuncIdentifiers {
+		fmtParams = append(fmtParams, j.Id("data").Dot(id).Dot("ValueString").Call())
+	}
+
+	f.Func().Params(j.Id("r").Op("*").Id(structName)).Id("toName").Params(
+		j.Id("data").Id(s.modelName(m)),
+	).String().Block(
+		j.Return(
+			j.Qual("fmt", "Sprintf").Call(
+				j.Lit(val.nameFuncPattern),
+				j.List(
+					fmtParams...,
+				),
+			),
+		),
+	)
 }
 
 // TODO - handle objects
@@ -245,8 +286,8 @@ func (s *standardResourceHandler) create(f *j.File, m *protogen.Message, structN
 	name := m.GoIdent.GoName
 
 	s.requestResponseMethod(f, structName, "Create",
-		s.crudMethodTemplate(m, "create", true,
-			j.Id("cr").Op(":=").Op("&").Qual(
+		s.crudMethodTemplate(m, "create", false, true,
+			j.Id("req").Op(":=").Op("&").Qual(
 				"gitlab.authwise.io/authwise/api-client-go/authwise/management/v1alpha1",
 				fmt.Sprintf("Create%sRequest", name),
 			).Values(
@@ -255,7 +296,7 @@ func (s *standardResourceHandler) create(f *j.File, m *protogen.Message, structN
 				}).Line(),
 			j.List(j.Id("resp"), j.Id("err")).Op(":=").Id("r").Dot("client").Dot(
 				fmt.Sprintf("Create%s", name),
-			).Call(j.Id("ctx"), j.Id("cr")).Line(),
+			).Call(j.Id("ctx"), j.Id("req")).Line(),
 			j.If(j.Id("err").Op("!=").Nil()).Block(
 				j.Id("response").Dot("Diagnostics").Dot("AddError").Call(
 					j.Lit(fmt.Sprintf("Error Creating %s", name)),
@@ -268,15 +309,91 @@ func (s *standardResourceHandler) create(f *j.File, m *protogen.Message, structN
 }
 
 func (s *standardResourceHandler) read(f *j.File, m *protogen.Message, structName string, l zerolog.Logger) {
-	s.requestResponseMethod(f, structName, "Read")
+	name := m.GoIdent.GoName
+
+	s.requestResponseMethod(f, structName, "Read",
+		s.crudMethodTemplate(m, "read", true, true,
+			j.Id("req").Op(":=").Op("&").Qual(
+				"gitlab.authwise.io/authwise/api-client-go/authwise/management/v1alpha1",
+				fmt.Sprintf("Get%sRequest", name),
+			).Values(
+				j.Dict{
+					j.Id("Name"): j.Id("r").Dot("toName").Call(
+						j.Id("data"),
+					),
+				},
+			).Line(),
+			j.List(j.Id("resp"), j.Id("err")).Op(":=").Id("r").Dot("client").Dot(
+				fmt.Sprintf("Get%s", name),
+			).Call(j.Id("ctx"), j.Id("req")).Line(),
+			j.If(j.Id("err").Op("!=").Nil()).Block(
+				j.Id("response").Dot("Diagnostics").Dot("AddError").Call(
+					j.Lit(fmt.Sprintf("Error Reading %s", name)),
+					j.Id("err").Dot("Error").Call(),
+				),
+				j.Return(),
+			).Line(),
+		)...,
+	)
 }
 
 func (s *standardResourceHandler) update(f *j.File, m *protogen.Message, structName string, l zerolog.Logger) {
-	s.requestResponseMethod(f, structName, "Update")
+	name := m.GoIdent.GoName
+
+	s.requestResponseMethod(f, structName, "Update",
+		s.crudMethodTemplate(m, "update", false, true,
+			j.Id("req").Op(":=").Op("&").Qual(
+				"gitlab.authwise.io/authwise/api-client-go/authwise/management/v1alpha1",
+				fmt.Sprintf("Update%sRequest", name),
+			).Values(
+				j.Dict{
+					j.Id("Name"): j.Id("r").Dot("toName").Call(
+						j.Id("data"),
+					),
+					j.Id(name): j.Id("r").Dot("toProto").Call(j.Op("&").Id("data")),
+				},
+			).Line(),
+			j.List(j.Id("resp"), j.Id("err")).Op(":=").Id("r").Dot("client").Dot(
+				fmt.Sprintf("Update%s", name),
+			).Call(j.Id("ctx"), j.Id("req")).Line(),
+			j.If(j.Id("err").Op("!=").Nil()).Block(
+				j.Id("response").Dot("Diagnostics").Dot("AddError").Call(
+					j.Lit(fmt.Sprintf("Error Updating %s", name)),
+					j.Id("err").Dot("Error").Call(),
+				),
+				j.Return(),
+			).Line(),
+		)...,
+	)
 }
 
 func (s *standardResourceHandler) delete(f *j.File, m *protogen.Message, structName string, l zerolog.Logger) {
-	s.requestResponseMethod(f, structName, "Delete")
+	name := m.GoIdent.GoName
+	s.requestResponseMethod(f, structName, "Delete",
+		s.crudMethodTemplate(m, "delete", true, false,
+			j.Id("req").Op(":=").Op("&").Qual(
+				"gitlab.authwise.io/authwise/api-client-go/authwise/management/v1alpha1",
+				fmt.Sprintf("Delete%sRequest", name),
+			).Values(
+				j.Dict{
+					j.Id("Name"): j.Id("r").Dot("toName").Call(
+						j.Id("data"),
+					),
+				},
+			).Line(),
+			j.List(j.Id("_"), j.Id("err")).Op(":=").Id("r").Dot("client").Dot(
+				fmt.Sprintf("Delete%s", name),
+			).Call(j.Id("ctx"), j.Id("req")).Line(),
+			j.If(j.Id("err").Op("!=").Nil()).Block(
+				j.Id("response").Dot("Diagnostics").Dot("AddError").Call(
+					j.Lit(fmt.Sprintf("Error Deleting %s", name)),
+					j.Id("err").Dot("Error").Call(),
+				),
+				j.Return(),
+			).Line(),
+			j.Return(),
+		)...,
+	)
 }
 
 /*

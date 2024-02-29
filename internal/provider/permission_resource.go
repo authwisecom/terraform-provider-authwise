@@ -68,8 +68,8 @@ func (r *permissionResource) Create(ctx context.Context, request resource.Create
 		return
 	}
 
-	cr := &v1alpha1.CreatePermissionRequest{Permission: r.toProto(&data)}
-	resp, err := r.client.CreatePermission(ctx, cr)
+	req := &v1alpha1.CreatePermissionRequest{Permission: r.toProto(&data)}
+	resp, err := r.client.CreatePermission(ctx, req)
 	if err != nil {
 		response.Diagnostics.AddError("Error Creating Permission", err.Error())
 		return
@@ -81,10 +81,64 @@ func (r *permissionResource) Create(ctx context.Context, request resource.Create
 }
 
 func (r *permissionResource) Read(ctx context.Context, request resource.ReadRequest, response *resource.ReadResponse) {
+	var data permissionModel
+
+	response.Diagnostics.Append(request.State.Get(ctx, &data)...)
+
+	if response.Diagnostics.HasError() {
+		return
+	}
+
+	req := &v1alpha1.GetPermissionRequest{Name: r.toName(data)}
+	resp, err := r.client.GetPermission(ctx, req)
+	if err != nil {
+		response.Diagnostics.AddError("Error Reading Permission", err.Error())
+		return
+	}
+
+	r.toModel(resp, &data)
+	tflog.Trace(ctx, "permission read")
+	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
 }
 
 func (r *permissionResource) Update(ctx context.Context, request resource.UpdateRequest, response *resource.UpdateResponse) {
+	var data permissionModel
+
+	response.Diagnostics.Append(request.Plan.Get(ctx, &data)...)
+
+	if response.Diagnostics.HasError() {
+		return
+	}
+
+	req := &v1alpha1.UpdatePermissionRequest{
+		Name:       r.toName(data),
+		Permission: r.toProto(&data),
+	}
+	resp, err := r.client.UpdatePermission(ctx, req)
+	if err != nil {
+		response.Diagnostics.AddError("Error Updating Permission", err.Error())
+		return
+	}
+
+	r.toModel(resp, &data)
+	tflog.Trace(ctx, "permission update")
+	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
 }
 
 func (r *permissionResource) Delete(ctx context.Context, request resource.DeleteRequest, response *resource.DeleteResponse) {
+	var data permissionModel
+
+	response.Diagnostics.Append(request.State.Get(ctx, &data)...)
+
+	if response.Diagnostics.HasError() {
+		return
+	}
+
+	req := &v1alpha1.DeletePermissionRequest{Name: r.toName(data)}
+	_, err := r.client.DeletePermission(ctx, req)
+	if err != nil {
+		response.Diagnostics.AddError("Error Deleting Permission", err.Error())
+		return
+	}
+	return
 }

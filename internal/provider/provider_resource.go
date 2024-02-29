@@ -73,8 +73,8 @@ func (r *providerResource) Create(ctx context.Context, request resource.CreateRe
 		return
 	}
 
-	cr := &v1alpha1.CreateProviderRequest{Provider: r.toProto(&data)}
-	resp, err := r.client.CreateProvider(ctx, cr)
+	req := &v1alpha1.CreateProviderRequest{Provider: r.toProto(&data)}
+	resp, err := r.client.CreateProvider(ctx, req)
 	if err != nil {
 		response.Diagnostics.AddError("Error Creating Provider", err.Error())
 		return
@@ -86,10 +86,64 @@ func (r *providerResource) Create(ctx context.Context, request resource.CreateRe
 }
 
 func (r *providerResource) Read(ctx context.Context, request resource.ReadRequest, response *resource.ReadResponse) {
+	var data providerModel
+
+	response.Diagnostics.Append(request.State.Get(ctx, &data)...)
+
+	if response.Diagnostics.HasError() {
+		return
+	}
+
+	req := &v1alpha1.GetProviderRequest{Name: r.toName(data)}
+	resp, err := r.client.GetProvider(ctx, req)
+	if err != nil {
+		response.Diagnostics.AddError("Error Reading Provider", err.Error())
+		return
+	}
+
+	r.toModel(resp, &data)
+	tflog.Trace(ctx, "provider read")
+	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
 }
 
 func (r *providerResource) Update(ctx context.Context, request resource.UpdateRequest, response *resource.UpdateResponse) {
+	var data providerModel
+
+	response.Diagnostics.Append(request.Plan.Get(ctx, &data)...)
+
+	if response.Diagnostics.HasError() {
+		return
+	}
+
+	req := &v1alpha1.UpdateProviderRequest{
+		Name:     r.toName(data),
+		Provider: r.toProto(&data),
+	}
+	resp, err := r.client.UpdateProvider(ctx, req)
+	if err != nil {
+		response.Diagnostics.AddError("Error Updating Provider", err.Error())
+		return
+	}
+
+	r.toModel(resp, &data)
+	tflog.Trace(ctx, "provider update")
+	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
 }
 
 func (r *providerResource) Delete(ctx context.Context, request resource.DeleteRequest, response *resource.DeleteResponse) {
+	var data providerModel
+
+	response.Diagnostics.Append(request.State.Get(ctx, &data)...)
+
+	if response.Diagnostics.HasError() {
+		return
+	}
+
+	req := &v1alpha1.DeleteProviderRequest{Name: r.toName(data)}
+	_, err := r.client.DeleteProvider(ctx, req)
+	if err != nil {
+		response.Diagnostics.AddError("Error Deleting Provider", err.Error())
+		return
+	}
+	return
 }

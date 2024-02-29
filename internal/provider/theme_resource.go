@@ -75,8 +75,8 @@ func (r *themeResource) Create(ctx context.Context, request resource.CreateReque
 		return
 	}
 
-	cr := &v1alpha1.CreateThemeRequest{Theme: r.toProto(&data)}
-	resp, err := r.client.CreateTheme(ctx, cr)
+	req := &v1alpha1.CreateThemeRequest{Theme: r.toProto(&data)}
+	resp, err := r.client.CreateTheme(ctx, req)
 	if err != nil {
 		response.Diagnostics.AddError("Error Creating Theme", err.Error())
 		return
@@ -88,10 +88,64 @@ func (r *themeResource) Create(ctx context.Context, request resource.CreateReque
 }
 
 func (r *themeResource) Read(ctx context.Context, request resource.ReadRequest, response *resource.ReadResponse) {
+	var data themeModel
+
+	response.Diagnostics.Append(request.State.Get(ctx, &data)...)
+
+	if response.Diagnostics.HasError() {
+		return
+	}
+
+	req := &v1alpha1.GetThemeRequest{Name: r.toName(data)}
+	resp, err := r.client.GetTheme(ctx, req)
+	if err != nil {
+		response.Diagnostics.AddError("Error Reading Theme", err.Error())
+		return
+	}
+
+	r.toModel(resp, &data)
+	tflog.Trace(ctx, "theme read")
+	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
 }
 
 func (r *themeResource) Update(ctx context.Context, request resource.UpdateRequest, response *resource.UpdateResponse) {
+	var data themeModel
+
+	response.Diagnostics.Append(request.Plan.Get(ctx, &data)...)
+
+	if response.Diagnostics.HasError() {
+		return
+	}
+
+	req := &v1alpha1.UpdateThemeRequest{
+		Name:  r.toName(data),
+		Theme: r.toProto(&data),
+	}
+	resp, err := r.client.UpdateTheme(ctx, req)
+	if err != nil {
+		response.Diagnostics.AddError("Error Updating Theme", err.Error())
+		return
+	}
+
+	r.toModel(resp, &data)
+	tflog.Trace(ctx, "theme update")
+	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
 }
 
 func (r *themeResource) Delete(ctx context.Context, request resource.DeleteRequest, response *resource.DeleteResponse) {
+	var data themeModel
+
+	response.Diagnostics.Append(request.State.Get(ctx, &data)...)
+
+	if response.Diagnostics.HasError() {
+		return
+	}
+
+	req := &v1alpha1.DeleteThemeRequest{Name: r.toName(data)}
+	_, err := r.client.DeleteTheme(ctx, req)
+	if err != nil {
+		response.Diagnostics.AddError("Error Deleting Theme", err.Error())
+		return
+	}
+	return
 }

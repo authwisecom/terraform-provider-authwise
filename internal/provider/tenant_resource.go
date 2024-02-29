@@ -70,8 +70,8 @@ func (r *tenantResource) Create(ctx context.Context, request resource.CreateRequ
 		return
 	}
 
-	cr := &v1alpha1.CreateTenantRequest{Tenant: r.toProto(&data)}
-	resp, err := r.client.CreateTenant(ctx, cr)
+	req := &v1alpha1.CreateTenantRequest{Tenant: r.toProto(&data)}
+	resp, err := r.client.CreateTenant(ctx, req)
 	if err != nil {
 		response.Diagnostics.AddError("Error Creating Tenant", err.Error())
 		return
@@ -83,10 +83,64 @@ func (r *tenantResource) Create(ctx context.Context, request resource.CreateRequ
 }
 
 func (r *tenantResource) Read(ctx context.Context, request resource.ReadRequest, response *resource.ReadResponse) {
+	var data tenantModel
+
+	response.Diagnostics.Append(request.State.Get(ctx, &data)...)
+
+	if response.Diagnostics.HasError() {
+		return
+	}
+
+	req := &v1alpha1.GetTenantRequest{Name: r.toName(data)}
+	resp, err := r.client.GetTenant(ctx, req)
+	if err != nil {
+		response.Diagnostics.AddError("Error Reading Tenant", err.Error())
+		return
+	}
+
+	r.toModel(resp, &data)
+	tflog.Trace(ctx, "tenant read")
+	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
 }
 
 func (r *tenantResource) Update(ctx context.Context, request resource.UpdateRequest, response *resource.UpdateResponse) {
+	var data tenantModel
+
+	response.Diagnostics.Append(request.Plan.Get(ctx, &data)...)
+
+	if response.Diagnostics.HasError() {
+		return
+	}
+
+	req := &v1alpha1.UpdateTenantRequest{
+		Name:   r.toName(data),
+		Tenant: r.toProto(&data),
+	}
+	resp, err := r.client.UpdateTenant(ctx, req)
+	if err != nil {
+		response.Diagnostics.AddError("Error Updating Tenant", err.Error())
+		return
+	}
+
+	r.toModel(resp, &data)
+	tflog.Trace(ctx, "tenant update")
+	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
 }
 
 func (r *tenantResource) Delete(ctx context.Context, request resource.DeleteRequest, response *resource.DeleteResponse) {
+	var data tenantModel
+
+	response.Diagnostics.Append(request.State.Get(ctx, &data)...)
+
+	if response.Diagnostics.HasError() {
+		return
+	}
+
+	req := &v1alpha1.DeleteTenantRequest{Name: r.toName(data)}
+	_, err := r.client.DeleteTenant(ctx, req)
+	if err != nil {
+		response.Diagnostics.AddError("Error Deleting Tenant", err.Error())
+		return
+	}
+	return
 }

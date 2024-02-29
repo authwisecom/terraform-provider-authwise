@@ -26,6 +26,9 @@ type assetModel struct {
 	MimeType types.String `tfsdk:"mime_type"`
 }
 
+func (r *assetResource) toName(data assetModel) string {
+	return fmt.Sprintf("assets/%s", data.Id.ValueString())
+}
 func (r *assetResource) toProto(m *assetModel) *v1alpha11.Asset {
 	return &v1alpha11.Asset{
 		Id:       m.Id.ValueString(),
@@ -71,8 +74,8 @@ func (r *assetResource) Create(ctx context.Context, request resource.CreateReque
 		return
 	}
 
-	cr := &v1alpha1.CreateAssetRequest{Asset: r.toProto(&data)}
-	resp, err := r.client.CreateAsset(ctx, cr)
+	req := &v1alpha1.CreateAssetRequest{Asset: r.toProto(&data)}
+	resp, err := r.client.CreateAsset(ctx, req)
 	if err != nil {
 		response.Diagnostics.AddError("Error Creating Asset", err.Error())
 		return
@@ -84,10 +87,64 @@ func (r *assetResource) Create(ctx context.Context, request resource.CreateReque
 }
 
 func (r *assetResource) Read(ctx context.Context, request resource.ReadRequest, response *resource.ReadResponse) {
+	var data assetModel
+
+	response.Diagnostics.Append(request.State.Get(ctx, &data)...)
+
+	if response.Diagnostics.HasError() {
+		return
+	}
+
+	req := &v1alpha1.GetAssetRequest{Name: r.toName(data)}
+	resp, err := r.client.GetAsset(ctx, req)
+	if err != nil {
+		response.Diagnostics.AddError("Error Reading Asset", err.Error())
+		return
+	}
+
+	r.toModel(resp, &data)
+	tflog.Trace(ctx, "asset read")
+	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
 }
 
 func (r *assetResource) Update(ctx context.Context, request resource.UpdateRequest, response *resource.UpdateResponse) {
+	var data assetModel
+
+	response.Diagnostics.Append(request.Plan.Get(ctx, &data)...)
+
+	if response.Diagnostics.HasError() {
+		return
+	}
+
+	req := &v1alpha1.UpdateAssetRequest{
+		Asset: r.toProto(&data),
+		Name:  r.toName(data),
+	}
+	resp, err := r.client.UpdateAsset(ctx, req)
+	if err != nil {
+		response.Diagnostics.AddError("Error Updating Asset", err.Error())
+		return
+	}
+
+	r.toModel(resp, &data)
+	tflog.Trace(ctx, "asset update")
+	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
 }
 
 func (r *assetResource) Delete(ctx context.Context, request resource.DeleteRequest, response *resource.DeleteResponse) {
+	var data assetModel
+
+	response.Diagnostics.Append(request.State.Get(ctx, &data)...)
+
+	if response.Diagnostics.HasError() {
+		return
+	}
+
+	req := &v1alpha1.DeleteAssetRequest{Name: r.toName(data)}
+	_, err := r.client.DeleteAsset(ctx, req)
+	if err != nil {
+		response.Diagnostics.AddError("Error Deleting Asset", err.Error())
+		return
+	}
+	return
 }
