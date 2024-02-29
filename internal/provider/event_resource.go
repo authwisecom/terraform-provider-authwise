@@ -6,6 +6,7 @@ import (
 	"fmt"
 	resource "github.com/hashicorp/terraform-plugin-framework/resource"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
+	tflog "github.com/hashicorp/terraform-plugin-log/tflog"
 	v1alpha1 "gitlab.authwise.io/authwise/api-client-go/authwise/management/v1alpha1"
 	v1alpha11 "gitlab.authwise.io/authwise/api-client-go/authwise/types/core/v1alpha1"
 )
@@ -37,6 +38,42 @@ type eventModel struct {
 	CreatedAt     types.Object `tfsdk:"created_at"`
 }
 
+func (r *eventResource) toProto(m *eventModel) *v1alpha11.Event {
+	return &v1alpha11.Event{
+		Attributes:    nil,
+		ClientId:      m.ClientId.ValueString(),
+		CreatedAt:     nil,
+		EndState:      m.EndState.ValueString(),
+		EndTime:       nil,
+		EventMessage:  m.EventMessage.ValueString(),
+		EventType:     m.EventType.ValueString(),
+		Id:            m.Id.ValueString(),
+		InteractionId: m.InteractionId.ValueString(),
+		RealmId:       m.RealmId.ValueString(),
+		RequestId:     m.RequestId.ValueString(),
+		SessionId:     m.SessionId.ValueString(),
+		StartState:    m.StartState.ValueString(),
+		StartTime:     nil,
+		TenantId:      m.TenantId.ValueString(),
+		UserId:        m.UserId.ValueString(),
+	}
+}
+
+func (r *eventResource) toModel(p *v1alpha11.Event, m *eventModel) {
+	m.Id = types.StringValue(p.Id)
+	m.TenantId = types.StringValue(p.TenantId)
+	m.RequestId = types.StringValue(p.RequestId)
+	m.ClientId = types.StringValue(p.ClientId)
+	m.RealmId = types.StringValue(p.RealmId)
+	m.UserId = types.StringValue(p.UserId)
+	m.SessionId = types.StringValue(p.SessionId)
+	m.InteractionId = types.StringValue(p.InteractionId)
+	m.EventType = types.StringValue(p.EventType)
+	m.EventMessage = types.StringValue(p.EventMessage)
+	m.StartState = types.StringValue(p.StartState)
+	m.EndState = types.StringValue(p.EndState)
+}
+
 func (r *eventResource) Configure(ctx context.Context, request resource.ConfigureRequest, response *resource.ConfigureResponse) {
 	if request.ProviderData == nil {
 		return
@@ -58,7 +95,7 @@ func (r *eventResource) Schema(ctx context.Context, request resource.SchemaReque
 }
 
 func (r *eventResource) Create(ctx context.Context, request resource.CreateRequest, response *resource.CreateResponse) {
-	var data v1alpha11.Event
+	var data eventModel
 
 	response.Diagnostics.Append(request.Plan.Get(ctx, &data)...)
 
@@ -66,7 +103,16 @@ func (r *eventResource) Create(ctx context.Context, request resource.CreateReque
 		return
 	}
 
-	cr := &v1alpha1.CreateEventRequest{}
+	cr := &v1alpha1.CreateEventRequest{Event: r.toProto(&data)}
+	resp, err := r.client.CreateEvent(ctx, cr)
+	if err != nil {
+		response.Diagnostics.AddError("Error Creating Event", err.Error())
+		return
+	}
+
+	r.toModel(resp, &data)
+	tflog.Trace(ctx, "event create")
+	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
 }
 
 func (r *eventResource) Read(ctx context.Context, request resource.ReadRequest, response *resource.ReadResponse) {

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	resource "github.com/hashicorp/terraform-plugin-framework/resource"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
+	tflog "github.com/hashicorp/terraform-plugin-log/tflog"
 	v1alpha1 "gitlab.authwise.io/authwise/api-client-go/authwise/management/v1alpha1"
 	v1alpha11 "gitlab.authwise.io/authwise/api-client-go/authwise/types/core/v1alpha1"
 )
@@ -23,6 +24,22 @@ type scopeModel struct {
 	AudienceId types.String `tfsdk:"audience_id"`
 	Kind       types.String `tfsdk:"kind"`
 	Auto       types.Bool   `tfsdk:"auto"`
+}
+
+func (r *scopeResource) toProto(m *scopeModel) *v1alpha11.Scope {
+	return &v1alpha11.Scope{
+		AudienceId: m.AudienceId.ValueString(),
+		Auto:       m.Auto.ValueBool(),
+		Id:         m.Id.ValueString(),
+		Kind:       m.Kind.ValueString(),
+	}
+}
+
+func (r *scopeResource) toModel(p *v1alpha11.Scope, m *scopeModel) {
+	m.Id = types.StringValue(p.Id)
+	m.AudienceId = types.StringValue(p.AudienceId)
+	m.Kind = types.StringValue(p.Kind)
+	m.Auto = types.BoolValue(p.Auto)
 }
 
 func (r *scopeResource) Configure(ctx context.Context, request resource.ConfigureRequest, response *resource.ConfigureResponse) {
@@ -46,7 +63,7 @@ func (r *scopeResource) Schema(ctx context.Context, request resource.SchemaReque
 }
 
 func (r *scopeResource) Create(ctx context.Context, request resource.CreateRequest, response *resource.CreateResponse) {
-	var data v1alpha11.Scope
+	var data scopeModel
 
 	response.Diagnostics.Append(request.Plan.Get(ctx, &data)...)
 
@@ -54,7 +71,16 @@ func (r *scopeResource) Create(ctx context.Context, request resource.CreateReque
 		return
 	}
 
-	cr := &v1alpha1.CreateScopeRequest{}
+	cr := &v1alpha1.CreateScopeRequest{Scope: r.toProto(&data)}
+	resp, err := r.client.CreateScope(ctx, cr)
+	if err != nil {
+		response.Diagnostics.AddError("Error Creating Scope", err.Error())
+		return
+	}
+
+	r.toModel(resp, &data)
+	tflog.Trace(ctx, "scope create")
+	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
 }
 
 func (r *scopeResource) Read(ctx context.Context, request resource.ReadRequest, response *resource.ReadResponse) {

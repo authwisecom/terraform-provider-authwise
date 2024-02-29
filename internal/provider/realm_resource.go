@@ -6,6 +6,7 @@ import (
 	"fmt"
 	resource "github.com/hashicorp/terraform-plugin-framework/resource"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
+	tflog "github.com/hashicorp/terraform-plugin-log/tflog"
 	v1alpha1 "gitlab.authwise.io/authwise/api-client-go/authwise/management/v1alpha1"
 	v1alpha11 "gitlab.authwise.io/authwise/api-client-go/authwise/types/core/v1alpha1"
 )
@@ -24,6 +25,24 @@ type realmModel struct {
 	UserDatabaseType types.String `tfsdk:"user_database_type"`
 	Name             types.String `tfsdk:"name"`
 	Description      types.String `tfsdk:"description"`
+}
+
+func (r *realmResource) toProto(m *realmModel) *v1alpha11.Realm {
+	return &v1alpha11.Realm{
+		Description:      m.Description.ValueString(),
+		Id:               m.Id.ValueString(),
+		Name:             m.Name.ValueString(),
+		TenantId:         m.TenantId.ValueString(),
+		UserDatabaseType: m.UserDatabaseType.ValueString(),
+	}
+}
+
+func (r *realmResource) toModel(p *v1alpha11.Realm, m *realmModel) {
+	m.Id = types.StringValue(p.Id)
+	m.TenantId = types.StringValue(p.TenantId)
+	m.UserDatabaseType = types.StringValue(p.UserDatabaseType)
+	m.Name = types.StringValue(p.Name)
+	m.Description = types.StringValue(p.Description)
 }
 
 func (r *realmResource) Configure(ctx context.Context, request resource.ConfigureRequest, response *resource.ConfigureResponse) {
@@ -47,7 +66,7 @@ func (r *realmResource) Schema(ctx context.Context, request resource.SchemaReque
 }
 
 func (r *realmResource) Create(ctx context.Context, request resource.CreateRequest, response *resource.CreateResponse) {
-	var data v1alpha11.Realm
+	var data realmModel
 
 	response.Diagnostics.Append(request.Plan.Get(ctx, &data)...)
 
@@ -55,7 +74,16 @@ func (r *realmResource) Create(ctx context.Context, request resource.CreateReque
 		return
 	}
 
-	cr := &v1alpha1.CreateRealmRequest{}
+	cr := &v1alpha1.CreateRealmRequest{Realm: r.toProto(&data)}
+	resp, err := r.client.CreateRealm(ctx, cr)
+	if err != nil {
+		response.Diagnostics.AddError("Error Creating Realm", err.Error())
+		return
+	}
+
+	r.toModel(resp, &data)
+	tflog.Trace(ctx, "realm create")
+	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
 }
 
 func (r *realmResource) Read(ctx context.Context, request resource.ReadRequest, response *resource.ReadResponse) {

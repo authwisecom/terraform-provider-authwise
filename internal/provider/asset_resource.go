@@ -6,6 +6,7 @@ import (
 	"fmt"
 	resource "github.com/hashicorp/terraform-plugin-framework/resource"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
+	tflog "github.com/hashicorp/terraform-plugin-log/tflog"
 	v1alpha1 "gitlab.authwise.io/authwise/api-client-go/authwise/management/v1alpha1"
 	v1alpha11 "gitlab.authwise.io/authwise/api-client-go/authwise/types/core/v1alpha1"
 )
@@ -23,6 +24,22 @@ type assetModel struct {
 	TenantId types.String `tfsdk:"tenant_id"`
 	Name     types.String `tfsdk:"name"`
 	MimeType types.String `tfsdk:"mime_type"`
+}
+
+func (r *assetResource) toProto(m *assetModel) *v1alpha11.Asset {
+	return &v1alpha11.Asset{
+		Id:       m.Id.ValueString(),
+		MimeType: m.MimeType.ValueString(),
+		Name:     m.Name.ValueString(),
+		TenantId: m.TenantId.ValueString(),
+	}
+}
+
+func (r *assetResource) toModel(p *v1alpha11.Asset, m *assetModel) {
+	m.Id = types.StringValue(p.Id)
+	m.TenantId = types.StringValue(p.TenantId)
+	m.Name = types.StringValue(p.Name)
+	m.MimeType = types.StringValue(p.MimeType)
 }
 
 func (r *assetResource) Configure(ctx context.Context, request resource.ConfigureRequest, response *resource.ConfigureResponse) {
@@ -46,7 +63,7 @@ func (r *assetResource) Schema(ctx context.Context, request resource.SchemaReque
 }
 
 func (r *assetResource) Create(ctx context.Context, request resource.CreateRequest, response *resource.CreateResponse) {
-	var data v1alpha11.Asset
+	var data assetModel
 
 	response.Diagnostics.Append(request.Plan.Get(ctx, &data)...)
 
@@ -54,7 +71,16 @@ func (r *assetResource) Create(ctx context.Context, request resource.CreateReque
 		return
 	}
 
-	cr := &v1alpha1.CreateAssetRequest{}
+	cr := &v1alpha1.CreateAssetRequest{Asset: r.toProto(&data)}
+	resp, err := r.client.CreateAsset(ctx, cr)
+	if err != nil {
+		response.Diagnostics.AddError("Error Creating Asset", err.Error())
+		return
+	}
+
+	r.toModel(resp, &data)
+	tflog.Trace(ctx, "asset create")
+	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
 }
 
 func (r *assetResource) Read(ctx context.Context, request resource.ReadRequest, response *resource.ReadResponse) {

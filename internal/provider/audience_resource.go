@@ -6,6 +6,7 @@ import (
 	"fmt"
 	resource "github.com/hashicorp/terraform-plugin-framework/resource"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
+	tflog "github.com/hashicorp/terraform-plugin-log/tflog"
 	v1alpha1 "gitlab.authwise.io/authwise/api-client-go/authwise/management/v1alpha1"
 	v1alpha11 "gitlab.authwise.io/authwise/api-client-go/authwise/types/core/v1alpha1"
 )
@@ -25,6 +26,25 @@ type audienceModel struct {
 	AppearanceProfileId types.String `tfsdk:"appearance_profile_id"`
 	Description         types.String `tfsdk:"description"`
 	Config              types.Object `tfsdk:"config"`
+}
+
+func (r *audienceResource) toProto(m *audienceModel) *v1alpha11.Audience {
+	return &v1alpha11.Audience{
+		AppearanceProfileId: m.AppearanceProfileId.ValueString(),
+		Config:              nil,
+		Description:         m.Description.ValueString(),
+		Id:                  m.Id.ValueString(),
+		Name:                m.Name.ValueString(),
+		TenantId:            m.TenantId.ValueString(),
+	}
+}
+
+func (r *audienceResource) toModel(p *v1alpha11.Audience, m *audienceModel) {
+	m.Id = types.StringValue(p.Id)
+	m.TenantId = types.StringValue(p.TenantId)
+	m.Name = types.StringValue(p.Name)
+	m.AppearanceProfileId = types.StringValue(p.AppearanceProfileId)
+	m.Description = types.StringValue(p.Description)
 }
 
 func (r *audienceResource) Configure(ctx context.Context, request resource.ConfigureRequest, response *resource.ConfigureResponse) {
@@ -48,7 +68,7 @@ func (r *audienceResource) Schema(ctx context.Context, request resource.SchemaRe
 }
 
 func (r *audienceResource) Create(ctx context.Context, request resource.CreateRequest, response *resource.CreateResponse) {
-	var data v1alpha11.Audience
+	var data audienceModel
 
 	response.Diagnostics.Append(request.Plan.Get(ctx, &data)...)
 
@@ -56,7 +76,16 @@ func (r *audienceResource) Create(ctx context.Context, request resource.CreateRe
 		return
 	}
 
-	cr := &v1alpha1.CreateAudienceRequest{}
+	cr := &v1alpha1.CreateAudienceRequest{Audience: r.toProto(&data)}
+	resp, err := r.client.CreateAudience(ctx, cr)
+	if err != nil {
+		response.Diagnostics.AddError("Error Creating Audience", err.Error())
+		return
+	}
+
+	r.toModel(resp, &data)
+	tflog.Trace(ctx, "audience create")
+	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
 }
 
 func (r *audienceResource) Read(ctx context.Context, request resource.ReadRequest, response *resource.ReadResponse) {

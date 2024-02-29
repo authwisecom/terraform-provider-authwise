@@ -6,6 +6,7 @@ import (
 	"fmt"
 	resource "github.com/hashicorp/terraform-plugin-framework/resource"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
+	tflog "github.com/hashicorp/terraform-plugin-log/tflog"
 	v1alpha1 "gitlab.authwise.io/authwise/api-client-go/authwise/management/v1alpha1"
 	v1alpha11 "gitlab.authwise.io/authwise/api-client-go/authwise/types/core/v1alpha1"
 )
@@ -31,6 +32,32 @@ type clientModel struct {
 	Metadata            types.Object `tfsdk:"metadata"`
 }
 
+func (r *clientResource) toProto(m *clientModel) *v1alpha11.Client {
+	return &v1alpha11.Client{
+		Alias:               m.Alias.ValueString(),
+		AppearanceProfileId: m.AppearanceProfileId.ValueString(),
+		AudienceId:          m.AudienceId.ValueString(),
+		Config:              nil,
+		GrantType:           m.GrantType.ValueString(),
+		Id:                  m.Id.ValueString(),
+		LoginUrl:            m.LoginUrl.ValueString(),
+		LogoId:              m.LogoId.ValueString(),
+		Metadata:            nil,
+		Name:                m.Name.ValueString(),
+	}
+}
+
+func (r *clientResource) toModel(p *v1alpha11.Client, m *clientModel) {
+	m.Id = types.StringValue(p.Id)
+	m.AudienceId = types.StringValue(p.AudienceId)
+	m.AppearanceProfileId = types.StringValue(p.AppearanceProfileId)
+	m.Name = types.StringValue(p.Name)
+	m.Alias = types.StringValue(p.Alias)
+	m.GrantType = types.StringValue(p.GrantType)
+	m.LoginUrl = types.StringValue(p.LoginUrl)
+	m.LogoId = types.StringValue(p.LogoId)
+}
+
 func (r *clientResource) Configure(ctx context.Context, request resource.ConfigureRequest, response *resource.ConfigureResponse) {
 	if request.ProviderData == nil {
 		return
@@ -52,7 +79,7 @@ func (r *clientResource) Schema(ctx context.Context, request resource.SchemaRequ
 }
 
 func (r *clientResource) Create(ctx context.Context, request resource.CreateRequest, response *resource.CreateResponse) {
-	var data v1alpha11.Client
+	var data clientModel
 
 	response.Diagnostics.Append(request.Plan.Get(ctx, &data)...)
 
@@ -60,7 +87,16 @@ func (r *clientResource) Create(ctx context.Context, request resource.CreateRequ
 		return
 	}
 
-	cr := &v1alpha1.CreateClientRequest{}
+	cr := &v1alpha1.CreateClientRequest{Client: r.toProto(&data)}
+	resp, err := r.client.CreateClient(ctx, cr)
+	if err != nil {
+		response.Diagnostics.AddError("Error Creating Client", err.Error())
+		return
+	}
+
+	r.toModel(resp, &data)
+	tflog.Trace(ctx, "client create")
+	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
 }
 
 func (r *clientResource) Read(ctx context.Context, request resource.ReadRequest, response *resource.ReadResponse) {

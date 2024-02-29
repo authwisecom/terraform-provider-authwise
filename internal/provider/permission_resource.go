@@ -6,6 +6,7 @@ import (
 	"fmt"
 	resource "github.com/hashicorp/terraform-plugin-framework/resource"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
+	tflog "github.com/hashicorp/terraform-plugin-log/tflog"
 	v1alpha1 "gitlab.authwise.io/authwise/api-client-go/authwise/management/v1alpha1"
 	v1alpha11 "gitlab.authwise.io/authwise/api-client-go/authwise/types/core/v1alpha1"
 )
@@ -22,6 +23,20 @@ type permissionModel struct {
 	Id         types.String `tfsdk:"id"`
 	AudienceId types.String `tfsdk:"audience_id"`
 	Name       types.String `tfsdk:"name"`
+}
+
+func (r *permissionResource) toProto(m *permissionModel) *v1alpha11.Permission {
+	return &v1alpha11.Permission{
+		AudienceId: m.AudienceId.ValueString(),
+		Id:         m.Id.ValueString(),
+		Name:       m.Name.ValueString(),
+	}
+}
+
+func (r *permissionResource) toModel(p *v1alpha11.Permission, m *permissionModel) {
+	m.Id = types.StringValue(p.Id)
+	m.AudienceId = types.StringValue(p.AudienceId)
+	m.Name = types.StringValue(p.Name)
 }
 
 func (r *permissionResource) Configure(ctx context.Context, request resource.ConfigureRequest, response *resource.ConfigureResponse) {
@@ -45,7 +60,7 @@ func (r *permissionResource) Schema(ctx context.Context, request resource.Schema
 }
 
 func (r *permissionResource) Create(ctx context.Context, request resource.CreateRequest, response *resource.CreateResponse) {
-	var data v1alpha11.Permission
+	var data permissionModel
 
 	response.Diagnostics.Append(request.Plan.Get(ctx, &data)...)
 
@@ -53,7 +68,16 @@ func (r *permissionResource) Create(ctx context.Context, request resource.Create
 		return
 	}
 
-	cr := &v1alpha1.CreatePermissionRequest{}
+	cr := &v1alpha1.CreatePermissionRequest{Permission: r.toProto(&data)}
+	resp, err := r.client.CreatePermission(ctx, cr)
+	if err != nil {
+		response.Diagnostics.AddError("Error Creating Permission", err.Error())
+		return
+	}
+
+	r.toModel(resp, &data)
+	tflog.Trace(ctx, "permission create")
+	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
 }
 
 func (r *permissionResource) Read(ctx context.Context, request resource.ReadRequest, response *resource.ReadResponse) {

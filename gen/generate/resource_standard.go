@@ -8,6 +8,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"google.golang.org/protobuf/compiler/protogen"
 	"google.golang.org/protobuf/reflect/protoreflect"
+	"strings"
 )
 
 type standardResourceHandler struct {
@@ -56,7 +57,9 @@ func (s *standardResourceHandler) resource(f *j.File, m *protogen.Message, l zer
 	).Line()
 
 	s.model(f, m, l)
-	s.configure(f, m, structName)
+	s.toProto(f, m, structName, l)
+	s.toModel(f, m, structName, l)
+	s.configure(f, m, structName, l)
 	s.metadata(f, m, structName, l)
 	s.schema(f, m, structName, l)
 	s.create(f, m, structName, l)
@@ -98,6 +101,37 @@ func (s *standardResourceHandler) modelFields(fields []*protogen.Field) []j.Code
 	return result
 }
 
+func (s *standardResourceHandler) crudMethodTemplate(m *protogen.Message, operation string, appendState bool, body ...j.Code) []j.Code {
+	name := m.GoIdent.GoName
+	//standard crud method start
+	result := []j.Code{
+		j.Var().Id("data").Qual("", s.modelName(m)).Line(),
+		j.Id("response").Dot("Diagnostics").Dot("Append").Call(
+			j.Id("request").Dot("Plan").Dot("Get").Call(j.Id("ctx"), j.Op("&").Id("data")).Op("..."),
+		).Line(),
+		j.If(j.Id("response").Dot("Diagnostics").Dot("HasError").Call().Block(
+			j.Return(),
+		).Line()),
+		j.Add(body...),
+	}
+
+	//append state to tf
+	if appendState {
+		result = append(result, j.Add(
+			j.Id("r").Dot("toModel").Call(j.Id("resp"), j.Op("&").Id("data")).Line(),
+			j.Qual("github.com/hashicorp/terraform-plugin-log/tflog", "Trace").Call(
+				j.Id("ctx"),
+				j.Lit(fmt.Sprintf("%s %s", strings.ToLower(name), operation)),
+			).Line(),
+			j.Id("response").Dot("Diagnostics").Dot("Append").Call(
+				j.Id("response").Dot("State").Dot("Set").Call(j.Id("ctx"), j.Op("&").Id("data")).Op("..."),
+			),
+		))
+	}
+
+	return result
+}
+
 func (s *standardResourceHandler) requestResponseMethod(f *j.File,
 	structName, functionName string,
 	statements ...j.Code) {
@@ -109,14 +143,68 @@ func (s *standardResourceHandler) requestResponseMethod(f *j.File,
 	).Block(statements...).Line()
 }
 
-func (s *standardResourceHandler) toProto(f *j.File, m *protogen.Message, structName string) {
+// TODO - handle objects
+func (s *standardResourceHandler) toProto(f *j.File, m *protogen.Message, structName string, l zerolog.Logger) {
 	name := m.GoIdent.GoName
+	dict := j.DictFunc(func(d j.Dict) {
+		for _, fi := range m.Fields {
+			valueFunc := "nil"
+			switch fi.Desc.Kind() {
+			case protoreflect.StringKind:
+				valueFunc = "ValueString"
+			case protoreflect.BoolKind:
+				valueFunc = "ValueBool"
+			default:
+				valueFunc = "nil"
+			}
+			if valueFunc == "nil" {
+				d[j.Id(fi.GoName)] = j.Nil()
+			} else {
+				d[j.Id(fi.GoName)] = j.Id("m").Dot(fi.GoName).Dot(valueFunc).Call()
+			}
+		}
+	})
+
 	f.Func().Params(j.Id("r").Op("*").Id(structName)).Id("toProto").Params(
-		j.Id("m").Op("*").Qual("gitlab.authwise.io/authwise/api-client-go/authwise/types/core/v1alpha1", name),
-	).Qual("", "").Block()
+		j.Id("m").Op("*").Qual("", s.modelName(m)),
+	).Op("*").Qual("gitlab.authwise.io/authwise/api-client-go/authwise/types/core/v1alpha1", name).Block(
+		j.Return(
+			j.Op("&").Qual("gitlab.authwise.io/authwise/api-client-go/authwise/types/core/v1alpha1", name).Values(
+				dict,
+			),
+		),
+	).Line()
 }
 
-func (s *standardResourceHandler) configure(f *j.File, m *protogen.Message, structName string) {
+// TODO - handle objects
+func (s *standardResourceHandler) toModel(f *j.File, m *protogen.Message, structName string, l zerolog.Logger) {
+	name := m.GoIdent.GoName
+
+	f.Func().Params(j.Id("r").Op("*").Id(structName)).Id("toModel").Params(
+		j.Id("p").Op("*").Qual("gitlab.authwise.io/authwise/api-client-go/authwise/types/core/v1alpha1", name),
+		j.Id("m").Op("*").Id(s.modelName(m)),
+	).BlockFunc(func(group *j.Group) {
+		for _, fi := range m.Fields {
+			path := "github.com/hashicorp/terraform-plugin-framework/types"
+			typesFunc := "nil"
+
+			switch fi.Desc.Kind() {
+			case protoreflect.StringKind:
+				typesFunc = "StringValue"
+			case protoreflect.BoolKind:
+				typesFunc = "BoolValue"
+			default:
+				typesFunc = "nil"
+			}
+
+			if typesFunc != "nil" {
+				group.Id("m").Dot(fi.GoName).Op("=").Qual(path, typesFunc).Call(j.Id("p").Dot(fi.GoName))
+			}
+		}
+	}).Line()
+}
+
+func (s *standardResourceHandler) configure(f *j.File, m *protogen.Message, structName string, l zerolog.Logger) {
 	s.requestResponseMethod(f, structName, "Configure",
 		j.If(
 			j.Id("request").Dot("ProviderData").Op("==").Nil().Block(
@@ -157,11 +245,24 @@ func (s *standardResourceHandler) create(f *j.File, m *protogen.Message, structN
 	name := m.GoIdent.GoName
 
 	s.requestResponseMethod(f, structName, "Create",
-		CrudMethodTemplate(name, true,
+		s.crudMethodTemplate(m, "create", true,
 			j.Id("cr").Op(":=").Op("&").Qual(
 				"gitlab.authwise.io/authwise/api-client-go/authwise/management/v1alpha1",
 				fmt.Sprintf("Create%sRequest", name),
-			).Values(),
+			).Values(
+				j.Dict{
+					j.Id(name): j.Id("r").Dot("toProto").Call(j.Op("&").Id("data")),
+				}).Line(),
+			j.List(j.Id("resp"), j.Id("err")).Op(":=").Id("r").Dot("client").Dot(
+				fmt.Sprintf("Create%s", name),
+			).Call(j.Id("ctx"), j.Id("cr")).Line(),
+			j.If(j.Id("err").Op("!=").Nil()).Block(
+				j.Id("response").Dot("Diagnostics").Dot("AddError").Call(
+					j.Lit(fmt.Sprintf("Error Creating %s", name)),
+					j.Id("err").Dot("Error").Call(),
+				),
+				j.Return(),
+			).Line(),
 		)...,
 	)
 }

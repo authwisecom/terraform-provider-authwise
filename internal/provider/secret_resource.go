@@ -6,6 +6,7 @@ import (
 	"fmt"
 	resource "github.com/hashicorp/terraform-plugin-framework/resource"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
+	tflog "github.com/hashicorp/terraform-plugin-log/tflog"
 	v1alpha1 "gitlab.authwise.io/authwise/api-client-go/authwise/management/v1alpha1"
 	v1alpha11 "gitlab.authwise.io/authwise/api-client-go/authwise/types/core/v1alpha1"
 )
@@ -24,6 +25,23 @@ type secretModel struct {
 	Name     types.String `tfsdk:"name"`
 	Encoding types.Object `tfsdk:"encoding"`
 	Value    types.String `tfsdk:"value"`
+}
+
+func (r *secretResource) toProto(m *secretModel) *v1alpha11.Secret {
+	return &v1alpha11.Secret{
+		Encoding: nil,
+		Id:       m.Id.ValueString(),
+		Name:     m.Name.ValueString(),
+		TenantId: m.TenantId.ValueString(),
+		Value:    m.Value.ValueString(),
+	}
+}
+
+func (r *secretResource) toModel(p *v1alpha11.Secret, m *secretModel) {
+	m.Id = types.StringValue(p.Id)
+	m.TenantId = types.StringValue(p.TenantId)
+	m.Name = types.StringValue(p.Name)
+	m.Value = types.StringValue(p.Value)
 }
 
 func (r *secretResource) Configure(ctx context.Context, request resource.ConfigureRequest, response *resource.ConfigureResponse) {
@@ -47,7 +65,7 @@ func (r *secretResource) Schema(ctx context.Context, request resource.SchemaRequ
 }
 
 func (r *secretResource) Create(ctx context.Context, request resource.CreateRequest, response *resource.CreateResponse) {
-	var data v1alpha11.Secret
+	var data secretModel
 
 	response.Diagnostics.Append(request.Plan.Get(ctx, &data)...)
 
@@ -55,7 +73,16 @@ func (r *secretResource) Create(ctx context.Context, request resource.CreateRequ
 		return
 	}
 
-	cr := &v1alpha1.CreateSecretRequest{}
+	cr := &v1alpha1.CreateSecretRequest{Secret: r.toProto(&data)}
+	resp, err := r.client.CreateSecret(ctx, cr)
+	if err != nil {
+		response.Diagnostics.AddError("Error Creating Secret", err.Error())
+		return
+	}
+
+	r.toModel(resp, &data)
+	tflog.Trace(ctx, "secret create")
+	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
 }
 
 func (r *secretResource) Read(ctx context.Context, request resource.ReadRequest, response *resource.ReadResponse) {

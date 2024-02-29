@@ -6,6 +6,7 @@ import (
 	"fmt"
 	resource "github.com/hashicorp/terraform-plugin-framework/resource"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
+	tflog "github.com/hashicorp/terraform-plugin-log/tflog"
 	v1alpha1 "gitlab.authwise.io/authwise/api-client-go/authwise/management/v1alpha1"
 	v1alpha11 "gitlab.authwise.io/authwise/api-client-go/authwise/types/core/v1alpha1"
 )
@@ -24,6 +25,23 @@ type providerModel struct {
 	Name         types.String `tfsdk:"name"`
 	ProviderType types.String `tfsdk:"provider_type"`
 	Config       types.Object `tfsdk:"config"`
+}
+
+func (r *providerResource) toProto(m *providerModel) *v1alpha11.Provider {
+	return &v1alpha11.Provider{
+		Config:       nil,
+		Id:           m.Id.ValueString(),
+		Name:         m.Name.ValueString(),
+		ProviderType: m.ProviderType.ValueString(),
+		RealmId:      m.RealmId.ValueString(),
+	}
+}
+
+func (r *providerResource) toModel(p *v1alpha11.Provider, m *providerModel) {
+	m.Id = types.StringValue(p.Id)
+	m.RealmId = types.StringValue(p.RealmId)
+	m.Name = types.StringValue(p.Name)
+	m.ProviderType = types.StringValue(p.ProviderType)
 }
 
 func (r *providerResource) Configure(ctx context.Context, request resource.ConfigureRequest, response *resource.ConfigureResponse) {
@@ -47,7 +65,7 @@ func (r *providerResource) Schema(ctx context.Context, request resource.SchemaRe
 }
 
 func (r *providerResource) Create(ctx context.Context, request resource.CreateRequest, response *resource.CreateResponse) {
-	var data v1alpha11.Provider
+	var data providerModel
 
 	response.Diagnostics.Append(request.Plan.Get(ctx, &data)...)
 
@@ -55,7 +73,16 @@ func (r *providerResource) Create(ctx context.Context, request resource.CreateRe
 		return
 	}
 
-	cr := &v1alpha1.CreateProviderRequest{}
+	cr := &v1alpha1.CreateProviderRequest{Provider: r.toProto(&data)}
+	resp, err := r.client.CreateProvider(ctx, cr)
+	if err != nil {
+		response.Diagnostics.AddError("Error Creating Provider", err.Error())
+		return
+	}
+
+	r.toModel(resp, &data)
+	tflog.Trace(ctx, "provider create")
+	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
 }
 
 func (r *providerResource) Read(ctx context.Context, request resource.ReadRequest, response *resource.ReadResponse) {

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	resource "github.com/hashicorp/terraform-plugin-framework/resource"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
+	tflog "github.com/hashicorp/terraform-plugin-log/tflog"
 	v1alpha1 "gitlab.authwise.io/authwise/api-client-go/authwise/management/v1alpha1"
 	v1alpha11 "gitlab.authwise.io/authwise/api-client-go/authwise/types/core/v1alpha1"
 )
@@ -23,6 +24,21 @@ type tenantModel struct {
 	Name                types.String `tfsdk:"name"`
 	AppearanceProfileId types.String `tfsdk:"appearance_profile_id"`
 	Config              types.Object `tfsdk:"config"`
+}
+
+func (r *tenantResource) toProto(m *tenantModel) *v1alpha11.Tenant {
+	return &v1alpha11.Tenant{
+		AppearanceProfileId: m.AppearanceProfileId.ValueString(),
+		Config:              nil,
+		Id:                  m.Id.ValueString(),
+		Name:                m.Name.ValueString(),
+	}
+}
+
+func (r *tenantResource) toModel(p *v1alpha11.Tenant, m *tenantModel) {
+	m.Id = types.StringValue(p.Id)
+	m.Name = types.StringValue(p.Name)
+	m.AppearanceProfileId = types.StringValue(p.AppearanceProfileId)
 }
 
 func (r *tenantResource) Configure(ctx context.Context, request resource.ConfigureRequest, response *resource.ConfigureResponse) {
@@ -46,7 +62,7 @@ func (r *tenantResource) Schema(ctx context.Context, request resource.SchemaRequ
 }
 
 func (r *tenantResource) Create(ctx context.Context, request resource.CreateRequest, response *resource.CreateResponse) {
-	var data v1alpha11.Tenant
+	var data tenantModel
 
 	response.Diagnostics.Append(request.Plan.Get(ctx, &data)...)
 
@@ -54,7 +70,16 @@ func (r *tenantResource) Create(ctx context.Context, request resource.CreateRequ
 		return
 	}
 
-	cr := &v1alpha1.CreateTenantRequest{}
+	cr := &v1alpha1.CreateTenantRequest{Tenant: r.toProto(&data)}
+	resp, err := r.client.CreateTenant(ctx, cr)
+	if err != nil {
+		response.Diagnostics.AddError("Error Creating Tenant", err.Error())
+		return
+	}
+
+	r.toModel(resp, &data)
+	tflog.Trace(ctx, "tenant create")
+	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
 }
 
 func (r *tenantResource) Read(ctx context.Context, request resource.ReadRequest, response *resource.ReadResponse) {

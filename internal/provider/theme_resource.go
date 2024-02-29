@@ -6,6 +6,7 @@ import (
 	"fmt"
 	resource "github.com/hashicorp/terraform-plugin-framework/resource"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
+	tflog "github.com/hashicorp/terraform-plugin-log/tflog"
 	v1alpha1 "gitlab.authwise.io/authwise/api-client-go/authwise/management/v1alpha1"
 	v1alpha11 "gitlab.authwise.io/authwise/api-client-go/authwise/types/core/v1alpha1"
 )
@@ -25,6 +26,24 @@ type themeModel struct {
 	Stylesheet           types.String `tfsdk:"stylesheet"`
 	StylesheetAttributes types.Object `tfsdk:"stylesheet_attributes"`
 	Content              types.Object `tfsdk:"content"`
+}
+
+func (r *themeResource) toProto(m *themeModel) *v1alpha11.Theme {
+	return &v1alpha11.Theme{
+		Content:              nil,
+		Id:                   m.Id.ValueString(),
+		Name:                 m.Name.ValueString(),
+		Stylesheet:           m.Stylesheet.ValueString(),
+		StylesheetAttributes: nil,
+		TenantId:             m.TenantId.ValueString(),
+	}
+}
+
+func (r *themeResource) toModel(p *v1alpha11.Theme, m *themeModel) {
+	m.Id = types.StringValue(p.Id)
+	m.TenantId = types.StringValue(p.TenantId)
+	m.Name = types.StringValue(p.Name)
+	m.Stylesheet = types.StringValue(p.Stylesheet)
 }
 
 func (r *themeResource) Configure(ctx context.Context, request resource.ConfigureRequest, response *resource.ConfigureResponse) {
@@ -48,7 +67,7 @@ func (r *themeResource) Schema(ctx context.Context, request resource.SchemaReque
 }
 
 func (r *themeResource) Create(ctx context.Context, request resource.CreateRequest, response *resource.CreateResponse) {
-	var data v1alpha11.Theme
+	var data themeModel
 
 	response.Diagnostics.Append(request.Plan.Get(ctx, &data)...)
 
@@ -56,7 +75,16 @@ func (r *themeResource) Create(ctx context.Context, request resource.CreateReque
 		return
 	}
 
-	cr := &v1alpha1.CreateThemeRequest{}
+	cr := &v1alpha1.CreateThemeRequest{Theme: r.toProto(&data)}
+	resp, err := r.client.CreateTheme(ctx, cr)
+	if err != nil {
+		response.Diagnostics.AddError("Error Creating Theme", err.Error())
+		return
+	}
+
+	r.toModel(resp, &data)
+	tflog.Trace(ctx, "theme create")
+	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
 }
 
 func (r *themeResource) Read(ctx context.Context, request resource.ReadRequest, response *resource.ReadResponse) {

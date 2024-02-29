@@ -6,6 +6,7 @@ import (
 	"fmt"
 	resource "github.com/hashicorp/terraform-plugin-framework/resource"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
+	tflog "github.com/hashicorp/terraform-plugin-log/tflog"
 	v1alpha1 "gitlab.authwise.io/authwise/api-client-go/authwise/management/v1alpha1"
 	v1alpha11 "gitlab.authwise.io/authwise/api-client-go/authwise/types/core/v1alpha1"
 )
@@ -25,6 +26,24 @@ type appearanceProfileModel struct {
 	ThemeId              types.String `tfsdk:"theme_id"`
 	StylesheetAttributes types.Object `tfsdk:"stylesheet_attributes"`
 	Content              types.Object `tfsdk:"content"`
+}
+
+func (r *appearanceProfileResource) toProto(m *appearanceProfileModel) *v1alpha11.AppearanceProfile {
+	return &v1alpha11.AppearanceProfile{
+		Content:              nil,
+		Id:                   m.Id.ValueString(),
+		Name:                 m.Name.ValueString(),
+		StylesheetAttributes: nil,
+		TenantId:             m.TenantId.ValueString(),
+		ThemeId:              m.ThemeId.ValueString(),
+	}
+}
+
+func (r *appearanceProfileResource) toModel(p *v1alpha11.AppearanceProfile, m *appearanceProfileModel) {
+	m.Id = types.StringValue(p.Id)
+	m.Name = types.StringValue(p.Name)
+	m.TenantId = types.StringValue(p.TenantId)
+	m.ThemeId = types.StringValue(p.ThemeId)
 }
 
 func (r *appearanceProfileResource) Configure(ctx context.Context, request resource.ConfigureRequest, response *resource.ConfigureResponse) {
@@ -48,7 +67,7 @@ func (r *appearanceProfileResource) Schema(ctx context.Context, request resource
 }
 
 func (r *appearanceProfileResource) Create(ctx context.Context, request resource.CreateRequest, response *resource.CreateResponse) {
-	var data v1alpha11.AppearanceProfile
+	var data appearanceProfileModel
 
 	response.Diagnostics.Append(request.Plan.Get(ctx, &data)...)
 
@@ -56,7 +75,16 @@ func (r *appearanceProfileResource) Create(ctx context.Context, request resource
 		return
 	}
 
-	cr := &v1alpha1.CreateAppearanceProfileRequest{}
+	cr := &v1alpha1.CreateAppearanceProfileRequest{AppearanceProfile: r.toProto(&data)}
+	resp, err := r.client.CreateAppearanceProfile(ctx, cr)
+	if err != nil {
+		response.Diagnostics.AddError("Error Creating AppearanceProfile", err.Error())
+		return
+	}
+
+	r.toModel(resp, &data)
+	tflog.Trace(ctx, "appearanceprofile create")
+	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
 }
 
 func (r *appearanceProfileResource) Read(ctx context.Context, request resource.ReadRequest, response *resource.ReadResponse) {

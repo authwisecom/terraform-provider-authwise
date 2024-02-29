@@ -6,6 +6,7 @@ import (
 	"fmt"
 	resource "github.com/hashicorp/terraform-plugin-framework/resource"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
+	tflog "github.com/hashicorp/terraform-plugin-log/tflog"
 	v1alpha1 "gitlab.authwise.io/authwise/api-client-go/authwise/management/v1alpha1"
 	v1alpha11 "gitlab.authwise.io/authwise/api-client-go/authwise/types/core/v1alpha1"
 )
@@ -22,6 +23,19 @@ type tenantUrlModel struct {
 	Id       types.String `tfsdk:"id"`
 	TenantId types.String `tfsdk:"tenant_id"`
 	Config   types.Object `tfsdk:"config"`
+}
+
+func (r *tenantUrlResource) toProto(m *tenantUrlModel) *v1alpha11.TenantUrl {
+	return &v1alpha11.TenantUrl{
+		Config:   nil,
+		Id:       m.Id.ValueString(),
+		TenantId: m.TenantId.ValueString(),
+	}
+}
+
+func (r *tenantUrlResource) toModel(p *v1alpha11.TenantUrl, m *tenantUrlModel) {
+	m.Id = types.StringValue(p.Id)
+	m.TenantId = types.StringValue(p.TenantId)
 }
 
 func (r *tenantUrlResource) Configure(ctx context.Context, request resource.ConfigureRequest, response *resource.ConfigureResponse) {
@@ -45,7 +59,7 @@ func (r *tenantUrlResource) Schema(ctx context.Context, request resource.SchemaR
 }
 
 func (r *tenantUrlResource) Create(ctx context.Context, request resource.CreateRequest, response *resource.CreateResponse) {
-	var data v1alpha11.TenantUrl
+	var data tenantUrlModel
 
 	response.Diagnostics.Append(request.Plan.Get(ctx, &data)...)
 
@@ -53,7 +67,16 @@ func (r *tenantUrlResource) Create(ctx context.Context, request resource.CreateR
 		return
 	}
 
-	cr := &v1alpha1.CreateTenantUrlRequest{}
+	cr := &v1alpha1.CreateTenantUrlRequest{TenantUrl: r.toProto(&data)}
+	resp, err := r.client.CreateTenantUrl(ctx, cr)
+	if err != nil {
+		response.Diagnostics.AddError("Error Creating TenantUrl", err.Error())
+		return
+	}
+
+	r.toModel(resp, &data)
+	tflog.Trace(ctx, "tenanturl create")
+	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
 }
 
 func (r *tenantUrlResource) Read(ctx context.Context, request resource.ReadRequest, response *resource.ReadResponse) {
