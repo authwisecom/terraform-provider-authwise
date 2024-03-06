@@ -92,6 +92,7 @@ func main() {
 func selectHandler(m *protogen.Message, l zerolog.Logger) generate.MessageHandler {
 	txt := m.Comments.Leading
 	match := tagPattern.FindStringSubmatch(string(txt))
+	l.Debug().Msgf("test: %v", match)
 	if len(match) == 3 && match[1] == "resource" {
 		switch match[2] {
 		case "standard":

@@ -70,16 +70,6 @@ func (s *standardResourceHandler) resource(f *j.File, m *protogen.Message, l zer
 
 }
 
-func (s *standardResourceHandler) resourceNameMap(m *protogen.Message) func(id string) string {
-	resourceMap := map[string]func(id string) string{
-		"Client": func(id string) string {
-			return ""
-		},
-	}
-
-	return resourceMap[m.GoIdent.GoName]
-}
-
 func (s *standardResourceHandler) modelName(m *protogen.Message) string {
 	return strcase.ToLowerCamel(m.GoIdent.GoName) + "Model"
 }
@@ -166,7 +156,7 @@ func (s *standardResourceHandler) toName(f *j.File, m *protogen.Message, structN
 	}
 
 	var fmtParams []j.Code
-	for _, id := range val.nameFuncIdentifiers {
+	for _, id := range val.resourceMetadata.nameFuncIdentifiers {
 		fmtParams = append(fmtParams, j.Id("data").Dot(id).Dot("ValueString").Call())
 	}
 

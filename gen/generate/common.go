@@ -36,32 +36,63 @@ type resourceMetadata struct {
 	nameFuncPattern     string //pattern, identifiers
 	nameFuncIdentifiers []string
 }
+type datasourceMetadata struct {
+	schemaIdentifiers []string
+}
+type metadata struct {
+	*resourceMetadata
+	*datasourceMetadata
+}
 
-type resourceMap = map[string]*resourceMetadata
+type resourceMap = map[string]*metadata
 
+// Config - only datasource
 var resourceMetadataMap = resourceMap{
-	"Client": &resourceMetadata{
-		nameFuncPattern:     "clients/%s",
-		nameFuncIdentifiers: []string{"Id"},
+	"Client": &metadata{
+		resourceMetadata: &resourceMetadata{
+			nameFuncPattern:     "clients/%s",
+			nameFuncIdentifiers: []string{"Id"},
+		},
+		datasourceMetadata: &datasourceMetadata{},
 	},
-	"Realm": &resourceMetadata{
-		nameFuncPattern:     "realms/%s",
-		nameFuncIdentifiers: []string{"Id"},
+	"Realm": &metadata{
+		resourceMetadata: &resourceMetadata{
+			nameFuncPattern:     "realms/%s",
+			nameFuncIdentifiers: []string{"Id"},
+		},
+		datasourceMetadata: &datasourceMetadata{},
 	},
-	"Asset": &resourceMetadata{
-		nameFuncPattern:     "assets/%s",
-		nameFuncIdentifiers: []string{"Id"},
+	"Asset": &metadata{
+		resourceMetadata: &resourceMetadata{
+			nameFuncPattern:     "assets/%s",
+			nameFuncIdentifiers: []string{"Id"},
+		},
+		datasourceMetadata: &datasourceMetadata{},
 	},
-	"Audience": &resourceMetadata{
-		nameFuncPattern:     "audiences/%s",
-		nameFuncIdentifiers: []string{"Id"},
+	"Audience": &metadata{
+		resourceMetadata: &resourceMetadata{
+			nameFuncPattern:     "audiences/%s",
+			nameFuncIdentifiers: []string{"Id"},
+		},
+		datasourceMetadata: &datasourceMetadata{},
 	},
-	"Event": &resourceMetadata{
-		nameFuncPattern:     "events/%s",
-		nameFuncIdentifiers: []string{"Id"},
+	"AppearanceProfile": &metadata{
+		resourceMetadata: &resourceMetadata{
+			nameFuncPattern:     "appearance_profiles/%s",
+			nameFuncIdentifiers: []string{"Id"},
+		},
+		datasourceMetadata: &datasourceMetadata{},
 	},
-	"AppearanceProfile": &resourceMetadata{
-		nameFuncPattern:     "appearance_profiles/%s",
-		nameFuncIdentifiers: []string{"Id"},
+	"AudienceConfig": &metadata{
+		resourceMetadata:   nil,
+		datasourceMetadata: &datasourceMetadata{schemaIdentifiers: []string{"id"}},
+	},
+	"InteractiveClientConfig": &metadata{
+		resourceMetadata:   nil,
+		datasourceMetadata: &datasourceMetadata{schemaIdentifiers: []string{"id"}},
+	},
+	"ProviderAuth0": &metadata{
+		resourceMetadata:   nil,
+		datasourceMetadata: &datasourceMetadata{schemaIdentifiers: []string{"id"}},
 	},
 }

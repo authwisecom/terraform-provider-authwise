@@ -10,7 +10,7 @@ require (
 	github.com/hashicorp/terraform-plugin-testing v1.6.0
 	github.com/iancoleman/strcase v0.3.0
 	github.com/rs/zerolog v1.32.0
-	gitlab.authwise.io/authwise/api-client-go v0.0.0-20240221030330-3b025be0ab9e
+	gitlab.authwise.io/authwise/api-client-go v0.0.0-20240301234647-fce3307771d7
 	google.golang.org/genproto/googleapis/api v0.0.0-20231106174013-bbf56f31fb17
 	google.golang.org/protobuf v1.32.0
 	gopkg.in/yaml.v3 v3.0.1
