@@ -53,35 +53,45 @@ var resourceMetadataMap = resourceMap{
 			nameFuncPattern:     "clients/%s",
 			nameFuncIdentifiers: []string{"Id"},
 		},
-		datasourceMetadata: &datasourceMetadata{},
+		datasourceMetadata: &datasourceMetadata{
+			schemaIdentifiers: []string{"id"},
+		},
 	},
 	"Realm": &metadata{
 		resourceMetadata: &resourceMetadata{
 			nameFuncPattern:     "realms/%s",
 			nameFuncIdentifiers: []string{"Id"},
 		},
-		datasourceMetadata: &datasourceMetadata{},
+		datasourceMetadata: &datasourceMetadata{
+			schemaIdentifiers: []string{"id"},
+		},
 	},
 	"Asset": &metadata{
 		resourceMetadata: &resourceMetadata{
 			nameFuncPattern:     "assets/%s",
 			nameFuncIdentifiers: []string{"Id"},
 		},
-		datasourceMetadata: &datasourceMetadata{},
+		datasourceMetadata: &datasourceMetadata{
+			schemaIdentifiers: []string{"id"},
+		},
 	},
 	"Audience": &metadata{
 		resourceMetadata: &resourceMetadata{
 			nameFuncPattern:     "audiences/%s",
 			nameFuncIdentifiers: []string{"Id"},
 		},
-		datasourceMetadata: &datasourceMetadata{},
+		datasourceMetadata: &datasourceMetadata{
+			schemaIdentifiers: []string{"id"},
+		},
 	},
 	"AppearanceProfile": &metadata{
 		resourceMetadata: &resourceMetadata{
 			nameFuncPattern:     "appearance_profiles/%s",
 			nameFuncIdentifiers: []string{"Id"},
 		},
-		datasourceMetadata: &datasourceMetadata{},
+		datasourceMetadata: &datasourceMetadata{
+			schemaIdentifiers: []string{"id"},
+		},
 	},
 	"AudienceConfig": &metadata{
 		resourceMetadata:   nil,

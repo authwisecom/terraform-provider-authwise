@@ -25,20 +25,23 @@ import (
 )
 
 type container struct {
-	schemaHandler           generate.MessageHandler
-	standardResourceHandler generate.MessageHandler
-	configResourceHandler   generate.MessageHandler
+	schemaHandler             generate.MessageHandler
+	standardResourceHandler   generate.MessageHandler
+	standardDataSourceHandler generate.MessageHandler
+	configResourceHandler     generate.MessageHandler
 }
 
 func (c *container) Init(p *protogen.Plugin) {
 	c.schemaHandler.Init(p)
 	c.standardResourceHandler.Init(p)
+	c.standardDataSourceHandler.Init(p)
 	c.configResourceHandler.Init(p)
 }
 
 func (c *container) Finish(p *protogen.Plugin) {
 	c.schemaHandler.Finish(p)
 	c.standardResourceHandler.Finish(p)
+	c.standardDataSourceHandler.Finish(p)
 	c.configResourceHandler.Finish(p)
 }
 
@@ -59,6 +62,10 @@ func initContainer() {
 	mainContainer = &container{
 		schemaHandler: schemaHandler,
 		standardResourceHandler: generate.NewStandardResourceHandler(generate.StandardResourceHandlerParams{
+			SchemaHandler: schemaHandler,
+			PackageName:   packageName,
+		}),
+		standardDataSourceHandler: generate.NewStandardDataSourceHandler(generate.StandardDataSourceHandlerParams{
 			SchemaHandler: schemaHandler,
 			PackageName:   packageName,
 		}),
@@ -89,16 +96,17 @@ func main() {
 	})
 }
 
-func selectHandler(m *protogen.Message, l zerolog.Logger) generate.MessageHandler {
+func selectHandlers(m *protogen.Message, l zerolog.Logger) []generate.MessageHandler {
 	txt := m.Comments.Leading
 	match := tagPattern.FindStringSubmatch(string(txt))
 	l.Debug().Msgf("test: %v", match)
 	if len(match) == 3 && match[1] == "resource" {
 		switch match[2] {
 		case "standard":
-			return mainContainer.standardResourceHandler
+			//generate resource and datasource
+			return []generate.MessageHandler{mainContainer.standardResourceHandler, mainContainer.standardDataSourceHandler}
 		case "config":
-			return mainContainer.configResourceHandler
+			return []generate.MessageHandler{mainContainer.configResourceHandler}
 		default:
 			panic("unrecognized resource type " + match[2])
 		}
@@ -113,12 +121,14 @@ func generateFile(gen *protogen.Plugin, file *protogen.File) {
 
 	for _, m := range file.Messages {
 		ml := l.With().Str("message", string(m.Desc.Name())).Logger()
-		h := selectHandler(m, l)
+		h := selectHandlers(m, l)
 		if h != nil {
-			ml.Info().Msg("handler found")
-			err := h.Handle(m)
-			if err != nil {
-				panic(err)
+			ml.Info().Msg("handlers found")
+			for _, v := range h {
+				err := v.Handle(m)
+				if err != nil {
+					panic(err)
+				}
 			}
 		} else {
 			ml.Info().Msg("handler not found")
