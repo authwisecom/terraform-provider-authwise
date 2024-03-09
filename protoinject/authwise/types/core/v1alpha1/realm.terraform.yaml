@@ -1,6 +1,0 @@
----
-injectedFields:
-  id:
-    type: StringAttribute
-    computed: true
-    planModifierUseStateForUnknown: true
