@@ -3,17 +3,13 @@ package provider
 
 import (
 	"context"
-	"fmt"
 	datasource "github.com/hashicorp/terraform-plugin-framework/datasource"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
 	tflog "github.com/hashicorp/terraform-plugin-log/tflog"
 	v1alpha1 "gitlab.authwise.io/authwise/api-client-go/authwise/management/v1alpha1"
-	v1alpha11 "gitlab.authwise.io/authwise/api-client-go/authwise/types/core/v1alpha1"
 )
 
-type tenantConfigDataSource struct {
-	client v1alpha1.AuthwiseManagementServiceClient
-}
+type tenantConfigDataSource struct{}
 
 func NewTenantConfig() datasource.DataSource {
 	return &tenantConfigDataSource{}
@@ -25,37 +21,15 @@ type tenantConfigDataSourceModel struct {
 	CookieDomain             types.String `tfsdk:"cookie_domain"`
 	Cors                     types.Object `tfsdk:"cors"`
 	Logging                  types.Object `tfsdk:"logging"`
-}
-
-func (r *tenantConfigDataSource) toProto(m *tenantConfigDataSourceModel) *v1alpha11.TenantConfig {
-	return &v1alpha11.TenantConfig{
-		AccessTokenExpireSeconds: nil,
-		CookieDomain:             m.CookieDomain.ValueString(),
-		Cors:                     nil,
-		InteractionForwardUri:    m.InteractionForwardUri.ValueString(),
-		Logging:                  nil,
-	}
-}
-
-func (r *tenantConfigDataSource) toModel(p *v1alpha11.TenantConfig, m *tenantConfigDataSourceModel) {
-	m.InteractionForwardUri = types.StringValue(p.InteractionForwardUri)
-	m.CookieDomain = types.StringValue(p.CookieDomain)
-}
-
-func (r *tenantConfigDataSource) Configure(ctx context.Context, request datasource.ConfigureRequest, response *datasource.ConfigureResponse) {
-	if request.ProviderData == nil {
-		return
-	}
-	client, ok := request.ProviderData.(v1alpha1.AuthwiseManagementServiceClient)
-	if !ok {
-		response.Diagnostics.AddError("Unexpected Resource Configure Type", fmt.Sprintf("Expected *v1alpha12.AuthwiseManagementServiceClient, got: %T. Please report this issue to the provider developers.", request.ProviderData))
-		return
-	}
-	r.client = client
+	Json                     types.String `tfsdk:"json"`
 }
 
 func (r *tenantConfigDataSource) Metadata(ctx context.Context, request datasource.MetadataRequest, response *datasource.MetadataResponse) {
 	response.TypeName = request.ProviderTypeName + "_tenant_config"
+}
+
+func (r *tenantConfigDataSource) Schema(ctx context.Context, request datasource.SchemaRequest, response *datasource.SchemaResponse) {
+	response.Schema = GenSchemaTenantConfigDataSource(ctx)
 }
 
 func (r *tenantConfigDataSource) Read(ctx context.Context, request datasource.ReadRequest, response *datasource.ReadResponse) {

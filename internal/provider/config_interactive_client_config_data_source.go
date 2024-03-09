@@ -3,18 +3,13 @@ package provider
 
 import (
 	"context"
-	"fmt"
 	datasource "github.com/hashicorp/terraform-plugin-framework/datasource"
-	schema "github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
 	tflog "github.com/hashicorp/terraform-plugin-log/tflog"
 	v1alpha1 "gitlab.authwise.io/authwise/api-client-go/authwise/management/v1alpha1"
-	v1alpha11 "gitlab.authwise.io/authwise/api-client-go/authwise/types/core/v1alpha1"
 )
 
-type interactiveClientConfigDataSource struct {
-	client v1alpha1.AuthwiseManagementServiceClient
-}
+type interactiveClientConfigDataSource struct{}
 
 func NewInteractiveClientConfig() datasource.DataSource {
 	return &interactiveClientConfigDataSource{}
@@ -26,33 +21,7 @@ type interactiveClientConfigDataSourceModel struct {
 	AccessTokenExpireSeconds types.Object `tfsdk:"access_token_expire_seconds"`
 	Cors                     types.Object `tfsdk:"cors"`
 	Logging                  types.Object `tfsdk:"logging"`
-}
-
-func (r *interactiveClientConfigDataSource) toProto(m *interactiveClientConfigDataSourceModel) *v1alpha11.InteractiveClientConfig {
-	return &v1alpha11.InteractiveClientConfig{
-		AccessTokenExpireSeconds: nil,
-		AllowedRedirectUris:      m.AllowedRedirectUris.ValueString(),
-		Cors:                     nil,
-		InteractionForwardUri:    m.InteractionForwardUri.ValueString(),
-		Logging:                  nil,
-	}
-}
-
-func (r *interactiveClientConfigDataSource) toModel(p *v1alpha11.InteractiveClientConfig, m *interactiveClientConfigDataSourceModel) {
-	m.InteractionForwardUri = types.StringValue(p.InteractionForwardUri)
-	m.AllowedRedirectUris = types.StringValue(p.AllowedRedirectUris)
-}
-
-func (r *interactiveClientConfigDataSource) Configure(ctx context.Context, request datasource.ConfigureRequest, response *datasource.ConfigureResponse) {
-	if request.ProviderData == nil {
-		return
-	}
-	client, ok := request.ProviderData.(v1alpha1.AuthwiseManagementServiceClient)
-	if !ok {
-		response.Diagnostics.AddError("Unexpected Resource Configure Type", fmt.Sprintf("Expected *v1alpha12.AuthwiseManagementServiceClient, got: %T. Please report this issue to the provider developers.", request.ProviderData))
-		return
-	}
-	r.client = client
+	Json                     types.String `tfsdk:"json"`
 }
 
 func (r *interactiveClientConfigDataSource) Metadata(ctx context.Context, request datasource.MetadataRequest, response *datasource.MetadataResponse) {
@@ -60,10 +29,7 @@ func (r *interactiveClientConfigDataSource) Metadata(ctx context.Context, reques
 }
 
 func (r *interactiveClientConfigDataSource) Schema(ctx context.Context, request datasource.SchemaRequest, response *datasource.SchemaResponse) {
-	response.Schema = schema.Schema{Attributes: map[string]schema.Attribute{"id": schema.StringAttribute{
-		Description: "",
-		Required:    true,
-	}}}
+	response.Schema = GenSchemaInteractiveClientConfigDataSource(ctx)
 }
 
 func (r *interactiveClientConfigDataSource) Read(ctx context.Context, request datasource.ReadRequest, response *datasource.ReadResponse) {

@@ -3,17 +3,13 @@ package provider
 
 import (
 	"context"
-	"fmt"
 	datasource "github.com/hashicorp/terraform-plugin-framework/datasource"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
 	tflog "github.com/hashicorp/terraform-plugin-log/tflog"
 	v1alpha1 "gitlab.authwise.io/authwise/api-client-go/authwise/management/v1alpha1"
-	v1alpha11 "gitlab.authwise.io/authwise/api-client-go/authwise/types/core/v1alpha1"
 )
 
-type tenantUrlConfigDataSource struct {
-	client v1alpha1.AuthwiseManagementServiceClient
-}
+type tenantUrlConfigDataSource struct{}
 
 func NewTenantUrlConfig() datasource.DataSource {
 	return &tenantUrlConfigDataSource{}
@@ -21,30 +17,15 @@ func NewTenantUrlConfig() datasource.DataSource {
 
 type tenantUrlConfigDataSourceModel struct {
 	CookieDomain types.String `tfsdk:"cookie_domain"`
-}
-
-func (r *tenantUrlConfigDataSource) toProto(m *tenantUrlConfigDataSourceModel) *v1alpha11.TenantUrlConfig {
-	return &v1alpha11.TenantUrlConfig{CookieDomain: m.CookieDomain.ValueString()}
-}
-
-func (r *tenantUrlConfigDataSource) toModel(p *v1alpha11.TenantUrlConfig, m *tenantUrlConfigDataSourceModel) {
-	m.CookieDomain = types.StringValue(p.CookieDomain)
-}
-
-func (r *tenantUrlConfigDataSource) Configure(ctx context.Context, request datasource.ConfigureRequest, response *datasource.ConfigureResponse) {
-	if request.ProviderData == nil {
-		return
-	}
-	client, ok := request.ProviderData.(v1alpha1.AuthwiseManagementServiceClient)
-	if !ok {
-		response.Diagnostics.AddError("Unexpected Resource Configure Type", fmt.Sprintf("Expected *v1alpha12.AuthwiseManagementServiceClient, got: %T. Please report this issue to the provider developers.", request.ProviderData))
-		return
-	}
-	r.client = client
+	Json         types.String `tfsdk:"json"`
 }
 
 func (r *tenantUrlConfigDataSource) Metadata(ctx context.Context, request datasource.MetadataRequest, response *datasource.MetadataResponse) {
 	response.TypeName = request.ProviderTypeName + "_tenant_url_config"
+}
+
+func (r *tenantUrlConfigDataSource) Schema(ctx context.Context, request datasource.SchemaRequest, response *datasource.SchemaResponse) {
+	response.Schema = GenSchemaTenantUrlConfigDataSource(ctx)
 }
 
 func (r *tenantUrlConfigDataSource) Read(ctx context.Context, request datasource.ReadRequest, response *datasource.ReadResponse) {

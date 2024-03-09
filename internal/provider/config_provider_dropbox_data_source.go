@@ -3,17 +3,13 @@ package provider
 
 import (
 	"context"
-	"fmt"
 	datasource "github.com/hashicorp/terraform-plugin-framework/datasource"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
 	tflog "github.com/hashicorp/terraform-plugin-log/tflog"
 	v1alpha1 "gitlab.authwise.io/authwise/api-client-go/authwise/management/v1alpha1"
-	v1alpha11 "gitlab.authwise.io/authwise/api-client-go/authwise/types/core/v1alpha1"
 )
 
-type providerDropboxDataSource struct {
-	client v1alpha1.AuthwiseManagementServiceClient
-}
+type providerDropboxDataSource struct{}
 
 func NewProviderDropbox() datasource.DataSource {
 	return &providerDropboxDataSource{}
@@ -24,38 +20,15 @@ type providerDropboxDataSourceModel struct {
 	ClientSecret         types.String `tfsdk:"client_secret"`
 	Scope                types.String `tfsdk:"scope"`
 	IncludeGrantedScopes types.String `tfsdk:"include_granted_scopes"`
-}
-
-func (r *providerDropboxDataSource) toProto(m *providerDropboxDataSourceModel) *v1alpha11.ProviderDropbox {
-	return &v1alpha11.ProviderDropbox{
-		ClientId:             m.ClientId.ValueString(),
-		ClientSecret:         m.ClientSecret.ValueString(),
-		IncludeGrantedScopes: m.IncludeGrantedScopes.ValueString(),
-		Scope:                m.Scope.ValueString(),
-	}
-}
-
-func (r *providerDropboxDataSource) toModel(p *v1alpha11.ProviderDropbox, m *providerDropboxDataSourceModel) {
-	m.ClientId = types.StringValue(p.ClientId)
-	m.ClientSecret = types.StringValue(p.ClientSecret)
-	m.Scope = types.StringValue(p.Scope)
-	m.IncludeGrantedScopes = types.StringValue(p.IncludeGrantedScopes)
-}
-
-func (r *providerDropboxDataSource) Configure(ctx context.Context, request datasource.ConfigureRequest, response *datasource.ConfigureResponse) {
-	if request.ProviderData == nil {
-		return
-	}
-	client, ok := request.ProviderData.(v1alpha1.AuthwiseManagementServiceClient)
-	if !ok {
-		response.Diagnostics.AddError("Unexpected Resource Configure Type", fmt.Sprintf("Expected *v1alpha12.AuthwiseManagementServiceClient, got: %T. Please report this issue to the provider developers.", request.ProviderData))
-		return
-	}
-	r.client = client
+	Json                 types.String `tfsdk:"json"`
 }
 
 func (r *providerDropboxDataSource) Metadata(ctx context.Context, request datasource.MetadataRequest, response *datasource.MetadataResponse) {
 	response.TypeName = request.ProviderTypeName + "_provider_dropbox"
+}
+
+func (r *providerDropboxDataSource) Schema(ctx context.Context, request datasource.SchemaRequest, response *datasource.SchemaResponse) {
+	response.Schema = GenSchemaProviderDropboxDataSource(ctx)
 }
 
 func (r *providerDropboxDataSource) Read(ctx context.Context, request datasource.ReadRequest, response *datasource.ReadResponse) {

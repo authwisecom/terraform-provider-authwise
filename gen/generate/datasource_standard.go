@@ -55,7 +55,7 @@ func (s *standardDataSourceHandler) datasource(f *j.File, m *protogen.Message, l
 	f.Func().Id(fmt.Sprintf("New%sDataSource", name)).Params().Qual(DataSource, "DataSource").Block(
 		j.Return(j.Op("&").Id(structName).Values()),
 	).Line()
-	
+
 	s.toName(f, m, structName, resourceMetadataMap, l)
 	s.toModel(f, m, structName, l)
 	s.dataModel(f, m, l)
@@ -102,7 +102,7 @@ func (s *standardDataSourceHandler) toModel(f *j.File, m *protogen.Message, stru
 		j.Id("m").Op("*").Id(s.modelName(m)),
 	).BlockFunc(func(group *j.Group) {
 		for _, fi := range m.Fields {
-			path := "github.com/hashicorp/terraform-plugin-framework/types"
+			path := Types
 			typesFunc := "nil"
 
 			switch fi.Desc.Kind() {
@@ -233,13 +233,13 @@ func (s *standardDataSourceHandler) schema(f *j.File, m *protogen.Message, struc
 
 	//datasource schema is different from resource schema
 	s.requestResponseMethod(f, structName, "Schema",
-		j.Id("response").Dot("Schema").Op("=").Qual("github.com/hashicorp/terraform-plugin-framework/datasource/schema", "Schema").Values(
+		j.Id("response").Dot("Schema").Op("=").Qual(DataSourceSchema, "Schema").Values(
 			j.Dict{
-				j.Id("Attributes"): j.Map(j.String()).Qual("github.com/hashicorp/terraform-plugin-framework/datasource/schema", "Attribute").Values(
+				j.Id("Attributes"): j.Map(j.String()).Qual(DataSourceSchema, "Attribute").Values(
 					j.DictFunc(func(d j.Dict) {
 						for _, v := range dsMeta.schemaIdentifiers {
 							l.Printf("test: %s", v)
-							d[j.Lit(v)] = j.Qual("github.com/hashicorp/terraform-plugin-framework/datasource/schema", "StringAttribute").Values(
+							d[j.Lit(v)] = j.Qual(DataSourceSchema, "StringAttribute").Values(
 								j.Dict{
 									j.Id("Description"): j.Lit(""),
 									j.Id("Required"):    j.True(),

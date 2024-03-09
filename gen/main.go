@@ -25,24 +25,27 @@ import (
 )
 
 type container struct {
-	schemaHandler             generate.MessageHandler
+	resourceSchemaHandler     generate.MessageHandler
+	dataSourceSchemaHandler   generate.MessageHandler
 	standardResourceHandler   generate.MessageHandler
 	standardDataSourceHandler generate.MessageHandler
-	configResourceHandler     generate.MessageHandler
+	configDataSourceHandler   generate.MessageHandler
 }
 
 func (c *container) Init(p *protogen.Plugin) {
-	c.schemaHandler.Init(p)
+	c.resourceSchemaHandler.Init(p)
+	c.dataSourceSchemaHandler.Init(p)
 	c.standardResourceHandler.Init(p)
 	c.standardDataSourceHandler.Init(p)
-	c.configResourceHandler.Init(p)
+	c.configDataSourceHandler.Init(p)
 }
 
 func (c *container) Finish(p *protogen.Plugin) {
-	c.schemaHandler.Finish(p)
+	c.resourceSchemaHandler.Finish(p)
+	c.dataSourceSchemaHandler.Finish(p)
 	c.standardResourceHandler.Finish(p)
 	c.standardDataSourceHandler.Finish(p)
-	c.configResourceHandler.Finish(p)
+	c.configDataSourceHandler.Finish(p)
 }
 
 var (
@@ -54,23 +57,29 @@ func initContainer() {
 
 	packageName := "terraform-provider-authwise/internal/provider"
 
-	schemaHandler := generate.NewSchemaHandler(generate.SchemaHandlerParams{
+	resourceSchemaHandler := generate.NewSchemaHandler(generate.SchemaHandlerParams{
 		PackageName: packageName,
 		Filename:    "schema.go",
 	})
 
+	dataSourceSchemaHandler := generate.NewSchemaDataSourceHandler(generate.SchemaDataSourceHandlerParams{
+		PackageName: packageName,
+		Filename:    "schema_data_source.go",
+	})
+
 	mainContainer = &container{
-		schemaHandler: schemaHandler,
+		resourceSchemaHandler:   resourceSchemaHandler,
+		dataSourceSchemaHandler: dataSourceSchemaHandler,
 		standardResourceHandler: generate.NewStandardResourceHandler(generate.StandardResourceHandlerParams{
-			SchemaHandler: schemaHandler,
+			SchemaHandler: resourceSchemaHandler,
 			PackageName:   packageName,
 		}),
 		standardDataSourceHandler: generate.NewStandardDataSourceHandler(generate.StandardDataSourceHandlerParams{
-			SchemaHandler: schemaHandler,
+			SchemaHandler: dataSourceSchemaHandler,
 			PackageName:   packageName,
 		}),
-		configResourceHandler: generate.NewConfigResourceHandler(generate.ConfigResourceHandlerParams{
-			SchemaHandler: schemaHandler,
+		configDataSourceHandler: generate.NewConfigDataSourceHandler(generate.ConfigDataSourceHandlerParams{
+			SchemaHandler: dataSourceSchemaHandler,
 			PackageName:   packageName,
 		}),
 	}
@@ -106,7 +115,7 @@ func selectHandlers(m *protogen.Message, l zerolog.Logger) []generate.MessageHan
 			//generate resource and datasource
 			return []generate.MessageHandler{mainContainer.standardResourceHandler, mainContainer.standardDataSourceHandler}
 		case "config":
-			return []generate.MessageHandler{mainContainer.configResourceHandler}
+			return []generate.MessageHandler{mainContainer.configDataSourceHandler}
 		default:
 			panic("unrecognized resource type " + match[2])
 		}

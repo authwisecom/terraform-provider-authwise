@@ -3,17 +3,13 @@ package provider
 
 import (
 	"context"
-	"fmt"
 	datasource "github.com/hashicorp/terraform-plugin-framework/datasource"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
 	tflog "github.com/hashicorp/terraform-plugin-log/tflog"
 	v1alpha1 "gitlab.authwise.io/authwise/api-client-go/authwise/management/v1alpha1"
-	v1alpha11 "gitlab.authwise.io/authwise/api-client-go/authwise/types/core/v1alpha1"
 )
 
-type providerFacebookDataSource struct {
-	client v1alpha1.AuthwiseManagementServiceClient
-}
+type providerFacebookDataSource struct{}
 
 func NewProviderFacebook() datasource.DataSource {
 	return &providerFacebookDataSource{}
@@ -24,38 +20,15 @@ type providerFacebookDataSourceModel struct {
 	ClientSecret types.String `tfsdk:"client_secret"`
 	Scope        types.String `tfsdk:"scope"`
 	UserFields   types.String `tfsdk:"user_fields"`
-}
-
-func (r *providerFacebookDataSource) toProto(m *providerFacebookDataSourceModel) *v1alpha11.ProviderFacebook {
-	return &v1alpha11.ProviderFacebook{
-		ClientId:     m.ClientId.ValueString(),
-		ClientSecret: m.ClientSecret.ValueString(),
-		Scope:        m.Scope.ValueString(),
-		UserFields:   m.UserFields.ValueString(),
-	}
-}
-
-func (r *providerFacebookDataSource) toModel(p *v1alpha11.ProviderFacebook, m *providerFacebookDataSourceModel) {
-	m.ClientId = types.StringValue(p.ClientId)
-	m.ClientSecret = types.StringValue(p.ClientSecret)
-	m.Scope = types.StringValue(p.Scope)
-	m.UserFields = types.StringValue(p.UserFields)
-}
-
-func (r *providerFacebookDataSource) Configure(ctx context.Context, request datasource.ConfigureRequest, response *datasource.ConfigureResponse) {
-	if request.ProviderData == nil {
-		return
-	}
-	client, ok := request.ProviderData.(v1alpha1.AuthwiseManagementServiceClient)
-	if !ok {
-		response.Diagnostics.AddError("Unexpected Resource Configure Type", fmt.Sprintf("Expected *v1alpha12.AuthwiseManagementServiceClient, got: %T. Please report this issue to the provider developers.", request.ProviderData))
-		return
-	}
-	r.client = client
+	Json         types.String `tfsdk:"json"`
 }
 
 func (r *providerFacebookDataSource) Metadata(ctx context.Context, request datasource.MetadataRequest, response *datasource.MetadataResponse) {
 	response.TypeName = request.ProviderTypeName + "_provider_facebook"
+}
+
+func (r *providerFacebookDataSource) Schema(ctx context.Context, request datasource.SchemaRequest, response *datasource.SchemaResponse) {
+	response.Schema = GenSchemaProviderFacebookDataSource(ctx)
 }
 
 func (r *providerFacebookDataSource) Read(ctx context.Context, request datasource.ReadRequest, response *datasource.ReadResponse) {

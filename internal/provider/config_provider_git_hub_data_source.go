@@ -3,17 +3,13 @@ package provider
 
 import (
 	"context"
-	"fmt"
 	datasource "github.com/hashicorp/terraform-plugin-framework/datasource"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
 	tflog "github.com/hashicorp/terraform-plugin-log/tflog"
 	v1alpha1 "gitlab.authwise.io/authwise/api-client-go/authwise/management/v1alpha1"
-	v1alpha11 "gitlab.authwise.io/authwise/api-client-go/authwise/types/core/v1alpha1"
 )
 
-type providerGitHubDataSource struct {
-	client v1alpha1.AuthwiseManagementServiceClient
-}
+type providerGitHubDataSource struct{}
 
 func NewProviderGitHub() datasource.DataSource {
 	return &providerGitHubDataSource{}
@@ -26,42 +22,15 @@ type providerGitHubDataSourceModel struct {
 	Prompt       types.String `tfsdk:"prompt"`
 	Display      types.String `tfsdk:"display"`
 	Scope        types.String `tfsdk:"scope"`
-}
-
-func (r *providerGitHubDataSource) toProto(m *providerGitHubDataSourceModel) *v1alpha11.ProviderGitHub {
-	return &v1alpha11.ProviderGitHub{
-		AllowSignup:  m.AllowSignup.ValueBool(),
-		ClientId:     m.ClientId.ValueString(),
-		ClientSecret: m.ClientSecret.ValueString(),
-		Display:      m.Display.ValueString(),
-		Prompt:       m.Prompt.ValueString(),
-		Scope:        m.Scope.ValueString(),
-	}
-}
-
-func (r *providerGitHubDataSource) toModel(p *v1alpha11.ProviderGitHub, m *providerGitHubDataSourceModel) {
-	m.ClientId = types.StringValue(p.ClientId)
-	m.ClientSecret = types.StringValue(p.ClientSecret)
-	m.AllowSignup = types.BoolValue(p.AllowSignup)
-	m.Prompt = types.StringValue(p.Prompt)
-	m.Display = types.StringValue(p.Display)
-	m.Scope = types.StringValue(p.Scope)
-}
-
-func (r *providerGitHubDataSource) Configure(ctx context.Context, request datasource.ConfigureRequest, response *datasource.ConfigureResponse) {
-	if request.ProviderData == nil {
-		return
-	}
-	client, ok := request.ProviderData.(v1alpha1.AuthwiseManagementServiceClient)
-	if !ok {
-		response.Diagnostics.AddError("Unexpected Resource Configure Type", fmt.Sprintf("Expected *v1alpha12.AuthwiseManagementServiceClient, got: %T. Please report this issue to the provider developers.", request.ProviderData))
-		return
-	}
-	r.client = client
+	Json         types.String `tfsdk:"json"`
 }
 
 func (r *providerGitHubDataSource) Metadata(ctx context.Context, request datasource.MetadataRequest, response *datasource.MetadataResponse) {
 	response.TypeName = request.ProviderTypeName + "_provider_git_hub"
+}
+
+func (r *providerGitHubDataSource) Schema(ctx context.Context, request datasource.SchemaRequest, response *datasource.SchemaResponse) {
+	response.Schema = GenSchemaProviderGitHubDataSource(ctx)
 }
 
 func (r *providerGitHubDataSource) Read(ctx context.Context, request datasource.ReadRequest, response *datasource.ReadResponse) {

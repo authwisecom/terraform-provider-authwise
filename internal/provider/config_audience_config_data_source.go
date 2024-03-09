@@ -3,18 +3,13 @@ package provider
 
 import (
 	"context"
-	"fmt"
 	datasource "github.com/hashicorp/terraform-plugin-framework/datasource"
-	schema "github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
 	tflog "github.com/hashicorp/terraform-plugin-log/tflog"
 	v1alpha1 "gitlab.authwise.io/authwise/api-client-go/authwise/management/v1alpha1"
-	v1alpha11 "gitlab.authwise.io/authwise/api-client-go/authwise/types/core/v1alpha1"
 )
 
-type audienceConfigDataSource struct {
-	client v1alpha1.AuthwiseManagementServiceClient
-}
+type audienceConfigDataSource struct{}
 
 func NewAudienceConfig() datasource.DataSource {
 	return &audienceConfigDataSource{}
@@ -26,32 +21,7 @@ type audienceConfigDataSourceModel struct {
 	Scopes                   types.Object `tfsdk:"scopes"`
 	Cors                     types.Object `tfsdk:"cors"`
 	Logging                  types.Object `tfsdk:"logging"`
-}
-
-func (r *audienceConfigDataSource) toProto(m *audienceConfigDataSourceModel) *v1alpha11.AudienceConfig {
-	return &v1alpha11.AudienceConfig{
-		AccessTokenExpireSeconds: nil,
-		Cors:                     nil,
-		InteractionForwardUri:    m.InteractionForwardUri.ValueString(),
-		Logging:                  nil,
-		Scopes:                   nil,
-	}
-}
-
-func (r *audienceConfigDataSource) toModel(p *v1alpha11.AudienceConfig, m *audienceConfigDataSourceModel) {
-	m.InteractionForwardUri = types.StringValue(p.InteractionForwardUri)
-}
-
-func (r *audienceConfigDataSource) Configure(ctx context.Context, request datasource.ConfigureRequest, response *datasource.ConfigureResponse) {
-	if request.ProviderData == nil {
-		return
-	}
-	client, ok := request.ProviderData.(v1alpha1.AuthwiseManagementServiceClient)
-	if !ok {
-		response.Diagnostics.AddError("Unexpected Resource Configure Type", fmt.Sprintf("Expected *v1alpha12.AuthwiseManagementServiceClient, got: %T. Please report this issue to the provider developers.", request.ProviderData))
-		return
-	}
-	r.client = client
+	Json                     types.String `tfsdk:"json"`
 }
 
 func (r *audienceConfigDataSource) Metadata(ctx context.Context, request datasource.MetadataRequest, response *datasource.MetadataResponse) {
@@ -59,10 +29,7 @@ func (r *audienceConfigDataSource) Metadata(ctx context.Context, request datasou
 }
 
 func (r *audienceConfigDataSource) Schema(ctx context.Context, request datasource.SchemaRequest, response *datasource.SchemaResponse) {
-	response.Schema = schema.Schema{Attributes: map[string]schema.Attribute{"id": schema.StringAttribute{
-		Description: "",
-		Required:    true,
-	}}}
+	response.Schema = GenSchemaAudienceConfigDataSource(ctx)
 }
 
 func (r *audienceConfigDataSource) Read(ctx context.Context, request datasource.ReadRequest, response *datasource.ReadResponse) {

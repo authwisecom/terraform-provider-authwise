@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"google.golang.org/protobuf/compiler/protogen"
 	"google.golang.org/protobuf/reflect/protoreflect"
+	"regexp"
+	"strings"
 )
 
 var typeTypeMap = map[protoreflect.Kind]string{
@@ -26,6 +28,31 @@ var typeMap = map[protoreflect.Kind]string{
 	protoreflect.FloatKind:  "Float64",
 	protoreflect.DoubleKind: "Float64",
 	protoreflect.BoolKind:   "Bool",
+}
+
+var attributeTypeMap = map[protoreflect.Kind]string{
+	protoreflect.StringKind: "StringAttribute",
+	protoreflect.BytesKind:  "StringAttribute",
+	protoreflect.Int32Kind:  "Int64Attribute",
+	protoreflect.Int64Kind:  "Int64Attribute",
+	protoreflect.EnumKind:   "Int64Attribute",
+	protoreflect.FloatKind:  "Float64Attribute",
+	protoreflect.DoubleKind: "Float64Attribute",
+	protoreflect.BoolKind:   "BoolAttribute",
+}
+
+var (
+	newlinePattern  = regexp.MustCompile(`\n//`)
+	variablePattern = regexp.MustCompile(`[ ]*\$[^\/]+[ ]*`)
+)
+
+func trimComments(c protogen.Comments) string {
+
+	trimmed := strings.TrimSpace(strings.TrimPrefix(c.String(), "// "))
+	trimmed = newlinePattern.ReplaceAllString(trimmed, "")
+	trimmed = variablePattern.ReplaceAllString(trimmed, "")
+
+	return trimmed
 }
 
 func PrintGeneratedHeader(gf *protogen.GeneratedFile) {
