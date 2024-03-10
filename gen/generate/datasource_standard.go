@@ -49,7 +49,7 @@ func (s *standardDataSourceHandler) datasource(f *j.File, m *protogen.Message, l
 	structName := strcase.ToLowerCamel(name) + "DataSource"
 
 	f.Type().Id(structName).Struct(
-		j.Id("client").Qual("gitlab.authwise.io/authwise/api-client-go/authwise/management/v1alpha1", "AuthwiseManagementServiceClient"),
+		j.Id("client").Qual(AuthwiseManagementClient, "AuthwiseManagementServiceClient"),
 	)
 
 	f.Func().Id(fmt.Sprintf("New%sDataSource", name)).Params().Qual(DataSource, "DataSource").Block(
@@ -98,7 +98,7 @@ func (s *standardDataSourceHandler) toModel(f *j.File, m *protogen.Message, stru
 	name := m.GoIdent.GoName
 
 	f.Func().Params(j.Id("r").Op("*").Id(structName)).Id("toModel").Params(
-		j.Id("p").Op("*").Qual("gitlab.authwise.io/authwise/api-client-go/authwise/types/core/v1alpha1", name),
+		j.Id("p").Op("*").Qual(TypesCore, name),
 		j.Id("m").Op("*").Id(s.modelName(m)),
 	).BlockFunc(func(group *j.Group) {
 		for _, fi := range m.Fields {
@@ -147,7 +147,7 @@ func (s *standardDataSourceHandler) crudMethodTemplate(m *protogen.Message, body
 		).Line()),
 		j.Add(body...),
 		j.Id("r").Dot("toModel").Call(j.Id("resp"), j.Op("&").Id("data")).Line(),
-		j.Qual("github.com/hashicorp/terraform-plugin-log/tflog", "Trace").Call(
+		j.Qual(TFLog, "Trace").Call(
 			j.Id("ctx"),
 			j.Lit(fmt.Sprintf("%s %s", strings.ToLower(name), "read")),
 		).Line(),
@@ -203,7 +203,7 @@ func (s *standardDataSourceHandler) configure(f *j.File, m *protogen.Message, st
 		j.List(
 			j.Id("client"), j.Id("ok"),
 		).Op(":=").Id("request").Dot("ProviderData").Assert(
-			j.Qual("gitlab.authwise.io/authwise/api-client-go/authwise/management/v1alpha1", "AuthwiseManagementServiceClient"),
+			j.Qual(AuthwiseManagementClient, "AuthwiseManagementServiceClient"),
 		),
 		j.If(j.Op("!").Id("ok").Block(
 			j.Id("response").Dot("Diagnostics").Dot("AddError").Call(j.Lit("Unexpected Resource Configure Type"), j.Qual("fmt", "Sprintf").Call(
@@ -259,7 +259,7 @@ func (s *standardDataSourceHandler) read(f *j.File, m *protogen.Message, structN
 	s.requestResponseMethod(f, structName, "Read",
 		s.crudMethodTemplate(m,
 			j.Id("req").Op(":=").Op("&").Qual(
-				"gitlab.authwise.io/authwise/api-client-go/authwise/management/v1alpha1",
+				AuthwiseManagementClient,
 				fmt.Sprintf("Get%sRequest", name),
 			).Values(
 				j.Dict{

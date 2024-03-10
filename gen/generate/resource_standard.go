@@ -49,7 +49,7 @@ func (s *standardResourceHandler) resource(f *j.File, m *protogen.Message, l zer
 	structName := strcase.ToLowerCamel(name) + "Resource"
 
 	f.Type().Id(structName).Struct(
-		j.Id("client").Qual("gitlab.authwise.io/authwise/api-client-go/authwise/management/v1alpha1", "AuthwiseManagementServiceClient"),
+		j.Id("client").Qual(AuthwiseManagementClient, "AuthwiseManagementServiceClient"),
 	)
 
 	f.Func().Id(fmt.Sprintf("New%s", name)).Params().Qual(Resource, "Resource").Block(
@@ -124,7 +124,7 @@ func (s *standardResourceHandler) crudMethodTemplate(m *protogen.Message, operat
 	if appendState {
 		result = append(result, j.Add(
 			j.Id("r").Dot("toModel").Call(j.Id("resp"), j.Op("&").Id("data")).Line(),
-			j.Qual("github.com/hashicorp/terraform-plugin-log/tflog", "Trace").Call(
+			j.Qual(TFLog, "Trace").Call(
 				j.Id("ctx"),
 				j.Lit(fmt.Sprintf("%s %s", strings.ToLower(name), operation)),
 			).Line(),
@@ -198,9 +198,9 @@ func (s *standardResourceHandler) toProto(f *j.File, m *protogen.Message, struct
 
 	f.Func().Params(j.Id("r").Op("*").Id(structName)).Id("toProto").Params(
 		j.Id("m").Op("*").Qual("", s.modelName(m)),
-	).Op("*").Qual("gitlab.authwise.io/authwise/api-client-go/authwise/types/core/v1alpha1", name).Block(
+	).Op("*").Qual(TypesCore, name).Block(
 		j.Return(
-			j.Op("&").Qual("gitlab.authwise.io/authwise/api-client-go/authwise/types/core/v1alpha1", name).Values(
+			j.Op("&").Qual(TypesCore, name).Values(
 				dict,
 			),
 		),
@@ -212,11 +212,11 @@ func (s *standardResourceHandler) toModel(f *j.File, m *protogen.Message, struct
 	name := m.GoIdent.GoName
 
 	f.Func().Params(j.Id("r").Op("*").Id(structName)).Id("toModel").Params(
-		j.Id("p").Op("*").Qual("gitlab.authwise.io/authwise/api-client-go/authwise/types/core/v1alpha1", name),
+		j.Id("p").Op("*").Qual(TypesCore, name),
 		j.Id("m").Op("*").Id(s.modelName(m)),
 	).BlockFunc(func(group *j.Group) {
 		for _, fi := range m.Fields {
-			path := "github.com/hashicorp/terraform-plugin-framework/types"
+			path := Types
 			typesFunc := "nil"
 
 			switch fi.Desc.Kind() {
@@ -245,7 +245,7 @@ func (s *standardResourceHandler) configure(f *j.File, m *protogen.Message, stru
 		j.List(
 			j.Id("client"), j.Id("ok"),
 		).Op(":=").Id("request").Dot("ProviderData").Assert(
-			j.Qual("gitlab.authwise.io/authwise/api-client-go/authwise/management/v1alpha1", "AuthwiseManagementServiceClient"),
+			j.Qual(AuthwiseManagementClient, "AuthwiseManagementServiceClient"),
 		),
 		j.If(j.Op("!").Id("ok").Block(
 			j.Id("response").Dot("Diagnostics").Dot("AddError").Call(j.Lit("Unexpected Resource Configure Type"), j.Qual("fmt", "Sprintf").Call(
@@ -278,7 +278,7 @@ func (s *standardResourceHandler) create(f *j.File, m *protogen.Message, structN
 	s.requestResponseMethod(f, structName, "Create",
 		s.crudMethodTemplate(m, "create", false, true,
 			j.Id("req").Op(":=").Op("&").Qual(
-				"gitlab.authwise.io/authwise/api-client-go/authwise/management/v1alpha1",
+				AuthwiseManagementClient,
 				fmt.Sprintf("Create%sRequest", name),
 			).Values(
 				j.Dict{
@@ -304,7 +304,7 @@ func (s *standardResourceHandler) read(f *j.File, m *protogen.Message, structNam
 	s.requestResponseMethod(f, structName, "Read",
 		s.crudMethodTemplate(m, "read", true, true,
 			j.Id("req").Op(":=").Op("&").Qual(
-				"gitlab.authwise.io/authwise/api-client-go/authwise/management/v1alpha1",
+				AuthwiseManagementClient,
 				fmt.Sprintf("Get%sRequest", name),
 			).Values(
 				j.Dict{
@@ -333,7 +333,7 @@ func (s *standardResourceHandler) update(f *j.File, m *protogen.Message, structN
 	s.requestResponseMethod(f, structName, "Update",
 		s.crudMethodTemplate(m, "update", false, true,
 			j.Id("req").Op(":=").Op("&").Qual(
-				"gitlab.authwise.io/authwise/api-client-go/authwise/management/v1alpha1",
+				AuthwiseManagementClient,
 				fmt.Sprintf("Update%sRequest", name),
 			).Values(
 				j.Dict{
@@ -362,7 +362,7 @@ func (s *standardResourceHandler) delete(f *j.File, m *protogen.Message, structN
 	s.requestResponseMethod(f, structName, "Delete",
 		s.crudMethodTemplate(m, "delete", true, false,
 			j.Id("req").Op(":=").Op("&").Qual(
-				"gitlab.authwise.io/authwise/api-client-go/authwise/management/v1alpha1",
+				AuthwiseManagementClient,
 				fmt.Sprintf("Delete%sRequest", name),
 			).Values(
 				j.Dict{

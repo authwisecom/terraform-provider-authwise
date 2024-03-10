@@ -98,7 +98,7 @@ func (s *configDataSourceHandler) crudMethodTemplate(m *protogen.Message, body .
 		).Line()),
 		j.Add(body...),
 		j.Id("r").Dot("toModel").Call(j.Id("resp"), j.Op("&").Id("data")).Line(),
-		j.Qual("github.com/hashicorp/terraform-plugin-log/tflog", "Trace").Call(
+		j.Qual(TFLog, "Trace").Call(
 			j.Id("ctx"),
 			j.Lit(fmt.Sprintf("%s %s", strings.ToLower(name), "read")),
 		).Line(),
@@ -131,9 +131,9 @@ func (s *configDataSourceHandler) modelFields(fields []*protogen.Field) []j.Code
 			"tfsdk": schemaName,
 		}))
 	}
-	//append json field
-	result = append(result, j.Id("Json").Qual(Types, "String").Tag(map[string]string{
-		"tfsdk": "json",
+	//append type field
+	result = append(result, j.Id("Type").Qual(Types, "String").Tag(map[string]string{
+		"tfsdk": "type",
 	}))
 	return result
 }
@@ -169,7 +169,7 @@ func (s *configDataSourceHandler) configure(f *j.File, m *protogen.Message, stru
 		j.List(
 			j.Id("client"), j.Id("ok"),
 		).Op(":=").Id("request").Dot("ProviderData").Assert(
-			j.Qual("gitlab.authwise.io/authwise/api-client-go/authwise/management/v1alpha1", "AuthwiseManagementServiceClient"),
+			j.Qual(AuthwiseManagementClient, "AuthwiseManagementServiceClient"),
 		),
 		j.If(j.Op("!").Id("ok").Block(
 			j.Id("response").Dot("Diagnostics").Dot("AddError").Call(j.Lit("Unexpected Resource Configure Type"), j.Qual("fmt", "Sprintf").Call(
@@ -189,7 +189,7 @@ func (s *configDataSourceHandler) read(f *j.File, m *protogen.Message, structNam
 	s.requestResponseMethod(f, structName, "Read",
 		s.crudMethodTemplate(m,
 			j.Id("req").Op(":=").Op("&").Qual(
-				"gitlab.authwise.io/authwise/api-client-go/authwise/management/v1alpha1",
+				AuthwiseManagementClient,
 				fmt.Sprintf("Get%sRequest", name),
 			).Values(
 				j.Dict{
