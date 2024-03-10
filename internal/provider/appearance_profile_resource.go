@@ -9,6 +9,7 @@ import (
 	tflog "github.com/hashicorp/terraform-plugin-log/tflog"
 	v1alpha1 "gitlab.authwise.io/authwise/api-client-go/authwise/management/v1alpha1"
 	v1alpha11 "gitlab.authwise.io/authwise/api-client-go/authwise/types/core/v1alpha1"
+	util "terraform-provider-authwise/internal/util"
 )
 
 type appearanceProfileResource struct {
@@ -31,15 +32,23 @@ type appearanceProfileModel struct {
 func (r *appearanceProfileResource) toName(data appearanceProfileModel) string {
 	return fmt.Sprintf("appearance_profiles/%s", data.Id.ValueString())
 }
-func (r *appearanceProfileResource) toProto(m *appearanceProfileModel) *v1alpha11.AppearanceProfile {
+func (r *appearanceProfileResource) toProto(m *appearanceProfileModel) (*v1alpha11.AppearanceProfile, error) {
+	converted_stylesheetattributes, err := util.ObjectToProtoStruct(m.StylesheetAttributes)
+	if err != nil {
+		return nil, err
+	}
+	converted_content, err := util.ObjectToProtoStruct(m.Content)
+	if err != nil {
+		return nil, err
+	}
 	return &v1alpha11.AppearanceProfile{
-		Content:              nil,
+		Content:              converted_content,
 		Id:                   m.Id.ValueString(),
 		Name:                 m.Name.ValueString(),
-		StylesheetAttributes: nil,
+		StylesheetAttributes: converted_stylesheetattributes,
 		TenantId:             m.TenantId.ValueString(),
 		ThemeId:              m.ThemeId.ValueString(),
-	}
+	}, nil
 }
 
 func (r *appearanceProfileResource) toModel(p *v1alpha11.AppearanceProfile, m *appearanceProfileModel) {
@@ -78,7 +87,13 @@ func (r *appearanceProfileResource) Create(ctx context.Context, request resource
 		return
 	}
 
-	req := &v1alpha1.CreateAppearanceProfileRequest{AppearanceProfile: r.toProto(&data)}
+	val, err := r.toProto(&data)
+	if err != nil {
+		response.Diagnostics.AddError("Error Converting AppearanceProfile to Proto", err.Error())
+		return
+	}
+
+	req := &v1alpha1.CreateAppearanceProfileRequest{AppearanceProfile: val}
 	resp, err := r.client.CreateAppearanceProfile(ctx, req)
 	if err != nil {
 		response.Diagnostics.AddError("Error Creating AppearanceProfile", err.Error())
@@ -120,8 +135,14 @@ func (r *appearanceProfileResource) Update(ctx context.Context, request resource
 		return
 	}
 
+	val, err := r.toProto(&data)
+	if err != nil {
+		response.Diagnostics.AddError("Error Converting AppearanceProfile to Proto", err.Error())
+		return
+	}
+
 	req := &v1alpha1.UpdateAppearanceProfileRequest{
-		AppearanceProfile: r.toProto(&data),
+		AppearanceProfile: val,
 		Name:              r.toName(data),
 	}
 	resp, err := r.client.UpdateAppearanceProfile(ctx, req)

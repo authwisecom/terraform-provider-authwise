@@ -27,14 +27,14 @@ type secretModel struct {
 	Value    types.String `tfsdk:"value"`
 }
 
-func (r *secretResource) toProto(m *secretModel) *v1alpha11.Secret {
+func (r *secretResource) toProto(m *secretModel) (*v1alpha11.Secret, error) {
 	return &v1alpha11.Secret{
-		Encoding: nil,
+		Encoding: converted_encoding,
 		Id:       m.Id.ValueString(),
 		Name:     m.Name.ValueString(),
 		TenantId: m.TenantId.ValueString(),
 		Value:    m.Value.ValueString(),
-	}
+	}, nil
 }
 
 func (r *secretResource) toModel(p *v1alpha11.Secret, m *secretModel) {
@@ -73,7 +73,13 @@ func (r *secretResource) Create(ctx context.Context, request resource.CreateRequ
 		return
 	}
 
-	req := &v1alpha1.CreateSecretRequest{Secret: r.toProto(&data)}
+	val, err := r.toProto(&data)
+	if err != nil {
+		response.Diagnostics.AddError("Error Converting Secret to Proto", err.Error())
+		return
+	}
+
+	req := &v1alpha1.CreateSecretRequest{Secret: val}
 	resp, err := r.client.CreateSecret(ctx, req)
 	if err != nil {
 		response.Diagnostics.AddError("Error Creating Secret", err.Error())
@@ -115,9 +121,15 @@ func (r *secretResource) Update(ctx context.Context, request resource.UpdateRequ
 		return
 	}
 
+	val, err := r.toProto(&data)
+	if err != nil {
+		response.Diagnostics.AddError("Error Converting Secret to Proto", err.Error())
+		return
+	}
+
 	req := &v1alpha1.UpdateSecretRequest{
 		Name:   r.toName(data),
-		Secret: r.toProto(&data),
+		Secret: val,
 	}
 	resp, err := r.client.UpdateSecret(ctx, req)
 	if err != nil {

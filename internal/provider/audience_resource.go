@@ -31,15 +31,15 @@ type audienceModel struct {
 func (r *audienceResource) toName(data audienceModel) string {
 	return fmt.Sprintf("audiences/%s", data.Id.ValueString())
 }
-func (r *audienceResource) toProto(m *audienceModel) *v1alpha11.Audience {
+func (r *audienceResource) toProto(m *audienceModel) (*v1alpha11.Audience, error) {
 	return &v1alpha11.Audience{
 		AppearanceProfileId: m.AppearanceProfileId.ValueString(),
-		Config:              nil,
+		Config:              converted_config,
 		Description:         m.Description.ValueString(),
 		Id:                  m.Id.ValueString(),
 		Name:                m.Name.ValueString(),
 		TenantId:            m.TenantId.ValueString(),
-	}
+	}, nil
 }
 
 func (r *audienceResource) toModel(p *v1alpha11.Audience, m *audienceModel) {
@@ -79,7 +79,13 @@ func (r *audienceResource) Create(ctx context.Context, request resource.CreateRe
 		return
 	}
 
-	req := &v1alpha1.CreateAudienceRequest{Audience: r.toProto(&data)}
+	val, err := r.toProto(&data)
+	if err != nil {
+		response.Diagnostics.AddError("Error Converting Audience to Proto", err.Error())
+		return
+	}
+
+	req := &v1alpha1.CreateAudienceRequest{Audience: val}
 	resp, err := r.client.CreateAudience(ctx, req)
 	if err != nil {
 		response.Diagnostics.AddError("Error Creating Audience", err.Error())
@@ -121,8 +127,14 @@ func (r *audienceResource) Update(ctx context.Context, request resource.UpdateRe
 		return
 	}
 
+	val, err := r.toProto(&data)
+	if err != nil {
+		response.Diagnostics.AddError("Error Converting Audience to Proto", err.Error())
+		return
+	}
+
 	req := &v1alpha1.UpdateAudienceRequest{
-		Audience: r.toProto(&data),
+		Audience: val,
 		Name:     r.toName(data),
 	}
 	resp, err := r.client.UpdateAudience(ctx, req)

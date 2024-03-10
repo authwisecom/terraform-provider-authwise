@@ -11,4 +11,5 @@ const (
 	AuthwiseManagementClient   = "gitlab.authwise.io/authwise/api-client-go/authwise/management/v1alpha1"
 	TypesCore                  = "gitlab.authwise.io/authwise/api-client-go/authwise/types/core/v1alpha1"
 	TFLog                      = "github.com/hashicorp/terraform-plugin-log/tflog"
+	Util                       = "terraform-provider-authwise/internal/util"
 )

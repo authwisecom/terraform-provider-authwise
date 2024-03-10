@@ -29,13 +29,13 @@ type assetModel struct {
 func (r *assetResource) toName(data assetModel) string {
 	return fmt.Sprintf("assets/%s", data.Id.ValueString())
 }
-func (r *assetResource) toProto(m *assetModel) *v1alpha11.Asset {
+func (r *assetResource) toProto(m *assetModel) (*v1alpha11.Asset, error) {
 	return &v1alpha11.Asset{
 		Id:       m.Id.ValueString(),
 		MimeType: m.MimeType.ValueString(),
 		Name:     m.Name.ValueString(),
 		TenantId: m.TenantId.ValueString(),
-	}
+	}, nil
 }
 
 func (r *assetResource) toModel(p *v1alpha11.Asset, m *assetModel) {
@@ -74,7 +74,13 @@ func (r *assetResource) Create(ctx context.Context, request resource.CreateReque
 		return
 	}
 
-	req := &v1alpha1.CreateAssetRequest{Asset: r.toProto(&data)}
+	val, err := r.toProto(&data)
+	if err != nil {
+		response.Diagnostics.AddError("Error Converting Asset to Proto", err.Error())
+		return
+	}
+
+	req := &v1alpha1.CreateAssetRequest{Asset: val}
 	resp, err := r.client.CreateAsset(ctx, req)
 	if err != nil {
 		response.Diagnostics.AddError("Error Creating Asset", err.Error())
@@ -116,8 +122,14 @@ func (r *assetResource) Update(ctx context.Context, request resource.UpdateReque
 		return
 	}
 
+	val, err := r.toProto(&data)
+	if err != nil {
+		response.Diagnostics.AddError("Error Converting Asset to Proto", err.Error())
+		return
+	}
+
 	req := &v1alpha1.UpdateAssetRequest{
-		Asset: r.toProto(&data),
+		Asset: val,
 		Name:  r.toName(data),
 	}
 	resp, err := r.client.UpdateAsset(ctx, req)

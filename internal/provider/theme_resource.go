@@ -9,6 +9,7 @@ import (
 	tflog "github.com/hashicorp/terraform-plugin-log/tflog"
 	v1alpha1 "gitlab.authwise.io/authwise/api-client-go/authwise/management/v1alpha1"
 	v1alpha11 "gitlab.authwise.io/authwise/api-client-go/authwise/types/core/v1alpha1"
+	util "terraform-provider-authwise/internal/util"
 )
 
 type themeResource struct {
@@ -28,15 +29,23 @@ type themeModel struct {
 	Content              types.Object `tfsdk:"content"`
 }
 
-func (r *themeResource) toProto(m *themeModel) *v1alpha11.Theme {
+func (r *themeResource) toProto(m *themeModel) (*v1alpha11.Theme, error) {
+	converted_stylesheetattributes, err := util.ObjectToProtoStruct(m.StylesheetAttributes)
+	if err != nil {
+		return nil, err
+	}
+	converted_content, err := util.ObjectToProtoStruct(m.Content)
+	if err != nil {
+		return nil, err
+	}
 	return &v1alpha11.Theme{
-		Content:              nil,
+		Content:              converted_content,
 		Id:                   m.Id.ValueString(),
 		Name:                 m.Name.ValueString(),
 		Stylesheet:           m.Stylesheet.ValueString(),
-		StylesheetAttributes: nil,
+		StylesheetAttributes: converted_stylesheetattributes,
 		TenantId:             m.TenantId.ValueString(),
-	}
+	}, nil
 }
 
 func (r *themeResource) toModel(p *v1alpha11.Theme, m *themeModel) {
@@ -75,7 +84,13 @@ func (r *themeResource) Create(ctx context.Context, request resource.CreateReque
 		return
 	}
 
-	req := &v1alpha1.CreateThemeRequest{Theme: r.toProto(&data)}
+	val, err := r.toProto(&data)
+	if err != nil {
+		response.Diagnostics.AddError("Error Converting Theme to Proto", err.Error())
+		return
+	}
+
+	req := &v1alpha1.CreateThemeRequest{Theme: val}
 	resp, err := r.client.CreateTheme(ctx, req)
 	if err != nil {
 		response.Diagnostics.AddError("Error Creating Theme", err.Error())
@@ -117,9 +132,15 @@ func (r *themeResource) Update(ctx context.Context, request resource.UpdateReque
 		return
 	}
 
+	val, err := r.toProto(&data)
+	if err != nil {
+		response.Diagnostics.AddError("Error Converting Theme to Proto", err.Error())
+		return
+	}
+
 	req := &v1alpha1.UpdateThemeRequest{
 		Name:  r.toName(data),
-		Theme: r.toProto(&data),
+		Theme: val,
 	}
 	resp, err := r.client.UpdateTheme(ctx, req)
 	if err != nil {

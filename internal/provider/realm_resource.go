@@ -30,14 +30,14 @@ type realmModel struct {
 func (r *realmResource) toName(data realmModel) string {
 	return fmt.Sprintf("realms/%s", data.Id.ValueString())
 }
-func (r *realmResource) toProto(m *realmModel) *v1alpha11.Realm {
+func (r *realmResource) toProto(m *realmModel) (*v1alpha11.Realm, error) {
 	return &v1alpha11.Realm{
 		Description:      m.Description.ValueString(),
 		Id:               m.Id.ValueString(),
 		Name:             m.Name.ValueString(),
 		TenantId:         m.TenantId.ValueString(),
 		UserDatabaseType: m.UserDatabaseType.ValueString(),
-	}
+	}, nil
 }
 
 func (r *realmResource) toModel(p *v1alpha11.Realm, m *realmModel) {
@@ -77,7 +77,13 @@ func (r *realmResource) Create(ctx context.Context, request resource.CreateReque
 		return
 	}
 
-	req := &v1alpha1.CreateRealmRequest{Realm: r.toProto(&data)}
+	val, err := r.toProto(&data)
+	if err != nil {
+		response.Diagnostics.AddError("Error Converting Realm to Proto", err.Error())
+		return
+	}
+
+	req := &v1alpha1.CreateRealmRequest{Realm: val}
 	resp, err := r.client.CreateRealm(ctx, req)
 	if err != nil {
 		response.Diagnostics.AddError("Error Creating Realm", err.Error())
@@ -119,9 +125,15 @@ func (r *realmResource) Update(ctx context.Context, request resource.UpdateReque
 		return
 	}
 
+	val, err := r.toProto(&data)
+	if err != nil {
+		response.Diagnostics.AddError("Error Converting Realm to Proto", err.Error())
+		return
+	}
+
 	req := &v1alpha1.UpdateRealmRequest{
 		Name:  r.toName(data),
-		Realm: r.toProto(&data),
+		Realm: val,
 	}
 	resp, err := r.client.UpdateRealm(ctx, req)
 	if err != nil {

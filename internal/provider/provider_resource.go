@@ -9,6 +9,7 @@ import (
 	tflog "github.com/hashicorp/terraform-plugin-log/tflog"
 	v1alpha1 "gitlab.authwise.io/authwise/api-client-go/authwise/management/v1alpha1"
 	v1alpha11 "gitlab.authwise.io/authwise/api-client-go/authwise/types/core/v1alpha1"
+	util "terraform-provider-authwise/internal/util"
 )
 
 type providerResource struct {
@@ -27,14 +28,18 @@ type providerModel struct {
 	Config       types.Object `tfsdk:"config"`
 }
 
-func (r *providerResource) toProto(m *providerModel) *v1alpha11.Provider {
+func (r *providerResource) toProto(m *providerModel) (*v1alpha11.Provider, error) {
+	converted_config, err := util.ObjectToProtoAny(m.Config)
+	if err != nil {
+		return nil, err
+	}
 	return &v1alpha11.Provider{
-		Config:       nil,
+		Config:       converted_config,
 		Id:           m.Id.ValueString(),
 		Name:         m.Name.ValueString(),
 		ProviderType: m.ProviderType.ValueString(),
 		RealmId:      m.RealmId.ValueString(),
-	}
+	}, nil
 }
 
 func (r *providerResource) toModel(p *v1alpha11.Provider, m *providerModel) {
@@ -73,7 +78,13 @@ func (r *providerResource) Create(ctx context.Context, request resource.CreateRe
 		return
 	}
 
-	req := &v1alpha1.CreateProviderRequest{Provider: r.toProto(&data)}
+	val, err := r.toProto(&data)
+	if err != nil {
+		response.Diagnostics.AddError("Error Converting Provider to Proto", err.Error())
+		return
+	}
+
+	req := &v1alpha1.CreateProviderRequest{Provider: val}
 	resp, err := r.client.CreateProvider(ctx, req)
 	if err != nil {
 		response.Diagnostics.AddError("Error Creating Provider", err.Error())
@@ -115,9 +126,15 @@ func (r *providerResource) Update(ctx context.Context, request resource.UpdateRe
 		return
 	}
 
+	val, err := r.toProto(&data)
+	if err != nil {
+		response.Diagnostics.AddError("Error Converting Provider to Proto", err.Error())
+		return
+	}
+
 	req := &v1alpha1.UpdateProviderRequest{
 		Name:     r.toName(data),
-		Provider: r.toProto(&data),
+		Provider: val,
 	}
 	resp, err := r.client.UpdateProvider(ctx, req)
 	if err != nil {

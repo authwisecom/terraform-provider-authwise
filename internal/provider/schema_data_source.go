@@ -595,6 +595,10 @@ func GenSchemaRealmDataSource(ctx context.Context) schema.Schema {
 			Description: "",
 			Optional:    true,
 		},
+		"id": schema.StringAttribute{
+			Description: "",
+			Optional:    true,
+		},
 		"name": schema.StringAttribute{
 			Description: "",
 			Optional:    true,

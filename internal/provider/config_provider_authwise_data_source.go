@@ -18,7 +18,7 @@ func NewProviderAuthwise() datasource.DataSource {
 type providerAuthwiseDataSourceModel struct {
 	Issuer   types.String `tfsdk:"issuer"`
 	ClientId types.String `tfsdk:"client_id"`
-	Json     types.String `tfsdk:"json"`
+	Type     types.String `tfsdk:"type"`
 }
 
 func (r *providerAuthwiseDataSource) Metadata(ctx context.Context, request datasource.MetadataRequest, response *datasource.MetadataResponse) {

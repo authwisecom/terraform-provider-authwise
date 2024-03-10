@@ -17,7 +17,7 @@ func NewTenantUrlConfig() datasource.DataSource {
 
 type tenantUrlConfigDataSourceModel struct {
 	CookieDomain types.String `tfsdk:"cookie_domain"`
-	Json         types.String `tfsdk:"json"`
+	Type         types.String `tfsdk:"type"`
 }
 
 func (r *tenantUrlConfigDataSource) Metadata(ctx context.Context, request datasource.MetadataRequest, response *datasource.MetadataResponse) {

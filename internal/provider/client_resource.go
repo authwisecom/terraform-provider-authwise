@@ -9,6 +9,7 @@ import (
 	tflog "github.com/hashicorp/terraform-plugin-log/tflog"
 	v1alpha1 "gitlab.authwise.io/authwise/api-client-go/authwise/management/v1alpha1"
 	v1alpha11 "gitlab.authwise.io/authwise/api-client-go/authwise/types/core/v1alpha1"
+	util "terraform-provider-authwise/internal/util"
 )
 
 type clientResource struct {
@@ -35,19 +36,27 @@ type clientModel struct {
 func (r *clientResource) toName(data clientModel) string {
 	return fmt.Sprintf("clients/%s", data.Id.ValueString())
 }
-func (r *clientResource) toProto(m *clientModel) *v1alpha11.Client {
+func (r *clientResource) toProto(m *clientModel) (*v1alpha11.Client, error) {
+	converted_config, err := util.ObjectToProtoAny(m.Config)
+	if err != nil {
+		return nil, err
+	}
+	converted_metadata, err := util.ObjectToProtoStruct(m.Metadata)
+	if err != nil {
+		return nil, err
+	}
 	return &v1alpha11.Client{
 		Alias:               m.Alias.ValueString(),
 		AppearanceProfileId: m.AppearanceProfileId.ValueString(),
 		AudienceId:          m.AudienceId.ValueString(),
-		Config:              nil,
+		Config:              converted_config,
 		GrantType:           m.GrantType.ValueString(),
 		Id:                  m.Id.ValueString(),
 		LoginUrl:            m.LoginUrl.ValueString(),
 		LogoId:              m.LogoId.ValueString(),
-		Metadata:            nil,
+		Metadata:            converted_metadata,
 		Name:                m.Name.ValueString(),
-	}
+	}, nil
 }
 
 func (r *clientResource) toModel(p *v1alpha11.Client, m *clientModel) {
@@ -90,7 +99,13 @@ func (r *clientResource) Create(ctx context.Context, request resource.CreateRequ
 		return
 	}
 
-	req := &v1alpha1.CreateClientRequest{Client: r.toProto(&data)}
+	val, err := r.toProto(&data)
+	if err != nil {
+		response.Diagnostics.AddError("Error Converting Client to Proto", err.Error())
+		return
+	}
+
+	req := &v1alpha1.CreateClientRequest{Client: val}
 	resp, err := r.client.CreateClient(ctx, req)
 	if err != nil {
 		response.Diagnostics.AddError("Error Creating Client", err.Error())
@@ -132,8 +147,14 @@ func (r *clientResource) Update(ctx context.Context, request resource.UpdateRequ
 		return
 	}
 
+	val, err := r.toProto(&data)
+	if err != nil {
+		response.Diagnostics.AddError("Error Converting Client to Proto", err.Error())
+		return
+	}
+
 	req := &v1alpha1.UpdateClientRequest{
-		Client: r.toProto(&data),
+		Client: val,
 		Name:   r.toName(data),
 	}
 	resp, err := r.client.UpdateClient(ctx, req)

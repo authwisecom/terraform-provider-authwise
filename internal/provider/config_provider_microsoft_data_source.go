@@ -21,7 +21,7 @@ type providerMicrosoftDataSourceModel struct {
 	ClientSecret types.String `tfsdk:"client_secret"`
 	PromptStyle  types.String `tfsdk:"prompt_style"`
 	Tenant       types.String `tfsdk:"tenant"`
-	Json         types.String `tfsdk:"json"`
+	Type         types.String `tfsdk:"type"`
 }
 
 func (r *providerMicrosoftDataSource) Metadata(ctx context.Context, request datasource.MetadataRequest, response *datasource.MetadataResponse) {

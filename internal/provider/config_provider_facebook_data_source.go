@@ -20,7 +20,7 @@ type providerFacebookDataSourceModel struct {
 	ClientSecret types.String `tfsdk:"client_secret"`
 	Scope        types.String `tfsdk:"scope"`
 	UserFields   types.String `tfsdk:"user_fields"`
-	Json         types.String `tfsdk:"json"`
+	Type         types.String `tfsdk:"type"`
 }
 
 func (r *providerFacebookDataSource) Metadata(ctx context.Context, request datasource.MetadataRequest, response *datasource.MetadataResponse) {

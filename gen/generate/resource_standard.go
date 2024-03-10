@@ -174,23 +174,49 @@ func (s *standardResourceHandler) toName(f *j.File, m *protogen.Message, structN
 	)
 }
 
+func (s *standardResourceHandler) objectToProtoStruct(objMap *map[string]interface{}, protoType string) {
+
+}
+
 // TODO - handle objects
 func (s *standardResourceHandler) toProto(f *j.File, m *protogen.Message, structName string, l zerolog.Logger) {
 	name := m.GoIdent.GoName
+	//type field fi.Desc.FullName()
+
+	errCheck := j.If(j.Id("err").Op("!=").Nil().Block(j.Return(j.Nil(), j.Id("err"))))
+
+	var conversions []j.Code
 	dict := j.DictFunc(func(d j.Dict) {
 		for _, fi := range m.Fields {
-			valueFunc := "nil"
+			valueFunc := ""
 			switch fi.Desc.Kind() {
 			case protoreflect.StringKind:
 				valueFunc = "ValueString"
 			case protoreflect.BoolKind:
 				valueFunc = "ValueBool"
-			default:
-				valueFunc = "nil"
+			case protoreflect.Int64Kind:
+				valueFunc = "ValueInt64"
+			case protoreflect.MessageKind:
+				//objects
+				switch fi.Desc.Message().FullName().Name() {
+				case "Any":
+					code := j.List(
+						j.Id(ConversionName(strings.ToLower(fi.GoName))),
+						j.Id("err")).Op(":=").Qual(Util, "ObjectToProtoAny").Call(j.Id("m").Dot(fi.GoName)).Line().Add(errCheck)
+					conversions = append(conversions, code)
+				case "Struct":
+					code := j.List(
+						j.Id(ConversionName(strings.ToLower(fi.GoName))),
+						j.Id("err")).Op(":=").Qual(Util, "ObjectToProtoStruct").Call(j.Id("m").Dot(fi.GoName)).Line().Add(errCheck)
+					conversions = append(conversions, code)
+				}
 			}
-			if valueFunc == "nil" {
-				d[j.Id(fi.GoName)] = j.Nil()
+
+			if valueFunc == "" {
+				//objects requiring conversion
+				d[j.Id(fi.GoName)] = j.Id(ConversionName(strings.ToLower(fi.GoName)))
 			} else {
+				//standard
 				d[j.Id(fi.GoName)] = j.Id("m").Dot(fi.GoName).Dot(valueFunc).Call()
 			}
 		}
@@ -198,12 +224,13 @@ func (s *standardResourceHandler) toProto(f *j.File, m *protogen.Message, struct
 
 	f.Func().Params(j.Id("r").Op("*").Id(structName)).Id("toProto").Params(
 		j.Id("m").Op("*").Qual("", s.modelName(m)),
-	).Op("*").Qual(TypesCore, name).Block(
-		j.Return(
+	).Parens(j.List(j.Op("*").Qual(TypesCore, name), j.Id("error"))).Block(
+		append(conversions, j.Return(
 			j.Op("&").Qual(TypesCore, name).Values(
 				dict,
 			),
-		),
+			j.Nil(),
+		))...,
 	).Line()
 }
 
@@ -271,18 +298,35 @@ func (s *standardResourceHandler) schema(f *j.File, m *protogen.Message, structN
 	)
 }
 
+// TODO - make this common?
+func (s *standardResourceHandler) protoConversion(name string) []j.Code {
+	return []j.Code{
+		j.List(j.Id("val"), j.Id("err")).Op(":=").Id("r").Dot("toProto").Call(j.Op("&").Id("data")).Line(),
+		j.If(
+			j.Id("err").Op("!=").Nil().Block(
+				j.Id("response").Dot("Diagnostics").Dot("AddError").Call(
+					j.Lit(fmt.Sprintf("Error Converting %s to Proto", name)),
+					j.Id("err").Dot("Error").Call(),
+				),
+				j.Return(),
+			),
+		).Line(),
+	}
+}
+
 // TODO - request objects can have arbitrary fields
 func (s *standardResourceHandler) create(f *j.File, m *protogen.Message, structName string, l zerolog.Logger) {
 	name := m.GoIdent.GoName
 
 	s.requestResponseMethod(f, structName, "Create",
 		s.crudMethodTemplate(m, "create", false, true,
+			j.Add(s.protoConversion(name)...).Line(),
 			j.Id("req").Op(":=").Op("&").Qual(
 				AuthwiseManagementClient,
 				fmt.Sprintf("Create%sRequest", name),
 			).Values(
 				j.Dict{
-					j.Id(name): j.Id("r").Dot("toProto").Call(j.Op("&").Id("data")),
+					j.Id(name): j.Id("val"),
 				}).Line(),
 			j.List(j.Id("resp"), j.Id("err")).Op(":=").Id("r").Dot("client").Dot(
 				fmt.Sprintf("Create%s", name),
@@ -332,6 +376,7 @@ func (s *standardResourceHandler) update(f *j.File, m *protogen.Message, structN
 
 	s.requestResponseMethod(f, structName, "Update",
 		s.crudMethodTemplate(m, "update", false, true,
+			j.Add(s.protoConversion(name)...).Line(),
 			j.Id("req").Op(":=").Op("&").Qual(
 				AuthwiseManagementClient,
 				fmt.Sprintf("Update%sRequest", name),
@@ -340,7 +385,7 @@ func (s *standardResourceHandler) update(f *j.File, m *protogen.Message, structN
 					j.Id("Name"): j.Id("r").Dot("toName").Call(
 						j.Id("data"),
 					),
-					j.Id(name): j.Id("r").Dot("toProto").Call(j.Op("&").Id("data")),
+					j.Id(name): j.Id("val"),
 				},
 			).Line(),
 			j.List(j.Id("resp"), j.Id("err")).Op(":=").Id("r").Dot("client").Dot(

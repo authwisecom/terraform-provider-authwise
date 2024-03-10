@@ -21,7 +21,7 @@ type audienceConfigDataSourceModel struct {
 	Scopes                   types.Object `tfsdk:"scopes"`
 	Cors                     types.Object `tfsdk:"cors"`
 	Logging                  types.Object `tfsdk:"logging"`
-	Json                     types.String `tfsdk:"json"`
+	Type                     types.String `tfsdk:"type"`
 }
 
 func (r *audienceConfigDataSource) Metadata(ctx context.Context, request datasource.MetadataRequest, response *datasource.MetadataResponse) {

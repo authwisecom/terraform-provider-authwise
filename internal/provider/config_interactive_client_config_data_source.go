@@ -21,7 +21,7 @@ type interactiveClientConfigDataSourceModel struct {
 	AccessTokenExpireSeconds types.Object `tfsdk:"access_token_expire_seconds"`
 	Cors                     types.Object `tfsdk:"cors"`
 	Logging                  types.Object `tfsdk:"logging"`
-	Json                     types.String `tfsdk:"json"`
+	Type                     types.String `tfsdk:"type"`
 }
 
 func (r *interactiveClientConfigDataSource) Metadata(ctx context.Context, request datasource.MetadataRequest, response *datasource.MetadataResponse) {

@@ -21,7 +21,7 @@ type tenantConfigDataSourceModel struct {
 	CookieDomain             types.String `tfsdk:"cookie_domain"`
 	Cors                     types.Object `tfsdk:"cors"`
 	Logging                  types.Object `tfsdk:"logging"`
-	Json                     types.String `tfsdk:"json"`
+	Type                     types.String `tfsdk:"type"`
 }
 
 func (r *tenantConfigDataSource) Metadata(ctx context.Context, request datasource.MetadataRequest, response *datasource.MetadataResponse) {

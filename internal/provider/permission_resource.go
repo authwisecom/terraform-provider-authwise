@@ -25,12 +25,12 @@ type permissionModel struct {
 	Name       types.String `tfsdk:"name"`
 }
 
-func (r *permissionResource) toProto(m *permissionModel) *v1alpha11.Permission {
+func (r *permissionResource) toProto(m *permissionModel) (*v1alpha11.Permission, error) {
 	return &v1alpha11.Permission{
 		AudienceId: m.AudienceId.ValueString(),
 		Id:         m.Id.ValueString(),
 		Name:       m.Name.ValueString(),
-	}
+	}, nil
 }
 
 func (r *permissionResource) toModel(p *v1alpha11.Permission, m *permissionModel) {
@@ -68,7 +68,13 @@ func (r *permissionResource) Create(ctx context.Context, request resource.Create
 		return
 	}
 
-	req := &v1alpha1.CreatePermissionRequest{Permission: r.toProto(&data)}
+	val, err := r.toProto(&data)
+	if err != nil {
+		response.Diagnostics.AddError("Error Converting Permission to Proto", err.Error())
+		return
+	}
+
+	req := &v1alpha1.CreatePermissionRequest{Permission: val}
 	resp, err := r.client.CreatePermission(ctx, req)
 	if err != nil {
 		response.Diagnostics.AddError("Error Creating Permission", err.Error())
@@ -110,9 +116,15 @@ func (r *permissionResource) Update(ctx context.Context, request resource.Update
 		return
 	}
 
+	val, err := r.toProto(&data)
+	if err != nil {
+		response.Diagnostics.AddError("Error Converting Permission to Proto", err.Error())
+		return
+	}
+
 	req := &v1alpha1.UpdatePermissionRequest{
 		Name:       r.toName(data),
-		Permission: r.toProto(&data),
+		Permission: val,
 	}
 	resp, err := r.client.UpdatePermission(ctx, req)
 	if err != nil {

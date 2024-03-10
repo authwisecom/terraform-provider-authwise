@@ -26,13 +26,13 @@ type tenantModel struct {
 	Config              types.Object `tfsdk:"config"`
 }
 
-func (r *tenantResource) toProto(m *tenantModel) *v1alpha11.Tenant {
+func (r *tenantResource) toProto(m *tenantModel) (*v1alpha11.Tenant, error) {
 	return &v1alpha11.Tenant{
 		AppearanceProfileId: m.AppearanceProfileId.ValueString(),
-		Config:              nil,
+		Config:              converted_config,
 		Id:                  m.Id.ValueString(),
 		Name:                m.Name.ValueString(),
-	}
+	}, nil
 }
 
 func (r *tenantResource) toModel(p *v1alpha11.Tenant, m *tenantModel) {
@@ -70,7 +70,13 @@ func (r *tenantResource) Create(ctx context.Context, request resource.CreateRequ
 		return
 	}
 
-	req := &v1alpha1.CreateTenantRequest{Tenant: r.toProto(&data)}
+	val, err := r.toProto(&data)
+	if err != nil {
+		response.Diagnostics.AddError("Error Converting Tenant to Proto", err.Error())
+		return
+	}
+
+	req := &v1alpha1.CreateTenantRequest{Tenant: val}
 	resp, err := r.client.CreateTenant(ctx, req)
 	if err != nil {
 		response.Diagnostics.AddError("Error Creating Tenant", err.Error())
@@ -112,9 +118,15 @@ func (r *tenantResource) Update(ctx context.Context, request resource.UpdateRequ
 		return
 	}
 
+	val, err := r.toProto(&data)
+	if err != nil {
+		response.Diagnostics.AddError("Error Converting Tenant to Proto", err.Error())
+		return
+	}
+
 	req := &v1alpha1.UpdateTenantRequest{
 		Name:   r.toName(data),
-		Tenant: r.toProto(&data),
+		Tenant: val,
 	}
 	resp, err := r.client.UpdateTenant(ctx, req)
 	if err != nil {

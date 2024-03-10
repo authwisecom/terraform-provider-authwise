@@ -25,12 +25,12 @@ type tenantUrlModel struct {
 	Config   types.Object `tfsdk:"config"`
 }
 
-func (r *tenantUrlResource) toProto(m *tenantUrlModel) *v1alpha11.TenantUrl {
+func (r *tenantUrlResource) toProto(m *tenantUrlModel) (*v1alpha11.TenantUrl, error) {
 	return &v1alpha11.TenantUrl{
-		Config:   nil,
+		Config:   converted_config,
 		Id:       m.Id.ValueString(),
 		TenantId: m.TenantId.ValueString(),
-	}
+	}, nil
 }
 
 func (r *tenantUrlResource) toModel(p *v1alpha11.TenantUrl, m *tenantUrlModel) {
@@ -67,7 +67,13 @@ func (r *tenantUrlResource) Create(ctx context.Context, request resource.CreateR
 		return
 	}
 
-	req := &v1alpha1.CreateTenantUrlRequest{TenantUrl: r.toProto(&data)}
+	val, err := r.toProto(&data)
+	if err != nil {
+		response.Diagnostics.AddError("Error Converting TenantUrl to Proto", err.Error())
+		return
+	}
+
+	req := &v1alpha1.CreateTenantUrlRequest{TenantUrl: val}
 	resp, err := r.client.CreateTenantUrl(ctx, req)
 	if err != nil {
 		response.Diagnostics.AddError("Error Creating TenantUrl", err.Error())
@@ -109,9 +115,15 @@ func (r *tenantUrlResource) Update(ctx context.Context, request resource.UpdateR
 		return
 	}
 
+	val, err := r.toProto(&data)
+	if err != nil {
+		response.Diagnostics.AddError("Error Converting TenantUrl to Proto", err.Error())
+		return
+	}
+
 	req := &v1alpha1.UpdateTenantUrlRequest{
 		Name:      r.toName(data),
-		TenantUrl: r.toProto(&data),
+		TenantUrl: val,
 	}
 	resp, err := r.client.UpdateTenantUrl(ctx, req)
 	if err != nil {

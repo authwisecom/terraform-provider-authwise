@@ -20,7 +20,7 @@ type providerGoogleDataSourceModel struct {
 	ClientSecret types.String `tfsdk:"client_secret"`
 	Scope        types.String `tfsdk:"scope"`
 	Prompt       types.String `tfsdk:"prompt"`
-	Json         types.String `tfsdk:"json"`
+	Type         types.String `tfsdk:"type"`
 }
 
 func (r *providerGoogleDataSource) Metadata(ctx context.Context, request datasource.MetadataRequest, response *datasource.MetadataResponse) {

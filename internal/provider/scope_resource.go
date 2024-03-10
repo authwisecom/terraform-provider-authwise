@@ -26,13 +26,13 @@ type scopeModel struct {
 	Auto       types.Bool   `tfsdk:"auto"`
 }
 
-func (r *scopeResource) toProto(m *scopeModel) *v1alpha11.Scope {
+func (r *scopeResource) toProto(m *scopeModel) (*v1alpha11.Scope, error) {
 	return &v1alpha11.Scope{
 		AudienceId: m.AudienceId.ValueString(),
 		Auto:       m.Auto.ValueBool(),
 		Id:         m.Id.ValueString(),
 		Kind:       m.Kind.ValueString(),
-	}
+	}, nil
 }
 
 func (r *scopeResource) toModel(p *v1alpha11.Scope, m *scopeModel) {
@@ -71,7 +71,13 @@ func (r *scopeResource) Create(ctx context.Context, request resource.CreateReque
 		return
 	}
 
-	req := &v1alpha1.CreateScopeRequest{Scope: r.toProto(&data)}
+	val, err := r.toProto(&data)
+	if err != nil {
+		response.Diagnostics.AddError("Error Converting Scope to Proto", err.Error())
+		return
+	}
+
+	req := &v1alpha1.CreateScopeRequest{Scope: val}
 	resp, err := r.client.CreateScope(ctx, req)
 	if err != nil {
 		response.Diagnostics.AddError("Error Creating Scope", err.Error())
@@ -113,9 +119,15 @@ func (r *scopeResource) Update(ctx context.Context, request resource.UpdateReque
 		return
 	}
 
+	val, err := r.toProto(&data)
+	if err != nil {
+		response.Diagnostics.AddError("Error Converting Scope to Proto", err.Error())
+		return
+	}
+
 	req := &v1alpha1.UpdateScopeRequest{
 		Name:  r.toName(data),
-		Scope: r.toProto(&data),
+		Scope: val,
 	}
 	resp, err := r.client.UpdateScope(ctx, req)
 	if err != nil {

@@ -20,7 +20,7 @@ type providerAuth0DataSourceModel struct {
 	ClientSecret types.String `tfsdk:"client_secret"`
 	Scope        types.String `tfsdk:"scope"`
 	TenantUrl    types.String `tfsdk:"tenant_url"`
-	Json         types.String `tfsdk:"json"`
+	Type         types.String `tfsdk:"type"`
 }
 
 func (r *providerAuth0DataSource) Metadata(ctx context.Context, request datasource.MetadataRequest, response *datasource.MetadataResponse) {

@@ -26,13 +26,13 @@ type roleModel struct {
 	Auto       types.Bool   `tfsdk:"auto"`
 }
 
-func (r *roleResource) toProto(m *roleModel) *v1alpha11.Role {
+func (r *roleResource) toProto(m *roleModel) (*v1alpha11.Role, error) {
 	return &v1alpha11.Role{
 		AudienceId: m.AudienceId.ValueString(),
 		Auto:       m.Auto.ValueBool(),
 		Id:         m.Id.ValueString(),
 		Name:       m.Name.ValueString(),
-	}
+	}, nil
 }
 
 func (r *roleResource) toModel(p *v1alpha11.Role, m *roleModel) {
@@ -71,7 +71,13 @@ func (r *roleResource) Create(ctx context.Context, request resource.CreateReques
 		return
 	}
 
-	req := &v1alpha1.CreateRoleRequest{Role: r.toProto(&data)}
+	val, err := r.toProto(&data)
+	if err != nil {
+		response.Diagnostics.AddError("Error Converting Role to Proto", err.Error())
+		return
+	}
+
+	req := &v1alpha1.CreateRoleRequest{Role: val}
 	resp, err := r.client.CreateRole(ctx, req)
 	if err != nil {
 		response.Diagnostics.AddError("Error Creating Role", err.Error())
@@ -113,9 +119,15 @@ func (r *roleResource) Update(ctx context.Context, request resource.UpdateReques
 		return
 	}
 
+	val, err := r.toProto(&data)
+	if err != nil {
+		response.Diagnostics.AddError("Error Converting Role to Proto", err.Error())
+		return
+	}
+
 	req := &v1alpha1.UpdateRoleRequest{
 		Name: r.toName(data),
-		Role: r.toProto(&data),
+		Role: val,
 	}
 	resp, err := r.client.UpdateRole(ctx, req)
 	if err != nil {

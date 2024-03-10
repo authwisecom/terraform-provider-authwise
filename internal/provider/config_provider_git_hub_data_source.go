@@ -22,7 +22,7 @@ type providerGitHubDataSourceModel struct {
 	Prompt       types.String `tfsdk:"prompt"`
 	Display      types.String `tfsdk:"display"`
 	Scope        types.String `tfsdk:"scope"`
-	Json         types.String `tfsdk:"json"`
+	Type         types.String `tfsdk:"type"`
 }
 
 func (r *providerGitHubDataSource) Metadata(ctx context.Context, request datasource.MetadataRequest, response *datasource.MetadataResponse) {

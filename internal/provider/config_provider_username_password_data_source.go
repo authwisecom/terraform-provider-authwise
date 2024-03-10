@@ -19,7 +19,7 @@ type providerUsernamePasswordDataSourceModel struct {
 	ForwardUri         types.String `tfsdk:"forward_uri"`
 	PasswordHashType   types.String `tfsdk:"password_hash_type"`
 	PasswordValidators types.Object `tfsdk:"password_validators"`
-	Json               types.String `tfsdk:"json"`
+	Type               types.String `tfsdk:"type"`
 }
 
 func (r *providerUsernamePasswordDataSource) Metadata(ctx context.Context, request datasource.MetadataRequest, response *datasource.MetadataResponse) {

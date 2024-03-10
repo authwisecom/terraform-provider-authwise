@@ -13,7 +13,7 @@ pushd build
 cp -R $(go list -m -f '{{.Dir}}' gitlab.authwise.io/authwise/api-client-go)/proto/types-core/* .
 find . -type f | xargs chmod 644
 find . -type d | xargs chmod 755
-cp -R ../protoinject/* .
+# cp -R ../protoinject/* .
 
 cat << EOF > buf.gen.yaml
 version: v1

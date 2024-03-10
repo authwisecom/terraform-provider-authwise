@@ -20,7 +20,7 @@ type providerDropboxDataSourceModel struct {
 	ClientSecret         types.String `tfsdk:"client_secret"`
 	Scope                types.String `tfsdk:"scope"`
 	IncludeGrantedScopes types.String `tfsdk:"include_granted_scopes"`
-	Json                 types.String `tfsdk:"json"`
+	Type                 types.String `tfsdk:"type"`
 }
 
 func (r *providerDropboxDataSource) Metadata(ctx context.Context, request datasource.MetadataRequest, response *datasource.MetadataResponse) {

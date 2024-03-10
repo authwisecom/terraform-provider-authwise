@@ -238,7 +238,6 @@ func (s *standardDataSourceHandler) schema(f *j.File, m *protogen.Message, struc
 				j.Id("Attributes"): j.Map(j.String()).Qual(DataSourceSchema, "Attribute").Values(
 					j.DictFunc(func(d j.Dict) {
 						for _, v := range dsMeta.schemaIdentifiers {
-							l.Printf("test: %s", v)
 							d[j.Lit(v)] = j.Qual(DataSourceSchema, "StringAttribute").Values(
 								j.Dict{
 									j.Id("Description"): j.Lit(""),
