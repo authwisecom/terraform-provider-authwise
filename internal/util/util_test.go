@@ -15,7 +15,7 @@ func TestObjectToMap(t *testing.T) {
 	}
 
 	cases := map[string]s{
-		"test_all_types": {
+		"all_types": {
 			arrange: func() types.Object {
 				nestedTypes := map[string]attr.Type{
 					"nested": types.StringType,
@@ -66,3 +66,58 @@ func TestObjectToMap(t *testing.T) {
 		})
 	}
 }
+
+//func TestMapToAny(t *testing.T) {
+//
+//	type s struct {
+//		arrange func() types.Object
+//		assert  func(got *anypb.Any, err error)
+//	}
+//
+//	cases := map[string]s{
+//		"all_types": {
+//			arrange: func() types.Object {
+//				nestedTypes := map[string]attr.Type{
+//					"nested": types.StringType,
+//				}
+//				nested := map[string]attr.Value{
+//					"nested": types.StringValue("nested_val"),
+//				}
+//				elemTypes := map[string]attr.Type{
+//					"attr1": types.StringType,
+//					"attr2": types.Int64Type,
+//					"attr3": types.ObjectType{
+//						AttrTypes: nestedTypes,
+//					},
+//					"attr4": types.BoolType,
+//				}
+//				elems := map[string]attr.Value{
+//					"attr1": types.StringValue("test"),
+//					"attr2": types.Int64Value(20),
+//					"attr3": types.ObjectValueMust(nestedTypes, nested),
+//					"attr4": types.BoolValue(false),
+//				}
+//
+//				return types.ObjectValueMust(elemTypes, elems)
+//			},
+//			assert: func(got *anypb.Any, err error) {
+//				expected := &anypb.Any{
+//					TypeUrl: "",
+//					Value:   nil,
+//				}
+//				assert.Nil(t, err)
+//			},
+//		},
+//	}
+//
+//	for k, v := range cases {
+//		t.Run(k, func(t *testing.T) {
+//			obj := v.arrange()
+//
+//			got, err := ObjectToProtoAny(obj)
+//
+//			v.assert(got, err)
+//
+//		})
+//	}
+//}
