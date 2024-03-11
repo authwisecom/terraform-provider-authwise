@@ -174,10 +174,6 @@ func (s *standardResourceHandler) toName(f *j.File, m *protogen.Message, structN
 	)
 }
 
-func (s *standardResourceHandler) objectToProtoStruct(objMap *map[string]interface{}, protoType string) {
-
-}
-
 // TODO - handle objects
 func (s *standardResourceHandler) toProto(f *j.File, m *protogen.Message, structName string, l zerolog.Logger) {
 	name := m.GoIdent.GoName
@@ -209,6 +205,12 @@ func (s *standardResourceHandler) toProto(f *j.File, m *protogen.Message, struct
 						j.Id(ConversionName(strings.ToLower(fi.GoName))),
 						j.Id("err")).Op(":=").Qual(Util, "ObjectToProtoStruct").Call(j.Id("m").Dot(fi.GoName)).Line().Add(errCheck)
 					conversions = append(conversions, code)
+				default:
+					code := j.List(
+						j.Id(ConversionName(strings.ToLower(fi.GoName))),
+						j.Id("err")).Op(":=").Qual(Util, "ObjectToProtoConcrete").Types(j.Qual(TypesCore, ConfigurationObjectName(string(fi.Message.Desc.FullName().Name())))).Call(j.Id("m").Dot(fi.GoName)).Line().Add(errCheck)
+					conversions = append(conversions, code)
+					l.Debug().Msgf("test: %s", fi.Message.Desc.FullName().Name())
 				}
 			}
 

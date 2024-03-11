@@ -9,6 +9,7 @@ import (
 	tflog "github.com/hashicorp/terraform-plugin-log/tflog"
 	v1alpha1 "gitlab.authwise.io/authwise/api-client-go/authwise/management/v1alpha1"
 	v1alpha11 "gitlab.authwise.io/authwise/api-client-go/authwise/types/core/v1alpha1"
+	util "terraform-provider-authwise/internal/util"
 )
 
 type tenantResource struct {
@@ -27,6 +28,10 @@ type tenantModel struct {
 }
 
 func (r *tenantResource) toProto(m *tenantModel) (*v1alpha11.Tenant, error) {
+	converted_config, err := util.ObjectToProtoConcrete[v1alpha11.TenantConfig](m.Config)
+	if err != nil {
+		return nil, err
+	}
 	return &v1alpha11.Tenant{
 		AppearanceProfileId: m.AppearanceProfileId.ValueString(),
 		Config:              converted_config,

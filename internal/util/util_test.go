@@ -4,6 +4,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/stretchr/testify/assert"
+	"gitlab.authwise.io/authwise/api-client-go/authwise/types/core/v1alpha1"
 	"testing"
 )
 
@@ -60,6 +61,48 @@ func TestObjectToMap(t *testing.T) {
 			obj := v.arrange()
 
 			got, err := objectToMap(obj)
+
+			v.assert(got, err)
+
+		})
+	}
+}
+
+func TestObjectToConcrete(t *testing.T) {
+
+	type s[T any] struct {
+		arrange func() types.Object
+		assert  func(got *T, err error)
+	}
+
+	cases := map[string]s[v1alpha1.TenantUrlConfig]{
+		"concrete": {
+			arrange: func() types.Object {
+				elemTypes := map[string]attr.Type{
+					"cookie_domain": types.StringType,
+				}
+				elems := map[string]attr.Value{
+					"cookie_domain": types.StringValue("test"),
+				}
+
+				return types.ObjectValueMust(elemTypes, elems)
+			},
+			assert: func(got *v1alpha1.TenantUrlConfig, err error) {
+
+				expected := &v1alpha1.TenantUrlConfig{
+					CookieDomain: "test",
+				}
+				assert.Nil(t, err)
+				assert.Equal(t, expected.CookieDomain, got.CookieDomain)
+			},
+		},
+	}
+
+	for k, v := range cases {
+		t.Run(k, func(t *testing.T) {
+			obj := v.arrange()
+
+			got, err := ObjectToProtoConcrete[v1alpha1.TenantUrlConfig](obj)
 
 			v.assert(got, err)
 

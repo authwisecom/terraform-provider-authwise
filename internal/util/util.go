@@ -3,12 +3,18 @@ package util
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 	"google.golang.org/protobuf/types/known/structpb"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 )
+
+var protoUnmarshaller = protojson.UnmarshalOptions{
+	DiscardUnknown: true,
+}
 
 func ObjectToProtoAny(obj types.Object) (*anypb.Any, error) {
 	res := &anypb.Any{}
@@ -38,6 +44,33 @@ func ObjectToProtoStruct(obj types.Object) (*structpb.Struct, error) {
 		return nil, err
 	}
 	return res, nil
+}
+
+func ObjectToProtoConcrete[T any](obj types.Object) (*T, error) {
+	converted, err := objectToMap(obj)
+	if err != nil {
+		return nil, err
+	}
+	var res any
+	val := new(T)
+	res = val
+
+	jsonString, err := json.Marshal(converted)
+
+	if err != nil {
+		return nil, err
+	}
+	if msg, ok := res.(proto.Message); ok {
+		err = protoUnmarshaller.Unmarshal(jsonString, msg)
+		if err != nil {
+			return nil, err
+		}
+
+		return val, nil
+	} else {
+		return nil, errors.New("must be proto.Message")
+	}
+
 }
 
 func objectToMap(obj types.Object) (map[string]any, error) {

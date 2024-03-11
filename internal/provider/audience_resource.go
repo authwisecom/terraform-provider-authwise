@@ -9,6 +9,7 @@ import (
 	tflog "github.com/hashicorp/terraform-plugin-log/tflog"
 	v1alpha1 "gitlab.authwise.io/authwise/api-client-go/authwise/management/v1alpha1"
 	v1alpha11 "gitlab.authwise.io/authwise/api-client-go/authwise/types/core/v1alpha1"
+	util "terraform-provider-authwise/internal/util"
 )
 
 type audienceResource struct {
@@ -32,6 +33,10 @@ func (r *audienceResource) toName(data audienceModel) string {
 	return fmt.Sprintf("audiences/%s", data.Id.ValueString())
 }
 func (r *audienceResource) toProto(m *audienceModel) (*v1alpha11.Audience, error) {
+	converted_config, err := util.ObjectToProtoConcrete[v1alpha11.AudienceConfig](m.Config)
+	if err != nil {
+		return nil, err
+	}
 	return &v1alpha11.Audience{
 		AppearanceProfileId: m.AppearanceProfileId.ValueString(),
 		Config:              converted_config,

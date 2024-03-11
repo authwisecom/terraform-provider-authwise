@@ -63,6 +63,11 @@ func ConversionName(name string) string {
 	return fmt.Sprintf("converted_%s", name)
 }
 
+func ConfigurationObjectName(fullName string) string {
+	split := strings.Split(fullName, ".")
+	return split[len(split)-1]
+}
+
 type resourceMetadata struct {
 	nameFuncPattern     string //pattern, identifiers
 	nameFuncIdentifiers []string
