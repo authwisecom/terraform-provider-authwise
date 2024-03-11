@@ -29,6 +29,9 @@ type themeModel struct {
 	Content              types.Object `tfsdk:"content"`
 }
 
+func (r *themeResource) toName(data themeModel) string {
+	return fmt.Sprintf("themes/%s", data.Id.ValueString())
+}
 func (r *themeResource) toProto(m *themeModel) (*v1alpha11.Theme, error) {
 	converted_stylesheetattributes, err := util.ObjectToProtoStruct(m.StylesheetAttributes)
 	if err != nil {

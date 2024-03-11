@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	datasource "github.com/hashicorp/terraform-plugin-framework/datasource"
+	schema "github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
 	tflog "github.com/hashicorp/terraform-plugin-log/tflog"
 	v1alpha1 "gitlab.authwise.io/authwise/api-client-go/authwise/management/v1alpha1"
@@ -19,6 +20,9 @@ func NewProviderDataSource() datasource.DataSource {
 	return &providerDataSource{}
 }
 
+func (r *providerDataSource) toName(data providerDataSourceModel) string {
+	return fmt.Sprintf("providers/%s", data.Id.ValueString())
+}
 func (r *providerDataSource) toModel(p *v1alpha11.Provider, m *providerDataSourceModel) {
 	m.Id = types.StringValue(p.Id)
 	m.RealmId = types.StringValue(p.RealmId)
@@ -48,6 +52,13 @@ func (r *providerDataSource) Configure(ctx context.Context, request datasource.C
 
 func (r *providerDataSource) Metadata(ctx context.Context, request datasource.MetadataRequest, response *datasource.MetadataResponse) {
 	response.TypeName = request.ProviderTypeName + "_provider"
+}
+
+func (r *providerDataSource) Schema(ctx context.Context, request datasource.SchemaRequest, response *datasource.SchemaResponse) {
+	response.Schema = schema.Schema{Attributes: map[string]schema.Attribute{"id": schema.StringAttribute{
+		Description: "",
+		Required:    true,
+	}}}
 }
 
 func (r *providerDataSource) Read(ctx context.Context, request datasource.ReadRequest, response *datasource.ReadResponse) {

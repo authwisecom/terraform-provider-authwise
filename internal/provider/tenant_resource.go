@@ -27,6 +27,9 @@ type tenantModel struct {
 	Config              types.Object `tfsdk:"config"`
 }
 
+func (r *tenantResource) toName(data tenantModel) string {
+	return fmt.Sprintf("tenants/%s", data.Id.ValueString())
+}
 func (r *tenantResource) toProto(m *tenantModel) (*v1alpha11.Tenant, error) {
 	converted_config, err := util.ObjectToProtoConcrete[v1alpha11.TenantConfig](m.Config)
 	if err != nil {

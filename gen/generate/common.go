@@ -84,9 +84,45 @@ type resourceMap = map[string]*metadata
 
 // Config - only datasource
 var resourceMetadataMap = resourceMap{
+	"Tenant": &metadata{
+		resourceMetadata: &resourceMetadata{
+			nameFuncPattern:     "tenants/%s",
+			nameFuncIdentifiers: []string{"Id"},
+		},
+		datasourceMetadata: &datasourceMetadata{
+			schemaIdentifiers: []string{"id"},
+		},
+	},
+	"TenantUrl": &metadata{
+		resourceMetadata: &resourceMetadata{
+			nameFuncPattern:     "tenant_urls/%s",
+			nameFuncIdentifiers: []string{"Id"},
+		},
+		datasourceMetadata: &datasourceMetadata{
+			schemaIdentifiers: []string{"id"},
+		},
+	},
+	"Secret": &metadata{
+		resourceMetadata: &resourceMetadata{
+			nameFuncPattern:     "secrets/%s",
+			nameFuncIdentifiers: []string{"Id"},
+		},
+		datasourceMetadata: &datasourceMetadata{
+			schemaIdentifiers: []string{"id"},
+		},
+	},
 	"Client": &metadata{
 		resourceMetadata: &resourceMetadata{
 			nameFuncPattern:     "clients/%s",
+			nameFuncIdentifiers: []string{"Id"},
+		},
+		datasourceMetadata: &datasourceMetadata{
+			schemaIdentifiers: []string{"id"},
+		},
+	},
+	"Provider": &metadata{
+		resourceMetadata: &resourceMetadata{
+			nameFuncPattern:     "providers/%s",
 			nameFuncIdentifiers: []string{"Id"},
 		},
 		datasourceMetadata: &datasourceMetadata{
@@ -127,6 +163,42 @@ var resourceMetadataMap = resourceMap{
 		},
 		datasourceMetadata: &datasourceMetadata{
 			schemaIdentifiers: []string{"id"},
+		},
+	},
+	"Theme": &metadata{
+		resourceMetadata: &resourceMetadata{
+			nameFuncPattern:     "themes/%s",
+			nameFuncIdentifiers: []string{"Id"},
+		},
+		datasourceMetadata: &datasourceMetadata{
+			schemaIdentifiers: []string{"id"},
+		},
+	},
+	"Permission": &metadata{
+		resourceMetadata: &resourceMetadata{
+			nameFuncPattern:     "audiences/%s/permissions/%s",
+			nameFuncIdentifiers: []string{"AudienceId", "Id"},
+		},
+		datasourceMetadata: &datasourceMetadata{
+			schemaIdentifiers: []string{"id", "audience_id"},
+		},
+	},
+	"Scope": &metadata{
+		resourceMetadata: &resourceMetadata{
+			nameFuncPattern:     "audiences/%s/scopes/%s",
+			nameFuncIdentifiers: []string{"AudienceId", "Id"},
+		},
+		datasourceMetadata: &datasourceMetadata{
+			schemaIdentifiers: []string{"id", "audience_id"},
+		},
+	},
+	"Role": &metadata{
+		resourceMetadata: &resourceMetadata{
+			nameFuncPattern:     "audiences/%s/roles/%s",
+			nameFuncIdentifiers: []string{"AudienceId", "Id"},
+		},
+		datasourceMetadata: &datasourceMetadata{
+			schemaIdentifiers: []string{"id", "audience_id"},
 		},
 	},
 	"AudienceConfig": &metadata{

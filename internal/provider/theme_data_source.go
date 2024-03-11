@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	datasource "github.com/hashicorp/terraform-plugin-framework/datasource"
+	schema "github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
 	tflog "github.com/hashicorp/terraform-plugin-log/tflog"
 	v1alpha1 "gitlab.authwise.io/authwise/api-client-go/authwise/management/v1alpha1"
@@ -19,6 +20,9 @@ func NewThemeDataSource() datasource.DataSource {
 	return &themeDataSource{}
 }
 
+func (r *themeDataSource) toName(data themeDataSourceModel) string {
+	return fmt.Sprintf("themes/%s", data.Id.ValueString())
+}
 func (r *themeDataSource) toModel(p *v1alpha11.Theme, m *themeDataSourceModel) {
 	m.Id = types.StringValue(p.Id)
 	m.TenantId = types.StringValue(p.TenantId)
@@ -49,6 +53,13 @@ func (r *themeDataSource) Configure(ctx context.Context, request datasource.Conf
 
 func (r *themeDataSource) Metadata(ctx context.Context, request datasource.MetadataRequest, response *datasource.MetadataResponse) {
 	response.TypeName = request.ProviderTypeName + "_theme"
+}
+
+func (r *themeDataSource) Schema(ctx context.Context, request datasource.SchemaRequest, response *datasource.SchemaResponse) {
+	response.Schema = schema.Schema{Attributes: map[string]schema.Attribute{"id": schema.StringAttribute{
+		Description: "",
+		Required:    true,
+	}}}
 }
 
 func (r *themeDataSource) Read(ctx context.Context, request datasource.ReadRequest, response *datasource.ReadResponse) {

@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	datasource "github.com/hashicorp/terraform-plugin-framework/datasource"
+	schema "github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
 	tflog "github.com/hashicorp/terraform-plugin-log/tflog"
 	v1alpha1 "gitlab.authwise.io/authwise/api-client-go/authwise/management/v1alpha1"
@@ -19,6 +20,9 @@ func NewPermissionDataSource() datasource.DataSource {
 	return &permissionDataSource{}
 }
 
+func (r *permissionDataSource) toName(data permissionDataSourceModel) string {
+	return fmt.Sprintf("audiences/%s/permissions/%s", data.AudienceId.ValueString(), data.Id.ValueString())
+}
 func (r *permissionDataSource) toModel(p *v1alpha11.Permission, m *permissionDataSourceModel) {
 	m.Id = types.StringValue(p.Id)
 	m.AudienceId = types.StringValue(p.AudienceId)
@@ -45,6 +49,19 @@ func (r *permissionDataSource) Configure(ctx context.Context, request datasource
 
 func (r *permissionDataSource) Metadata(ctx context.Context, request datasource.MetadataRequest, response *datasource.MetadataResponse) {
 	response.TypeName = request.ProviderTypeName + "_permission"
+}
+
+func (r *permissionDataSource) Schema(ctx context.Context, request datasource.SchemaRequest, response *datasource.SchemaResponse) {
+	response.Schema = schema.Schema{Attributes: map[string]schema.Attribute{
+		"audience_id": schema.StringAttribute{
+			Description: "",
+			Required:    true,
+		},
+		"id": schema.StringAttribute{
+			Description: "",
+			Required:    true,
+		},
+	}}
 }
 
 func (r *permissionDataSource) Read(ctx context.Context, request datasource.ReadRequest, response *datasource.ReadResponse) {

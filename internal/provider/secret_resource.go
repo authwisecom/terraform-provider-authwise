@@ -23,11 +23,16 @@ type secretModel struct {
 	Id       types.String `tfsdk:"id"`
 	TenantId types.String `tfsdk:"tenant_id"`
 	Name     types.String `tfsdk:"name"`
-	Encoding types.Object `tfsdk:"encoding"`
+	Encoding types.Int64  `tfsdk:"encoding"`
 	Value    types.String `tfsdk:"value"`
 }
 
+func (r *secretResource) toName(data secretModel) string {
+	return fmt.Sprintf("secrets/%s", data.Id.ValueString())
+}
 func (r *secretResource) toProto(m *secretModel) (*v1alpha11.Secret, error) {
+	converted_encoding := v1alpha11.SECRET_ENCODING(m.Encoding.ValueInt64())
+
 	return &v1alpha11.Secret{
 		Encoding: converted_encoding,
 		Id:       m.Id.ValueString(),

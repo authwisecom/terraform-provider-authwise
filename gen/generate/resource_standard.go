@@ -93,6 +93,8 @@ func (s *standardResourceHandler) modelFields(fields []*protogen.Field) []j.Code
 			typeName = "String"
 		case protoreflect.BoolKind:
 			typeName = "Bool"
+		case protoreflect.EnumKind:
+			typeName = "Int64"
 		}
 		log.Debug().Str("kind", f.Desc.Kind().GoString()).Msg("processing model field")
 		result = append(result, j.Id(f.GoName).Qual(Types, typeName).Tag(map[string]string{
@@ -210,8 +212,12 @@ func (s *standardResourceHandler) toProto(f *j.File, m *protogen.Message, struct
 						j.Id(ConversionName(strings.ToLower(fi.GoName))),
 						j.Id("err")).Op(":=").Qual(Util, "ObjectToProtoConcrete").Types(j.Qual(TypesCore, ConfigurationObjectName(string(fi.Message.Desc.FullName().Name())))).Call(j.Id("m").Dot(fi.GoName)).Line().Add(errCheck)
 					conversions = append(conversions, code)
-					l.Debug().Msgf("test: %s", fi.Message.Desc.FullName().Name())
 				}
+			case protoreflect.EnumKind:
+				l.Debug().Msgf("test: %v", fi.Desc)
+				code := j.Id(ConversionName(string(fi.Desc.FullName().Name()))).Op(":=").
+					Qual(TypesCore, ConfigurationObjectName(string(fi.Desc.Enum().FullName().Name()))).Call(j.Id("m").Dot(fi.GoName).Dot("ValueInt64").Call()).Line()
+				conversions = append(conversions, code)
 			}
 
 			if valueFunc == "" {

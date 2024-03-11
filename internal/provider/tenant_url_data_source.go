@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	datasource "github.com/hashicorp/terraform-plugin-framework/datasource"
+	schema "github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
 	tflog "github.com/hashicorp/terraform-plugin-log/tflog"
 	v1alpha1 "gitlab.authwise.io/authwise/api-client-go/authwise/management/v1alpha1"
@@ -19,6 +20,9 @@ func NewTenantUrlDataSource() datasource.DataSource {
 	return &tenantUrlDataSource{}
 }
 
+func (r *tenantUrlDataSource) toName(data tenantUrlDataSourceModel) string {
+	return fmt.Sprintf("tenant_urls/%s", data.Id.ValueString())
+}
 func (r *tenantUrlDataSource) toModel(p *v1alpha11.TenantUrl, m *tenantUrlDataSourceModel) {
 	m.Id = types.StringValue(p.Id)
 	m.TenantId = types.StringValue(p.TenantId)
@@ -44,6 +48,13 @@ func (r *tenantUrlDataSource) Configure(ctx context.Context, request datasource.
 
 func (r *tenantUrlDataSource) Metadata(ctx context.Context, request datasource.MetadataRequest, response *datasource.MetadataResponse) {
 	response.TypeName = request.ProviderTypeName + "_tenant_url"
+}
+
+func (r *tenantUrlDataSource) Schema(ctx context.Context, request datasource.SchemaRequest, response *datasource.SchemaResponse) {
+	response.Schema = schema.Schema{Attributes: map[string]schema.Attribute{"id": schema.StringAttribute{
+		Description: "",
+		Required:    true,
+	}}}
 }
 
 func (r *tenantUrlDataSource) Read(ctx context.Context, request datasource.ReadRequest, response *datasource.ReadResponse) {

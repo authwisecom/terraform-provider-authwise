@@ -28,6 +28,9 @@ type providerModel struct {
 	Config       types.Object `tfsdk:"config"`
 }
 
+func (r *providerResource) toName(data providerModel) string {
+	return fmt.Sprintf("providers/%s", data.Id.ValueString())
+}
 func (r *providerResource) toProto(m *providerModel) (*v1alpha11.Provider, error) {
 	converted_config, err := util.ObjectToProtoAny(m.Config)
 	if err != nil {

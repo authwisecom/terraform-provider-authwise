@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	datasource "github.com/hashicorp/terraform-plugin-framework/datasource"
+	schema "github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
 	tflog "github.com/hashicorp/terraform-plugin-log/tflog"
 	v1alpha1 "gitlab.authwise.io/authwise/api-client-go/authwise/management/v1alpha1"
@@ -19,6 +20,9 @@ func NewRoleDataSource() datasource.DataSource {
 	return &roleDataSource{}
 }
 
+func (r *roleDataSource) toName(data roleDataSourceModel) string {
+	return fmt.Sprintf("audiences/%s/roles/%s", data.AudienceId.ValueString(), data.Id.ValueString())
+}
 func (r *roleDataSource) toModel(p *v1alpha11.Role, m *roleDataSourceModel) {
 	m.Id = types.StringValue(p.Id)
 	m.AudienceId = types.StringValue(p.AudienceId)
@@ -47,6 +51,19 @@ func (r *roleDataSource) Configure(ctx context.Context, request datasource.Confi
 
 func (r *roleDataSource) Metadata(ctx context.Context, request datasource.MetadataRequest, response *datasource.MetadataResponse) {
 	response.TypeName = request.ProviderTypeName + "_role"
+}
+
+func (r *roleDataSource) Schema(ctx context.Context, request datasource.SchemaRequest, response *datasource.SchemaResponse) {
+	response.Schema = schema.Schema{Attributes: map[string]schema.Attribute{
+		"audience_id": schema.StringAttribute{
+			Description: "",
+			Required:    true,
+		},
+		"id": schema.StringAttribute{
+			Description: "",
+			Required:    true,
+		},
+	}}
 }
 
 func (r *roleDataSource) Read(ctx context.Context, request datasource.ReadRequest, response *datasource.ReadResponse) {

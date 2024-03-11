@@ -26,6 +26,9 @@ type roleModel struct {
 	Auto       types.Bool   `tfsdk:"auto"`
 }
 
+func (r *roleResource) toName(data roleModel) string {
+	return fmt.Sprintf("audiences/%s/roles/%s", data.AudienceId.ValueString(), data.Id.ValueString())
+}
 func (r *roleResource) toProto(m *roleModel) (*v1alpha11.Role, error) {
 	return &v1alpha11.Role{
 		AudienceId: m.AudienceId.ValueString(),
