@@ -36,10 +36,11 @@ func (r *permissionResource) toProto(m *permissionModel) (*v1alpha11.Permission,
 	}, nil
 }
 
-func (r *permissionResource) toModel(p *v1alpha11.Permission, m *permissionModel) {
+func (r *permissionResource) toModel(p *v1alpha11.Permission, m *permissionModel) error {
 	m.Id = types.StringValue(p.Id)
 	m.AudienceId = types.StringValue(p.AudienceId)
 	m.Name = types.StringValue(p.Name)
+	return nil
 }
 
 func (r *permissionResource) Configure(ctx context.Context, request resource.ConfigureRequest, response *resource.ConfigureResponse) {
@@ -84,7 +85,11 @@ func (r *permissionResource) Create(ctx context.Context, request resource.Create
 		return
 	}
 
-	r.toModel(resp, &data)
+	err = r.toModel(resp, &data)
+	if err != nil {
+		response.Diagnostics.AddError("Error Converting Permission to Model", err.Error())
+		return
+	}
 	tflog.Trace(ctx, "permission create")
 	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
 }
@@ -105,7 +110,11 @@ func (r *permissionResource) Read(ctx context.Context, request resource.ReadRequ
 		return
 	}
 
-	r.toModel(resp, &data)
+	err = r.toModel(resp, &data)
+	if err != nil {
+		response.Diagnostics.AddError("Error Converting Permission to Model", err.Error())
+		return
+	}
 	tflog.Trace(ctx, "permission read")
 	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
 }
@@ -135,7 +144,11 @@ func (r *permissionResource) Update(ctx context.Context, request resource.Update
 		return
 	}
 
-	r.toModel(resp, &data)
+	err = r.toModel(resp, &data)
+	if err != nil {
+		response.Diagnostics.AddError("Error Converting Permission to Model", err.Error())
+		return
+	}
 	tflog.Trace(ctx, "permission update")
 	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
 }

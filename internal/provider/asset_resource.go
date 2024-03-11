@@ -38,11 +38,12 @@ func (r *assetResource) toProto(m *assetModel) (*v1alpha11.Asset, error) {
 	}, nil
 }
 
-func (r *assetResource) toModel(p *v1alpha11.Asset, m *assetModel) {
+func (r *assetResource) toModel(p *v1alpha11.Asset, m *assetModel) error {
 	m.Id = types.StringValue(p.Id)
 	m.TenantId = types.StringValue(p.TenantId)
 	m.Name = types.StringValue(p.Name)
 	m.MimeType = types.StringValue(p.MimeType)
+	return nil
 }
 
 func (r *assetResource) Configure(ctx context.Context, request resource.ConfigureRequest, response *resource.ConfigureResponse) {
@@ -87,7 +88,11 @@ func (r *assetResource) Create(ctx context.Context, request resource.CreateReque
 		return
 	}
 
-	r.toModel(resp, &data)
+	err = r.toModel(resp, &data)
+	if err != nil {
+		response.Diagnostics.AddError("Error Converting Asset to Model", err.Error())
+		return
+	}
 	tflog.Trace(ctx, "asset create")
 	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
 }
@@ -108,7 +113,11 @@ func (r *assetResource) Read(ctx context.Context, request resource.ReadRequest, 
 		return
 	}
 
-	r.toModel(resp, &data)
+	err = r.toModel(resp, &data)
+	if err != nil {
+		response.Diagnostics.AddError("Error Converting Asset to Model", err.Error())
+		return
+	}
 	tflog.Trace(ctx, "asset read")
 	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
 }
@@ -138,7 +147,11 @@ func (r *assetResource) Update(ctx context.Context, request resource.UpdateReque
 		return
 	}
 
-	r.toModel(resp, &data)
+	err = r.toModel(resp, &data)
+	if err != nil {
+		response.Diagnostics.AddError("Error Converting Asset to Model", err.Error())
+		return
+	}
 	tflog.Trace(ctx, "asset update")
 	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
 }

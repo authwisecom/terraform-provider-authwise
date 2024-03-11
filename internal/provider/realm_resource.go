@@ -40,12 +40,13 @@ func (r *realmResource) toProto(m *realmModel) (*v1alpha11.Realm, error) {
 	}, nil
 }
 
-func (r *realmResource) toModel(p *v1alpha11.Realm, m *realmModel) {
+func (r *realmResource) toModel(p *v1alpha11.Realm, m *realmModel) error {
 	m.Id = types.StringValue(p.Id)
 	m.TenantId = types.StringValue(p.TenantId)
 	m.UserDatabaseType = types.StringValue(p.UserDatabaseType)
 	m.Name = types.StringValue(p.Name)
 	m.Description = types.StringValue(p.Description)
+	return nil
 }
 
 func (r *realmResource) Configure(ctx context.Context, request resource.ConfigureRequest, response *resource.ConfigureResponse) {
@@ -90,7 +91,11 @@ func (r *realmResource) Create(ctx context.Context, request resource.CreateReque
 		return
 	}
 
-	r.toModel(resp, &data)
+	err = r.toModel(resp, &data)
+	if err != nil {
+		response.Diagnostics.AddError("Error Converting Realm to Model", err.Error())
+		return
+	}
 	tflog.Trace(ctx, "realm create")
 	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
 }
@@ -111,7 +116,11 @@ func (r *realmResource) Read(ctx context.Context, request resource.ReadRequest, 
 		return
 	}
 
-	r.toModel(resp, &data)
+	err = r.toModel(resp, &data)
+	if err != nil {
+		response.Diagnostics.AddError("Error Converting Realm to Model", err.Error())
+		return
+	}
 	tflog.Trace(ctx, "realm read")
 	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
 }
@@ -141,7 +150,11 @@ func (r *realmResource) Update(ctx context.Context, request resource.UpdateReque
 		return
 	}
 
-	r.toModel(resp, &data)
+	err = r.toModel(resp, &data)
+	if err != nil {
+		response.Diagnostics.AddError("Error Converting Realm to Model", err.Error())
+		return
+	}
 	tflog.Trace(ctx, "realm update")
 	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
 }

@@ -38,11 +38,12 @@ func (r *roleResource) toProto(m *roleModel) (*v1alpha11.Role, error) {
 	}, nil
 }
 
-func (r *roleResource) toModel(p *v1alpha11.Role, m *roleModel) {
+func (r *roleResource) toModel(p *v1alpha11.Role, m *roleModel) error {
 	m.Id = types.StringValue(p.Id)
 	m.AudienceId = types.StringValue(p.AudienceId)
 	m.Name = types.StringValue(p.Name)
 	m.Auto = types.BoolValue(p.Auto)
+	return nil
 }
 
 func (r *roleResource) Configure(ctx context.Context, request resource.ConfigureRequest, response *resource.ConfigureResponse) {
@@ -87,7 +88,11 @@ func (r *roleResource) Create(ctx context.Context, request resource.CreateReques
 		return
 	}
 
-	r.toModel(resp, &data)
+	err = r.toModel(resp, &data)
+	if err != nil {
+		response.Diagnostics.AddError("Error Converting Role to Model", err.Error())
+		return
+	}
 	tflog.Trace(ctx, "role create")
 	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
 }
@@ -108,7 +113,11 @@ func (r *roleResource) Read(ctx context.Context, request resource.ReadRequest, r
 		return
 	}
 
-	r.toModel(resp, &data)
+	err = r.toModel(resp, &data)
+	if err != nil {
+		response.Diagnostics.AddError("Error Converting Role to Model", err.Error())
+		return
+	}
 	tflog.Trace(ctx, "role read")
 	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
 }
@@ -138,7 +147,11 @@ func (r *roleResource) Update(ctx context.Context, request resource.UpdateReques
 		return
 	}
 
-	r.toModel(resp, &data)
+	err = r.toModel(resp, &data)
+	if err != nil {
+		response.Diagnostics.AddError("Error Converting Role to Model", err.Error())
+		return
+	}
 	tflog.Trace(ctx, "role update")
 	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
 }

@@ -38,11 +38,12 @@ func (r *scopeResource) toProto(m *scopeModel) (*v1alpha11.Scope, error) {
 	}, nil
 }
 
-func (r *scopeResource) toModel(p *v1alpha11.Scope, m *scopeModel) {
+func (r *scopeResource) toModel(p *v1alpha11.Scope, m *scopeModel) error {
 	m.Id = types.StringValue(p.Id)
 	m.AudienceId = types.StringValue(p.AudienceId)
 	m.Kind = types.StringValue(p.Kind)
 	m.Auto = types.BoolValue(p.Auto)
+	return nil
 }
 
 func (r *scopeResource) Configure(ctx context.Context, request resource.ConfigureRequest, response *resource.ConfigureResponse) {
@@ -87,7 +88,11 @@ func (r *scopeResource) Create(ctx context.Context, request resource.CreateReque
 		return
 	}
 
-	r.toModel(resp, &data)
+	err = r.toModel(resp, &data)
+	if err != nil {
+		response.Diagnostics.AddError("Error Converting Scope to Model", err.Error())
+		return
+	}
 	tflog.Trace(ctx, "scope create")
 	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
 }
@@ -108,7 +113,11 @@ func (r *scopeResource) Read(ctx context.Context, request resource.ReadRequest, 
 		return
 	}
 
-	r.toModel(resp, &data)
+	err = r.toModel(resp, &data)
+	if err != nil {
+		response.Diagnostics.AddError("Error Converting Scope to Model", err.Error())
+		return
+	}
 	tflog.Trace(ctx, "scope read")
 	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
 }
@@ -138,7 +147,11 @@ func (r *scopeResource) Update(ctx context.Context, request resource.UpdateReque
 		return
 	}
 
-	r.toModel(resp, &data)
+	err = r.toModel(resp, &data)
+	if err != nil {
+		response.Diagnostics.AddError("Error Converting Scope to Model", err.Error())
+		return
+	}
 	tflog.Trace(ctx, "scope update")
 	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
 }

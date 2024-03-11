@@ -59,7 +59,7 @@ func (r *clientResource) toProto(m *clientModel) (*v1alpha11.Client, error) {
 	}, nil
 }
 
-func (r *clientResource) toModel(p *v1alpha11.Client, m *clientModel) {
+func (r *clientResource) toModel(p *v1alpha11.Client, m *clientModel) error {
 	m.Id = types.StringValue(p.Id)
 	m.AudienceId = types.StringValue(p.AudienceId)
 	m.AppearanceProfileId = types.StringValue(p.AppearanceProfileId)
@@ -68,6 +68,17 @@ func (r *clientResource) toModel(p *v1alpha11.Client, m *clientModel) {
 	m.GrantType = types.StringValue(p.GrantType)
 	m.LoginUrl = types.StringValue(p.LoginUrl)
 	m.LogoId = types.StringValue(p.LogoId)
+	converted_config, err := util.ProtoAnyToObject(p.Config)
+	if err != nil {
+		return err
+	}
+	m.Config = *converted_config
+	converted_metadata, err := util.ProtoStructToObject(p.Metadata)
+	if err != nil {
+		return err
+	}
+	m.Metadata = *converted_metadata
+	return nil
 }
 
 func (r *clientResource) Configure(ctx context.Context, request resource.ConfigureRequest, response *resource.ConfigureResponse) {
@@ -112,7 +123,11 @@ func (r *clientResource) Create(ctx context.Context, request resource.CreateRequ
 		return
 	}
 
-	r.toModel(resp, &data)
+	err = r.toModel(resp, &data)
+	if err != nil {
+		response.Diagnostics.AddError("Error Converting Client to Model", err.Error())
+		return
+	}
 	tflog.Trace(ctx, "client create")
 	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
 }
@@ -133,7 +148,11 @@ func (r *clientResource) Read(ctx context.Context, request resource.ReadRequest,
 		return
 	}
 
-	r.toModel(resp, &data)
+	err = r.toModel(resp, &data)
+	if err != nil {
+		response.Diagnostics.AddError("Error Converting Client to Model", err.Error())
+		return
+	}
 	tflog.Trace(ctx, "client read")
 	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
 }
@@ -163,7 +182,11 @@ func (r *clientResource) Update(ctx context.Context, request resource.UpdateRequ
 		return
 	}
 
-	r.toModel(resp, &data)
+	err = r.toModel(resp, &data)
+	if err != nil {
+		response.Diagnostics.AddError("Error Converting Client to Model", err.Error())
+		return
+	}
 	tflog.Trace(ctx, "client update")
 	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
 }

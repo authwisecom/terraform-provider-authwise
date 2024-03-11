@@ -45,11 +45,17 @@ func (r *providerResource) toProto(m *providerModel) (*v1alpha11.Provider, error
 	}, nil
 }
 
-func (r *providerResource) toModel(p *v1alpha11.Provider, m *providerModel) {
+func (r *providerResource) toModel(p *v1alpha11.Provider, m *providerModel) error {
 	m.Id = types.StringValue(p.Id)
 	m.RealmId = types.StringValue(p.RealmId)
 	m.Name = types.StringValue(p.Name)
 	m.ProviderType = types.StringValue(p.ProviderType)
+	converted_config, err := util.ProtoAnyToObject(p.Config)
+	if err != nil {
+		return err
+	}
+	m.Config = *converted_config
+	return nil
 }
 
 func (r *providerResource) Configure(ctx context.Context, request resource.ConfigureRequest, response *resource.ConfigureResponse) {
@@ -94,7 +100,11 @@ func (r *providerResource) Create(ctx context.Context, request resource.CreateRe
 		return
 	}
 
-	r.toModel(resp, &data)
+	err = r.toModel(resp, &data)
+	if err != nil {
+		response.Diagnostics.AddError("Error Converting Provider to Model", err.Error())
+		return
+	}
 	tflog.Trace(ctx, "provider create")
 	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
 }
@@ -115,7 +125,11 @@ func (r *providerResource) Read(ctx context.Context, request resource.ReadReques
 		return
 	}
 
-	r.toModel(resp, &data)
+	err = r.toModel(resp, &data)
+	if err != nil {
+		response.Diagnostics.AddError("Error Converting Provider to Model", err.Error())
+		return
+	}
 	tflog.Trace(ctx, "provider read")
 	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
 }
@@ -145,7 +159,11 @@ func (r *providerResource) Update(ctx context.Context, request resource.UpdateRe
 		return
 	}
 
-	r.toModel(resp, &data)
+	err = r.toModel(resp, &data)
+	if err != nil {
+		response.Diagnostics.AddError("Error Converting Provider to Model", err.Error())
+		return
+	}
 	tflog.Trace(ctx, "provider update")
 	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
 }

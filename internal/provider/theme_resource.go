@@ -51,11 +51,22 @@ func (r *themeResource) toProto(m *themeModel) (*v1alpha11.Theme, error) {
 	}, nil
 }
 
-func (r *themeResource) toModel(p *v1alpha11.Theme, m *themeModel) {
+func (r *themeResource) toModel(p *v1alpha11.Theme, m *themeModel) error {
 	m.Id = types.StringValue(p.Id)
 	m.TenantId = types.StringValue(p.TenantId)
 	m.Name = types.StringValue(p.Name)
 	m.Stylesheet = types.StringValue(p.Stylesheet)
+	converted_stylesheetattributes, err := util.ProtoStructToObject(p.StylesheetAttributes)
+	if err != nil {
+		return err
+	}
+	m.StylesheetAttributes = *converted_stylesheetattributes
+	converted_content, err := util.ProtoStructToObject(p.Content)
+	if err != nil {
+		return err
+	}
+	m.Content = *converted_content
+	return nil
 }
 
 func (r *themeResource) Configure(ctx context.Context, request resource.ConfigureRequest, response *resource.ConfigureResponse) {
@@ -100,7 +111,11 @@ func (r *themeResource) Create(ctx context.Context, request resource.CreateReque
 		return
 	}
 
-	r.toModel(resp, &data)
+	err = r.toModel(resp, &data)
+	if err != nil {
+		response.Diagnostics.AddError("Error Converting Theme to Model", err.Error())
+		return
+	}
 	tflog.Trace(ctx, "theme create")
 	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
 }
@@ -121,7 +136,11 @@ func (r *themeResource) Read(ctx context.Context, request resource.ReadRequest, 
 		return
 	}
 
-	r.toModel(resp, &data)
+	err = r.toModel(resp, &data)
+	if err != nil {
+		response.Diagnostics.AddError("Error Converting Theme to Model", err.Error())
+		return
+	}
 	tflog.Trace(ctx, "theme read")
 	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
 }
@@ -151,7 +170,11 @@ func (r *themeResource) Update(ctx context.Context, request resource.UpdateReque
 		return
 	}
 
-	r.toModel(resp, &data)
+	err = r.toModel(resp, &data)
+	if err != nil {
+		response.Diagnostics.AddError("Error Converting Theme to Model", err.Error())
+		return
+	}
 	tflog.Trace(ctx, "theme update")
 	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
 }

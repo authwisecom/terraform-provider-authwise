@@ -125,7 +125,14 @@ func (s *standardResourceHandler) crudMethodTemplate(m *protogen.Message, operat
 	//append state to tf
 	if appendState {
 		result = append(result, j.Add(
-			j.Id("r").Dot("toModel").Call(j.Id("resp"), j.Op("&").Id("data")).Line(),
+			j.Id("err").Op("=").Id("r").Dot("toModel").Call(j.Id("resp"), j.Op("&").Id("data")).Line(),
+			j.If(j.Id("err").Op("!=").Nil().Block(
+				j.Id("response").Dot("Diagnostics").Dot("AddError").Call(
+					j.Lit(fmt.Sprintf("Error Converting %s to Model", name)),
+					j.Id("err").Dot("Error").Call(),
+				),
+				j.Return(),
+			)).Line(),
 			j.Qual(TFLog, "Trace").Call(
 				j.Id("ctx"),
 				j.Lit(fmt.Sprintf("%s %s", strings.ToLower(name), operation)),
@@ -214,7 +221,6 @@ func (s *standardResourceHandler) toProto(f *j.File, m *protogen.Message, struct
 					conversions = append(conversions, code)
 				}
 			case protoreflect.EnumKind:
-				l.Debug().Msgf("test: %v", fi.Desc)
 				code := j.Id(ConversionName(string(fi.Desc.FullName().Name()))).Op(":=").
 					Qual(TypesCore, ConfigurationObjectName(string(fi.Desc.Enum().FullName().Name()))).Call(j.Id("m").Dot(fi.GoName).Dot("ValueInt64").Call()).Line()
 				conversions = append(conversions, code)
@@ -249,24 +255,41 @@ func (s *standardResourceHandler) toModel(f *j.File, m *protogen.Message, struct
 	f.Func().Params(j.Id("r").Op("*").Id(structName)).Id("toModel").Params(
 		j.Id("p").Op("*").Qual(TypesCore, name),
 		j.Id("m").Op("*").Id(s.modelName(m)),
-	).BlockFunc(func(group *j.Group) {
+	).Id("error").BlockFunc(func(group *j.Group) {
+		errCheck := j.If(j.Id("err").Op("!=").Nil().Block(j.Return(j.Id("err"))))
 		for _, fi := range m.Fields {
 			path := Types
-			typesFunc := "nil"
+			typesFunc := ""
 
 			switch fi.Desc.Kind() {
 			case protoreflect.StringKind:
 				typesFunc = "StringValue"
 			case protoreflect.BoolKind:
 				typesFunc = "BoolValue"
+			case protoreflect.MessageKind:
+				//handle object conversions
+				switch fi.Desc.Message().FullName().Name() {
+				case "Any":
+					group.List(
+						j.Id(ConversionName(strings.ToLower(fi.GoName))),
+						j.Id("err")).Op(":=").Qual(Util, "ProtoAnyToObject").Call(j.Id("p").Dot(fi.GoName)).Line().Add(errCheck)
+					group.Id("m").Dot(fi.GoName).Op("=").Op("*").Id(ConversionName(strings.ToLower(fi.GoName)))
+				case "Struct":
+					group.List(
+						j.Id(ConversionName(strings.ToLower(fi.GoName))),
+						j.Id("err")).Op(":=").Qual(Util, "ProtoStructToObject").Call(j.Id("p").Dot(fi.GoName)).Line().Add(errCheck)
+					group.Id("m").Dot(fi.GoName).Op("=").Op("*").Id(ConversionName(strings.ToLower(fi.GoName)))
+				}
 			default:
-				typesFunc = "nil"
+				l.Debug().Msgf("test: %v", fi.Desc)
+				typesFunc = ""
 			}
 
-			if typesFunc != "nil" {
+			if typesFunc != "" {
 				group.Id("m").Dot(fi.GoName).Op("=").Qual(path, typesFunc).Call(j.Id("p").Dot(fi.GoName))
 			}
 		}
+		group.Return(j.Nil())
 	}).Line()
 }
 

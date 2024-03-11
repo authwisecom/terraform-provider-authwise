@@ -51,11 +51,22 @@ func (r *appearanceProfileResource) toProto(m *appearanceProfileModel) (*v1alpha
 	}, nil
 }
 
-func (r *appearanceProfileResource) toModel(p *v1alpha11.AppearanceProfile, m *appearanceProfileModel) {
+func (r *appearanceProfileResource) toModel(p *v1alpha11.AppearanceProfile, m *appearanceProfileModel) error {
 	m.Id = types.StringValue(p.Id)
 	m.Name = types.StringValue(p.Name)
 	m.TenantId = types.StringValue(p.TenantId)
 	m.ThemeId = types.StringValue(p.ThemeId)
+	converted_stylesheetattributes, err := util.ProtoStructToObject(p.StylesheetAttributes)
+	if err != nil {
+		return err
+	}
+	m.StylesheetAttributes = *converted_stylesheetattributes
+	converted_content, err := util.ProtoStructToObject(p.Content)
+	if err != nil {
+		return err
+	}
+	m.Content = *converted_content
+	return nil
 }
 
 func (r *appearanceProfileResource) Configure(ctx context.Context, request resource.ConfigureRequest, response *resource.ConfigureResponse) {
@@ -100,7 +111,11 @@ func (r *appearanceProfileResource) Create(ctx context.Context, request resource
 		return
 	}
 
-	r.toModel(resp, &data)
+	err = r.toModel(resp, &data)
+	if err != nil {
+		response.Diagnostics.AddError("Error Converting AppearanceProfile to Model", err.Error())
+		return
+	}
 	tflog.Trace(ctx, "appearanceprofile create")
 	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
 }
@@ -121,7 +136,11 @@ func (r *appearanceProfileResource) Read(ctx context.Context, request resource.R
 		return
 	}
 
-	r.toModel(resp, &data)
+	err = r.toModel(resp, &data)
+	if err != nil {
+		response.Diagnostics.AddError("Error Converting AppearanceProfile to Model", err.Error())
+		return
+	}
 	tflog.Trace(ctx, "appearanceprofile read")
 	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
 }
@@ -151,7 +170,11 @@ func (r *appearanceProfileResource) Update(ctx context.Context, request resource
 		return
 	}
 
-	r.toModel(resp, &data)
+	err = r.toModel(resp, &data)
+	if err != nil {
+		response.Diagnostics.AddError("Error Converting AppearanceProfile to Model", err.Error())
+		return
+	}
 	tflog.Trace(ctx, "appearanceprofile update")
 	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
 }

@@ -42,11 +42,12 @@ func (r *secretResource) toProto(m *secretModel) (*v1alpha11.Secret, error) {
 	}, nil
 }
 
-func (r *secretResource) toModel(p *v1alpha11.Secret, m *secretModel) {
+func (r *secretResource) toModel(p *v1alpha11.Secret, m *secretModel) error {
 	m.Id = types.StringValue(p.Id)
 	m.TenantId = types.StringValue(p.TenantId)
 	m.Name = types.StringValue(p.Name)
 	m.Value = types.StringValue(p.Value)
+	return nil
 }
 
 func (r *secretResource) Configure(ctx context.Context, request resource.ConfigureRequest, response *resource.ConfigureResponse) {
@@ -91,7 +92,11 @@ func (r *secretResource) Create(ctx context.Context, request resource.CreateRequ
 		return
 	}
 
-	r.toModel(resp, &data)
+	err = r.toModel(resp, &data)
+	if err != nil {
+		response.Diagnostics.AddError("Error Converting Secret to Model", err.Error())
+		return
+	}
 	tflog.Trace(ctx, "secret create")
 	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
 }
@@ -112,7 +117,11 @@ func (r *secretResource) Read(ctx context.Context, request resource.ReadRequest,
 		return
 	}
 
-	r.toModel(resp, &data)
+	err = r.toModel(resp, &data)
+	if err != nil {
+		response.Diagnostics.AddError("Error Converting Secret to Model", err.Error())
+		return
+	}
 	tflog.Trace(ctx, "secret read")
 	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
 }
@@ -142,7 +151,11 @@ func (r *secretResource) Update(ctx context.Context, request resource.UpdateRequ
 		return
 	}
 
-	r.toModel(resp, &data)
+	err = r.toModel(resp, &data)
+	if err != nil {
+		response.Diagnostics.AddError("Error Converting Secret to Model", err.Error())
+		return
+	}
 	tflog.Trace(ctx, "secret update")
 	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
 }

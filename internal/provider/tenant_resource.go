@@ -43,10 +43,11 @@ func (r *tenantResource) toProto(m *tenantModel) (*v1alpha11.Tenant, error) {
 	}, nil
 }
 
-func (r *tenantResource) toModel(p *v1alpha11.Tenant, m *tenantModel) {
+func (r *tenantResource) toModel(p *v1alpha11.Tenant, m *tenantModel) error {
 	m.Id = types.StringValue(p.Id)
 	m.Name = types.StringValue(p.Name)
 	m.AppearanceProfileId = types.StringValue(p.AppearanceProfileId)
+	return nil
 }
 
 func (r *tenantResource) Configure(ctx context.Context, request resource.ConfigureRequest, response *resource.ConfigureResponse) {
@@ -91,7 +92,11 @@ func (r *tenantResource) Create(ctx context.Context, request resource.CreateRequ
 		return
 	}
 
-	r.toModel(resp, &data)
+	err = r.toModel(resp, &data)
+	if err != nil {
+		response.Diagnostics.AddError("Error Converting Tenant to Model", err.Error())
+		return
+	}
 	tflog.Trace(ctx, "tenant create")
 	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
 }
@@ -112,7 +117,11 @@ func (r *tenantResource) Read(ctx context.Context, request resource.ReadRequest,
 		return
 	}
 
-	r.toModel(resp, &data)
+	err = r.toModel(resp, &data)
+	if err != nil {
+		response.Diagnostics.AddError("Error Converting Tenant to Model", err.Error())
+		return
+	}
 	tflog.Trace(ctx, "tenant read")
 	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
 }
@@ -142,7 +151,11 @@ func (r *tenantResource) Update(ctx context.Context, request resource.UpdateRequ
 		return
 	}
 
-	r.toModel(resp, &data)
+	err = r.toModel(resp, &data)
+	if err != nil {
+		response.Diagnostics.AddError("Error Converting Tenant to Model", err.Error())
+		return
+	}
 	tflog.Trace(ctx, "tenant update")
 	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
 }

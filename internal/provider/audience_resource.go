@@ -47,12 +47,13 @@ func (r *audienceResource) toProto(m *audienceModel) (*v1alpha11.Audience, error
 	}, nil
 }
 
-func (r *audienceResource) toModel(p *v1alpha11.Audience, m *audienceModel) {
+func (r *audienceResource) toModel(p *v1alpha11.Audience, m *audienceModel) error {
 	m.Id = types.StringValue(p.Id)
 	m.TenantId = types.StringValue(p.TenantId)
 	m.Name = types.StringValue(p.Name)
 	m.AppearanceProfileId = types.StringValue(p.AppearanceProfileId)
 	m.Description = types.StringValue(p.Description)
+	return nil
 }
 
 func (r *audienceResource) Configure(ctx context.Context, request resource.ConfigureRequest, response *resource.ConfigureResponse) {
@@ -97,7 +98,11 @@ func (r *audienceResource) Create(ctx context.Context, request resource.CreateRe
 		return
 	}
 
-	r.toModel(resp, &data)
+	err = r.toModel(resp, &data)
+	if err != nil {
+		response.Diagnostics.AddError("Error Converting Audience to Model", err.Error())
+		return
+	}
 	tflog.Trace(ctx, "audience create")
 	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
 }
@@ -118,7 +123,11 @@ func (r *audienceResource) Read(ctx context.Context, request resource.ReadReques
 		return
 	}
 
-	r.toModel(resp, &data)
+	err = r.toModel(resp, &data)
+	if err != nil {
+		response.Diagnostics.AddError("Error Converting Audience to Model", err.Error())
+		return
+	}
 	tflog.Trace(ctx, "audience read")
 	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
 }
@@ -148,7 +157,11 @@ func (r *audienceResource) Update(ctx context.Context, request resource.UpdateRe
 		return
 	}
 
-	r.toModel(resp, &data)
+	err = r.toModel(resp, &data)
+	if err != nil {
+		response.Diagnostics.AddError("Error Converting Audience to Model", err.Error())
+		return
+	}
 	tflog.Trace(ctx, "audience update")
 	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
 }
