@@ -31,12 +31,28 @@ func TestObjectToMap(t *testing.T) {
 						AttrTypes: nestedTypes,
 					},
 					"attr4": types.BoolType,
+					"attr5": types.ListType{
+						ElemType: types.StringType,
+					},
+					"attr6": types.ListType{
+						ElemType: types.Int64Type,
+					},
+				}
+				stringListValues := []attr.Value{
+					types.StringValue("test"),
+					types.StringValue("test2"),
+				}
+				intListValues := []attr.Value{
+					types.Int64Value(20),
+					types.Int64Value(40),
 				}
 				elems := map[string]attr.Value{
 					"attr1": types.StringValue("test"),
 					"attr2": types.Int64Value(20),
 					"attr3": types.ObjectValueMust(nestedTypes, nested),
 					"attr4": types.BoolValue(false),
+					"attr5": types.ListValueMust(types.StringType, stringListValues),
+					"attr6": types.ListValueMust(types.Int64Type, intListValues),
 				}
 
 				return types.ObjectValueMust(elemTypes, elems)
@@ -49,6 +65,14 @@ func TestObjectToMap(t *testing.T) {
 						"nested": "nested_val",
 					},
 					"attr4": false,
+					"attr5": []string{
+						"test",
+						"test2",
+					},
+					"attr6": []int{
+						20,
+						40,
+					},
 				}
 				assert.Nil(t, err)
 				assert.Equal(t, expected, got)
@@ -129,6 +153,10 @@ func TestMapToObject(t *testing.T) {
 						"attr4_nested1": "nested1",
 						"attr4_nested2": false,
 					},
+					"attr5": []string{
+						"test1",
+						"test2",
+					},
 				}
 			},
 			assert: func(got types.Object, err error) {
@@ -148,12 +176,20 @@ func TestMapToObject(t *testing.T) {
 					"attr4": types.ObjectType{
 						AttrTypes: nestedTypes,
 					},
+					"attr5": types.ListType{
+						ElemType: types.StringType,
+					},
+				}
+				stringListValues := []attr.Value{
+					types.StringValue("test1"),
+					types.StringValue("test2"),
 				}
 				elems := map[string]attr.Value{
 					"attr1": types.StringValue("test"),
 					"attr2": types.Int64Value(20),
 					"attr3": types.BoolValue(false),
 					"attr4": types.ObjectValueMust(nestedTypes, nested),
+					"attr5": types.ListValueMust(types.StringType, stringListValues),
 				}
 
 				expected := types.ObjectValueMust(elemTypes, elems)

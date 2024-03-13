@@ -3,10 +3,11 @@ package provider
 
 import (
 	"context"
+	attr "github.com/hashicorp/terraform-plugin-framework/attr"
 	datasource "github.com/hashicorp/terraform-plugin-framework/datasource"
+	diag "github.com/hashicorp/terraform-plugin-framework/diag"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
 	tflog "github.com/hashicorp/terraform-plugin-log/tflog"
-	v1alpha1 "gitlab.authwise.io/authwise/api-client-go/authwise/management/v1alpha1"
 )
 
 type providerUsernamePasswordDataSource struct{}
@@ -19,7 +20,29 @@ type providerUsernamePasswordDataSourceModel struct {
 	ForwardUri         types.String `tfsdk:"forward_uri"`
 	PasswordHashType   types.String `tfsdk:"password_hash_type"`
 	PasswordValidators types.Object `tfsdk:"password_validators"`
-	Type               types.String `tfsdk:"type"`
+	Result             types.Object `tfsdk:"Result"`
+}
+
+func (r *providerUsernamePasswordDataSource) computeResult(ctx context.Context, m *providerUsernamePasswordDataSourceModel) (*types.Object, diag.Diagnostics) {
+	tMap := map[string]attr.Type{
+		"@type":              types.StringType,
+		"ForwardUri":         m.ForwardUri.Type(ctx),
+		"PasswordHashType":   m.PasswordHashType.Type(ctx),
+		"PasswordValidators": m.PasswordValidators.Type(ctx),
+	}
+	vMap := map[string]attr.Value{
+		"@type":              types.StringValue("type.googleapis.com/authwise.types.core.v1alpha1.ProviderUsernamePassword"),
+		"ForwardUri":         m.ForwardUri,
+		"PasswordHashType":   m.PasswordHashType,
+		"PasswordValidators": m.PasswordValidators,
+	}
+	obj, diag := types.ObjectValue(tMap, vMap)
+
+	if diag.HasError() {
+		return nil, diag
+	}
+
+	return &obj, nil
 }
 
 func (r *providerUsernamePasswordDataSource) Metadata(ctx context.Context, request datasource.MetadataRequest, response *datasource.MetadataResponse) {
@@ -39,16 +62,12 @@ func (r *providerUsernamePasswordDataSource) Read(ctx context.Context, request d
 		return
 	}
 
-	req := &v1alpha1.GetProviderUsernamePasswordRequest{Name: r.toName(data)}
-	resp, err := r.client.GetProviderUsernamePassword(ctx, req)
-	if err != nil {
-		response.Diagnostics.AddError("Error Reading ProviderUsernamePassword", err.Error())
+	res, diag := r.computeResult(ctx, &data)
+	if diag.HasError() {
 		return
 	}
 
-	r.toModel(resp, &data)
-
 	tflog.Trace(ctx, "providerusernamepassword read")
 
-	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
+	response.Diagnostics.Append(response.State.Set(ctx, res)...)
 }

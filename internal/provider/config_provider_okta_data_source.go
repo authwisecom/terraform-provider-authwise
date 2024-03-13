@@ -3,10 +3,11 @@ package provider
 
 import (
 	"context"
+	attr "github.com/hashicorp/terraform-plugin-framework/attr"
 	datasource "github.com/hashicorp/terraform-plugin-framework/datasource"
+	diag "github.com/hashicorp/terraform-plugin-framework/diag"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
 	tflog "github.com/hashicorp/terraform-plugin-log/tflog"
-	v1alpha1 "gitlab.authwise.io/authwise/api-client-go/authwise/management/v1alpha1"
 )
 
 type providerOktaDataSource struct{}
@@ -20,7 +21,31 @@ type providerOktaDataSourceModel struct {
 	ClientSecret types.String `tfsdk:"client_secret"`
 	Scope        types.String `tfsdk:"scope"`
 	TenantUrl    types.String `tfsdk:"tenant_url"`
-	Type         types.String `tfsdk:"type"`
+	Result       types.Object `tfsdk:"Result"`
+}
+
+func (r *providerOktaDataSource) computeResult(ctx context.Context, m *providerOktaDataSourceModel) (*types.Object, diag.Diagnostics) {
+	tMap := map[string]attr.Type{
+		"@type":        types.StringType,
+		"ClientId":     m.ClientId.Type(ctx),
+		"ClientSecret": m.ClientSecret.Type(ctx),
+		"Scope":        m.Scope.Type(ctx),
+		"TenantUrl":    m.TenantUrl.Type(ctx),
+	}
+	vMap := map[string]attr.Value{
+		"@type":        types.StringValue("type.googleapis.com/authwise.types.core.v1alpha1.ProviderOkta"),
+		"ClientId":     m.ClientId,
+		"ClientSecret": m.ClientSecret,
+		"Scope":        m.Scope,
+		"TenantUrl":    m.TenantUrl,
+	}
+	obj, diag := types.ObjectValue(tMap, vMap)
+
+	if diag.HasError() {
+		return nil, diag
+	}
+
+	return &obj, nil
 }
 
 func (r *providerOktaDataSource) Metadata(ctx context.Context, request datasource.MetadataRequest, response *datasource.MetadataResponse) {
@@ -40,16 +65,12 @@ func (r *providerOktaDataSource) Read(ctx context.Context, request datasource.Re
 		return
 	}
 
-	req := &v1alpha1.GetProviderOktaRequest{Name: r.toName(data)}
-	resp, err := r.client.GetProviderOkta(ctx, req)
-	if err != nil {
-		response.Diagnostics.AddError("Error Reading ProviderOkta", err.Error())
+	res, diag := r.computeResult(ctx, &data)
+	if diag.HasError() {
 		return
 	}
 
-	r.toModel(resp, &data)
-
 	tflog.Trace(ctx, "providerokta read")
 
-	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
+	response.Diagnostics.Append(response.State.Set(ctx, res)...)
 }

@@ -3,10 +3,11 @@ package provider
 
 import (
 	"context"
+	attr "github.com/hashicorp/terraform-plugin-framework/attr"
 	datasource "github.com/hashicorp/terraform-plugin-framework/datasource"
+	diag "github.com/hashicorp/terraform-plugin-framework/diag"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
 	tflog "github.com/hashicorp/terraform-plugin-log/tflog"
-	v1alpha1 "gitlab.authwise.io/authwise/api-client-go/authwise/management/v1alpha1"
 )
 
 type providerFacebookDataSource struct{}
@@ -20,7 +21,31 @@ type providerFacebookDataSourceModel struct {
 	ClientSecret types.String `tfsdk:"client_secret"`
 	Scope        types.String `tfsdk:"scope"`
 	UserFields   types.String `tfsdk:"user_fields"`
-	Type         types.String `tfsdk:"type"`
+	Result       types.Object `tfsdk:"Result"`
+}
+
+func (r *providerFacebookDataSource) computeResult(ctx context.Context, m *providerFacebookDataSourceModel) (*types.Object, diag.Diagnostics) {
+	tMap := map[string]attr.Type{
+		"@type":        types.StringType,
+		"ClientId":     m.ClientId.Type(ctx),
+		"ClientSecret": m.ClientSecret.Type(ctx),
+		"Scope":        m.Scope.Type(ctx),
+		"UserFields":   m.UserFields.Type(ctx),
+	}
+	vMap := map[string]attr.Value{
+		"@type":        types.StringValue("type.googleapis.com/authwise.types.core.v1alpha1.ProviderFacebook"),
+		"ClientId":     m.ClientId,
+		"ClientSecret": m.ClientSecret,
+		"Scope":        m.Scope,
+		"UserFields":   m.UserFields,
+	}
+	obj, diag := types.ObjectValue(tMap, vMap)
+
+	if diag.HasError() {
+		return nil, diag
+	}
+
+	return &obj, nil
 }
 
 func (r *providerFacebookDataSource) Metadata(ctx context.Context, request datasource.MetadataRequest, response *datasource.MetadataResponse) {
@@ -40,16 +65,12 @@ func (r *providerFacebookDataSource) Read(ctx context.Context, request datasourc
 		return
 	}
 
-	req := &v1alpha1.GetProviderFacebookRequest{Name: r.toName(data)}
-	resp, err := r.client.GetProviderFacebook(ctx, req)
-	if err != nil {
-		response.Diagnostics.AddError("Error Reading ProviderFacebook", err.Error())
+	res, diag := r.computeResult(ctx, &data)
+	if diag.HasError() {
 		return
 	}
 
-	r.toModel(resp, &data)
-
 	tflog.Trace(ctx, "providerfacebook read")
 
-	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
+	response.Diagnostics.Append(response.State.Set(ctx, res)...)
 }

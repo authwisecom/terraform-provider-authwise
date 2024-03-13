@@ -3,10 +3,11 @@ package provider
 
 import (
 	"context"
+	attr "github.com/hashicorp/terraform-plugin-framework/attr"
 	datasource "github.com/hashicorp/terraform-plugin-framework/datasource"
+	diag "github.com/hashicorp/terraform-plugin-framework/diag"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
 	tflog "github.com/hashicorp/terraform-plugin-log/tflog"
-	v1alpha1 "gitlab.authwise.io/authwise/api-client-go/authwise/management/v1alpha1"
 )
 
 type providerLinkedInDataSource struct{}
@@ -20,7 +21,31 @@ type providerLinkedInDataSourceModel struct {
 	ClientSecret         types.String `tfsdk:"client_secret"`
 	Scope                types.String `tfsdk:"scope"`
 	IncludeGrantedScopes types.String `tfsdk:"include_granted_scopes"`
-	Type                 types.String `tfsdk:"type"`
+	Result               types.Object `tfsdk:"Result"`
+}
+
+func (r *providerLinkedInDataSource) computeResult(ctx context.Context, m *providerLinkedInDataSourceModel) (*types.Object, diag.Diagnostics) {
+	tMap := map[string]attr.Type{
+		"@type":                types.StringType,
+		"ClientId":             m.ClientId.Type(ctx),
+		"ClientSecret":         m.ClientSecret.Type(ctx),
+		"IncludeGrantedScopes": m.IncludeGrantedScopes.Type(ctx),
+		"Scope":                m.Scope.Type(ctx),
+	}
+	vMap := map[string]attr.Value{
+		"@type":                types.StringValue("type.googleapis.com/authwise.types.core.v1alpha1.ProviderLinkedIn"),
+		"ClientId":             m.ClientId,
+		"ClientSecret":         m.ClientSecret,
+		"IncludeGrantedScopes": m.IncludeGrantedScopes,
+		"Scope":                m.Scope,
+	}
+	obj, diag := types.ObjectValue(tMap, vMap)
+
+	if diag.HasError() {
+		return nil, diag
+	}
+
+	return &obj, nil
 }
 
 func (r *providerLinkedInDataSource) Metadata(ctx context.Context, request datasource.MetadataRequest, response *datasource.MetadataResponse) {
@@ -40,16 +65,12 @@ func (r *providerLinkedInDataSource) Read(ctx context.Context, request datasourc
 		return
 	}
 
-	req := &v1alpha1.GetProviderLinkedInRequest{Name: r.toName(data)}
-	resp, err := r.client.GetProviderLinkedIn(ctx, req)
-	if err != nil {
-		response.Diagnostics.AddError("Error Reading ProviderLinkedIn", err.Error())
+	res, diag := r.computeResult(ctx, &data)
+	if diag.HasError() {
 		return
 	}
 
-	r.toModel(resp, &data)
-
 	tflog.Trace(ctx, "providerlinkedin read")
 
-	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
+	response.Diagnostics.Append(response.State.Set(ctx, res)...)
 }

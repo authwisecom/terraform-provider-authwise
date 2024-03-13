@@ -75,18 +75,38 @@ func ObjectToProtoConcrete[T any](obj types.Object) (*T, error) {
 	}
 }
 
+// TODO - add cases for each list type
 func objectToMap(obj types.Object) (map[string]any, error) {
+	ctx := context.Background()
 	attrs := obj.Attributes()
 	res := map[string]any{}
 
 	for k, v := range attrs {
-		switch v.Type(context.Background()) {
+		switch v.Type(ctx) {
 		case types.StringType:
 			res[k] = v.(types.String).ValueString()
 		case types.Int64Type:
 			res[k] = v.(types.Int64).ValueInt64()
 		case types.BoolType:
 			res[k] = v.(types.Bool).ValueBool()
+		case types.ListType{
+			ElemType: types.StringType,
+		}:
+			elements := make([]string, 0, len(v.(types.List).Elements()))
+			diag := v.(types.List).ElementsAs(ctx, &elements, false)
+			if diag.HasError() {
+				return res, errors.New("can not convert types.list(types.string) to []string")
+			}
+			res[k] = elements
+		case types.ListType{
+			ElemType: types.Int64Type,
+		}:
+			elements := make([]int, 0, len(v.(types.List).Elements()))
+			diag := v.(types.List).ElementsAs(ctx, &elements, false)
+			if diag.HasError() {
+				return res, errors.New("can not convert types.list(types.int64) to []int64")
+			}
+			res[k] = elements
 		default:
 			//handle objects
 			ret, err := objectToMap(v.(types.Object))
@@ -100,9 +120,40 @@ func objectToMap(obj types.Object) (map[string]any, error) {
 	return res, nil
 }
 
+func sliceToList(a any) (*types.List, error) {
+
+	t := reflect.TypeOf(a).Elem()
+	l := reflect.ValueOf(a)
+	ctx := context.Background()
+
+	switch t.Kind() {
+	case reflect.String:
+		slice, diag := types.ListValueFrom(ctx, types.StringType, l.Interface().([]string))
+		if diag.HasError() {
+			return nil, errors.New("unable to convert slice to []types.string")
+		}
+		return &slice, nil
+	case reflect.Int64, reflect.Int32:
+		slice, diag := types.ListValueFrom(ctx, types.StringType, l.Interface().([]int))
+		if diag.HasError() {
+			return nil, errors.New("unable to convert slice to []types.int64")
+		}
+		return &slice, nil
+	case reflect.Bool:
+		slice, diag := types.ListValueFrom(ctx, types.StringType, l.Interface().([]bool))
+		if diag.HasError() {
+			return &slice, errors.New("unable to convert slice to []types.bool")
+		}
+		return &slice, nil
+	default:
+		return nil, errors.New("unexpected type during slice conversion")
+	}
+}
+
 func mapToObject(m map[string]any) (*types.Object, error) {
 	tMap := map[string]attr.Type{}
 	vMap := map[string]attr.Value{}
+	ctx := context.Background()
 
 	for k, v := range m {
 		switch reflect.TypeOf(v).Kind() {
@@ -118,13 +169,20 @@ func mapToObject(m map[string]any) (*types.Object, error) {
 		case reflect.Bool:
 			tMap[k] = types.BoolType
 			vMap[k] = types.BoolValue(v.(bool))
+		case reflect.Slice:
+			test, err := sliceToList(v)
+			if err != nil {
+				return nil, err
+			}
+			tMap[k] = test.Type(ctx)
+			vMap[k], _ = test.ToListValue(ctx)
 		case reflect.Map:
 			nested, err := mapToObject(m[k].(map[string]any))
 			if err != nil {
 				return nil, err
 			}
 			tMap[k] = types.ObjectType{
-				AttrTypes: nested.AttributeTypes(context.Background()),
+				AttrTypes: nested.AttributeTypes(ctx),
 			}
 			vMap[k] = *nested
 		default:

@@ -3,10 +3,11 @@ package provider
 
 import (
 	"context"
+	attr "github.com/hashicorp/terraform-plugin-framework/attr"
 	datasource "github.com/hashicorp/terraform-plugin-framework/datasource"
+	diag "github.com/hashicorp/terraform-plugin-framework/diag"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
 	tflog "github.com/hashicorp/terraform-plugin-log/tflog"
-	v1alpha1 "gitlab.authwise.io/authwise/api-client-go/authwise/management/v1alpha1"
 )
 
 type tenantUrlConfigDataSource struct{}
@@ -17,7 +18,25 @@ func NewTenantUrlConfig() datasource.DataSource {
 
 type tenantUrlConfigDataSourceModel struct {
 	CookieDomain types.String `tfsdk:"cookie_domain"`
-	Type         types.String `tfsdk:"type"`
+	Result       types.Object `tfsdk:"Result"`
+}
+
+func (r *tenantUrlConfigDataSource) computeResult(ctx context.Context, m *tenantUrlConfigDataSourceModel) (*types.Object, diag.Diagnostics) {
+	tMap := map[string]attr.Type{
+		"@type":        types.StringType,
+		"CookieDomain": m.CookieDomain.Type(ctx),
+	}
+	vMap := map[string]attr.Value{
+		"@type":        types.StringValue("type.googleapis.com/authwise.types.core.v1alpha1.TenantUrlConfig"),
+		"CookieDomain": m.CookieDomain,
+	}
+	obj, diag := types.ObjectValue(tMap, vMap)
+
+	if diag.HasError() {
+		return nil, diag
+	}
+
+	return &obj, nil
 }
 
 func (r *tenantUrlConfigDataSource) Metadata(ctx context.Context, request datasource.MetadataRequest, response *datasource.MetadataResponse) {
@@ -37,16 +56,12 @@ func (r *tenantUrlConfigDataSource) Read(ctx context.Context, request datasource
 		return
 	}
 
-	req := &v1alpha1.GetTenantUrlConfigRequest{Name: r.toName(data)}
-	resp, err := r.client.GetTenantUrlConfig(ctx, req)
-	if err != nil {
-		response.Diagnostics.AddError("Error Reading TenantUrlConfig", err.Error())
+	res, diag := r.computeResult(ctx, &data)
+	if diag.HasError() {
 		return
 	}
 
-	r.toModel(resp, &data)
-
 	tflog.Trace(ctx, "tenanturlconfig read")
 
-	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
+	response.Diagnostics.Append(response.State.Set(ctx, res)...)
 }

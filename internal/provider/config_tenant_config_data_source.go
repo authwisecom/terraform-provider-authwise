@@ -3,10 +3,11 @@ package provider
 
 import (
 	"context"
+	attr "github.com/hashicorp/terraform-plugin-framework/attr"
 	datasource "github.com/hashicorp/terraform-plugin-framework/datasource"
+	diag "github.com/hashicorp/terraform-plugin-framework/diag"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
 	tflog "github.com/hashicorp/terraform-plugin-log/tflog"
-	v1alpha1 "gitlab.authwise.io/authwise/api-client-go/authwise/management/v1alpha1"
 )
 
 type tenantConfigDataSource struct{}
@@ -17,11 +18,37 @@ func NewTenantConfig() datasource.DataSource {
 
 type tenantConfigDataSourceModel struct {
 	InteractionForwardUri    types.String `tfsdk:"interaction_forward_uri"`
-	AccessTokenExpireSeconds types.Object `tfsdk:"access_token_expire_seconds"`
+	AccessTokenExpireSeconds types.Int64  `tfsdk:"access_token_expire_seconds"`
 	CookieDomain             types.String `tfsdk:"cookie_domain"`
 	Cors                     types.Object `tfsdk:"cors"`
 	Logging                  types.Object `tfsdk:"logging"`
-	Type                     types.String `tfsdk:"type"`
+	Result                   types.Object `tfsdk:"Result"`
+}
+
+func (r *tenantConfigDataSource) computeResult(ctx context.Context, m *tenantConfigDataSourceModel) (*types.Object, diag.Diagnostics) {
+	tMap := map[string]attr.Type{
+		"@type":                    types.StringType,
+		"AccessTokenExpireSeconds": m.AccessTokenExpireSeconds.Type(ctx),
+		"CookieDomain":             m.CookieDomain.Type(ctx),
+		"Cors":                     m.Cors.Type(ctx),
+		"InteractionForwardUri":    m.InteractionForwardUri.Type(ctx),
+		"Logging":                  m.Logging.Type(ctx),
+	}
+	vMap := map[string]attr.Value{
+		"@type":                    types.StringValue("type.googleapis.com/authwise.types.core.v1alpha1.TenantConfig"),
+		"AccessTokenExpireSeconds": m.AccessTokenExpireSeconds,
+		"CookieDomain":             m.CookieDomain,
+		"Cors":                     m.Cors,
+		"InteractionForwardUri":    m.InteractionForwardUri,
+		"Logging":                  m.Logging,
+	}
+	obj, diag := types.ObjectValue(tMap, vMap)
+
+	if diag.HasError() {
+		return nil, diag
+	}
+
+	return &obj, nil
 }
 
 func (r *tenantConfigDataSource) Metadata(ctx context.Context, request datasource.MetadataRequest, response *datasource.MetadataResponse) {
@@ -41,16 +68,12 @@ func (r *tenantConfigDataSource) Read(ctx context.Context, request datasource.Re
 		return
 	}
 
-	req := &v1alpha1.GetTenantConfigRequest{Name: r.toName(data)}
-	resp, err := r.client.GetTenantConfig(ctx, req)
-	if err != nil {
-		response.Diagnostics.AddError("Error Reading TenantConfig", err.Error())
+	res, diag := r.computeResult(ctx, &data)
+	if diag.HasError() {
 		return
 	}
 
-	r.toModel(resp, &data)
-
 	tflog.Trace(ctx, "tenantconfig read")
 
-	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
+	response.Diagnostics.Append(response.State.Set(ctx, res)...)
 }

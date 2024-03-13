@@ -3,10 +3,11 @@ package provider
 
 import (
 	"context"
+	attr "github.com/hashicorp/terraform-plugin-framework/attr"
 	datasource "github.com/hashicorp/terraform-plugin-framework/datasource"
+	diag "github.com/hashicorp/terraform-plugin-framework/diag"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
 	tflog "github.com/hashicorp/terraform-plugin-log/tflog"
-	v1alpha1 "gitlab.authwise.io/authwise/api-client-go/authwise/management/v1alpha1"
 )
 
 type providerAuthwiseDataSource struct{}
@@ -18,7 +19,27 @@ func NewProviderAuthwise() datasource.DataSource {
 type providerAuthwiseDataSourceModel struct {
 	Issuer   types.String `tfsdk:"issuer"`
 	ClientId types.String `tfsdk:"client_id"`
-	Type     types.String `tfsdk:"type"`
+	Result   types.Object `tfsdk:"Result"`
+}
+
+func (r *providerAuthwiseDataSource) computeResult(ctx context.Context, m *providerAuthwiseDataSourceModel) (*types.Object, diag.Diagnostics) {
+	tMap := map[string]attr.Type{
+		"@type":    types.StringType,
+		"ClientId": m.ClientId.Type(ctx),
+		"Issuer":   m.Issuer.Type(ctx),
+	}
+	vMap := map[string]attr.Value{
+		"@type":    types.StringValue("type.googleapis.com/authwise.types.core.v1alpha1.ProviderAuthwise"),
+		"ClientId": m.ClientId,
+		"Issuer":   m.Issuer,
+	}
+	obj, diag := types.ObjectValue(tMap, vMap)
+
+	if diag.HasError() {
+		return nil, diag
+	}
+
+	return &obj, nil
 }
 
 func (r *providerAuthwiseDataSource) Metadata(ctx context.Context, request datasource.MetadataRequest, response *datasource.MetadataResponse) {
@@ -38,16 +59,12 @@ func (r *providerAuthwiseDataSource) Read(ctx context.Context, request datasourc
 		return
 	}
 
-	req := &v1alpha1.GetProviderAuthwiseRequest{Name: r.toName(data)}
-	resp, err := r.client.GetProviderAuthwise(ctx, req)
-	if err != nil {
-		response.Diagnostics.AddError("Error Reading ProviderAuthwise", err.Error())
+	res, diag := r.computeResult(ctx, &data)
+	if diag.HasError() {
 		return
 	}
 
-	r.toModel(resp, &data)
-
 	tflog.Trace(ctx, "providerauthwise read")
 
-	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
+	response.Diagnostics.Append(response.State.Set(ctx, res)...)
 }

@@ -3,10 +3,11 @@ package provider
 
 import (
 	"context"
+	attr "github.com/hashicorp/terraform-plugin-framework/attr"
 	datasource "github.com/hashicorp/terraform-plugin-framework/datasource"
+	diag "github.com/hashicorp/terraform-plugin-framework/diag"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
 	tflog "github.com/hashicorp/terraform-plugin-log/tflog"
-	v1alpha1 "gitlab.authwise.io/authwise/api-client-go/authwise/management/v1alpha1"
 )
 
 type interactiveClientConfigDataSource struct{}
@@ -17,11 +18,37 @@ func NewInteractiveClientConfig() datasource.DataSource {
 
 type interactiveClientConfigDataSourceModel struct {
 	InteractionForwardUri    types.String `tfsdk:"interaction_forward_uri"`
-	AllowedRedirectUris      types.String `tfsdk:"allowed_redirect_uris"`
-	AccessTokenExpireSeconds types.Object `tfsdk:"access_token_expire_seconds"`
+	AllowedRedirectUris      types.List   `tfsdk:"allowed_redirect_uris"`
+	AccessTokenExpireSeconds types.Int64  `tfsdk:"access_token_expire_seconds"`
 	Cors                     types.Object `tfsdk:"cors"`
 	Logging                  types.Object `tfsdk:"logging"`
-	Type                     types.String `tfsdk:"type"`
+	Result                   types.Object `tfsdk:"Result"`
+}
+
+func (r *interactiveClientConfigDataSource) computeResult(ctx context.Context, m *interactiveClientConfigDataSourceModel) (*types.Object, diag.Diagnostics) {
+	tMap := map[string]attr.Type{
+		"@type":                    types.StringType,
+		"AccessTokenExpireSeconds": m.AccessTokenExpireSeconds.Type(ctx),
+		"AllowedRedirectUris":      m.AllowedRedirectUris.Type(ctx),
+		"Cors":                     m.Cors.Type(ctx),
+		"InteractionForwardUri":    m.InteractionForwardUri.Type(ctx),
+		"Logging":                  m.Logging.Type(ctx),
+	}
+	vMap := map[string]attr.Value{
+		"@type":                    types.StringValue("type.googleapis.com/authwise.types.core.v1alpha1.InteractiveClientConfig"),
+		"AccessTokenExpireSeconds": m.AccessTokenExpireSeconds,
+		"AllowedRedirectUris":      m.AllowedRedirectUris,
+		"Cors":                     m.Cors,
+		"InteractionForwardUri":    m.InteractionForwardUri,
+		"Logging":                  m.Logging,
+	}
+	obj, diag := types.ObjectValue(tMap, vMap)
+
+	if diag.HasError() {
+		return nil, diag
+	}
+
+	return &obj, nil
 }
 
 func (r *interactiveClientConfigDataSource) Metadata(ctx context.Context, request datasource.MetadataRequest, response *datasource.MetadataResponse) {
@@ -41,16 +68,12 @@ func (r *interactiveClientConfigDataSource) Read(ctx context.Context, request da
 		return
 	}
 
-	req := &v1alpha1.GetInteractiveClientConfigRequest{Name: r.toName(data)}
-	resp, err := r.client.GetInteractiveClientConfig(ctx, req)
-	if err != nil {
-		response.Diagnostics.AddError("Error Reading InteractiveClientConfig", err.Error())
+	res, diag := r.computeResult(ctx, &data)
+	if diag.HasError() {
 		return
 	}
 
-	r.toModel(resp, &data)
-
 	tflog.Trace(ctx, "interactiveclientconfig read")
 
-	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
+	response.Diagnostics.Append(response.State.Set(ctx, res)...)
 }

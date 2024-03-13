@@ -66,6 +66,7 @@ func (s *configDataSourceHandler) datasource(f *j.File, m *protogen.Message, l z
 	).Line()
 
 	s.model(f, m, l)
+	s.computeResult(f, m, structName, l)
 	s.metadata(f, m, structName, l)
 	s.schema(f, m, structName, resourceMetadataMap, l)
 	s.read(f, m, structName, l)
@@ -97,13 +98,12 @@ func (s *configDataSourceHandler) crudMethodTemplate(m *protogen.Message, body .
 			j.Return(),
 		).Line()),
 		j.Add(body...),
-		j.Id("r").Dot("toModel").Call(j.Id("resp"), j.Op("&").Id("data")).Line(),
 		j.Qual(TFLog, "Trace").Call(
 			j.Id("ctx"),
 			j.Lit(fmt.Sprintf("%s %s", strings.ToLower(name), "read")),
 		).Line(),
 		j.Id("response").Dot("Diagnostics").Dot("Append").Call(
-			j.Id("response").Dot("State").Dot("Set").Call(j.Id("ctx"), j.Op("&").Id("data")).Op("..."),
+			j.Id("response").Dot("State").Dot("Set").Call(j.Id("ctx"), j.Id("res")).Op("..."),
 		),
 	}
 
@@ -114,7 +114,7 @@ func (s *configDataSourceHandler) dataModelName(m *protogen.Message) string {
 	return strcase.ToLowerCamel(m.GoIdent.GoName) + "DataSourceModel"
 }
 
-func (s *configDataSourceHandler) modelFields(fields []*protogen.Field) []j.Code {
+func (s *configDataSourceHandler) modelFields(fields []*protogen.Field, l zerolog.Logger) []j.Code {
 	var result []j.Code
 	for _, f := range fields {
 		typeName := "Object"
@@ -122,9 +122,17 @@ func (s *configDataSourceHandler) modelFields(fields []*protogen.Field) []j.Code
 		// TODO - Build out this set of data
 		switch f.Desc.Kind() {
 		case protoreflect.StringKind:
-			typeName = "String"
+			if f.Desc.IsList() {
+				typeName = "List"
+			} else {
+				typeName = "String"
+			}
 		case protoreflect.BoolKind:
 			typeName = "Bool"
+		case protoreflect.Int64Kind, protoreflect.Int32Kind:
+			typeName = "Int64"
+		default:
+			l.Debug().Msgf("test: %v", f.Desc)
 		}
 		log.Debug().Str("kind", f.Desc.Kind().GoString()).Msg("processing model field")
 		result = append(result, j.Id(f.GoName).Qual(Types, typeName).Tag(map[string]string{
@@ -132,16 +140,56 @@ func (s *configDataSourceHandler) modelFields(fields []*protogen.Field) []j.Code
 		}))
 	}
 	//append type field
-	result = append(result, j.Id("Type").Qual(Types, "String").Tag(map[string]string{
-		"tfsdk": "type",
+	result = append(result, j.Id("Result").Qual(Types, "Object").Tag(map[string]string{
+		"tfsdk": "Result",
 	}))
 	return result
 }
 
-func (s *configDataSourceHandler) model(f *j.File, m *protogen.Message, l zerolog.Logger) {
+// TODO - do we need a method here?
+func (s *configDataSourceHandler) computeResult(f *j.File, m *protogen.Message, structName string, l zerolog.Logger) {
+	f.Func().Params(j.Id("r").Op("*").Id(structName)).Id("computeResult").Params(j.List(
+		j.Id("ctx").Qual("context", "Context"),
+		j.Id("m").Op("*").Id(s.dataModelName(m))),
+	).Parens(j.List(j.Op("*").Qual(Types, "Object"), j.Qual(Diag, "Diagnostics"))).Block(
+		j.Id("tMap").Op(":=").Map(j.String()).Qual(Attr, "Type").Values(
+			j.DictFunc(func(d j.Dict) {
+				d[j.Lit("@type")] = j.Qual(Types, "StringType")
+				for _, v := range m.Fields {
+					name := v.GoName
+					if name == "Result" {
+						continue
+					}
 
+					d[j.Lit(name)] = j.Id("m").Dot(name).Dot("Type").Call(j.Id("ctx"))
+				}
+			}),
+		),
+		j.Id("vMap").Op(":=").Map(j.String()).Qual(Attr, "Value").Values(
+			j.DictFunc(func(d j.Dict) {
+				d[j.Lit("@type")] = j.Qual(Types, "StringValue").Call(j.Lit(fmt.Sprintf("type.googleapis.com/%s", m.Desc.FullName())))
+				for _, v := range m.Fields {
+					name := v.GoName
+					if name == "Result" {
+						continue
+					}
+
+					d[j.Lit(name)] = j.Id("m").Dot(name)
+				}
+			}),
+		),
+		j.List(j.Id("obj"), j.Id("diag")).Op(":=").Qual(Types, "ObjectValue").Call(j.Id("tMap"), j.Id("vMap")).Line(),
+		j.If(j.Id("diag").Dot("HasError").Call()).Block(
+			j.Return(j.List(j.Nil(), j.Id("diag"))),
+		).Line(),
+		j.Return(j.List(j.Op("&").Id("obj"), j.Nil())),
+	).Line()
+
+}
+
+func (s *configDataSourceHandler) model(f *j.File, m *protogen.Message, l zerolog.Logger) {
 	f.Type().Id(s.dataModelName(m)).Struct(
-		s.modelFields(m.Fields)...,
+		s.modelFields(m.Fields, l)...,
 	).Line()
 
 }
@@ -184,28 +232,11 @@ func (s *configDataSourceHandler) configure(f *j.File, m *protogen.Message, stru
 }
 
 func (s *configDataSourceHandler) read(f *j.File, m *protogen.Message, structName string, l zerolog.Logger) {
-	name := m.GoIdent.GoName
 
 	s.requestResponseMethod(f, structName, "Read",
 		s.crudMethodTemplate(m,
-			j.Id("req").Op(":=").Op("&").Qual(
-				AuthwiseManagementClient,
-				fmt.Sprintf("Get%sRequest", name),
-			).Values(
-				j.Dict{
-					j.Id("Name"): j.Id("r").Dot("toName").Call(
-						j.Id("data"),
-					),
-				},
-			).Line(),
-			j.List(j.Id("resp"), j.Id("err")).Op(":=").Id("r").Dot("client").Dot(
-				fmt.Sprintf("Get%s", name),
-			).Call(j.Id("ctx"), j.Id("req")).Line(),
-			j.If(j.Id("err").Op("!=").Nil()).Block(
-				j.Id("response").Dot("Diagnostics").Dot("AddError").Call(
-					j.Lit(fmt.Sprintf("Error Reading %s", name)),
-					j.Id("err").Dot("Error").Call(),
-				),
+			j.List(j.Id("res"), j.Id("diag")).Op(":=").Id("r").Dot("computeResult").Call(j.List(j.Id("ctx"), j.Op("&").Id("data"))).Line(),
+			j.If(j.Id("diag").Dot("HasError").Call()).Block(
 				j.Return(),
 			).Line(),
 		)...,

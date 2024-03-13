@@ -3,10 +3,11 @@ package provider
 
 import (
 	"context"
+	attr "github.com/hashicorp/terraform-plugin-framework/attr"
 	datasource "github.com/hashicorp/terraform-plugin-framework/datasource"
+	diag "github.com/hashicorp/terraform-plugin-framework/diag"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
 	tflog "github.com/hashicorp/terraform-plugin-log/tflog"
-	v1alpha1 "gitlab.authwise.io/authwise/api-client-go/authwise/management/v1alpha1"
 )
 
 type providerGitHubDataSource struct{}
@@ -22,7 +23,35 @@ type providerGitHubDataSourceModel struct {
 	Prompt       types.String `tfsdk:"prompt"`
 	Display      types.String `tfsdk:"display"`
 	Scope        types.String `tfsdk:"scope"`
-	Type         types.String `tfsdk:"type"`
+	Result       types.Object `tfsdk:"Result"`
+}
+
+func (r *providerGitHubDataSource) computeResult(ctx context.Context, m *providerGitHubDataSourceModel) (*types.Object, diag.Diagnostics) {
+	tMap := map[string]attr.Type{
+		"@type":        types.StringType,
+		"AllowSignup":  m.AllowSignup.Type(ctx),
+		"ClientId":     m.ClientId.Type(ctx),
+		"ClientSecret": m.ClientSecret.Type(ctx),
+		"Display":      m.Display.Type(ctx),
+		"Prompt":       m.Prompt.Type(ctx),
+		"Scope":        m.Scope.Type(ctx),
+	}
+	vMap := map[string]attr.Value{
+		"@type":        types.StringValue("type.googleapis.com/authwise.types.core.v1alpha1.ProviderGitHub"),
+		"AllowSignup":  m.AllowSignup,
+		"ClientId":     m.ClientId,
+		"ClientSecret": m.ClientSecret,
+		"Display":      m.Display,
+		"Prompt":       m.Prompt,
+		"Scope":        m.Scope,
+	}
+	obj, diag := types.ObjectValue(tMap, vMap)
+
+	if diag.HasError() {
+		return nil, diag
+	}
+
+	return &obj, nil
 }
 
 func (r *providerGitHubDataSource) Metadata(ctx context.Context, request datasource.MetadataRequest, response *datasource.MetadataResponse) {
@@ -42,16 +71,12 @@ func (r *providerGitHubDataSource) Read(ctx context.Context, request datasource.
 		return
 	}
 
-	req := &v1alpha1.GetProviderGitHubRequest{Name: r.toName(data)}
-	resp, err := r.client.GetProviderGitHub(ctx, req)
-	if err != nil {
-		response.Diagnostics.AddError("Error Reading ProviderGitHub", err.Error())
+	res, diag := r.computeResult(ctx, &data)
+	if diag.HasError() {
 		return
 	}
 
-	r.toModel(resp, &data)
-
 	tflog.Trace(ctx, "providergithub read")
 
-	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
+	response.Diagnostics.Append(response.State.Set(ctx, res)...)
 }

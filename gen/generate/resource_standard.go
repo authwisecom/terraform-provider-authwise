@@ -281,7 +281,7 @@ func (s *standardResourceHandler) toModel(f *j.File, m *protogen.Message, struct
 					group.Id("m").Dot(fi.GoName).Op("=").Op("*").Id(ConversionName(strings.ToLower(fi.GoName)))
 				}
 			default:
-				l.Debug().Msgf("test: %v", fi.Desc)
+				//TODO - fail here
 				typesFunc = ""
 			}
 

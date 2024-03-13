@@ -3,10 +3,11 @@ package provider
 
 import (
 	"context"
+	attr "github.com/hashicorp/terraform-plugin-framework/attr"
 	datasource "github.com/hashicorp/terraform-plugin-framework/datasource"
+	diag "github.com/hashicorp/terraform-plugin-framework/diag"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
 	tflog "github.com/hashicorp/terraform-plugin-log/tflog"
-	v1alpha1 "gitlab.authwise.io/authwise/api-client-go/authwise/management/v1alpha1"
 )
 
 type providerMicrosoftDataSource struct{}
@@ -21,7 +22,33 @@ type providerMicrosoftDataSourceModel struct {
 	ClientSecret types.String `tfsdk:"client_secret"`
 	PromptStyle  types.String `tfsdk:"prompt_style"`
 	Tenant       types.String `tfsdk:"tenant"`
-	Type         types.String `tfsdk:"type"`
+	Result       types.Object `tfsdk:"Result"`
+}
+
+func (r *providerMicrosoftDataSource) computeResult(ctx context.Context, m *providerMicrosoftDataSourceModel) (*types.Object, diag.Diagnostics) {
+	tMap := map[string]attr.Type{
+		"@type":        types.StringType,
+		"ClientId":     m.ClientId.Type(ctx),
+		"ClientSecret": m.ClientSecret.Type(ctx),
+		"PromptStyle":  m.PromptStyle.Type(ctx),
+		"Scope":        m.Scope.Type(ctx),
+		"Tenant":       m.Tenant.Type(ctx),
+	}
+	vMap := map[string]attr.Value{
+		"@type":        types.StringValue("type.googleapis.com/authwise.types.core.v1alpha1.ProviderMicrosoft"),
+		"ClientId":     m.ClientId,
+		"ClientSecret": m.ClientSecret,
+		"PromptStyle":  m.PromptStyle,
+		"Scope":        m.Scope,
+		"Tenant":       m.Tenant,
+	}
+	obj, diag := types.ObjectValue(tMap, vMap)
+
+	if diag.HasError() {
+		return nil, diag
+	}
+
+	return &obj, nil
 }
 
 func (r *providerMicrosoftDataSource) Metadata(ctx context.Context, request datasource.MetadataRequest, response *datasource.MetadataResponse) {
@@ -41,16 +68,12 @@ func (r *providerMicrosoftDataSource) Read(ctx context.Context, request datasour
 		return
 	}
 
-	req := &v1alpha1.GetProviderMicrosoftRequest{Name: r.toName(data)}
-	resp, err := r.client.GetProviderMicrosoft(ctx, req)
-	if err != nil {
-		response.Diagnostics.AddError("Error Reading ProviderMicrosoft", err.Error())
+	res, diag := r.computeResult(ctx, &data)
+	if diag.HasError() {
 		return
 	}
 
-	r.toModel(resp, &data)
-
 	tflog.Trace(ctx, "providermicrosoft read")
 
-	response.Diagnostics.Append(response.State.Set(ctx, &data)...)
+	response.Diagnostics.Append(response.State.Set(ctx, res)...)
 }

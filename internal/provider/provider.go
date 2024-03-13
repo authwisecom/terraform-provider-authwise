@@ -74,11 +74,19 @@ func (p *AuthwiseProvider) Configure(ctx context.Context, req provider.Configure
 }
 
 func (p *AuthwiseProvider) Resources(ctx context.Context) []func() resource.Resource {
-	return []func() resource.Resource{}
+	return []func() resource.Resource{
+		NewClient,
+		NewRealm,
+		NewAudience,
+		NewAsset,
+		NewAppearanceProfile,
+	}
 }
 
 func (p *AuthwiseProvider) DataSources(ctx context.Context) []func() datasource.DataSource {
-	return []func() datasource.DataSource{}
+	return []func() datasource.DataSource{
+		NewInteractiveClientConfig,
+	}
 }
 
 func New(version string) func() provider.Provider {
