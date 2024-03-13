@@ -246,7 +246,11 @@ func GenSchemaProviderUsernamePasswordDataSource(ctx context.Context) schema.Sch
 			Description: "",
 			NestedObject: schema.NestedAttributeObject{Attributes: map[string]schema.Attribute{
 				"config": schema1.SingleNestedAttribute{
-					Attributes:  map[string]schema1.Attribute{"fields": schema1.MapAttribute{Description: "Unordered map of dynamically typed values."}},
+					Attributes: map[string]schema1.Attribute{"fields": schema1.MapAttribute{
+						Description: "Unordered map of dynamically typed values.",
+						ElementType: types.StringType,
+						Optional:    true,
+					}},
 					Description: "",
 					Optional:    true,
 				},
@@ -766,7 +770,11 @@ func GenSchemaClientDataSource(ctx context.Context) schema.Schema {
 			Optional:    true,
 		},
 		"metadata": schema.SingleNestedAttribute{
-			Attributes:  map[string]schema.Attribute{"fields": schema1.MapAttribute{Description: "Unordered map of dynamically typed values."}},
+			Attributes: map[string]schema.Attribute{"fields": schema1.MapAttribute{
+				Description: "Unordered map of dynamically typed values.",
+				ElementType: types.StringType,
+				Optional:    true,
+			}},
 			Description: "",
 			Optional:    true,
 		},
@@ -843,7 +851,11 @@ func GenSchemaScopeDataSource(ctx context.Context) schema.Schema {
 func GenSchemaAppearanceProfileDataSource(ctx context.Context) schema.Schema {
 	return schema.Schema{Attributes: map[string]schema.Attribute{
 		"content": schema.SingleNestedAttribute{
-			Attributes:  map[string]schema.Attribute{"fields": schema1.MapAttribute{Description: "Unordered map of dynamically typed values."}},
+			Attributes: map[string]schema.Attribute{"fields": schema1.MapAttribute{
+				Description: "Unordered map of dynamically typed values.",
+				ElementType: types.StringType,
+				Optional:    true,
+			}},
 			Description: "",
 			Optional:    true,
 		},
@@ -856,7 +868,11 @@ func GenSchemaAppearanceProfileDataSource(ctx context.Context) schema.Schema {
 			Optional:    true,
 		},
 		"stylesheet_attributes": schema.SingleNestedAttribute{
-			Attributes:  map[string]schema.Attribute{"fields": schema1.MapAttribute{Description: "Unordered map of dynamically typed values."}},
+			Attributes: map[string]schema.Attribute{"fields": schema1.MapAttribute{
+				Description: "Unordered map of dynamically typed values.",
+				ElementType: types.StringType,
+				Optional:    true,
+			}},
 			Description: "",
 			Optional:    true,
 		},
@@ -875,7 +891,11 @@ func GenSchemaAppearanceProfileDataSource(ctx context.Context) schema.Schema {
 func GenSchemaThemeDataSource(ctx context.Context) schema.Schema {
 	return schema.Schema{Attributes: map[string]schema.Attribute{
 		"content": schema.SingleNestedAttribute{
-			Attributes:  map[string]schema.Attribute{"fields": schema1.MapAttribute{Description: "Unordered map of dynamically typed values."}},
+			Attributes: map[string]schema.Attribute{"fields": schema1.MapAttribute{
+				Description: "Unordered map of dynamically typed values.",
+				ElementType: types.StringType,
+				Optional:    true,
+			}},
 			Description: "",
 			Optional:    true,
 		},
@@ -892,7 +912,11 @@ func GenSchemaThemeDataSource(ctx context.Context) schema.Schema {
 			Optional:    true,
 		},
 		"stylesheet_attributes": schema.SingleNestedAttribute{
-			Attributes:  map[string]schema.Attribute{"fields": schema1.MapAttribute{Description: "Unordered map of dynamically typed values."}},
+			Attributes: map[string]schema.Attribute{"fields": schema1.MapAttribute{
+				Description: "Unordered map of dynamically typed values.",
+				ElementType: types.StringType,
+				Optional:    true,
+			}},
 			Description: "",
 			Optional:    true,
 		},

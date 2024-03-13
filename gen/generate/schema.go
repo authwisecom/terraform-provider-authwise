@@ -90,10 +90,13 @@ func fields(l zerolog.Logger, m *protogen.Message) j.Dict {
 		if injected[name] {
 			continue
 		}
-
+		//TODO - not working
 		// Hack to handle structs
 		if f.Parent.Desc.FullName() == "google.protobuf.Struct" {
 			d[j.Lit(name)] = j.Qual(ResourceSchema, "MapAttribute").Values(j.Dict{
+				//hack for now
+				j.Id("ElementType"): j.Qual(Types, "StringType"),
+				j.Id("Optional"):    j.True(),
 				j.Id("Description"): j.Lit(trimComments(f.Comments.Leading)),
 			})
 			continue

@@ -321,7 +321,11 @@ func GenSchemaClient(ctx context.Context) schema.Schema {
 			Optional:    true,
 		},
 		"metadata": schema.SingleNestedAttribute{
-			Attributes:  map[string]schema.Attribute{"fields": schema.MapAttribute{Description: "Unordered map of dynamically typed values."}},
+			Attributes: map[string]schema.Attribute{"fields": schema.MapAttribute{
+				Description: "Unordered map of dynamically typed values.",
+				ElementType: types.StringType,
+				Optional:    true,
+			}},
 			Description: "",
 			Optional:    true,
 		},
@@ -398,7 +402,11 @@ func GenSchemaScope(ctx context.Context) schema.Schema {
 func GenSchemaAppearanceProfile(ctx context.Context) schema.Schema {
 	return schema.Schema{Attributes: map[string]schema.Attribute{
 		"content": schema.SingleNestedAttribute{
-			Attributes:  map[string]schema.Attribute{"fields": schema.MapAttribute{Description: "Unordered map of dynamically typed values."}},
+			Attributes: map[string]schema.Attribute{"fields": schema.MapAttribute{
+				Description: "Unordered map of dynamically typed values.",
+				ElementType: types.StringType,
+				Optional:    true,
+			}},
 			Description: "",
 			Optional:    true,
 		},
@@ -411,7 +419,11 @@ func GenSchemaAppearanceProfile(ctx context.Context) schema.Schema {
 			Optional:    true,
 		},
 		"stylesheet_attributes": schema.SingleNestedAttribute{
-			Attributes:  map[string]schema.Attribute{"fields": schema.MapAttribute{Description: "Unordered map of dynamically typed values."}},
+			Attributes: map[string]schema.Attribute{"fields": schema.MapAttribute{
+				Description: "Unordered map of dynamically typed values.",
+				ElementType: types.StringType,
+				Optional:    true,
+			}},
 			Description: "",
 			Optional:    true,
 		},
@@ -430,7 +442,11 @@ func GenSchemaAppearanceProfile(ctx context.Context) schema.Schema {
 func GenSchemaTheme(ctx context.Context) schema.Schema {
 	return schema.Schema{Attributes: map[string]schema.Attribute{
 		"content": schema.SingleNestedAttribute{
-			Attributes:  map[string]schema.Attribute{"fields": schema.MapAttribute{Description: "Unordered map of dynamically typed values."}},
+			Attributes: map[string]schema.Attribute{"fields": schema.MapAttribute{
+				Description: "Unordered map of dynamically typed values.",
+				ElementType: types.StringType,
+				Optional:    true,
+			}},
 			Description: "",
 			Optional:    true,
 		},
@@ -447,7 +463,11 @@ func GenSchemaTheme(ctx context.Context) schema.Schema {
 			Optional:    true,
 		},
 		"stylesheet_attributes": schema.SingleNestedAttribute{
-			Attributes:  map[string]schema.Attribute{"fields": schema.MapAttribute{Description: "Unordered map of dynamically typed values."}},
+			Attributes: map[string]schema.Attribute{"fields": schema.MapAttribute{
+				Description: "Unordered map of dynamically typed values.",
+				ElementType: types.StringType,
+				Optional:    true,
+			}},
 			Description: "",
 			Optional:    true,
 		},

@@ -67,16 +67,12 @@ func newTestSimpleClientParams() *testSimpleClientParams {
 
 func testAccClientResourceConfig(params *testSimpleClientParams) string {
 	return fmt.Sprintf(`
-resource "authwise_realm" "default" {
-  name = %[1]q
-}
 
 resource "authwise_audience" "default" {
   name = %[2]q
 }
 
 resource "authwise_client" "default" {
-  realm_id = authwise_realm.default.id
   audience_id = authwise_audience.default.id
   config = {
 	"@type" = "type.googleapis.com/authwise.types.core.v1alpha1.InteractiveClientConfig",
@@ -95,10 +91,6 @@ resource "authwise_client" "default" {
 
 func testAccClientResourceConfigWithDataSource(params *testSimpleClientParams) string {
 	return fmt.Sprintf(`
-resource "authwise_realm" "default" {
-  name = %[1]q
-}
-
 resource "authwise_audience" "default" {
   name = %[2]q
 }
@@ -114,7 +106,6 @@ datasource "authwise_config_interactive_client_config" "default" {
 }
 
 resource "authwise_client" "default" {
-  realm_id = authwise_realm.default.id
   audience_id = authwise_audience.default.id
   name = %[3]q
   config = authwise_config_interactive_client_config.default.result
