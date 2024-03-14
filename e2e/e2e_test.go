@@ -74,6 +74,7 @@ resource "authwise_audience" "default" {
 
 resource "authwise_client" "default" {
   audience_id = authwise_audience.default.id
+  grant_type = "client_credentials"
   config = {
 	"@type" = "type.googleapis.com/authwise.types.core.v1alpha1.InteractiveClientConfig",
 	"access_token_expire_seconds" = 7200,
@@ -107,6 +108,7 @@ datasource "authwise_config_interactive_client_config" "default" {
 
 resource "authwise_client" "default" {
   audience_id = authwise_audience.default.id
+  grant_type = "client_credentials"
   name = %[3]q
   config = authwise_config_interactive_client_config.default.result
 }

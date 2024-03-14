@@ -132,7 +132,7 @@ func (s *configDataSourceHandler) modelFields(fields []*protogen.Field, l zerolo
 		case protoreflect.Int64Kind, protoreflect.Int32Kind:
 			typeName = "Int64"
 		default:
-			l.Debug().Msgf("test: %v", f.Desc)
+			//l.Debug().Msgf("test: %v", f.Desc)
 		}
 		log.Debug().Str("kind", f.Desc.Kind().GoString()).Msg("processing model field")
 		result = append(result, j.Id(f.GoName).Qual(Types, typeName).Tag(map[string]string{

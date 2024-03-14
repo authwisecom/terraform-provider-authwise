@@ -3,7 +3,10 @@ package provider
 
 import (
 	"context"
+	attr "github.com/hashicorp/terraform-plugin-framework/attr"
 	schema "github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	objectdefault "github.com/hashicorp/terraform-plugin-framework/resource/schema/objectdefault"
+	stringdefault "github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
 )
 
@@ -11,76 +14,24 @@ import (
 func GenSchemaTenant(ctx context.Context) schema.Schema {
 	return schema.Schema{Attributes: map[string]schema.Attribute{
 		"appearance_profile_id": schema.StringAttribute{
+			Computed:    true,
 			Description: "",
 			Optional:    true,
 		},
 		"config": schema.SingleNestedAttribute{
-			Attributes: map[string]schema.Attribute{
-				"access_token_expire_seconds": schema.Int64Attribute{
-					Description: "",
-					Optional:    true,
-				},
-				"cookie_domain": schema.StringAttribute{
-					Description: "",
-					Optional:    true,
-				},
-				"cors": schema.SingleNestedAttribute{
-					Attributes: map[string]schema.Attribute{
-						"allowed_headers": schema.ListAttribute{
-							Description: "",
-							ElementType: types.StringType,
-							Optional:    true,
-						},
-						"allowed_origins": schema.ListAttribute{
-							Description: "",
-							ElementType: types.StringType,
-							Optional:    true,
-						},
-						"options_mode": schema.Int64Attribute{
-							Description: "",
-							Optional:    true,
-						},
-					},
-					Description: "",
-					Optional:    true,
-				},
-				"interaction_forward_uri": schema.StringAttribute{
-					Description: "",
-					Optional:    true,
-				},
-				"logging": schema.SingleNestedAttribute{
-					Attributes: map[string]schema.Attribute{
-						"include_caller": schema.BoolAttribute{
-							Description: "",
-							Optional:    true,
-						},
-						"include_stack_trace": schema.BoolAttribute{
-							Description: "",
-							Optional:    true,
-						},
-						"log_level": schema.Int64Attribute{
-							Description: "",
-							Optional:    true,
-						},
-						"send_to_event_stream": schema.BoolAttribute{
-							Description: "",
-							Optional:    true,
-						},
-					},
-					Description: "",
-					Optional:    true,
-				},
-			},
+			Computed:    true,
+			Default:     objectdefault.StaticValue(types.ObjectValueMust(map[string]attr.Type{}, map[string]attr.Value{})),
 			Description: "",
 			Optional:    true,
 		},
 		"id": schema.StringAttribute{
+			Computed:    true,
 			Description: "",
 			Optional:    true,
 		},
 		"name": schema.StringAttribute{
 			Description: "",
-			Optional:    true,
+			Required:    true,
 		},
 	}}
 }
@@ -89,14 +40,13 @@ func GenSchemaTenant(ctx context.Context) schema.Schema {
 func GenSchemaTenantUrl(ctx context.Context) schema.Schema {
 	return schema.Schema{Attributes: map[string]schema.Attribute{
 		"config": schema.SingleNestedAttribute{
-			Attributes: map[string]schema.Attribute{"cookie_domain": schema.StringAttribute{
-				Description: "",
-				Optional:    true,
-			}},
+			Computed:    true,
+			Default:     objectdefault.StaticValue(types.ObjectValueMust(map[string]attr.Type{}, map[string]attr.Value{})),
 			Description: "",
 			Optional:    true,
 		},
 		"id": schema.StringAttribute{
+			Computed:    true,
 			Description: "",
 			Optional:    true,
 		},
@@ -111,20 +61,13 @@ func GenSchemaTenantUrl(ctx context.Context) schema.Schema {
 func GenSchemaProvider(ctx context.Context) schema.Schema {
 	return schema.Schema{Attributes: map[string]schema.Attribute{
 		"config": schema.SingleNestedAttribute{
-			Attributes: map[string]schema.Attribute{
-				"type_url": schema.StringAttribute{
-					Description: "A URL/resource name that uniquely identifies the type of the serialized protocol buffer message. This string must contain at least one \"/\" character. The last segment of the URL's path must represent the fully qualified name of the type (as in `path/google.protobuf.Duration`). The name should be in a canonical form (e.g., leading \".\" is not accepted). In practice, teams usually precompile into the binary all types that they expect it to use in the context of Any. However, for URLs which use the scheme `http`, `https`, or no scheme, one can optionally set up a type server that maps type URLs to message definitions as follows: * If no scheme is provided, `https` is assumed. * An HTTP GET on the URL must yield a [google.protobuf.Type][]   value in binary format, or produce an error. * Applications are allowed to cache lookup results based on the   URL, or have them precompiled into a binary to avoid any   lookup. Therefore, binary compatibility needs to be preserved   on changes to types. (Use versioned type names to manage   breaking changes.) Note: this functionality is not currently available in the official protobuf release, and it is not used for type URLs beginning with type.googleapis.com. Schemes other than `http`, `https` (or the empty scheme) might be used with implementation specific semantics.",
-					Optional:    true,
-				},
-				"value": schema.StringAttribute{
-					Description: "Must be a valid serialized protocol buffer of the above specified type.",
-					Optional:    true,
-				},
-			},
+			Computed:    true,
+			Default:     objectdefault.StaticValue(types.ObjectValueMust(map[string]attr.Type{}, map[string]attr.Value{})),
 			Description: "",
 			Optional:    true,
 		},
 		"id": schema.StringAttribute{
+			Computed:    true,
 			Description: "",
 			Optional:    true,
 		},
@@ -151,6 +94,7 @@ func GenSchemaRealm(ctx context.Context) schema.Schema {
 			Optional:    true,
 		},
 		"id": schema.StringAttribute{
+			Computed:    true,
 			Description: "",
 			Optional:    true,
 		},
@@ -159,6 +103,7 @@ func GenSchemaRealm(ctx context.Context) schema.Schema {
 			Optional:    true,
 		},
 		"tenant_id": schema.StringAttribute{
+			Computed:    true,
 			Description: "",
 			Optional:    true,
 		},
@@ -173,102 +118,35 @@ func GenSchemaRealm(ctx context.Context) schema.Schema {
 func GenSchemaAudience(ctx context.Context) schema.Schema {
 	return schema.Schema{Attributes: map[string]schema.Attribute{
 		"appearance_profile_id": schema.StringAttribute{
+			Computed:    true,
+			Default:     stringdefault.StaticString(""),
 			Description: "",
 			Optional:    true,
 		},
 		"config": schema.SingleNestedAttribute{
-			Attributes: map[string]schema.Attribute{
-				"access_token_expire_seconds": schema.Int64Attribute{
-					Description: "",
-					Optional:    true,
-				},
-				"cors": schema.SingleNestedAttribute{
-					Attributes: map[string]schema.Attribute{
-						"allowed_headers": schema.ListAttribute{
-							Description: "",
-							ElementType: types.StringType,
-							Optional:    true,
-						},
-						"allowed_origins": schema.ListAttribute{
-							Description: "",
-							ElementType: types.StringType,
-							Optional:    true,
-						},
-						"options_mode": schema.Int64Attribute{
-							Description: "",
-							Optional:    true,
-						},
-					},
-					Description: "",
-					Optional:    true,
-				},
-				"interaction_forward_uri": schema.StringAttribute{
-					Description: "",
-					Optional:    true,
-				},
-				"logging": schema.SingleNestedAttribute{
-					Attributes: map[string]schema.Attribute{
-						"include_caller": schema.BoolAttribute{
-							Description: "",
-							Optional:    true,
-						},
-						"include_stack_trace": schema.BoolAttribute{
-							Description: "",
-							Optional:    true,
-						},
-						"log_level": schema.Int64Attribute{
-							Description: "",
-							Optional:    true,
-						},
-						"send_to_event_stream": schema.BoolAttribute{
-							Description: "",
-							Optional:    true,
-						},
-					},
-					Description: "",
-					Optional:    true,
-				},
-				"scopes": schema.SingleNestedAttribute{
-					Attributes: map[string]schema.Attribute{
-						"authorization": schema.SingleNestedAttribute{
-							Attributes: map[string]schema.Attribute{
-								"include_permissions": schema.BoolAttribute{
-									Description: "",
-									Optional:    true,
-								},
-								"include_roles": schema.BoolAttribute{
-									Description: "",
-									Optional:    true,
-								},
-							},
-							Description: "",
-							Optional:    true,
-						},
-						"openid": schema.BoolAttribute{
-							Description: "",
-							Optional:    true,
-						},
-					},
-					Description: "",
-					Optional:    true,
-				},
-			},
+			Computed:    true,
+			Default:     objectdefault.StaticValue(types.ObjectValueMust(map[string]attr.Type{}, map[string]attr.Value{})),
 			Description: "",
 			Optional:    true,
 		},
 		"description": schema.StringAttribute{
+			Computed:    true,
+			Default:     stringdefault.StaticString(""),
 			Description: "",
 			Optional:    true,
 		},
 		"id": schema.StringAttribute{
+			Computed:    true,
 			Description: "",
 			Optional:    true,
 		},
 		"name": schema.StringAttribute{
 			Description: "",
-			Optional:    true,
+			Required:    true,
 		},
 		"tenant_id": schema.StringAttribute{
+			Computed:    true,
+			Default:     stringdefault.StaticString(""),
 			Description: "",
 			Optional:    true,
 		},
@@ -279,59 +157,59 @@ func GenSchemaAudience(ctx context.Context) schema.Schema {
 func GenSchemaClient(ctx context.Context) schema.Schema {
 	return schema.Schema{Attributes: map[string]schema.Attribute{
 		"alias": schema.StringAttribute{
+			Computed:    true,
+			Default:     stringdefault.StaticString(""),
 			Description: "",
 			Optional:    true,
 		},
 		"appearance_profile_id": schema.StringAttribute{
+			Computed:    true,
+			Default:     stringdefault.StaticString(""),
 			Description: "",
 			Optional:    true,
 		},
 		"audience_id": schema.StringAttribute{
+			Computed:    true,
+			Default:     stringdefault.StaticString(""),
 			Description: "",
 			Optional:    true,
 		},
 		"config": schema.SingleNestedAttribute{
-			Attributes: map[string]schema.Attribute{
-				"type_url": schema.StringAttribute{
-					Description: "A URL/resource name that uniquely identifies the type of the serialized protocol buffer message. This string must contain at least one \"/\" character. The last segment of the URL's path must represent the fully qualified name of the type (as in `path/google.protobuf.Duration`). The name should be in a canonical form (e.g., leading \".\" is not accepted). In practice, teams usually precompile into the binary all types that they expect it to use in the context of Any. However, for URLs which use the scheme `http`, `https`, or no scheme, one can optionally set up a type server that maps type URLs to message definitions as follows: * If no scheme is provided, `https` is assumed. * An HTTP GET on the URL must yield a [google.protobuf.Type][]   value in binary format, or produce an error. * Applications are allowed to cache lookup results based on the   URL, or have them precompiled into a binary to avoid any   lookup. Therefore, binary compatibility needs to be preserved   on changes to types. (Use versioned type names to manage   breaking changes.) Note: this functionality is not currently available in the official protobuf release, and it is not used for type URLs beginning with type.googleapis.com. Schemes other than `http`, `https` (or the empty scheme) might be used with implementation specific semantics.",
-					Optional:    true,
-				},
-				"value": schema.StringAttribute{
-					Description: "Must be a valid serialized protocol buffer of the above specified type.",
-					Optional:    true,
-				},
-			},
+			Computed:    true,
+			Default:     objectdefault.StaticValue(types.ObjectValueMust(map[string]attr.Type{}, map[string]attr.Value{})),
 			Description: "",
 			Optional:    true,
 		},
 		"grant_type": schema.StringAttribute{
 			Description: "",
-			Optional:    true,
+			Required:    true,
 		},
 		"id": schema.StringAttribute{
+			Computed:    true,
 			Description: "",
 			Optional:    true,
 		},
 		"login_url": schema.StringAttribute{
+			Computed:    true,
+			Default:     stringdefault.StaticString(""),
 			Description: "",
 			Optional:    true,
 		},
 		"logo_id": schema.StringAttribute{
+			Computed:    true,
+			Default:     stringdefault.StaticString(""),
 			Description: "",
 			Optional:    true,
 		},
 		"metadata": schema.SingleNestedAttribute{
-			Attributes: map[string]schema.Attribute{"fields": schema.MapAttribute{
-				Description: "Unordered map of dynamically typed values.",
-				ElementType: types.StringType,
-				Optional:    true,
-			}},
+			Computed:    true,
+			Default:     objectdefault.StaticValue(types.ObjectValueMust(map[string]attr.Type{}, map[string]attr.Value{})),
 			Description: "",
 			Optional:    true,
 		},
 		"name": schema.StringAttribute{
 			Description: "",
-			Optional:    true,
+			Required:    true,
 		},
 	}}
 }
@@ -348,6 +226,7 @@ func GenSchemaRole(ctx context.Context) schema.Schema {
 			Optional:    true,
 		},
 		"id": schema.StringAttribute{
+			Computed:    true,
 			Description: "",
 			Optional:    true,
 		},
@@ -366,6 +245,7 @@ func GenSchemaPermission(ctx context.Context) schema.Schema {
 			Optional:    true,
 		},
 		"id": schema.StringAttribute{
+			Computed:    true,
 			Description: "",
 			Optional:    true,
 		},
@@ -388,6 +268,7 @@ func GenSchemaScope(ctx context.Context) schema.Schema {
 			Optional:    true,
 		},
 		"id": schema.StringAttribute{
+			Computed:    true,
 			Description: "",
 			Optional:    true,
 		},
@@ -402,15 +283,13 @@ func GenSchemaScope(ctx context.Context) schema.Schema {
 func GenSchemaAppearanceProfile(ctx context.Context) schema.Schema {
 	return schema.Schema{Attributes: map[string]schema.Attribute{
 		"content": schema.SingleNestedAttribute{
-			Attributes: map[string]schema.Attribute{"fields": schema.MapAttribute{
-				Description: "Unordered map of dynamically typed values.",
-				ElementType: types.StringType,
-				Optional:    true,
-			}},
+			Computed:    true,
+			Default:     objectdefault.StaticValue(types.ObjectValueMust(map[string]attr.Type{}, map[string]attr.Value{})),
 			Description: "",
 			Optional:    true,
 		},
 		"id": schema.StringAttribute{
+			Computed:    true,
 			Description: "",
 			Optional:    true,
 		},
@@ -419,11 +298,8 @@ func GenSchemaAppearanceProfile(ctx context.Context) schema.Schema {
 			Optional:    true,
 		},
 		"stylesheet_attributes": schema.SingleNestedAttribute{
-			Attributes: map[string]schema.Attribute{"fields": schema.MapAttribute{
-				Description: "Unordered map of dynamically typed values.",
-				ElementType: types.StringType,
-				Optional:    true,
-			}},
+			Computed:    true,
+			Default:     objectdefault.StaticValue(types.ObjectValueMust(map[string]attr.Type{}, map[string]attr.Value{})),
 			Description: "",
 			Optional:    true,
 		},
@@ -442,15 +318,13 @@ func GenSchemaAppearanceProfile(ctx context.Context) schema.Schema {
 func GenSchemaTheme(ctx context.Context) schema.Schema {
 	return schema.Schema{Attributes: map[string]schema.Attribute{
 		"content": schema.SingleNestedAttribute{
-			Attributes: map[string]schema.Attribute{"fields": schema.MapAttribute{
-				Description: "Unordered map of dynamically typed values.",
-				ElementType: types.StringType,
-				Optional:    true,
-			}},
+			Computed:    true,
+			Default:     objectdefault.StaticValue(types.ObjectValueMust(map[string]attr.Type{}, map[string]attr.Value{})),
 			Description: "",
 			Optional:    true,
 		},
 		"id": schema.StringAttribute{
+			Computed:    true,
 			Description: "",
 			Optional:    true,
 		},
@@ -463,11 +337,8 @@ func GenSchemaTheme(ctx context.Context) schema.Schema {
 			Optional:    true,
 		},
 		"stylesheet_attributes": schema.SingleNestedAttribute{
-			Attributes: map[string]schema.Attribute{"fields": schema.MapAttribute{
-				Description: "Unordered map of dynamically typed values.",
-				ElementType: types.StringType,
-				Optional:    true,
-			}},
+			Computed:    true,
+			Default:     objectdefault.StaticValue(types.ObjectValueMust(map[string]attr.Type{}, map[string]attr.Value{})),
 			Description: "",
 			Optional:    true,
 		},
@@ -486,6 +357,7 @@ func GenSchemaSecret(ctx context.Context) schema.Schema {
 			Optional:    true,
 		},
 		"id": schema.StringAttribute{
+			Computed:    true,
 			Description: "",
 			Optional:    true,
 		},
@@ -508,6 +380,7 @@ func GenSchemaSecret(ctx context.Context) schema.Schema {
 func GenSchemaAsset(ctx context.Context) schema.Schema {
 	return schema.Schema{Attributes: map[string]schema.Attribute{
 		"id": schema.StringAttribute{
+			Computed:    true,
 			Description: "",
 			Optional:    true,
 		},

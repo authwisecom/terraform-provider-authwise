@@ -3,8 +3,10 @@ package provider
 
 import (
 	"context"
+	attr "github.com/hashicorp/terraform-plugin-framework/attr"
 	schema "github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	schema1 "github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	objectdefault "github.com/hashicorp/terraform-plugin-framework/resource/schema/objectdefault"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
 )
 
@@ -193,16 +195,8 @@ func GenSchemaAudienceConfigDataSource(ctx context.Context) schema.Schema {
 		"scopes": schema.SingleNestedAttribute{
 			Attributes: map[string]schema.Attribute{
 				"authorization": schema1.SingleNestedAttribute{
-					Attributes: map[string]schema1.Attribute{
-						"include_permissions": schema1.BoolAttribute{
-							Description: "",
-							Optional:    true,
-						},
-						"include_roles": schema1.BoolAttribute{
-							Description: "",
-							Optional:    true,
-						},
-					},
+					Computed:    true,
+					Default:     objectdefault.StaticValue(types.ObjectValueMust(map[string]attr.Type{}, map[string]attr.Value{})),
 					Description: "",
 					Optional:    true,
 				},
@@ -246,11 +240,8 @@ func GenSchemaProviderUsernamePasswordDataSource(ctx context.Context) schema.Sch
 			Description: "",
 			NestedObject: schema.NestedAttributeObject{Attributes: map[string]schema.Attribute{
 				"config": schema1.SingleNestedAttribute{
-					Attributes: map[string]schema1.Attribute{"fields": schema1.MapAttribute{
-						Description: "Unordered map of dynamically typed values.",
-						ElementType: types.StringType,
-						Optional:    true,
-					}},
+					Computed:    true,
+					Default:     objectdefault.StaticValue(types.ObjectValueMust(map[string]attr.Type{}, map[string]attr.Value{})),
 					Description: "",
 					Optional:    true,
 				},
@@ -474,22 +465,8 @@ func GenSchemaTenantDataSource(ctx context.Context) schema.Schema {
 					Optional:    true,
 				},
 				"cors": schema1.SingleNestedAttribute{
-					Attributes: map[string]schema1.Attribute{
-						"allowed_headers": schema1.ListAttribute{
-							Description: "",
-							ElementType: types.StringType,
-							Optional:    true,
-						},
-						"allowed_origins": schema1.ListAttribute{
-							Description: "",
-							ElementType: types.StringType,
-							Optional:    true,
-						},
-						"options_mode": schema1.Int64Attribute{
-							Description: "",
-							Optional:    true,
-						},
-					},
+					Computed:    true,
+					Default:     objectdefault.StaticValue(types.ObjectValueMust(map[string]attr.Type{}, map[string]attr.Value{})),
 					Description: "",
 					Optional:    true,
 				},
@@ -498,24 +475,8 @@ func GenSchemaTenantDataSource(ctx context.Context) schema.Schema {
 					Optional:    true,
 				},
 				"logging": schema1.SingleNestedAttribute{
-					Attributes: map[string]schema1.Attribute{
-						"include_caller": schema1.BoolAttribute{
-							Description: "",
-							Optional:    true,
-						},
-						"include_stack_trace": schema1.BoolAttribute{
-							Description: "",
-							Optional:    true,
-						},
-						"log_level": schema1.Int64Attribute{
-							Description: "",
-							Optional:    true,
-						},
-						"send_to_event_stream": schema1.BoolAttribute{
-							Description: "",
-							Optional:    true,
-						},
-					},
+					Computed:    true,
+					Default:     objectdefault.StaticValue(types.ObjectValueMust(map[string]attr.Type{}, map[string]attr.Value{})),
 					Description: "",
 					Optional:    true,
 				},
@@ -632,22 +593,8 @@ func GenSchemaAudienceDataSource(ctx context.Context) schema.Schema {
 					Optional:    true,
 				},
 				"cors": schema1.SingleNestedAttribute{
-					Attributes: map[string]schema1.Attribute{
-						"allowed_headers": schema1.ListAttribute{
-							Description: "",
-							ElementType: types.StringType,
-							Optional:    true,
-						},
-						"allowed_origins": schema1.ListAttribute{
-							Description: "",
-							ElementType: types.StringType,
-							Optional:    true,
-						},
-						"options_mode": schema1.Int64Attribute{
-							Description: "",
-							Optional:    true,
-						},
-					},
+					Computed:    true,
+					Default:     objectdefault.StaticValue(types.ObjectValueMust(map[string]attr.Type{}, map[string]attr.Value{})),
 					Description: "",
 					Optional:    true,
 				},
@@ -656,48 +603,14 @@ func GenSchemaAudienceDataSource(ctx context.Context) schema.Schema {
 					Optional:    true,
 				},
 				"logging": schema1.SingleNestedAttribute{
-					Attributes: map[string]schema1.Attribute{
-						"include_caller": schema1.BoolAttribute{
-							Description: "",
-							Optional:    true,
-						},
-						"include_stack_trace": schema1.BoolAttribute{
-							Description: "",
-							Optional:    true,
-						},
-						"log_level": schema1.Int64Attribute{
-							Description: "",
-							Optional:    true,
-						},
-						"send_to_event_stream": schema1.BoolAttribute{
-							Description: "",
-							Optional:    true,
-						},
-					},
+					Computed:    true,
+					Default:     objectdefault.StaticValue(types.ObjectValueMust(map[string]attr.Type{}, map[string]attr.Value{})),
 					Description: "",
 					Optional:    true,
 				},
 				"scopes": schema1.SingleNestedAttribute{
-					Attributes: map[string]schema1.Attribute{
-						"authorization": schema1.SingleNestedAttribute{
-							Attributes: map[string]schema1.Attribute{
-								"include_permissions": schema1.BoolAttribute{
-									Description: "",
-									Optional:    true,
-								},
-								"include_roles": schema1.BoolAttribute{
-									Description: "",
-									Optional:    true,
-								},
-							},
-							Description: "",
-							Optional:    true,
-						},
-						"openid": schema1.BoolAttribute{
-							Description: "",
-							Optional:    true,
-						},
-					},
+					Computed:    true,
+					Default:     objectdefault.StaticValue(types.ObjectValueMust(map[string]attr.Type{}, map[string]attr.Value{})),
 					Description: "",
 					Optional:    true,
 				},

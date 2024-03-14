@@ -108,6 +108,7 @@ func objectToMap(obj types.Object) (map[string]any, error) {
 			}
 			res[k] = elements
 		default:
+			fmt.Printf("test: %v", v.Type(ctx))
 			//handle objects
 			ret, err := objectToMap(v.(types.Object))
 			if err != nil {

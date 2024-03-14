@@ -77,12 +77,12 @@ func (s *standardResourceHandler) modelName(m *protogen.Message) string {
 func (s *standardResourceHandler) model(f *j.File, m *protogen.Message, l zerolog.Logger) {
 
 	f.Type().Id(s.modelName(m)).Struct(
-		s.modelFields(m.Fields)...,
+		s.modelFields(m.Fields, l)...,
 	).Line()
 
 }
 
-func (s *standardResourceHandler) modelFields(fields []*protogen.Field) []j.Code {
+func (s *standardResourceHandler) modelFields(fields []*protogen.Field, l zerolog.Logger) []j.Code {
 	var result []j.Code
 	for _, f := range fields {
 		typeName := "Object"
@@ -95,6 +95,8 @@ func (s *standardResourceHandler) modelFields(fields []*protogen.Field) []j.Code
 			typeName = "Bool"
 		case protoreflect.EnumKind:
 			typeName = "Int64"
+		default:
+			l.Debug().Msgf("test: %v", f.Desc)
 		}
 		log.Debug().Str("kind", f.Desc.Kind().GoString()).Msg("processing model field")
 		result = append(result, j.Id(f.GoName).Qual(Types, typeName).Tag(map[string]string{

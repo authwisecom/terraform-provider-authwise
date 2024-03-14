@@ -5,7 +5,7 @@ import (
 	"github.com/iancoleman/strcase"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	"google.golang.org/genproto/googleapis/api/annotations"
+	v1alpha11 "gitlab.authwise.io/authwise/api-client-go/authwise/types/core/v1alpha1"
 	"google.golang.org/protobuf/compiler/protogen"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
@@ -120,20 +120,22 @@ func field(l zerolog.Logger, f *protogen.Field) j.Code {
 	d := j.Dict{
 		j.Id("Description"): j.Lit(trimComments(f.Comments.Leading)),
 	}
-
-	// Handle field behavior annotations
+	f.Desc.Options()
+	// Handle field behavior annotations - not being used
 	opts := f.Desc.Options().(*descriptorpb.FieldOptions)
-	optional := true
-	for _, b := range proto.GetExtension(opts, annotations.E_FieldBehavior).([]annotations.FieldBehavior) {
-		switch b {
-		case annotations.FieldBehavior_REQUIRED:
-			d[j.Id("Required")] = j.Lit(true)
-			optional = false
-		}
+	//TODO - other extensions in core.proto
+	if proto.GetExtension(opts, v1alpha11.E_Computed).(bool) {
+		d[j.Id("Computed")] = j.True()
 	}
-	// If required or computed is not set, default to optional
-	if optional {
-		d[j.Id("Optional")] = j.Lit(true)
+	if proto.GetExtension(opts, v1alpha11.E_Required).(bool) {
+		d[j.Id("Required")] = j.True()
+	} else {
+		d[j.Id("Optional")] = j.True()
+	}
+	//must be computed when using a default
+	if proto.HasExtension(opts, v1alpha11.E_Default) {
+		d[j.Id("Computed")] = j.True()
+		d[j.Id("Default")] = j.Qual(ResourceSchema+"/stringdefault", "StaticString").Call(j.Lit(proto.GetExtension(opts, v1alpha11.E_Default).(string)))
 	}
 
 	attributeTypeName := attributeTypeMap[f.Desc.Kind()]
@@ -172,8 +174,17 @@ func field(l zerolog.Logger, f *protogen.Field) j.Code {
 			return j.Qual(ResourceSchema, "ListAttribute").Values(d)
 		}
 	} else if f.Message != nil {
-		d[j.Id("Attributes")] = j.Map(j.String()).Qual(ResourceSchema, "Attribute").Values(
-			fields(l, f.Message),
+		//d[j.Id("Attributes")] = j.Map(j.String()).Qual(ResourceSchema, "Attribute").Values(
+		//	fields(l, f.Message),
+		//)
+		d[j.Id("Computed")] = j.True()
+		//TODO - use extensions to generate this
+		//  objectdefault.StaticValue(types.ObjectValueMust(map[string]attr.Type{}, map[string]attr.Value{})),
+		d[j.Id("Default")] = j.Qual(ResourceSchema+"/objectdefault", "StaticValue").Call(
+			j.Qual(Types, "ObjectValueMust").Call(
+				j.Map(j.String()).Qual(Attr, "Type").Values(),
+				j.Map(j.String()).Qual(Attr, "Value").Values(),
+			),
 		)
 		return j.Qual(ResourceSchema, "SingleNestedAttribute").Values(d)
 	} else {
