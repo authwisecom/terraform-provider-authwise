@@ -75,6 +75,7 @@ type resourceMetadata struct {
 }
 type schemaMetadata struct {
 	hasResult bool //create a computed result field
+	hasType   bool //create a computed @type field
 }
 type datasourceMetadata struct {
 	schemaIdentifiers []string
@@ -225,6 +226,7 @@ var resourceMetadataMap = resourceMap{
 			schemaIdentifiers: []string{"id"},
 			schemaMetadata: &schemaMetadata{
 				hasResult: true,
+				hasType:   true,
 			},
 		},
 	},

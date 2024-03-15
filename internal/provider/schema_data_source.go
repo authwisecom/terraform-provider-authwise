@@ -13,6 +13,10 @@ import (
 // GenSchemaInteractiveClientConfigDataSource returns tfsdk.Schema definition for InteractiveClientConfig
 func GenSchemaInteractiveClientConfigDataSource(ctx context.Context) schema.Schema {
 	return schema.Schema{Attributes: map[string]schema.Attribute{
+		"@type": schema.StringAttribute{
+			Computed:    true,
+			Description: "",
+		},
 		"access_token_expire_seconds": schema.Int64Attribute{
 			Description: "",
 			Optional:    true,
