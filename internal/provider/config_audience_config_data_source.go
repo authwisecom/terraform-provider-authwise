@@ -27,20 +27,20 @@ type audienceConfigDataSourceModel struct {
 
 func (r *audienceConfigDataSource) computeResult(ctx context.Context, m *audienceConfigDataSourceModel) (*types.Object, diag.Diagnostics) {
 	tMap := map[string]attr.Type{
-		"@type":                    types.StringType,
-		"AccessTokenExpireSeconds": m.AccessTokenExpireSeconds.Type(ctx),
-		"Cors":                     m.Cors.Type(ctx),
-		"InteractionForwardUri":    m.InteractionForwardUri.Type(ctx),
-		"Logging":                  m.Logging.Type(ctx),
-		"Scopes":                   m.Scopes.Type(ctx),
+		"@type":                       types.StringType,
+		"access_token_expire_seconds": m.AccessTokenExpireSeconds.Type(ctx),
+		"cors":                        m.Cors.Type(ctx),
+		"interaction_forward_uri":     m.InteractionForwardUri.Type(ctx),
+		"logging":                     m.Logging.Type(ctx),
+		"scopes":                      m.Scopes.Type(ctx),
 	}
 	vMap := map[string]attr.Value{
-		"@type":                    types.StringValue("type.googleapis.com/authwise.types.core.v1alpha1.AudienceConfig"),
-		"AccessTokenExpireSeconds": m.AccessTokenExpireSeconds,
-		"Cors":                     m.Cors,
-		"InteractionForwardUri":    m.InteractionForwardUri,
-		"Logging":                  m.Logging,
-		"Scopes":                   m.Scopes,
+		"@type":                       types.StringValue("type.googleapis.com/authwise.types.core.v1alpha1.AudienceConfig"),
+		"access_token_expire_seconds": m.AccessTokenExpireSeconds,
+		"cors":                        m.Cors,
+		"interaction_forward_uri":     m.InteractionForwardUri,
+		"logging":                     m.Logging,
+		"scopes":                      m.Scopes,
 	}
 	obj, diag := types.ObjectValue(tMap, vMap)
 

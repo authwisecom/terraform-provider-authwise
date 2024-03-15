@@ -28,22 +28,22 @@ type providerGitHubDataSourceModel struct {
 
 func (r *providerGitHubDataSource) computeResult(ctx context.Context, m *providerGitHubDataSourceModel) (*types.Object, diag.Diagnostics) {
 	tMap := map[string]attr.Type{
-		"@type":        types.StringType,
-		"AllowSignup":  m.AllowSignup.Type(ctx),
-		"ClientId":     m.ClientId.Type(ctx),
-		"ClientSecret": m.ClientSecret.Type(ctx),
-		"Display":      m.Display.Type(ctx),
-		"Prompt":       m.Prompt.Type(ctx),
-		"Scope":        m.Scope.Type(ctx),
+		"@type":         types.StringType,
+		"allow_signup":  m.AllowSignup.Type(ctx),
+		"client_id":     m.ClientId.Type(ctx),
+		"client_secret": m.ClientSecret.Type(ctx),
+		"display":       m.Display.Type(ctx),
+		"prompt":        m.Prompt.Type(ctx),
+		"scope":         m.Scope.Type(ctx),
 	}
 	vMap := map[string]attr.Value{
-		"@type":        types.StringValue("type.googleapis.com/authwise.types.core.v1alpha1.ProviderGitHub"),
-		"AllowSignup":  m.AllowSignup,
-		"ClientId":     m.ClientId,
-		"ClientSecret": m.ClientSecret,
-		"Display":      m.Display,
-		"Prompt":       m.Prompt,
-		"Scope":        m.Scope,
+		"@type":         types.StringValue("type.googleapis.com/authwise.types.core.v1alpha1.ProviderGitHub"),
+		"allow_signup":  m.AllowSignup,
+		"client_id":     m.ClientId,
+		"client_secret": m.ClientSecret,
+		"display":       m.Display,
+		"prompt":        m.Prompt,
+		"scope":         m.Scope,
 	}
 	obj, diag := types.ObjectValue(tMap, vMap)
 

@@ -26,18 +26,18 @@ type providerAuth0DataSourceModel struct {
 
 func (r *providerAuth0DataSource) computeResult(ctx context.Context, m *providerAuth0DataSourceModel) (*types.Object, diag.Diagnostics) {
 	tMap := map[string]attr.Type{
-		"@type":        types.StringType,
-		"ClientId":     m.ClientId.Type(ctx),
-		"ClientSecret": m.ClientSecret.Type(ctx),
-		"Scope":        m.Scope.Type(ctx),
-		"TenantUrl":    m.TenantUrl.Type(ctx),
+		"@type":         types.StringType,
+		"client_id":     m.ClientId.Type(ctx),
+		"client_secret": m.ClientSecret.Type(ctx),
+		"scope":         m.Scope.Type(ctx),
+		"tenant_url":    m.TenantUrl.Type(ctx),
 	}
 	vMap := map[string]attr.Value{
-		"@type":        types.StringValue("type.googleapis.com/authwise.types.core.v1alpha1.ProviderAuth0"),
-		"ClientId":     m.ClientId,
-		"ClientSecret": m.ClientSecret,
-		"Scope":        m.Scope,
-		"TenantUrl":    m.TenantUrl,
+		"@type":         types.StringValue("type.googleapis.com/authwise.types.core.v1alpha1.ProviderAuth0"),
+		"client_id":     m.ClientId,
+		"client_secret": m.ClientSecret,
+		"scope":         m.Scope,
+		"tenant_url":    m.TenantUrl,
 	}
 	obj, diag := types.ObjectValue(tMap, vMap)
 

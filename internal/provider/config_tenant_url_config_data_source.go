@@ -23,12 +23,12 @@ type tenantUrlConfigDataSourceModel struct {
 
 func (r *tenantUrlConfigDataSource) computeResult(ctx context.Context, m *tenantUrlConfigDataSourceModel) (*types.Object, diag.Diagnostics) {
 	tMap := map[string]attr.Type{
-		"@type":        types.StringType,
-		"CookieDomain": m.CookieDomain.Type(ctx),
+		"@type":         types.StringType,
+		"cookie_domain": m.CookieDomain.Type(ctx),
 	}
 	vMap := map[string]attr.Value{
-		"@type":        types.StringValue("type.googleapis.com/authwise.types.core.v1alpha1.TenantUrlConfig"),
-		"CookieDomain": m.CookieDomain,
+		"@type":         types.StringValue("type.googleapis.com/authwise.types.core.v1alpha1.TenantUrlConfig"),
+		"cookie_domain": m.CookieDomain,
 	}
 	obj, diag := types.ObjectValue(tMap, vMap)
 

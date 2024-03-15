@@ -24,14 +24,14 @@ type providerAuthwiseDataSourceModel struct {
 
 func (r *providerAuthwiseDataSource) computeResult(ctx context.Context, m *providerAuthwiseDataSourceModel) (*types.Object, diag.Diagnostics) {
 	tMap := map[string]attr.Type{
-		"@type":    types.StringType,
-		"ClientId": m.ClientId.Type(ctx),
-		"Issuer":   m.Issuer.Type(ctx),
+		"@type":     types.StringType,
+		"client_id": m.ClientId.Type(ctx),
+		"issuer":    m.Issuer.Type(ctx),
 	}
 	vMap := map[string]attr.Value{
-		"@type":    types.StringValue("type.googleapis.com/authwise.types.core.v1alpha1.ProviderAuthwise"),
-		"ClientId": m.ClientId,
-		"Issuer":   m.Issuer,
+		"@type":     types.StringValue("type.googleapis.com/authwise.types.core.v1alpha1.ProviderAuthwise"),
+		"client_id": m.ClientId,
+		"issuer":    m.Issuer,
 	}
 	obj, diag := types.ObjectValue(tMap, vMap)
 

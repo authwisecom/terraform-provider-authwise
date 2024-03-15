@@ -25,16 +25,16 @@ type providerUsernamePasswordDataSourceModel struct {
 
 func (r *providerUsernamePasswordDataSource) computeResult(ctx context.Context, m *providerUsernamePasswordDataSourceModel) (*types.Object, diag.Diagnostics) {
 	tMap := map[string]attr.Type{
-		"@type":              types.StringType,
-		"ForwardUri":         m.ForwardUri.Type(ctx),
-		"PasswordHashType":   m.PasswordHashType.Type(ctx),
-		"PasswordValidators": m.PasswordValidators.Type(ctx),
+		"@type":               types.StringType,
+		"forward_uri":         m.ForwardUri.Type(ctx),
+		"password_hash_type":  m.PasswordHashType.Type(ctx),
+		"password_validators": m.PasswordValidators.Type(ctx),
 	}
 	vMap := map[string]attr.Value{
-		"@type":              types.StringValue("type.googleapis.com/authwise.types.core.v1alpha1.ProviderUsernamePassword"),
-		"ForwardUri":         m.ForwardUri,
-		"PasswordHashType":   m.PasswordHashType,
-		"PasswordValidators": m.PasswordValidators,
+		"@type":               types.StringValue("type.googleapis.com/authwise.types.core.v1alpha1.ProviderUsernamePassword"),
+		"forward_uri":         m.ForwardUri,
+		"password_hash_type":  m.PasswordHashType,
+		"password_validators": m.PasswordValidators,
 	}
 	obj, diag := types.ObjectValue(tMap, vMap)
 

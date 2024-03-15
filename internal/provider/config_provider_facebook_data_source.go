@@ -26,18 +26,18 @@ type providerFacebookDataSourceModel struct {
 
 func (r *providerFacebookDataSource) computeResult(ctx context.Context, m *providerFacebookDataSourceModel) (*types.Object, diag.Diagnostics) {
 	tMap := map[string]attr.Type{
-		"@type":        types.StringType,
-		"ClientId":     m.ClientId.Type(ctx),
-		"ClientSecret": m.ClientSecret.Type(ctx),
-		"Scope":        m.Scope.Type(ctx),
-		"UserFields":   m.UserFields.Type(ctx),
+		"@type":         types.StringType,
+		"client_id":     m.ClientId.Type(ctx),
+		"client_secret": m.ClientSecret.Type(ctx),
+		"scope":         m.Scope.Type(ctx),
+		"user_fields":   m.UserFields.Type(ctx),
 	}
 	vMap := map[string]attr.Value{
-		"@type":        types.StringValue("type.googleapis.com/authwise.types.core.v1alpha1.ProviderFacebook"),
-		"ClientId":     m.ClientId,
-		"ClientSecret": m.ClientSecret,
-		"Scope":        m.Scope,
-		"UserFields":   m.UserFields,
+		"@type":         types.StringValue("type.googleapis.com/authwise.types.core.v1alpha1.ProviderFacebook"),
+		"client_id":     m.ClientId,
+		"client_secret": m.ClientSecret,
+		"scope":         m.Scope,
+		"user_fields":   m.UserFields,
 	}
 	obj, diag := types.ObjectValue(tMap, vMap)
 

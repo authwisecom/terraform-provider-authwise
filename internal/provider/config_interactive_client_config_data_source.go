@@ -27,20 +27,20 @@ type interactiveClientConfigDataSourceModel struct {
 
 func (r *interactiveClientConfigDataSource) computeResult(ctx context.Context, m *interactiveClientConfigDataSourceModel) (*types.Object, diag.Diagnostics) {
 	tMap := map[string]attr.Type{
-		"@type":                    types.StringType,
-		"AccessTokenExpireSeconds": m.AccessTokenExpireSeconds.Type(ctx),
-		"AllowedRedirectUris":      m.AllowedRedirectUris.Type(ctx),
-		"Cors":                     m.Cors.Type(ctx),
-		"InteractionForwardUri":    m.InteractionForwardUri.Type(ctx),
-		"Logging":                  m.Logging.Type(ctx),
+		"@type":                       types.StringType,
+		"access_token_expire_seconds": m.AccessTokenExpireSeconds.Type(ctx),
+		"allowed_redirect_uris":       m.AllowedRedirectUris.Type(ctx),
+		"cors":                        m.Cors.Type(ctx),
+		"interaction_forward_uri":     m.InteractionForwardUri.Type(ctx),
+		"logging":                     m.Logging.Type(ctx),
 	}
 	vMap := map[string]attr.Value{
-		"@type":                    types.StringValue("type.googleapis.com/authwise.types.core.v1alpha1.InteractiveClientConfig"),
-		"AccessTokenExpireSeconds": m.AccessTokenExpireSeconds,
-		"AllowedRedirectUris":      m.AllowedRedirectUris,
-		"Cors":                     m.Cors,
-		"InteractionForwardUri":    m.InteractionForwardUri,
-		"Logging":                  m.Logging,
+		"@type":                       types.StringValue("type.googleapis.com/authwise.types.core.v1alpha1.InteractiveClientConfig"),
+		"access_token_expire_seconds": m.AccessTokenExpireSeconds,
+		"allowed_redirect_uris":       m.AllowedRedirectUris,
+		"cors":                        m.Cors,
+		"interaction_forward_uri":     m.InteractionForwardUri,
+		"logging":                     m.Logging,
 	}
 	obj, diag := types.ObjectValue(tMap, vMap)
 

@@ -27,20 +27,20 @@ type providerMicrosoftDataSourceModel struct {
 
 func (r *providerMicrosoftDataSource) computeResult(ctx context.Context, m *providerMicrosoftDataSourceModel) (*types.Object, diag.Diagnostics) {
 	tMap := map[string]attr.Type{
-		"@type":        types.StringType,
-		"ClientId":     m.ClientId.Type(ctx),
-		"ClientSecret": m.ClientSecret.Type(ctx),
-		"PromptStyle":  m.PromptStyle.Type(ctx),
-		"Scope":        m.Scope.Type(ctx),
-		"Tenant":       m.Tenant.Type(ctx),
+		"@type":         types.StringType,
+		"client_id":     m.ClientId.Type(ctx),
+		"client_secret": m.ClientSecret.Type(ctx),
+		"prompt_style":  m.PromptStyle.Type(ctx),
+		"scope":         m.Scope.Type(ctx),
+		"tenant":        m.Tenant.Type(ctx),
 	}
 	vMap := map[string]attr.Value{
-		"@type":        types.StringValue("type.googleapis.com/authwise.types.core.v1alpha1.ProviderMicrosoft"),
-		"ClientId":     m.ClientId,
-		"ClientSecret": m.ClientSecret,
-		"PromptStyle":  m.PromptStyle,
-		"Scope":        m.Scope,
-		"Tenant":       m.Tenant,
+		"@type":         types.StringValue("type.googleapis.com/authwise.types.core.v1alpha1.ProviderMicrosoft"),
+		"client_id":     m.ClientId,
+		"client_secret": m.ClientSecret,
+		"prompt_style":  m.PromptStyle,
+		"scope":         m.Scope,
+		"tenant":        m.Tenant,
 	}
 	obj, diag := types.ObjectValue(tMap, vMap)
 

@@ -85,21 +85,9 @@ func (s *standardResourceHandler) model(f *j.File, m *protogen.Message, l zerolo
 func (s *standardResourceHandler) modelFields(fields []*protogen.Field, l zerolog.Logger) []j.Code {
 	var result []j.Code
 	for _, f := range fields {
-		typeName := "Object"
 		schemaName := strcase.ToSnake(f.GoName)
-		// TODO - Build out this set of data
-		switch f.Desc.Kind() {
-		case protoreflect.StringKind:
-			typeName = "String"
-		case protoreflect.BoolKind:
-			typeName = "Bool"
-		case protoreflect.EnumKind:
-			typeName = "Int64"
-		default:
-			l.Debug().Msgf("test: %v", f.Desc)
-		}
 		log.Debug().Str("kind", f.Desc.Kind().GoString()).Msg("processing model field")
-		result = append(result, j.Id(f.GoName).Qual(Types, typeName).Tag(map[string]string{
+		result = append(result, j.Id(f.GoName).Qual(Types, typeMap[f.Desc.Kind()]).Tag(map[string]string{
 			"tfsdk": schemaName,
 		}))
 	}

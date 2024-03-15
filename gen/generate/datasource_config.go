@@ -160,8 +160,7 @@ func (s *configDataSourceHandler) computeResult(f *j.File, m *protogen.Message, 
 					if name == "Result" {
 						continue
 					}
-
-					d[j.Lit(name)] = j.Id("m").Dot(name).Dot("Type").Call(j.Id("ctx"))
+					d[j.Lit(fmt.Sprintf("%s", v.Desc.FullName().Name()))] = j.Id("m").Dot(name).Dot("Type").Call(j.Id("ctx"))
 				}
 			}),
 		),
@@ -174,7 +173,7 @@ func (s *configDataSourceHandler) computeResult(f *j.File, m *protogen.Message, 
 						continue
 					}
 
-					d[j.Lit(name)] = j.Id("m").Dot(name)
+					d[j.Lit(fmt.Sprintf("%s", v.Desc.FullName().Name()))] = j.Id("m").Dot(name)
 				}
 			}),
 		),
