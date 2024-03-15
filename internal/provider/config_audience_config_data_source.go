@@ -22,7 +22,7 @@ type audienceConfigDataSourceModel struct {
 	Scopes                   types.Object `tfsdk:"scopes"`
 	Cors                     types.Object `tfsdk:"cors"`
 	Logging                  types.Object `tfsdk:"logging"`
-	Result                   types.Object `tfsdk:"Result"`
+	Result                   types.Object `tfsdk:"result"`
 }
 
 func (r *audienceConfigDataSource) computeResult(ctx context.Context, m *audienceConfigDataSourceModel) (*types.Object, diag.Diagnostics) {

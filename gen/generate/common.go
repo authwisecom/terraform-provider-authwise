@@ -72,8 +72,12 @@ type resourceMetadata struct {
 	nameFuncPattern     string //pattern, identifiers
 	nameFuncIdentifiers []string
 }
+type schemaMetadata struct {
+	hasResult bool //create a computed result field
+}
 type datasourceMetadata struct {
 	schemaIdentifiers []string
+	schemaMetadata    *schemaMetadata
 }
 type metadata struct {
 	*resourceMetadata
@@ -201,15 +205,65 @@ var resourceMetadataMap = resourceMap{
 			schemaIdentifiers: []string{"id", "audience_id"},
 		},
 	},
+	//Configuration objects
 	"AudienceConfig": &metadata{
 		resourceMetadata:   nil,
 		datasourceMetadata: &datasourceMetadata{schemaIdentifiers: []string{"id"}},
 	},
-	"InteractiveClientConfig": &metadata{
+	"TenantConfig": &metadata{
 		resourceMetadata:   nil,
 		datasourceMetadata: &datasourceMetadata{schemaIdentifiers: []string{"id"}},
 	},
+	"TenantUrlConfig": &metadata{
+		resourceMetadata:   nil,
+		datasourceMetadata: &datasourceMetadata{schemaIdentifiers: []string{"id"}},
+	},
+	"InteractiveClientConfig": &metadata{
+		resourceMetadata: nil,
+		datasourceMetadata: &datasourceMetadata{
+			schemaIdentifiers: []string{"id"},
+			schemaMetadata: &schemaMetadata{
+				hasResult: true,
+			},
+		},
+	},
 	"ProviderAuth0": &metadata{
+		resourceMetadata:   nil,
+		datasourceMetadata: &datasourceMetadata{schemaIdentifiers: []string{"id"}},
+	},
+	"ProviderAuthwise": &metadata{
+		resourceMetadata:   nil,
+		datasourceMetadata: &datasourceMetadata{schemaIdentifiers: []string{"id"}},
+	},
+	"ProviderUsernamePassword": &metadata{
+		resourceMetadata:   nil,
+		datasourceMetadata: &datasourceMetadata{schemaIdentifiers: []string{"id"}},
+	},
+	"ProviderMicrosoft": &metadata{
+		resourceMetadata:   nil,
+		datasourceMetadata: &datasourceMetadata{schemaIdentifiers: []string{"id"}},
+	},
+	"ProviderGoogle": &metadata{
+		resourceMetadata:   nil,
+		datasourceMetadata: &datasourceMetadata{schemaIdentifiers: []string{"id"}},
+	},
+	"ProviderGitHub": &metadata{
+		resourceMetadata:   nil,
+		datasourceMetadata: &datasourceMetadata{schemaIdentifiers: []string{"id"}},
+	},
+	"ProviderLinkedIn": &metadata{
+		resourceMetadata:   nil,
+		datasourceMetadata: &datasourceMetadata{schemaIdentifiers: []string{"id"}},
+	},
+	"ProviderFacebook": &metadata{
+		resourceMetadata:   nil,
+		datasourceMetadata: &datasourceMetadata{schemaIdentifiers: []string{"id"}},
+	},
+	"ProviderDropbox": &metadata{
+		resourceMetadata:   nil,
+		datasourceMetadata: &datasourceMetadata{schemaIdentifiers: []string{"id"}},
+	},
+	"ProviderOkta": &metadata{
 		resourceMetadata:   nil,
 		datasourceMetadata: &datasourceMetadata{schemaIdentifiers: []string{"id"}},
 	},

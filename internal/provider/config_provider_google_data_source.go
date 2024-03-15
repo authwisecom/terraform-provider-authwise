@@ -21,7 +21,7 @@ type providerGoogleDataSourceModel struct {
 	ClientSecret types.String `tfsdk:"client_secret"`
 	Scope        types.String `tfsdk:"scope"`
 	Prompt       types.String `tfsdk:"prompt"`
-	Result       types.Object `tfsdk:"Result"`
+	Result       types.Object `tfsdk:"result"`
 }
 
 func (r *providerGoogleDataSource) computeResult(ctx context.Context, m *providerGoogleDataSourceModel) (*types.Object, diag.Diagnostics) {

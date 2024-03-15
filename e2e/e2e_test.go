@@ -11,41 +11,44 @@ import (
 )
 
 func TestSimpleClientInlineConfig(t *testing.T) {
+	params := newTestSimpleClientParams()
+	clientName := "authwise_client.default"
+	expectedClientConfig := &ClientConfig{
+		accessTokenExpireSeconds: 7200,
+	}
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
 			// Create and Read testing
 			{
-				Config: providerConfig + testAccClientResourceConfig(newTestSimpleClientParams()),
-				Check:  resource.ComposeAggregateTestCheckFunc(
-				//resource.TestCheckResourceAttr("authwise_client.test", "name", "one"),
+				Config: providerConfig + testAccClientResourceConfigWithDataSource(params),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr(clientName, "name", params.clientName),
+					resource.TestCheckResourceAttr(clientName, "grant_type", "client_credentials"),
+					resource.TestCheckResourceAttrSet(clientName, "audience_id"),
+					testAccCheckClientConfiguration(clientName, "config", expectedClientConfig),
 				),
 			},
 			// ImportState testing
-			/*
-				{
-					ResourceName:      "authwise_client.test",
-					ImportState:       true,
-					ImportStateVerify: true,
-				},
-
-			*/
-			/*
-				// Update and Read testing
-				{
-					Config: testAccClientResourceConfig("two"),
-					Check: resource.ComposeAggregateTestCheckFunc(
-						resource.TestCheckResourceAttr("authwise_client.test", "name", "two"),
-						resource.TestCheckResourceAttr("authwise_client.test", "alias", ""),
-						resource.TestCheckResourceAttr("authwise_client.test", "login_url", ""),
-						resource.TestCheckResourceAttr("authwise_client.test", "grant_type", ""),
-						resource.TestCheckResourceAttr("authwise_client.test", "logo_id", ""),
-						resource.TestCheckResourceAttr("authwise_client.test", "audience_id", ""),
-						resource.TestCheckResourceAttr("authwise_client.test", "appearance_profile_id", ""),
-					),
-				},
-			*/
+			//{
+			//	ResourceName:      clientName,
+			//	ImportState:       true,
+			//	ImportStateVerify: true,
+			//},
+			// Update and Read testing
+			//{
+			//	Config: testAccClientResourceConfig(newTestSimpleClientParams()),
+			//	Check: resource.ComposeAggregateTestCheckFunc(
+			//		resource.TestCheckResourceAttr("authwise_client.test", "name", "two"),
+			//		resource.TestCheckResourceAttr("authwise_client.test", "alias", ""),
+			//		resource.TestCheckResourceAttr("authwise_client.test", "login_url", ""),
+			//		resource.TestCheckResourceAttr("authwise_client.test", "grant_type", ""),
+			//		resource.TestCheckResourceAttr("authwise_client.test", "logo_id", ""),
+			//		resource.TestCheckResourceAttr("authwise_client.test", "audience_id", ""),
+			//		resource.TestCheckResourceAttr("authwise_client.test", "appearance_profile_id", ""),
+			//	),
+			//},
 			// Delete tests
 		},
 	})
@@ -96,21 +99,21 @@ resource "authwise_audience" "default" {
   name = %[2]q
 }
 
-datasource "authwise_config_interactive_client_config" "default" {
-	"access_token_expire_seconds" = 7200,
-	"allowed_redirect_uris" = ["http://localhost:8990/return","https://localhost:3000*"],
-	"cors" = {
-		"allowed_origins" = ["https://localhost:3000"],
-		"options_mode" = "CORS_OPTIONS_MODE_STRICT"
-	},
-	"interaction_forward_uri" = "/"
+data "authwise_interactive_client_config" "default" {
+	access_token_expire_seconds = 7200
+	allowed_redirect_uris = ["http://localhost:8990/return","https://localhost:3000*"]
+	cors = {
+		"allowed_origins" = ["https://localhost:3000"]
+		"options_mode" = 1
+	}
+	interaction_forward_uri = "/"
 }
 
 resource "authwise_client" "default" {
   audience_id = authwise_audience.default.id
   grant_type = "client_credentials"
   name = %[3]q
-  config = authwise_config_interactive_client_config.default.result
+  config = data.authwise_interactive_client_config.default.result
 }
 `, params.realmName, params.audienceName, params.clientName)
 }

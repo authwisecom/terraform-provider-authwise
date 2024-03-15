@@ -21,7 +21,7 @@ type providerLinkedInDataSourceModel struct {
 	ClientSecret         types.String `tfsdk:"client_secret"`
 	Scope                types.String `tfsdk:"scope"`
 	IncludeGrantedScopes types.String `tfsdk:"include_granted_scopes"`
-	Result               types.Object `tfsdk:"Result"`
+	Result               types.Object `tfsdk:"result"`
 }
 
 func (r *providerLinkedInDataSource) computeResult(ctx context.Context, m *providerLinkedInDataSourceModel) (*types.Object, diag.Diagnostics) {

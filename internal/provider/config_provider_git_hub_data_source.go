@@ -23,7 +23,7 @@ type providerGitHubDataSourceModel struct {
 	Prompt       types.String `tfsdk:"prompt"`
 	Display      types.String `tfsdk:"display"`
 	Scope        types.String `tfsdk:"scope"`
-	Result       types.Object `tfsdk:"Result"`
+	Result       types.Object `tfsdk:"result"`
 }
 
 func (r *providerGitHubDataSource) computeResult(ctx context.Context, m *providerGitHubDataSourceModel) (*types.Object, diag.Diagnostics) {

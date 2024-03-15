@@ -21,7 +21,7 @@ type providerOktaDataSourceModel struct {
 	ClientSecret types.String `tfsdk:"client_secret"`
 	Scope        types.String `tfsdk:"scope"`
 	TenantUrl    types.String `tfsdk:"tenant_url"`
-	Result       types.Object `tfsdk:"Result"`
+	Result       types.Object `tfsdk:"result"`
 }
 
 func (r *providerOktaDataSource) computeResult(ctx context.Context, m *providerOktaDataSourceModel) (*types.Object, diag.Diagnostics) {

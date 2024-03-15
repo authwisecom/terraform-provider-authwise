@@ -22,7 +22,7 @@ type providerMicrosoftDataSourceModel struct {
 	ClientSecret types.String `tfsdk:"client_secret"`
 	PromptStyle  types.String `tfsdk:"prompt_style"`
 	Tenant       types.String `tfsdk:"tenant"`
-	Result       types.Object `tfsdk:"Result"`
+	Result       types.Object `tfsdk:"result"`
 }
 
 func (r *providerMicrosoftDataSource) computeResult(ctx context.Context, m *providerMicrosoftDataSourceModel) (*types.Object, diag.Diagnostics) {

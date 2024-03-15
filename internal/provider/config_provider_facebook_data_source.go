@@ -21,7 +21,7 @@ type providerFacebookDataSourceModel struct {
 	ClientSecret types.String `tfsdk:"client_secret"`
 	Scope        types.String `tfsdk:"scope"`
 	UserFields   types.String `tfsdk:"user_fields"`
-	Result       types.Object `tfsdk:"Result"`
+	Result       types.Object `tfsdk:"result"`
 }
 
 func (r *providerFacebookDataSource) computeResult(ctx context.Context, m *providerFacebookDataSourceModel) (*types.Object, diag.Diagnostics) {

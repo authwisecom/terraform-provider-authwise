@@ -21,7 +21,7 @@ type providerAuth0DataSourceModel struct {
 	ClientSecret types.String `tfsdk:"client_secret"`
 	Scope        types.String `tfsdk:"scope"`
 	TenantUrl    types.String `tfsdk:"tenant_url"`
-	Result       types.Object `tfsdk:"Result"`
+	Result       types.Object `tfsdk:"result"`
 }
 
 func (r *providerAuth0DataSource) computeResult(ctx context.Context, m *providerAuth0DataSourceModel) (*types.Object, diag.Diagnostics) {

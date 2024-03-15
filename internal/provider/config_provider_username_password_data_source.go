@@ -20,7 +20,7 @@ type providerUsernamePasswordDataSourceModel struct {
 	ForwardUri         types.String `tfsdk:"forward_uri"`
 	PasswordHashType   types.String `tfsdk:"password_hash_type"`
 	PasswordValidators types.Object `tfsdk:"password_validators"`
-	Result             types.Object `tfsdk:"Result"`
+	Result             types.Object `tfsdk:"result"`
 }
 
 func (r *providerUsernamePasswordDataSource) computeResult(ctx context.Context, m *providerUsernamePasswordDataSourceModel) (*types.Object, diag.Diagnostics) {

@@ -22,7 +22,7 @@ type tenantConfigDataSourceModel struct {
 	CookieDomain             types.String `tfsdk:"cookie_domain"`
 	Cors                     types.Object `tfsdk:"cors"`
 	Logging                  types.Object `tfsdk:"logging"`
-	Result                   types.Object `tfsdk:"Result"`
+	Result                   types.Object `tfsdk:"result"`
 }
 
 func (r *tenantConfigDataSource) computeResult(ctx context.Context, m *tenantConfigDataSourceModel) (*types.Object, diag.Diagnostics) {

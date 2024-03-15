@@ -19,7 +19,7 @@ func NewProviderAuthwise() datasource.DataSource {
 type providerAuthwiseDataSourceModel struct {
 	Issuer   types.String `tfsdk:"issuer"`
 	ClientId types.String `tfsdk:"client_id"`
-	Result   types.Object `tfsdk:"Result"`
+	Result   types.Object `tfsdk:"result"`
 }
 
 func (r *providerAuthwiseDataSource) computeResult(ctx context.Context, m *providerAuthwiseDataSourceModel) (*types.Object, diag.Diagnostics) {

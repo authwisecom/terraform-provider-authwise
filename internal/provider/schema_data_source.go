@@ -68,6 +68,10 @@ func GenSchemaInteractiveClientConfigDataSource(ctx context.Context) schema.Sche
 			Description: "",
 			Optional:    true,
 		},
+		"result": schema.SingleNestedAttribute{
+			Computed:    true,
+			Description: "",
+		},
 	}}
 }
 

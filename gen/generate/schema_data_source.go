@@ -100,6 +100,18 @@ func fieldsDataSource(l zerolog.Logger, m *protogen.Message) j.Dict {
 		}
 		d[j.Lit(name)] = fieldDataSource(l, f)
 	}
+	meta := resourceMetadataMap[m.GoIdent.GoName].schemaMetadata
+	if meta != nil {
+		//append computed result field to schema
+		if meta.hasResult {
+			d[j.Lit("result")] = j.Qual(DataSourceSchema, "SingleNestedAttribute").Values(
+				j.Dict{
+					j.Id("Description"): j.Lit(""),
+					j.Id("Computed"):    j.True(),
+				},
+			)
+		}
+	}
 
 	return d
 }

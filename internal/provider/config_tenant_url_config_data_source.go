@@ -18,7 +18,7 @@ func NewTenantUrlConfig() datasource.DataSource {
 
 type tenantUrlConfigDataSourceModel struct {
 	CookieDomain types.String `tfsdk:"cookie_domain"`
-	Result       types.Object `tfsdk:"Result"`
+	Result       types.Object `tfsdk:"result"`
 }
 
 func (r *tenantUrlConfigDataSource) computeResult(ctx context.Context, m *tenantUrlConfigDataSourceModel) (*types.Object, diag.Diagnostics) {

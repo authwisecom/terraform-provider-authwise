@@ -21,7 +21,7 @@ type providerDropboxDataSourceModel struct {
 	ClientSecret         types.String `tfsdk:"client_secret"`
 	Scope                types.String `tfsdk:"scope"`
 	IncludeGrantedScopes types.String `tfsdk:"include_granted_scopes"`
-	Result               types.Object `tfsdk:"Result"`
+	Result               types.Object `tfsdk:"result"`
 }
 
 func (r *providerDropboxDataSource) computeResult(ctx context.Context, m *providerDropboxDataSourceModel) (*types.Object, diag.Diagnostics) {

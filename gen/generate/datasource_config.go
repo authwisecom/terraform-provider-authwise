@@ -141,7 +141,7 @@ func (s *configDataSourceHandler) modelFields(fields []*protogen.Field, l zerolo
 	}
 	//append type field
 	result = append(result, j.Id("Result").Qual(Types, "Object").Tag(map[string]string{
-		"tfsdk": "Result",
+		"tfsdk": "result",
 	}))
 	return result
 }
