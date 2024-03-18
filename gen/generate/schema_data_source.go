@@ -111,15 +111,15 @@ func fieldsDataSource(l zerolog.Logger, m *protogen.Message) j.Dict {
 				},
 			)
 		}
-		if meta.hasType {
-			//TODO - can not have @ in this
-			d[j.Lit("@type")] = j.Qual(DataSourceSchema, "StringAttribute").Values(
-				j.Dict{
-					j.Id("Description"): j.Lit(""),
-					j.Id("Computed"):    j.True(),
-				},
-			)
-		}
+		//if meta.hasType {
+		//	//TODO - can not have @ in this
+		//	d[j.Lit("@type")] = j.Qual(DataSourceSchema, "StringAttribute").Values(
+		//		j.Dict{
+		//			j.Id("Description"): j.Lit(""),
+		//			j.Id("Computed"):    j.True(),
+		//		},
+		//	)
+		//}
 	}
 
 	return d
