@@ -4,6 +4,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	jsontypes "github.com/hashicorp/terraform-plugin-framework-jsontypes/jsontypes"
 	resource "github.com/hashicorp/terraform-plugin-framework/resource"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
 	tflog "github.com/hashicorp/terraform-plugin-log/tflog"
@@ -21,18 +22,18 @@ func NewProvider() resource.Resource {
 }
 
 type providerModel struct {
-	Id           types.String `tfsdk:"id"`
-	RealmId      types.String `tfsdk:"realm_id"`
-	Name         types.String `tfsdk:"name"`
-	ProviderType types.String `tfsdk:"provider_type"`
-	Config       types.Object `tfsdk:"config"`
+	Id           types.String         `tfsdk:"id"`
+	RealmId      types.String         `tfsdk:"realm_id"`
+	Name         types.String         `tfsdk:"name"`
+	ProviderType types.String         `tfsdk:"provider_type"`
+	Config       jsontypes.Normalized `tfsdk:"config"`
 }
 
 func (r *providerResource) toName(data providerModel) string {
 	return fmt.Sprintf("providers/%s", data.Id.ValueString())
 }
 func (r *providerResource) toProto(m *providerModel) (*v1alpha11.Provider, error) {
-	converted_config, err := util.ObjectToProtoAny(m.Config)
+	converted_config, err := util.JsonToProtoAny(m.Config)
 	if err != nil {
 		return nil, err
 	}
@@ -50,7 +51,7 @@ func (r *providerResource) toModel(p *v1alpha11.Provider, m *providerModel) erro
 	m.RealmId = types.StringValue(p.RealmId)
 	m.Name = types.StringValue(p.Name)
 	m.ProviderType = types.StringValue(p.ProviderType)
-	converted_config, err := util.ProtoAnyToObject(p.Config)
+	converted_config, err := util.ProtoAnyToJson(p.Config)
 	if err != nil {
 		return err
 	}

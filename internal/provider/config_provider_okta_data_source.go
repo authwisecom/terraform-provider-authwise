@@ -3,9 +3,9 @@ package provider
 
 import (
 	"context"
-	attr "github.com/hashicorp/terraform-plugin-framework/attr"
+	"encoding/json"
+	jsontypes "github.com/hashicorp/terraform-plugin-framework-jsontypes/jsontypes"
 	datasource "github.com/hashicorp/terraform-plugin-framework/datasource"
-	diag "github.com/hashicorp/terraform-plugin-framework/diag"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
 	tflog "github.com/hashicorp/terraform-plugin-log/tflog"
 )
@@ -17,35 +17,22 @@ func NewProviderOkta() datasource.DataSource {
 }
 
 type providerOktaDataSourceModel struct {
-	ClientId     types.String `tfsdk:"client_id"`
-	ClientSecret types.String `tfsdk:"client_secret"`
-	Scope        types.String `tfsdk:"scope"`
-	TenantUrl    types.String `tfsdk:"tenant_url"`
-	Result       types.Object `tfsdk:"result"`
+	ClientId     types.String         `tfsdk:"client_id"`
+	ClientSecret types.String         `tfsdk:"client_secret"`
+	Scope        types.String         `tfsdk:"scope"`
+	TenantUrl    types.String         `tfsdk:"tenant_url"`
+	Result       jsontypes.Normalized `tfsdk:"result"`
 }
 
-func (r *providerOktaDataSource) computeResult(ctx context.Context, m *providerOktaDataSourceModel) (*types.Object, diag.Diagnostics) {
-	tMap := map[string]attr.Type{
-		"@type":         types.StringType,
-		"client_id":     m.ClientId.Type(ctx),
-		"client_secret": m.ClientSecret.Type(ctx),
-		"scope":         m.Scope.Type(ctx),
-		"tenant_url":    m.TenantUrl.Type(ctx),
-	}
-	vMap := map[string]attr.Value{
-		"@type":         types.StringValue("type.googleapis.com/authwise.types.core.v1alpha1.ProviderOkta"),
-		"client_id":     m.ClientId,
-		"client_secret": m.ClientSecret,
-		"scope":         m.Scope,
-		"tenant_url":    m.TenantUrl,
-	}
-	obj, diag := types.ObjectValue(tMap, vMap)
+func (r *providerOktaDataSource) computeResult(ctx context.Context, m *providerOktaDataSourceModel) (*jsontypes.Normalized, error) {
+	j, err := json.Marshal(m)
 
-	if diag.HasError() {
-		return nil, diag
+	if err != nil {
+		return nil, err
 	}
 
-	return &obj, nil
+	val := jsontypes.NewNormalizedValue(string(j))
+	return &val, nil
 }
 
 func (r *providerOktaDataSource) Metadata(ctx context.Context, request datasource.MetadataRequest, response *datasource.MetadataResponse) {
@@ -65,12 +52,12 @@ func (r *providerOktaDataSource) Read(ctx context.Context, request datasource.Re
 		return
 	}
 
-	res, diag := r.computeResult(ctx, &data)
-	if diag.HasError() {
+	res, err := r.computeResult(ctx, &data)
+	if err != nil {
 		return
 	}
-
+	data.Result = *res
 	tflog.Trace(ctx, "providerokta read")
 
-	response.Diagnostics.Append(response.State.Set(ctx, res)...)
+	response.Diagnostics.Append(response.State.Set(ctx, data)...)
 }

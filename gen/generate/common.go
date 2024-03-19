@@ -230,6 +230,46 @@ var resourceMetadataMap = resourceMap{
 			},
 		},
 	},
+	"CorsConfig": &metadata{
+		resourceMetadata: nil,
+		datasourceMetadata: &datasourceMetadata{
+			schemaIdentifiers: []string{"id"},
+			schemaMetadata: &schemaMetadata{
+				hasResult: true,
+				hasType:   true,
+			},
+		},
+	},
+	"LoggingConfig": &metadata{
+		resourceMetadata: nil,
+		datasourceMetadata: &datasourceMetadata{
+			schemaIdentifiers: []string{"id"},
+			schemaMetadata: &schemaMetadata{
+				hasResult: true,
+				hasType:   true,
+			},
+		},
+	},
+	"AuthorizationConfig": &metadata{
+		resourceMetadata: nil,
+		datasourceMetadata: &datasourceMetadata{
+			schemaIdentifiers: []string{"id"},
+			schemaMetadata: &schemaMetadata{
+				hasResult: true,
+				hasType:   true,
+			},
+		},
+	},
+	"ScopesConfig": &metadata{
+		resourceMetadata: nil,
+		datasourceMetadata: &datasourceMetadata{
+			schemaIdentifiers: []string{"id"},
+			schemaMetadata: &schemaMetadata{
+				hasResult: true,
+				hasType:   true,
+			},
+		},
+	},
 	"ProviderAuth0": &metadata{
 		resourceMetadata:   nil,
 		datasourceMetadata: &datasourceMetadata{schemaIdentifiers: []string{"id"}},

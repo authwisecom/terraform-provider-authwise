@@ -3,9 +3,9 @@ package provider
 
 import (
 	"context"
-	attr "github.com/hashicorp/terraform-plugin-framework/attr"
+	"encoding/json"
+	jsontypes "github.com/hashicorp/terraform-plugin-framework-jsontypes/jsontypes"
 	datasource "github.com/hashicorp/terraform-plugin-framework/datasource"
-	diag "github.com/hashicorp/terraform-plugin-framework/diag"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
 	tflog "github.com/hashicorp/terraform-plugin-log/tflog"
 )
@@ -17,38 +17,23 @@ func NewProviderMicrosoft() datasource.DataSource {
 }
 
 type providerMicrosoftDataSourceModel struct {
-	Scope        types.String `tfsdk:"scope"`
-	ClientId     types.String `tfsdk:"client_id"`
-	ClientSecret types.String `tfsdk:"client_secret"`
-	PromptStyle  types.String `tfsdk:"prompt_style"`
-	Tenant       types.String `tfsdk:"tenant"`
-	Result       types.Object `tfsdk:"result"`
+	Scope        types.String         `tfsdk:"scope"`
+	ClientId     types.String         `tfsdk:"client_id"`
+	ClientSecret types.String         `tfsdk:"client_secret"`
+	PromptStyle  types.String         `tfsdk:"prompt_style"`
+	Tenant       types.String         `tfsdk:"tenant"`
+	Result       jsontypes.Normalized `tfsdk:"result"`
 }
 
-func (r *providerMicrosoftDataSource) computeResult(ctx context.Context, m *providerMicrosoftDataSourceModel) (*types.Object, diag.Diagnostics) {
-	tMap := map[string]attr.Type{
-		"@type":         types.StringType,
-		"client_id":     m.ClientId.Type(ctx),
-		"client_secret": m.ClientSecret.Type(ctx),
-		"prompt_style":  m.PromptStyle.Type(ctx),
-		"scope":         m.Scope.Type(ctx),
-		"tenant":        m.Tenant.Type(ctx),
-	}
-	vMap := map[string]attr.Value{
-		"@type":         types.StringValue("type.googleapis.com/authwise.types.core.v1alpha1.ProviderMicrosoft"),
-		"client_id":     m.ClientId,
-		"client_secret": m.ClientSecret,
-		"prompt_style":  m.PromptStyle,
-		"scope":         m.Scope,
-		"tenant":        m.Tenant,
-	}
-	obj, diag := types.ObjectValue(tMap, vMap)
+func (r *providerMicrosoftDataSource) computeResult(ctx context.Context, m *providerMicrosoftDataSourceModel) (*jsontypes.Normalized, error) {
+	j, err := json.Marshal(m)
 
-	if diag.HasError() {
-		return nil, diag
+	if err != nil {
+		return nil, err
 	}
 
-	return &obj, nil
+	val := jsontypes.NewNormalizedValue(string(j))
+	return &val, nil
 }
 
 func (r *providerMicrosoftDataSource) Metadata(ctx context.Context, request datasource.MetadataRequest, response *datasource.MetadataResponse) {
@@ -68,12 +53,12 @@ func (r *providerMicrosoftDataSource) Read(ctx context.Context, request datasour
 		return
 	}
 
-	res, diag := r.computeResult(ctx, &data)
-	if diag.HasError() {
+	res, err := r.computeResult(ctx, &data)
+	if err != nil {
 		return
 	}
-
+	data.Result = *res
 	tflog.Trace(ctx, "providermicrosoft read")
 
-	response.Diagnostics.Append(response.State.Set(ctx, res)...)
+	response.Diagnostics.Append(response.State.Set(ctx, data)...)
 }

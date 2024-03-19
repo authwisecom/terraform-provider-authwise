@@ -4,6 +4,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	jsontypes "github.com/hashicorp/terraform-plugin-framework-jsontypes/jsontypes"
 	resource "github.com/hashicorp/terraform-plugin-framework/resource"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
 	tflog "github.com/hashicorp/terraform-plugin-log/tflog"
@@ -21,27 +22,27 @@ func NewClient() resource.Resource {
 }
 
 type clientModel struct {
-	Id                  types.String `tfsdk:"id"`
-	AudienceId          types.String `tfsdk:"audience_id"`
-	AppearanceProfileId types.String `tfsdk:"appearance_profile_id"`
-	Name                types.String `tfsdk:"name"`
-	Alias               types.String `tfsdk:"alias"`
-	GrantType           types.String `tfsdk:"grant_type"`
-	LoginUrl            types.String `tfsdk:"login_url"`
-	LogoId              types.String `tfsdk:"logo_id"`
-	Config              types.Object `tfsdk:"config"`
-	Metadata            types.Object `tfsdk:"metadata"`
+	Id                  types.String         `tfsdk:"id"`
+	AudienceId          types.String         `tfsdk:"audience_id"`
+	AppearanceProfileId types.String         `tfsdk:"appearance_profile_id"`
+	Name                types.String         `tfsdk:"name"`
+	Alias               types.String         `tfsdk:"alias"`
+	GrantType           types.String         `tfsdk:"grant_type"`
+	LoginUrl            types.String         `tfsdk:"login_url"`
+	LogoId              types.String         `tfsdk:"logo_id"`
+	Config              jsontypes.Normalized `tfsdk:"config"`
+	Metadata            jsontypes.Normalized `tfsdk:"metadata"`
 }
 
 func (r *clientResource) toName(data clientModel) string {
 	return fmt.Sprintf("clients/%s", data.Id.ValueString())
 }
 func (r *clientResource) toProto(m *clientModel) (*v1alpha11.Client, error) {
-	converted_config, err := util.ObjectToProtoAny(m.Config)
+	converted_config, err := util.JsonToProtoAny(m.Config)
 	if err != nil {
 		return nil, err
 	}
-	converted_metadata, err := util.ObjectToProtoStruct(m.Metadata)
+	converted_metadata, err := util.JsonToProtoStruct(m.Metadata)
 	if err != nil {
 		return nil, err
 	}
@@ -68,12 +69,12 @@ func (r *clientResource) toModel(p *v1alpha11.Client, m *clientModel) error {
 	m.GrantType = types.StringValue(p.GrantType)
 	m.LoginUrl = types.StringValue(p.LoginUrl)
 	m.LogoId = types.StringValue(p.LogoId)
-	converted_config, err := util.ProtoAnyToObject(p.Config)
+	converted_config, err := util.ProtoAnyToJson(p.Config)
 	if err != nil {
 		return err
 	}
 	m.Config = *converted_config
-	converted_metadata, err := util.ProtoStructToObject(p.Metadata)
+	converted_metadata, err := util.ProtoStructToJson(p.Metadata)
 	if err != nil {
 		return err
 	}

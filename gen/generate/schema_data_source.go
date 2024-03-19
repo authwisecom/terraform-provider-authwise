@@ -93,33 +93,28 @@ func fieldsDataSource(l zerolog.Logger, m *protogen.Message) j.Dict {
 
 		// Hack to handle structs
 		if f.Parent.Desc.FullName() == "google.protobuf.Struct" {
-			d[j.Lit(name)] = j.Qual(DataSourceSchema, "MapAttribute").Values(j.Dict{
+			d[j.Lit(name)] = j.Qual(DataSourceSchema, "SingleNestedAttribute").Values(j.Dict{
 				j.Id("Description"): j.Lit(trimComments(f.Comments.Leading)),
 			})
 			continue
 		}
 		d[j.Lit(name)] = fieldDataSource(l, f)
 	}
-	meta := resourceMetadataMap[m.GoIdent.GoName].schemaMetadata
+	l.Debug().Msgf("test: %v", m.GoIdent.GoName)
+	meta := resourceMetadataMap[m.GoIdent.GoName]
 	if meta != nil {
-		//append computed result field to schema
-		if meta.hasResult {
-			d[j.Lit("result")] = j.Qual(DataSourceSchema, "SingleNestedAttribute").Values(
-				j.Dict{
-					j.Id("Description"): j.Lit(""),
-					j.Id("Computed"):    j.True(),
-				},
-			)
+		s := meta.schemaMetadata
+		if s != nil {
+			//append computed result field to schema
+			if s.hasResult {
+				d[j.Lit("result")] = j.Qual(DataSourceSchema, "StringAttribute").Values(
+					j.Dict{
+						j.Id("Description"): j.Lit(""),
+						j.Id("Computed"):    j.True(),
+					},
+				)
+			}
 		}
-		//if meta.hasType {
-		//	//TODO - can not have @ in this
-		//	d[j.Lit("@type")] = j.Qual(DataSourceSchema, "StringAttribute").Values(
-		//		j.Dict{
-		//			j.Id("Description"): j.Lit(""),
-		//			j.Id("Computed"):    j.True(),
-		//		},
-		//	)
-		//}
 	}
 
 	return d
@@ -156,7 +151,7 @@ func fieldDataSource(l zerolog.Logger, f *protogen.Field) j.Code {
 		if val.Message() != nil {
 			d[j.Id("NestedObject")] = j.Qual(DataSourceSchema, "NestedAttributeObject").Values(j.Dict{
 				j.Id("Attributes"): j.Map(j.String()).Qual(DataSourceSchema, "Attribute").Values(
-					fields(l, f.Message),
+					fieldsDataSource(l, f.Message),
 				),
 			})
 			return j.Qual(DataSourceSchema, "MapNestedAttribute").Values(d)
@@ -172,7 +167,7 @@ func fieldDataSource(l zerolog.Logger, f *protogen.Field) j.Code {
 		if f.Message != nil {
 			d[j.Id("NestedObject")] = j.Qual(DataSourceSchema, "NestedAttributeObject").Values(j.Dict{
 				j.Id("Attributes"): j.Map(j.String()).Qual(DataSourceSchema, "Attribute").Values(
-					fields(l, f.Message),
+					fieldsDataSource(l, f.Message),
 				),
 			})
 			return j.Qual(DataSourceSchema, "ListNestedAttribute").Values(d)
@@ -185,7 +180,7 @@ func fieldDataSource(l zerolog.Logger, f *protogen.Field) j.Code {
 		}
 	} else if f.Message != nil {
 		d[j.Id("Attributes")] = j.Map(j.String()).Qual(DataSourceSchema, "Attribute").Values(
-			fields(l, f.Message),
+			fieldsDataSource(l, f.Message),
 		)
 		return j.Qual(DataSourceSchema, "SingleNestedAttribute").Values(d)
 	} else {

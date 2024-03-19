@@ -121,6 +121,7 @@ func field(l zerolog.Logger, f *protogen.Field) j.Code {
 		j.Id("Description"): j.Lit(trimComments(f.Comments.Leading)),
 	}
 	f.Desc.Options()
+
 	// Handle field behavior annotations - not being used
 	opts := f.Desc.Options().(*descriptorpb.FieldOptions)
 	//TODO - other extensions in core.proto
@@ -174,19 +175,8 @@ func field(l zerolog.Logger, f *protogen.Field) j.Code {
 			return j.Qual(ResourceSchema, "ListAttribute").Values(d)
 		}
 	} else if f.Message != nil {
-		//d[j.Id("Attributes")] = j.Map(j.String()).Qual(ResourceSchema, "Attribute").Values(
-		//	fields(l, f.Message),
-		//)
-		d[j.Id("Computed")] = j.True()
-		//TODO - use extensions to generate this
-		//  objectdefault.StaticValue(types.ObjectValueMust(map[string]attr.Type{}, map[string]attr.Value{})),
-		d[j.Id("Default")] = j.Qual(ResourceSchema+"/objectdefault", "StaticValue").Call(
-			j.Qual(Types, "ObjectValueMust").Call(
-				j.Map(j.String()).Qual(Attr, "Type").Values(),
-				j.Map(j.String()).Qual(Attr, "Value").Values(),
-			),
-		)
-		return j.Qual(ResourceSchema, "SingleNestedAttribute").Values(d)
+		d[j.Id("CustomType")] = j.Qual(JSONTypes, "NormalizedType").Values()
+		return j.Comment("JSON").Line().Qual(ResourceSchema, "StringAttribute").Values(d)
 	} else {
 		if attributeTypeName == "" {
 			panic("unhandled kind " + f.Desc.Kind().String())

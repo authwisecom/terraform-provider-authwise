@@ -22,7 +22,7 @@ func TestSimpleClientInlineConfig(t *testing.T) {
 		Steps: []resource.TestStep{
 			// Create and Read testing
 			{
-				Config: providerConfig + testAccClientResourceConfigWithDataSource(params),
+				Config: providerConfig + testAccClientResourceConfig(params),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(clientName, "name", params.clientName),
 					resource.TestCheckResourceAttr(clientName, "grant_type", "client_credentials"),
@@ -78,16 +78,18 @@ resource "authwise_audience" "default" {
 resource "authwise_client" "default" {
   audience_id = authwise_audience.default.id
   grant_type = "client_credentials"
-  config = {
-	"@type" = "type.googleapis.com/authwise.types.core.v1alpha1.InteractiveClientConfig",
-	"access_token_expire_seconds" = 7200,
-	"allowed_redirect_uris" = ["http://localhost:8990/return","https://localhost:3000*"],
-	"cors" = {
-		"allowed_origins" = ["https://localhost:3000"],
-		"options_mode" = "CORS_OPTIONS_MODE_STRICT"
+  config = <<EOF
+{
+	"@type": "type.googleapis.com/authwise.types.core.v1alpha1.InteractiveClientConfig",
+	"access_token_expire_seconds": 7200,
+	"allowed_redirect_uris": ["http://localhost:8990/return","https://localhost:3000*"],
+	"cors": {
+		"allowed_origins": ["https://localhost:3000"],
+		"options_mode": "CORS_OPTIONS_MODE_STRICT"
 	},
-	"interaction_forward_uri" = "/"
+	"interaction_forward_uri": "/"
   }
+EOF
   name = %[3]q
 }
 `, params.realmName, params.audienceName, params.clientName)

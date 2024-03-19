@@ -87,9 +87,16 @@ func (s *standardResourceHandler) modelFields(fields []*protogen.Field, l zerolo
 	for _, f := range fields {
 		schemaName := strcase.ToSnake(f.GoName)
 		log.Debug().Str("kind", f.Desc.Kind().GoString()).Msg("processing model field")
-		result = append(result, j.Id(f.GoName).Qual(Types, typeMap[f.Desc.Kind()]).Tag(map[string]string{
-			"tfsdk": schemaName,
-		}))
+		t := typeMap[f.Desc.Kind()]
+		if t == "Object" {
+			result = append(result, j.Id(f.GoName).Qual(JSONTypes, "Normalized").Tag(map[string]string{
+				"tfsdk": schemaName,
+			}))
+		} else {
+			result = append(result, j.Id(f.GoName).Qual(Types, typeMap[f.Desc.Kind()]).Tag(map[string]string{
+				"tfsdk": schemaName,
+			}))
+		}
 	}
 	return result
 }
@@ -197,17 +204,17 @@ func (s *standardResourceHandler) toProto(f *j.File, m *protogen.Message, struct
 				case "Any":
 					code := j.List(
 						j.Id(ConversionName(strings.ToLower(fi.GoName))),
-						j.Id("err")).Op(":=").Qual(Util, "ObjectToProtoAny").Call(j.Id("m").Dot(fi.GoName)).Line().Add(errCheck)
+						j.Id("err")).Op(":=").Qual(Util, "JsonToProtoAny").Call(j.Id("m").Dot(fi.GoName)).Line().Add(errCheck)
 					conversions = append(conversions, code)
 				case "Struct":
 					code := j.List(
 						j.Id(ConversionName(strings.ToLower(fi.GoName))),
-						j.Id("err")).Op(":=").Qual(Util, "ObjectToProtoStruct").Call(j.Id("m").Dot(fi.GoName)).Line().Add(errCheck)
+						j.Id("err")).Op(":=").Qual(Util, "JsonToProtoStruct").Call(j.Id("m").Dot(fi.GoName)).Line().Add(errCheck)
 					conversions = append(conversions, code)
 				default:
 					code := j.List(
 						j.Id(ConversionName(strings.ToLower(fi.GoName))),
-						j.Id("err")).Op(":=").Qual(Util, "ObjectToProtoConcrete").Types(j.Qual(TypesCore, ConfigurationObjectName(string(fi.Message.Desc.FullName().Name())))).Call(j.Id("m").Dot(fi.GoName)).Line().Add(errCheck)
+						j.Id("err")).Op(":=").Qual(Util, "JsonToProtoConcrete").Types(j.Qual(TypesCore, ConfigurationObjectName(string(fi.Message.Desc.FullName().Name())))).Call(j.Id("m").Dot(fi.GoName)).Line().Add(errCheck)
 					conversions = append(conversions, code)
 				}
 			case protoreflect.EnumKind:
@@ -262,12 +269,12 @@ func (s *standardResourceHandler) toModel(f *j.File, m *protogen.Message, struct
 				case "Any":
 					group.List(
 						j.Id(ConversionName(strings.ToLower(fi.GoName))),
-						j.Id("err")).Op(":=").Qual(Util, "ProtoAnyToObject").Call(j.Id("p").Dot(fi.GoName)).Line().Add(errCheck)
+						j.Id("err")).Op(":=").Qual(Util, "ProtoAnyToJson").Call(j.Id("p").Dot(fi.GoName)).Line().Add(errCheck)
 					group.Id("m").Dot(fi.GoName).Op("=").Op("*").Id(ConversionName(strings.ToLower(fi.GoName)))
 				case "Struct":
 					group.List(
 						j.Id(ConversionName(strings.ToLower(fi.GoName))),
-						j.Id("err")).Op(":=").Qual(Util, "ProtoStructToObject").Call(j.Id("p").Dot(fi.GoName)).Line().Add(errCheck)
+						j.Id("err")).Op(":=").Qual(Util, "ProtoStructToJson").Call(j.Id("p").Dot(fi.GoName)).Line().Add(errCheck)
 					group.Id("m").Dot(fi.GoName).Op("=").Op("*").Id(ConversionName(strings.ToLower(fi.GoName)))
 				}
 			default:

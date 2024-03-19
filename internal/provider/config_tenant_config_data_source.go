@@ -3,9 +3,9 @@ package provider
 
 import (
 	"context"
-	attr "github.com/hashicorp/terraform-plugin-framework/attr"
+	"encoding/json"
+	jsontypes "github.com/hashicorp/terraform-plugin-framework-jsontypes/jsontypes"
 	datasource "github.com/hashicorp/terraform-plugin-framework/datasource"
-	diag "github.com/hashicorp/terraform-plugin-framework/diag"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
 	tflog "github.com/hashicorp/terraform-plugin-log/tflog"
 )
@@ -17,38 +17,23 @@ func NewTenantConfig() datasource.DataSource {
 }
 
 type tenantConfigDataSourceModel struct {
-	InteractionForwardUri    types.String `tfsdk:"interaction_forward_uri"`
-	AccessTokenExpireSeconds types.Int64  `tfsdk:"access_token_expire_seconds"`
-	CookieDomain             types.String `tfsdk:"cookie_domain"`
-	Cors                     types.Object `tfsdk:"cors"`
-	Logging                  types.Object `tfsdk:"logging"`
-	Result                   types.Object `tfsdk:"result"`
+	InteractionForwardUri    types.String         `tfsdk:"interaction_forward_uri"`
+	AccessTokenExpireSeconds types.Int64          `tfsdk:"access_token_expire_seconds"`
+	CookieDomain             types.String         `tfsdk:"cookie_domain"`
+	Cors                     types.Object         `tfsdk:"cors"`
+	Logging                  types.Object         `tfsdk:"logging"`
+	Result                   jsontypes.Normalized `tfsdk:"result"`
 }
 
-func (r *tenantConfigDataSource) computeResult(ctx context.Context, m *tenantConfigDataSourceModel) (*types.Object, diag.Diagnostics) {
-	tMap := map[string]attr.Type{
-		"@type":                       types.StringType,
-		"access_token_expire_seconds": m.AccessTokenExpireSeconds.Type(ctx),
-		"cookie_domain":               m.CookieDomain.Type(ctx),
-		"cors":                        m.Cors.Type(ctx),
-		"interaction_forward_uri":     m.InteractionForwardUri.Type(ctx),
-		"logging":                     m.Logging.Type(ctx),
-	}
-	vMap := map[string]attr.Value{
-		"@type":                       types.StringValue("type.googleapis.com/authwise.types.core.v1alpha1.TenantConfig"),
-		"access_token_expire_seconds": m.AccessTokenExpireSeconds,
-		"cookie_domain":               m.CookieDomain,
-		"cors":                        m.Cors,
-		"interaction_forward_uri":     m.InteractionForwardUri,
-		"logging":                     m.Logging,
-	}
-	obj, diag := types.ObjectValue(tMap, vMap)
+func (r *tenantConfigDataSource) computeResult(ctx context.Context, m *tenantConfigDataSourceModel) (*jsontypes.Normalized, error) {
+	j, err := json.Marshal(m)
 
-	if diag.HasError() {
-		return nil, diag
+	if err != nil {
+		return nil, err
 	}
 
-	return &obj, nil
+	val := jsontypes.NewNormalizedValue(string(j))
+	return &val, nil
 }
 
 func (r *tenantConfigDataSource) Metadata(ctx context.Context, request datasource.MetadataRequest, response *datasource.MetadataResponse) {
@@ -68,12 +53,12 @@ func (r *tenantConfigDataSource) Read(ctx context.Context, request datasource.Re
 		return
 	}
 
-	res, diag := r.computeResult(ctx, &data)
-	if diag.HasError() {
+	res, err := r.computeResult(ctx, &data)
+	if err != nil {
 		return
 	}
-
+	data.Result = *res
 	tflog.Trace(ctx, "tenantconfig read")
 
-	response.Diagnostics.Append(response.State.Set(ctx, res)...)
+	response.Diagnostics.Append(response.State.Set(ctx, data)...)
 }

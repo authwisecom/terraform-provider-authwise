@@ -3,9 +3,9 @@ package provider
 
 import (
 	"context"
-	attr "github.com/hashicorp/terraform-plugin-framework/attr"
+	"encoding/json"
+	jsontypes "github.com/hashicorp/terraform-plugin-framework-jsontypes/jsontypes"
 	datasource "github.com/hashicorp/terraform-plugin-framework/datasource"
-	diag "github.com/hashicorp/terraform-plugin-framework/diag"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
 	tflog "github.com/hashicorp/terraform-plugin-log/tflog"
 )
@@ -17,26 +17,19 @@ func NewTenantUrlConfig() datasource.DataSource {
 }
 
 type tenantUrlConfigDataSourceModel struct {
-	CookieDomain types.String `tfsdk:"cookie_domain"`
-	Result       types.Object `tfsdk:"result"`
+	CookieDomain types.String         `tfsdk:"cookie_domain"`
+	Result       jsontypes.Normalized `tfsdk:"result"`
 }
 
-func (r *tenantUrlConfigDataSource) computeResult(ctx context.Context, m *tenantUrlConfigDataSourceModel) (*types.Object, diag.Diagnostics) {
-	tMap := map[string]attr.Type{
-		"@type":         types.StringType,
-		"cookie_domain": m.CookieDomain.Type(ctx),
-	}
-	vMap := map[string]attr.Value{
-		"@type":         types.StringValue("type.googleapis.com/authwise.types.core.v1alpha1.TenantUrlConfig"),
-		"cookie_domain": m.CookieDomain,
-	}
-	obj, diag := types.ObjectValue(tMap, vMap)
+func (r *tenantUrlConfigDataSource) computeResult(ctx context.Context, m *tenantUrlConfigDataSourceModel) (*jsontypes.Normalized, error) {
+	j, err := json.Marshal(m)
 
-	if diag.HasError() {
-		return nil, diag
+	if err != nil {
+		return nil, err
 	}
 
-	return &obj, nil
+	val := jsontypes.NewNormalizedValue(string(j))
+	return &val, nil
 }
 
 func (r *tenantUrlConfigDataSource) Metadata(ctx context.Context, request datasource.MetadataRequest, response *datasource.MetadataResponse) {
@@ -56,12 +49,12 @@ func (r *tenantUrlConfigDataSource) Read(ctx context.Context, request datasource
 		return
 	}
 
-	res, diag := r.computeResult(ctx, &data)
-	if diag.HasError() {
+	res, err := r.computeResult(ctx, &data)
+	if err != nil {
 		return
 	}
-
+	data.Result = *res
 	tflog.Trace(ctx, "tenanturlconfig read")
 
-	response.Diagnostics.Append(response.State.Set(ctx, res)...)
+	response.Diagnostics.Append(response.State.Set(ctx, data)...)
 }

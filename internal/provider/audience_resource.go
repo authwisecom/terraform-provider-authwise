@@ -4,6 +4,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	jsontypes "github.com/hashicorp/terraform-plugin-framework-jsontypes/jsontypes"
 	resource "github.com/hashicorp/terraform-plugin-framework/resource"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
 	tflog "github.com/hashicorp/terraform-plugin-log/tflog"
@@ -21,19 +22,19 @@ func NewAudience() resource.Resource {
 }
 
 type audienceModel struct {
-	Id                  types.String `tfsdk:"id"`
-	TenantId            types.String `tfsdk:"tenant_id"`
-	Name                types.String `tfsdk:"name"`
-	AppearanceProfileId types.String `tfsdk:"appearance_profile_id"`
-	Description         types.String `tfsdk:"description"`
-	Config              types.Object `tfsdk:"config"`
+	Id                  types.String         `tfsdk:"id"`
+	TenantId            types.String         `tfsdk:"tenant_id"`
+	Name                types.String         `tfsdk:"name"`
+	AppearanceProfileId types.String         `tfsdk:"appearance_profile_id"`
+	Description         types.String         `tfsdk:"description"`
+	Config              jsontypes.Normalized `tfsdk:"config"`
 }
 
 func (r *audienceResource) toName(data audienceModel) string {
 	return fmt.Sprintf("audiences/%s", data.Id.ValueString())
 }
 func (r *audienceResource) toProto(m *audienceModel) (*v1alpha11.Audience, error) {
-	converted_config, err := util.ObjectToProtoConcrete[v1alpha11.AudienceConfig](m.Config)
+	converted_config, err := util.JsonToProtoConcrete[v1alpha11.AudienceConfig](m.Config)
 	if err != nil {
 		return nil, err
 	}

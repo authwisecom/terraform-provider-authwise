@@ -3,11 +3,9 @@ package provider
 
 import (
 	"context"
-	attr "github.com/hashicorp/terraform-plugin-framework/attr"
+	jsontypes "github.com/hashicorp/terraform-plugin-framework-jsontypes/jsontypes"
 	schema "github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	objectdefault "github.com/hashicorp/terraform-plugin-framework/resource/schema/objectdefault"
 	stringdefault "github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
-	types "github.com/hashicorp/terraform-plugin-framework/types"
 )
 
 // GenSchemaTenant returns tfsdk.Schema definition for Tenant
@@ -18,9 +16,9 @@ func GenSchemaTenant(ctx context.Context) schema.Schema {
 			Description: "",
 			Optional:    true,
 		},
-		"config": schema.SingleNestedAttribute{
-			Computed:    true,
-			Default:     objectdefault.StaticValue(types.ObjectValueMust(map[string]attr.Type{}, map[string]attr.Value{})),
+		"config": // JSON
+		schema.StringAttribute{
+			CustomType:  jsontypes.NormalizedType{},
 			Description: "",
 			Optional:    true,
 		},
@@ -39,9 +37,9 @@ func GenSchemaTenant(ctx context.Context) schema.Schema {
 // GenSchemaTenantUrl returns tfsdk.Schema definition for TenantUrl
 func GenSchemaTenantUrl(ctx context.Context) schema.Schema {
 	return schema.Schema{Attributes: map[string]schema.Attribute{
-		"config": schema.SingleNestedAttribute{
-			Computed:    true,
-			Default:     objectdefault.StaticValue(types.ObjectValueMust(map[string]attr.Type{}, map[string]attr.Value{})),
+		"config": // JSON
+		schema.StringAttribute{
+			CustomType:  jsontypes.NormalizedType{},
 			Description: "",
 			Optional:    true,
 		},
@@ -60,9 +58,9 @@ func GenSchemaTenantUrl(ctx context.Context) schema.Schema {
 // GenSchemaProvider returns tfsdk.Schema definition for Provider
 func GenSchemaProvider(ctx context.Context) schema.Schema {
 	return schema.Schema{Attributes: map[string]schema.Attribute{
-		"config": schema.SingleNestedAttribute{
-			Computed:    true,
-			Default:     objectdefault.StaticValue(types.ObjectValueMust(map[string]attr.Type{}, map[string]attr.Value{})),
+		"config": // JSON
+		schema.StringAttribute{
+			CustomType:  jsontypes.NormalizedType{},
 			Description: "",
 			Optional:    true,
 		},
@@ -123,9 +121,9 @@ func GenSchemaAudience(ctx context.Context) schema.Schema {
 			Description: "",
 			Optional:    true,
 		},
-		"config": schema.SingleNestedAttribute{
-			Computed:    true,
-			Default:     objectdefault.StaticValue(types.ObjectValueMust(map[string]attr.Type{}, map[string]attr.Value{})),
+		"config": // JSON
+		schema.StringAttribute{
+			CustomType:  jsontypes.NormalizedType{},
 			Description: "",
 			Optional:    true,
 		},
@@ -174,9 +172,9 @@ func GenSchemaClient(ctx context.Context) schema.Schema {
 			Description: "",
 			Optional:    true,
 		},
-		"config": schema.SingleNestedAttribute{
-			Computed:    true,
-			Default:     objectdefault.StaticValue(types.ObjectValueMust(map[string]attr.Type{}, map[string]attr.Value{})),
+		"config": // JSON
+		schema.StringAttribute{
+			CustomType:  jsontypes.NormalizedType{},
 			Description: "",
 			Optional:    true,
 		},
@@ -201,9 +199,11 @@ func GenSchemaClient(ctx context.Context) schema.Schema {
 			Description: "",
 			Optional:    true,
 		},
-		"metadata": schema.SingleNestedAttribute{
+		"metadata": // JSON
+		schema.StringAttribute{
 			Computed:    true,
-			Default:     objectdefault.StaticValue(types.ObjectValueMust(map[string]attr.Type{}, map[string]attr.Value{})),
+			CustomType:  jsontypes.NormalizedType{},
+			Default:     stringdefault.StaticString("{}"),
 			Description: "",
 			Optional:    true,
 		},
@@ -282,9 +282,9 @@ func GenSchemaScope(ctx context.Context) schema.Schema {
 // GenSchemaAppearanceProfile returns tfsdk.Schema definition for AppearanceProfile
 func GenSchemaAppearanceProfile(ctx context.Context) schema.Schema {
 	return schema.Schema{Attributes: map[string]schema.Attribute{
-		"content": schema.SingleNestedAttribute{
-			Computed:    true,
-			Default:     objectdefault.StaticValue(types.ObjectValueMust(map[string]attr.Type{}, map[string]attr.Value{})),
+		"content": // JSON
+		schema.StringAttribute{
+			CustomType:  jsontypes.NormalizedType{},
 			Description: "",
 			Optional:    true,
 		},
@@ -297,9 +297,9 @@ func GenSchemaAppearanceProfile(ctx context.Context) schema.Schema {
 			Description: "",
 			Optional:    true,
 		},
-		"stylesheet_attributes": schema.SingleNestedAttribute{
-			Computed:    true,
-			Default:     objectdefault.StaticValue(types.ObjectValueMust(map[string]attr.Type{}, map[string]attr.Value{})),
+		"stylesheet_attributes": // JSON
+		schema.StringAttribute{
+			CustomType:  jsontypes.NormalizedType{},
 			Description: "",
 			Optional:    true,
 		},
@@ -317,9 +317,9 @@ func GenSchemaAppearanceProfile(ctx context.Context) schema.Schema {
 // GenSchemaTheme returns tfsdk.Schema definition for Theme
 func GenSchemaTheme(ctx context.Context) schema.Schema {
 	return schema.Schema{Attributes: map[string]schema.Attribute{
-		"content": schema.SingleNestedAttribute{
-			Computed:    true,
-			Default:     objectdefault.StaticValue(types.ObjectValueMust(map[string]attr.Type{}, map[string]attr.Value{})),
+		"content": // JSON
+		schema.StringAttribute{
+			CustomType:  jsontypes.NormalizedType{},
 			Description: "",
 			Optional:    true,
 		},
@@ -336,9 +336,9 @@ func GenSchemaTheme(ctx context.Context) schema.Schema {
 			Description: "",
 			Optional:    true,
 		},
-		"stylesheet_attributes": schema.SingleNestedAttribute{
-			Computed:    true,
-			Default:     objectdefault.StaticValue(types.ObjectValueMust(map[string]attr.Type{}, map[string]attr.Value{})),
+		"stylesheet_attributes": // JSON
+		schema.StringAttribute{
+			CustomType:  jsontypes.NormalizedType{},
 			Description: "",
 			Optional:    true,
 		},

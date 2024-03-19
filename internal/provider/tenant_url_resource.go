@@ -4,6 +4,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	jsontypes "github.com/hashicorp/terraform-plugin-framework-jsontypes/jsontypes"
 	resource "github.com/hashicorp/terraform-plugin-framework/resource"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
 	tflog "github.com/hashicorp/terraform-plugin-log/tflog"
@@ -21,16 +22,16 @@ func NewTenantUrl() resource.Resource {
 }
 
 type tenantUrlModel struct {
-	Id       types.String `tfsdk:"id"`
-	TenantId types.String `tfsdk:"tenant_id"`
-	Config   types.Object `tfsdk:"config"`
+	Id       types.String         `tfsdk:"id"`
+	TenantId types.String         `tfsdk:"tenant_id"`
+	Config   jsontypes.Normalized `tfsdk:"config"`
 }
 
 func (r *tenantUrlResource) toName(data tenantUrlModel) string {
 	return fmt.Sprintf("tenant_urls/%s", data.Id.ValueString())
 }
 func (r *tenantUrlResource) toProto(m *tenantUrlModel) (*v1alpha11.TenantUrl, error) {
-	converted_config, err := util.ObjectToProtoConcrete[v1alpha11.TenantUrlConfig](m.Config)
+	converted_config, err := util.JsonToProtoConcrete[v1alpha11.TenantUrlConfig](m.Config)
 	if err != nil {
 		return nil, err
 	}

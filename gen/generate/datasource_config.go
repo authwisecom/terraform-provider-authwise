@@ -103,7 +103,7 @@ func (s *configDataSourceHandler) crudMethodTemplate(m *protogen.Message, body .
 			j.Lit(fmt.Sprintf("%s %s", strings.ToLower(name), "read")),
 		).Line(),
 		j.Id("response").Dot("Diagnostics").Dot("Append").Call(
-			j.Id("response").Dot("State").Dot("Set").Call(j.Id("ctx"), j.Id("res")).Op("..."),
+			j.Id("response").Dot("State").Dot("Set").Call(j.Id("ctx"), j.Id("data")).Op("..."),
 		),
 	}
 
@@ -131,8 +131,11 @@ func (s *configDataSourceHandler) modelFields(fields []*protogen.Field, l zerolo
 			typeName = "Bool"
 		case protoreflect.Int64Kind, protoreflect.Int32Kind:
 			typeName = "Int64"
+		case protoreflect.MessageKind:
+			typeName = "Object"
 		default:
-			//l.Debug().Msgf("test: %v", f.Desc)
+			l.Debug().Msgf("test: %v", f.Desc)
+			panic("unknown type")
 		}
 		log.Debug().Str("kind", f.Desc.Kind().GoString()).Msg("processing model field")
 		result = append(result, j.Id(f.GoName).Qual(Types, typeName).Tag(map[string]string{
@@ -140,7 +143,7 @@ func (s *configDataSourceHandler) modelFields(fields []*protogen.Field, l zerolo
 		}))
 	}
 	//append type field
-	result = append(result, j.Id("Result").Qual(Types, "Object").Tag(map[string]string{
+	result = append(result, j.Id("Result").Qual(JSONTypes, "Normalized").Tag(map[string]string{
 		"tfsdk": "result",
 	}))
 	return result
@@ -151,37 +154,43 @@ func (s *configDataSourceHandler) computeResult(f *j.File, m *protogen.Message, 
 	f.Func().Params(j.Id("r").Op("*").Id(structName)).Id("computeResult").Params(j.List(
 		j.Id("ctx").Qual("context", "Context"),
 		j.Id("m").Op("*").Id(s.dataModelName(m))),
-	).Parens(j.List(j.Op("*").Qual(Types, "Object"), j.Qual(Diag, "Diagnostics"))).Block(
-		j.Id("tMap").Op(":=").Map(j.String()).Qual(Attr, "Type").Values(
-			j.DictFunc(func(d j.Dict) {
-				d[j.Lit("@type")] = j.Qual(Types, "StringType")
-				for _, v := range m.Fields {
-					name := v.GoName
-					if name == "Result" {
-						continue
-					}
-					d[j.Lit(fmt.Sprintf("%s", v.Desc.FullName().Name()))] = j.Id("m").Dot(name).Dot("Type").Call(j.Id("ctx"))
-				}
-			}),
-		),
-		j.Id("vMap").Op(":=").Map(j.String()).Qual(Attr, "Value").Values(
-			j.DictFunc(func(d j.Dict) {
-				d[j.Lit("@type")] = j.Qual(Types, "StringValue").Call(j.Lit(fmt.Sprintf("type.googleapis.com/%s", m.Desc.FullName())))
-				for _, v := range m.Fields {
-					name := v.GoName
-					if name == "Result" {
-						continue
-					}
-
-					d[j.Lit(fmt.Sprintf("%s", v.Desc.FullName().Name()))] = j.Id("m").Dot(name)
-				}
-			}),
-		),
-		j.List(j.Id("obj"), j.Id("diag")).Op(":=").Qual(Types, "ObjectValue").Call(j.Id("tMap"), j.Id("vMap")).Line(),
-		j.If(j.Id("diag").Dot("HasError").Call()).Block(
-			j.Return(j.List(j.Nil(), j.Id("diag"))),
+	).Parens(j.List(j.Op("*").Qual(JSONTypes, "Normalized"), j.Id("error"))).Block(
+		//j.Id("tMap").Op(":=").Map(j.String()).Qual(Attr, "Type").Values(
+		//	j.DictFunc(func(d j.Dict) {
+		//		d[j.Lit("@type")] = j.Qual(Types, "StringType")
+		//		for _, v := range m.Fields {
+		//			name := v.GoName
+		//			if name == "Result" {
+		//				continue
+		//			}
+		//			d[j.Lit(fmt.Sprintf("%s", v.Desc.FullName().Name()))] = j.Id("m").Dot(name).Dot("Type").Call(j.Id("ctx"))
+		//		}
+		//	}),
+		//),
+		//j.Id("vMap").Op(":=").Map(j.String()).Qual(Attr, "Value").Values(
+		//	j.DictFunc(func(d j.Dict) {
+		//		d[j.Lit("@type")] = j.Qual(Types, "StringValue").Call(j.Lit(fmt.Sprintf("type.googleapis.com/%s", m.Desc.FullName())))
+		//		for _, v := range m.Fields {
+		//			name := v.GoName
+		//			if name == "Result" {
+		//				continue
+		//			}
+		//
+		//			d[j.Lit(fmt.Sprintf("%s", v.Desc.FullName().Name()))] = j.Id("m").Dot(name)
+		//		}
+		//	}),
+		//),
+		//j.List(j.Id("obj"), j.Id("diag")).Op(":=").Qual(Types, "ObjectValue").Call(j.Id("tMap"), j.Id("vMap")).Line(),
+		//j.If(j.Id("diag").Dot("HasError").Call()).Block(
+		//	j.Return(j.List(j.Nil(), j.Id("diag"))),
+		//).Line(),
+		//j.Return(j.List(j.Op("&").Id("obj"), j.Nil())),
+		j.List(j.Id("j"), j.Id("err")).Op(":=").Qual("encoding/json", "Marshal").Call(j.Id("m")).Line(),
+		j.If(j.Id("err").Op("!=").Nil()).Block(
+			j.Return(j.List(j.Nil(), j.Id("err"))),
 		).Line(),
-		j.Return(j.List(j.Op("&").Id("obj"), j.Nil())),
+		j.Id("val").Op(":=").Qual(JSONTypes, "NewNormalizedValue").Call(j.Id("string").Call(j.Id("j"))),
+		j.Return(j.List(j.Op("&").Id("val"), j.Nil())),
 	).Line()
 
 }
@@ -234,10 +243,11 @@ func (s *configDataSourceHandler) read(f *j.File, m *protogen.Message, structNam
 
 	s.requestResponseMethod(f, structName, "Read",
 		s.crudMethodTemplate(m,
-			j.List(j.Id("res"), j.Id("diag")).Op(":=").Id("r").Dot("computeResult").Call(j.List(j.Id("ctx"), j.Op("&").Id("data"))).Line(),
-			j.If(j.Id("diag").Dot("HasError").Call()).Block(
+			j.List(j.Id("res"), j.Id("err")).Op(":=").Id("r").Dot("computeResult").Call(j.List(j.Id("ctx"), j.Op("&").Id("data"))).Line(),
+			j.If(j.Id("err").Op("!=").Nil()).Block(
 				j.Return(),
 			).Line(),
+			j.Id("data").Dot("Result").Op("=").Op("*").Id("res"),
 		)...,
 	)
 }

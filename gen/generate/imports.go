@@ -8,6 +8,7 @@ const (
 	ResourceStringPlanModifier = "github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	DataSourceSchema           = "github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	Types                      = "github.com/hashicorp/terraform-plugin-framework/types"
+	JSONTypes                  = "github.com/hashicorp/terraform-plugin-framework-jsontypes/jsontypes"
 	Diag                       = "github.com/hashicorp/terraform-plugin-framework/diag"
 	Attr                       = "github.com/hashicorp/terraform-plugin-framework/attr"
 	AuthwiseManagementClient   = "gitlab.authwise.io/authwise/api-client-go/authwise/management/v1alpha1"

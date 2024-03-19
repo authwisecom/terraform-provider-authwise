@@ -3,9 +3,9 @@ package provider
 
 import (
 	"context"
-	attr "github.com/hashicorp/terraform-plugin-framework/attr"
+	"encoding/json"
+	jsontypes "github.com/hashicorp/terraform-plugin-framework-jsontypes/jsontypes"
 	datasource "github.com/hashicorp/terraform-plugin-framework/datasource"
-	diag "github.com/hashicorp/terraform-plugin-framework/diag"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
 	tflog "github.com/hashicorp/terraform-plugin-log/tflog"
 )
@@ -17,38 +17,23 @@ func NewInteractiveClientConfig() datasource.DataSource {
 }
 
 type interactiveClientConfigDataSourceModel struct {
-	InteractionForwardUri    types.String `tfsdk:"interaction_forward_uri"`
-	AllowedRedirectUris      types.List   `tfsdk:"allowed_redirect_uris"`
-	AccessTokenExpireSeconds types.Int64  `tfsdk:"access_token_expire_seconds"`
-	Cors                     types.Object `tfsdk:"cors"`
-	Logging                  types.Object `tfsdk:"logging"`
-	Result                   types.Object `tfsdk:"result"`
+	InteractionForwardUri    types.String         `tfsdk:"interaction_forward_uri"`
+	AllowedRedirectUris      types.List           `tfsdk:"allowed_redirect_uris"`
+	AccessTokenExpireSeconds types.Int64          `tfsdk:"access_token_expire_seconds"`
+	Cors                     types.Object         `tfsdk:"cors"`
+	Logging                  types.Object         `tfsdk:"logging"`
+	Result                   jsontypes.Normalized `tfsdk:"result"`
 }
 
-func (r *interactiveClientConfigDataSource) computeResult(ctx context.Context, m *interactiveClientConfigDataSourceModel) (*types.Object, diag.Diagnostics) {
-	tMap := map[string]attr.Type{
-		"@type":                       types.StringType,
-		"access_token_expire_seconds": m.AccessTokenExpireSeconds.Type(ctx),
-		"allowed_redirect_uris":       m.AllowedRedirectUris.Type(ctx),
-		"cors":                        m.Cors.Type(ctx),
-		"interaction_forward_uri":     m.InteractionForwardUri.Type(ctx),
-		"logging":                     m.Logging.Type(ctx),
-	}
-	vMap := map[string]attr.Value{
-		"@type":                       types.StringValue("type.googleapis.com/authwise.types.core.v1alpha1.InteractiveClientConfig"),
-		"access_token_expire_seconds": m.AccessTokenExpireSeconds,
-		"allowed_redirect_uris":       m.AllowedRedirectUris,
-		"cors":                        m.Cors,
-		"interaction_forward_uri":     m.InteractionForwardUri,
-		"logging":                     m.Logging,
-	}
-	obj, diag := types.ObjectValue(tMap, vMap)
+func (r *interactiveClientConfigDataSource) computeResult(ctx context.Context, m *interactiveClientConfigDataSourceModel) (*jsontypes.Normalized, error) {
+	j, err := json.Marshal(m)
 
-	if diag.HasError() {
-		return nil, diag
+	if err != nil {
+		return nil, err
 	}
 
-	return &obj, nil
+	val := jsontypes.NewNormalizedValue(string(j))
+	return &val, nil
 }
 
 func (r *interactiveClientConfigDataSource) Metadata(ctx context.Context, request datasource.MetadataRequest, response *datasource.MetadataResponse) {
@@ -68,12 +53,12 @@ func (r *interactiveClientConfigDataSource) Read(ctx context.Context, request da
 		return
 	}
 
-	res, diag := r.computeResult(ctx, &data)
-	if diag.HasError() {
+	res, err := r.computeResult(ctx, &data)
+	if err != nil {
 		return
 	}
-
+	data.Result = *res
 	tflog.Trace(ctx, "interactiveclientconfig read")
 
-	response.Diagnostics.Append(response.State.Set(ctx, res)...)
+	response.Diagnostics.Append(response.State.Set(ctx, data)...)
 }

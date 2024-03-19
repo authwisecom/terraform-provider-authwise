@@ -4,6 +4,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	jsontypes "github.com/hashicorp/terraform-plugin-framework-jsontypes/jsontypes"
 	resource "github.com/hashicorp/terraform-plugin-framework/resource"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
 	tflog "github.com/hashicorp/terraform-plugin-log/tflog"
@@ -21,17 +22,17 @@ func NewTenant() resource.Resource {
 }
 
 type tenantModel struct {
-	Id                  types.String `tfsdk:"id"`
-	Name                types.String `tfsdk:"name"`
-	AppearanceProfileId types.String `tfsdk:"appearance_profile_id"`
-	Config              types.Object `tfsdk:"config"`
+	Id                  types.String         `tfsdk:"id"`
+	Name                types.String         `tfsdk:"name"`
+	AppearanceProfileId types.String         `tfsdk:"appearance_profile_id"`
+	Config              jsontypes.Normalized `tfsdk:"config"`
 }
 
 func (r *tenantResource) toName(data tenantModel) string {
 	return fmt.Sprintf("tenants/%s", data.Id.ValueString())
 }
 func (r *tenantResource) toProto(m *tenantModel) (*v1alpha11.Tenant, error) {
-	converted_config, err := util.ObjectToProtoConcrete[v1alpha11.TenantConfig](m.Config)
+	converted_config, err := util.JsonToProtoConcrete[v1alpha11.TenantConfig](m.Config)
 	if err != nil {
 		return nil, err
 	}

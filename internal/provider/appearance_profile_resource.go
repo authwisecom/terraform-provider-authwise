@@ -4,6 +4,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	jsontypes "github.com/hashicorp/terraform-plugin-framework-jsontypes/jsontypes"
 	resource "github.com/hashicorp/terraform-plugin-framework/resource"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
 	tflog "github.com/hashicorp/terraform-plugin-log/tflog"
@@ -21,23 +22,23 @@ func NewAppearanceProfile() resource.Resource {
 }
 
 type appearanceProfileModel struct {
-	Id                   types.String `tfsdk:"id"`
-	Name                 types.String `tfsdk:"name"`
-	TenantId             types.String `tfsdk:"tenant_id"`
-	ThemeId              types.String `tfsdk:"theme_id"`
-	StylesheetAttributes types.Object `tfsdk:"stylesheet_attributes"`
-	Content              types.Object `tfsdk:"content"`
+	Id                   types.String         `tfsdk:"id"`
+	Name                 types.String         `tfsdk:"name"`
+	TenantId             types.String         `tfsdk:"tenant_id"`
+	ThemeId              types.String         `tfsdk:"theme_id"`
+	StylesheetAttributes jsontypes.Normalized `tfsdk:"stylesheet_attributes"`
+	Content              jsontypes.Normalized `tfsdk:"content"`
 }
 
 func (r *appearanceProfileResource) toName(data appearanceProfileModel) string {
 	return fmt.Sprintf("appearance_profiles/%s", data.Id.ValueString())
 }
 func (r *appearanceProfileResource) toProto(m *appearanceProfileModel) (*v1alpha11.AppearanceProfile, error) {
-	converted_stylesheetattributes, err := util.ObjectToProtoStruct(m.StylesheetAttributes)
+	converted_stylesheetattributes, err := util.JsonToProtoStruct(m.StylesheetAttributes)
 	if err != nil {
 		return nil, err
 	}
-	converted_content, err := util.ObjectToProtoStruct(m.Content)
+	converted_content, err := util.JsonToProtoStruct(m.Content)
 	if err != nil {
 		return nil, err
 	}
@@ -56,12 +57,12 @@ func (r *appearanceProfileResource) toModel(p *v1alpha11.AppearanceProfile, m *a
 	m.Name = types.StringValue(p.Name)
 	m.TenantId = types.StringValue(p.TenantId)
 	m.ThemeId = types.StringValue(p.ThemeId)
-	converted_stylesheetattributes, err := util.ProtoStructToObject(p.StylesheetAttributes)
+	converted_stylesheetattributes, err := util.ProtoStructToJson(p.StylesheetAttributes)
 	if err != nil {
 		return err
 	}
 	m.StylesheetAttributes = *converted_stylesheetattributes
-	converted_content, err := util.ProtoStructToObject(p.Content)
+	converted_content, err := util.ProtoStructToJson(p.Content)
 	if err != nil {
 		return err
 	}
