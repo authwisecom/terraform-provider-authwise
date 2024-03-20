@@ -25,7 +25,15 @@ type providerLinkedInDataSourceModel struct {
 }
 
 func (r *providerLinkedInDataSource) computeResult(ctx context.Context, m *providerLinkedInDataSourceModel) (*jsontypes.Normalized, error) {
-	j, err := json.Marshal(m)
+
+	converted := map[string]any{
+		"@type":                  "type.googleapis.com/authwise.types.core.v1alpha1.ProviderLinkedIn",
+		"client_id":              m.ClientId.ValueString(),
+		"client_secret":          m.ClientSecret.ValueString(),
+		"include_granted_scopes": m.IncludeGrantedScopes.ValueString(),
+		"scope":                  m.Scope.ValueString(),
+	}
+	j, err := json.Marshal(converted)
 
 	if err != nil {
 		return nil, err

@@ -83,6 +83,24 @@ func fieldsDataSource(l zerolog.Logger, m *protogen.Message) j.Dict {
 		injected[k] = true
 	}
 
+	l.Debug().Msgf("test: %v", m.GoIdent.GoName)
+	meta := resourceMetadataMap[m.GoIdent.GoName]
+	if meta != nil {
+		s := meta.schemaMetadata
+		if s != nil {
+			//append computed result field to schema
+			if s.hasResult {
+				d[j.Lit("result")] = j.Qual(DataSourceSchema, "StringAttribute").Values(
+					j.Dict{
+						j.Id("CustomType"):  j.Qual(JSONTypes, "NormalizedType").Values(),
+						j.Id("Description"): j.Lit(""),
+						j.Id("Computed"):    j.True(),
+					},
+				)
+			}
+		}
+	}
+
 	for _, f := range m.Fields {
 
 		name := strcase.ToSnake(f.GoName)
@@ -99,22 +117,6 @@ func fieldsDataSource(l zerolog.Logger, m *protogen.Message) j.Dict {
 			continue
 		}
 		d[j.Lit(name)] = fieldDataSource(l, f)
-	}
-	l.Debug().Msgf("test: %v", m.GoIdent.GoName)
-	meta := resourceMetadataMap[m.GoIdent.GoName]
-	if meta != nil {
-		s := meta.schemaMetadata
-		if s != nil {
-			//append computed result field to schema
-			if s.hasResult {
-				d[j.Lit("result")] = j.Qual(DataSourceSchema, "StringAttribute").Values(
-					j.Dict{
-						j.Id("Description"): j.Lit(""),
-						j.Id("Computed"):    j.True(),
-					},
-				)
-			}
-		}
 	}
 
 	return d

@@ -23,7 +23,13 @@ type providerAuthwiseDataSourceModel struct {
 }
 
 func (r *providerAuthwiseDataSource) computeResult(ctx context.Context, m *providerAuthwiseDataSourceModel) (*jsontypes.Normalized, error) {
-	j, err := json.Marshal(m)
+
+	converted := map[string]any{
+		"@type":     "type.googleapis.com/authwise.types.core.v1alpha1.ProviderAuthwise",
+		"client_id": m.ClientId.ValueString(),
+		"issuer":    m.Issuer.ValueString(),
+	}
+	j, err := json.Marshal(converted)
 
 	if err != nil {
 		return nil, err

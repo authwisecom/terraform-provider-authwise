@@ -22,7 +22,7 @@ func TestSimpleClientInlineConfig(t *testing.T) {
 		Steps: []resource.TestStep{
 			// Create and Read testing
 			{
-				Config: providerConfig + testAccClientResourceConfig(params),
+				Config: providerConfig + testAccClientResourceConfigWithDataSource(params),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(clientName, "name", params.clientName),
 					resource.TestCheckResourceAttr(clientName, "grant_type", "client_credentials"),

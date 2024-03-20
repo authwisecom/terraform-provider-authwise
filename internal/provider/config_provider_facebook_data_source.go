@@ -25,7 +25,15 @@ type providerFacebookDataSourceModel struct {
 }
 
 func (r *providerFacebookDataSource) computeResult(ctx context.Context, m *providerFacebookDataSourceModel) (*jsontypes.Normalized, error) {
-	j, err := json.Marshal(m)
+
+	converted := map[string]any{
+		"@type":         "type.googleapis.com/authwise.types.core.v1alpha1.ProviderFacebook",
+		"client_id":     m.ClientId.ValueString(),
+		"client_secret": m.ClientSecret.ValueString(),
+		"scope":         m.Scope.ValueString(),
+		"user_fields":   m.UserFields.ValueString(),
+	}
+	j, err := json.Marshal(converted)
 
 	if err != nil {
 		return nil, err

@@ -22,7 +22,12 @@ type tenantUrlConfigDataSourceModel struct {
 }
 
 func (r *tenantUrlConfigDataSource) computeResult(ctx context.Context, m *tenantUrlConfigDataSourceModel) (*jsontypes.Normalized, error) {
-	j, err := json.Marshal(m)
+
+	converted := map[string]any{
+		"@type":         "type.googleapis.com/authwise.types.core.v1alpha1.TenantUrlConfig",
+		"cookie_domain": m.CookieDomain.ValueString(),
+	}
+	j, err := json.Marshal(converted)
 
 	if err != nil {
 		return nil, err

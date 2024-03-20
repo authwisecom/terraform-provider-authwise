@@ -190,45 +190,36 @@ func (s *standardResourceHandler) toProto(f *j.File, m *protogen.Message, struct
 	var conversions []j.Code
 	dict := j.DictFunc(func(d j.Dict) {
 		for _, fi := range m.Fields {
-			valueFunc := ""
-			switch fi.Desc.Kind() {
-			case protoreflect.StringKind:
-				valueFunc = "ValueString"
-			case protoreflect.BoolKind:
-				valueFunc = "ValueBool"
-			case protoreflect.Int64Kind:
-				valueFunc = "ValueInt64"
-			case protoreflect.MessageKind:
-				//objects
-				switch fi.Desc.Message().FullName().Name() {
-				case "Any":
-					code := j.List(
-						j.Id(ConversionName(strings.ToLower(fi.GoName))),
-						j.Id("err")).Op(":=").Qual(Util, "JsonToProtoAny").Call(j.Id("m").Dot(fi.GoName)).Line().Add(errCheck)
-					conversions = append(conversions, code)
-				case "Struct":
-					code := j.List(
-						j.Id(ConversionName(strings.ToLower(fi.GoName))),
-						j.Id("err")).Op(":=").Qual(Util, "JsonToProtoStruct").Call(j.Id("m").Dot(fi.GoName)).Line().Add(errCheck)
-					conversions = append(conversions, code)
-				default:
-					code := j.List(
-						j.Id(ConversionName(strings.ToLower(fi.GoName))),
-						j.Id("err")).Op(":=").Qual(Util, "JsonToProtoConcrete").Types(j.Qual(TypesCore, ConfigurationObjectName(string(fi.Message.Desc.FullName().Name())))).Call(j.Id("m").Dot(fi.GoName)).Line().Add(errCheck)
+			valueFunc, ok := valueTypeMap[fi.Desc.Kind()]
+			if ok {
+				d[j.Id(fi.GoName)] = j.Id("m").Dot(fi.GoName).Dot(valueFunc).Call()
+			} else {
+				switch fi.Desc.Kind() {
+				case protoreflect.MessageKind:
+					//objects
+					switch fi.Desc.Message().FullName().Name() {
+					case "Any":
+						code := j.List(
+							j.Id(ConversionName(strings.ToLower(fi.GoName))),
+							j.Id("err")).Op(":=").Qual(Util, "JsonToProtoAny").Call(j.Id("m").Dot(fi.GoName)).Line().Add(errCheck)
+						conversions = append(conversions, code)
+					case "Struct":
+						code := j.List(
+							j.Id(ConversionName(strings.ToLower(fi.GoName))),
+							j.Id("err")).Op(":=").Qual(Util, "JsonToProtoStruct").Call(j.Id("m").Dot(fi.GoName)).Line().Add(errCheck)
+						conversions = append(conversions, code)
+					default:
+						code := j.List(
+							j.Id(ConversionName(strings.ToLower(fi.GoName))),
+							j.Id("err")).Op(":=").Qual(Util, "JsonToProtoConcrete").Types(j.Qual(TypesCore, ConfigurationObjectName(string(fi.Message.Desc.FullName().Name())))).Call(j.Id("m").Dot(fi.GoName)).Line().Add(errCheck)
+						conversions = append(conversions, code)
+					}
+				case protoreflect.EnumKind:
+					code := j.Id(ConversionName(string(fi.Desc.FullName().Name()))).Op(":=").
+						Qual(TypesCore, ConfigurationObjectName(string(fi.Desc.Enum().FullName().Name()))).Call(j.Id("m").Dot(fi.GoName).Dot("ValueInt64").Call()).Line()
 					conversions = append(conversions, code)
 				}
-			case protoreflect.EnumKind:
-				code := j.Id(ConversionName(string(fi.Desc.FullName().Name()))).Op(":=").
-					Qual(TypesCore, ConfigurationObjectName(string(fi.Desc.Enum().FullName().Name()))).Call(j.Id("m").Dot(fi.GoName).Dot("ValueInt64").Call()).Line()
-				conversions = append(conversions, code)
-			}
-
-			if valueFunc == "" {
-				//objects requiring conversion
 				d[j.Id(fi.GoName)] = j.Id(ConversionName(strings.ToLower(fi.GoName)))
-			} else {
-				//standard
-				d[j.Id(fi.GoName)] = j.Id("m").Dot(fi.GoName).Dot(valueFunc).Call()
 			}
 		}
 	})

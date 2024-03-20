@@ -24,7 +24,15 @@ type providerUsernamePasswordDataSourceModel struct {
 }
 
 func (r *providerUsernamePasswordDataSource) computeResult(ctx context.Context, m *providerUsernamePasswordDataSourceModel) (*jsontypes.Normalized, error) {
-	j, err := json.Marshal(m)
+	// TODO - PasswordValidators unsupported list type
+	converted_password_validators := map[string]any{}
+	converted := map[string]any{
+		"@type":               "type.googleapis.com/authwise.types.core.v1alpha1.ProviderUsernamePassword",
+		"forward_uri":         m.ForwardUri.ValueString(),
+		"password_hash_type":  m.PasswordHashType.ValueString(),
+		"password_validators": converted_password_validators,
+	}
+	j, err := json.Marshal(converted)
 
 	if err != nil {
 		return nil, err

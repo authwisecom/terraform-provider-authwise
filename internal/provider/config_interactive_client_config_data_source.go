@@ -8,6 +8,7 @@ import (
 	datasource "github.com/hashicorp/terraform-plugin-framework/datasource"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
 	tflog "github.com/hashicorp/terraform-plugin-log/tflog"
+	util "terraform-provider-authwise/internal/util"
 )
 
 type interactiveClientConfigDataSource struct{}
@@ -26,7 +27,28 @@ type interactiveClientConfigDataSourceModel struct {
 }
 
 func (r *interactiveClientConfigDataSource) computeResult(ctx context.Context, m *interactiveClientConfigDataSourceModel) (*jsontypes.Normalized, error) {
-	j, err := json.Marshal(m)
+	converted_allowed_redirect_uris, err := util.ListToSlice[string](m.AllowedRedirectUris)
+	if err != nil {
+		return nil, err
+	}
+	converted_cors, err := util.ObjectToMap(m.Cors)
+	if err != nil {
+		return nil, err
+	}
+	converted_logging, err := util.ObjectToMap(m.Logging)
+	if err != nil {
+		return nil, err
+	}
+
+	converted := map[string]any{
+		"@type":                       "type.googleapis.com/authwise.types.core.v1alpha1.InteractiveClientConfig",
+		"access_token_expire_seconds": m.AccessTokenExpireSeconds.ValueInt64(),
+		"allowed_redirect_uris":       converted_allowed_redirect_uris,
+		"cors":                        converted_cors,
+		"interaction_forward_uri":     m.InteractionForwardUri.ValueString(),
+		"logging":                     converted_logging,
+	}
+	j, err := json.Marshal(converted)
 
 	if err != nil {
 		return nil, err

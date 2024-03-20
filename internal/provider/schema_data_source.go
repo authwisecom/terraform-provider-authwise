@@ -3,6 +3,7 @@ package provider
 
 import (
 	"context"
+	jsontypes "github.com/hashicorp/terraform-plugin-framework-jsontypes/jsontypes"
 	schema "github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
 )
@@ -35,10 +36,6 @@ func GenSchemaInteractiveClientConfigDataSource(ctx context.Context) schema.Sche
 					Description: "",
 					Optional:    true,
 				},
-				"result": schema.StringAttribute{
-					Computed:    true,
-					Description: "",
-				},
 			},
 			Description: "",
 			Optional:    true,
@@ -61,10 +58,6 @@ func GenSchemaInteractiveClientConfigDataSource(ctx context.Context) schema.Sche
 					Description: "",
 					Optional:    true,
 				},
-				"result": schema.StringAttribute{
-					Computed:    true,
-					Description: "",
-				},
 				"send_to_event_stream": schema.BoolAttribute{
 					Description: "",
 					Optional:    true,
@@ -75,6 +68,7 @@ func GenSchemaInteractiveClientConfigDataSource(ctx context.Context) schema.Sche
 		},
 		"result": schema.StringAttribute{
 			Computed:    true,
+			CustomType:  jsontypes.NormalizedType{},
 			Description: "",
 		},
 	}}
@@ -107,10 +101,6 @@ func GenSchemaTenantConfigDataSource(ctx context.Context) schema.Schema {
 					Description: "",
 					Optional:    true,
 				},
-				"result": schema.StringAttribute{
-					Computed:    true,
-					Description: "",
-				},
 			},
 			Description: "",
 			Optional:    true,
@@ -132,10 +122,6 @@ func GenSchemaTenantConfigDataSource(ctx context.Context) schema.Schema {
 				"log_level": schema.Int64Attribute{
 					Description: "",
 					Optional:    true,
-				},
-				"result": schema.StringAttribute{
-					Computed:    true,
-					Description: "",
 				},
 				"send_to_event_stream": schema.BoolAttribute{
 					Description: "",
@@ -179,10 +165,6 @@ func GenSchemaAudienceConfigDataSource(ctx context.Context) schema.Schema {
 					Description: "",
 					Optional:    true,
 				},
-				"result": schema.StringAttribute{
-					Computed:    true,
-					Description: "",
-				},
 			},
 			Description: "",
 			Optional:    true,
@@ -205,10 +187,6 @@ func GenSchemaAudienceConfigDataSource(ctx context.Context) schema.Schema {
 					Description: "",
 					Optional:    true,
 				},
-				"result": schema.StringAttribute{
-					Computed:    true,
-					Description: "",
-				},
 				"send_to_event_stream": schema.BoolAttribute{
 					Description: "",
 					Optional:    true,
@@ -229,10 +207,6 @@ func GenSchemaAudienceConfigDataSource(ctx context.Context) schema.Schema {
 							Description: "",
 							Optional:    true,
 						},
-						"result": schema.StringAttribute{
-							Computed:    true,
-							Description: "",
-						},
 					},
 					Description: "",
 					Optional:    true,
@@ -240,10 +214,6 @@ func GenSchemaAudienceConfigDataSource(ctx context.Context) schema.Schema {
 				"openid": schema.BoolAttribute{
 					Description: "",
 					Optional:    true,
-				},
-				"result": schema.StringAttribute{
-					Computed:    true,
-					Description: "",
 				},
 			},
 			Description: "",
@@ -520,10 +490,6 @@ func GenSchemaTenantDataSource(ctx context.Context) schema.Schema {
 							Description: "",
 							Optional:    true,
 						},
-						"result": schema.StringAttribute{
-							Computed:    true,
-							Description: "",
-						},
 					},
 					Description: "",
 					Optional:    true,
@@ -545,10 +511,6 @@ func GenSchemaTenantDataSource(ctx context.Context) schema.Schema {
 						"log_level": schema.Int64Attribute{
 							Description: "",
 							Optional:    true,
-						},
-						"result": schema.StringAttribute{
-							Computed:    true,
-							Description: "",
 						},
 						"send_to_event_stream": schema.BoolAttribute{
 							Description: "",
@@ -686,10 +648,6 @@ func GenSchemaAudienceDataSource(ctx context.Context) schema.Schema {
 							Description: "",
 							Optional:    true,
 						},
-						"result": schema.StringAttribute{
-							Computed:    true,
-							Description: "",
-						},
 					},
 					Description: "",
 					Optional:    true,
@@ -712,10 +670,6 @@ func GenSchemaAudienceDataSource(ctx context.Context) schema.Schema {
 							Description: "",
 							Optional:    true,
 						},
-						"result": schema.StringAttribute{
-							Computed:    true,
-							Description: "",
-						},
 						"send_to_event_stream": schema.BoolAttribute{
 							Description: "",
 							Optional:    true,
@@ -736,10 +690,6 @@ func GenSchemaAudienceDataSource(ctx context.Context) schema.Schema {
 									Description: "",
 									Optional:    true,
 								},
-								"result": schema.StringAttribute{
-									Computed:    true,
-									Description: "",
-								},
 							},
 							Description: "",
 							Optional:    true,
@@ -747,10 +697,6 @@ func GenSchemaAudienceDataSource(ctx context.Context) schema.Schema {
 						"openid": schema.BoolAttribute{
 							Description: "",
 							Optional:    true,
-						},
-						"result": schema.StringAttribute{
-							Computed:    true,
-							Description: "",
 						},
 					},
 					Description: "",

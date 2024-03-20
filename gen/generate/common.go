@@ -42,6 +42,16 @@ var attributeTypeMap = map[protoreflect.Kind]string{
 	protoreflect.BoolKind:   "BoolAttribute",
 }
 
+var valueTypeMap = map[protoreflect.Kind]string{
+	protoreflect.StringKind: "ValueString",
+	protoreflect.BytesKind:  "ValueString",
+	protoreflect.Int64Kind:  "ValueInt64",
+	protoreflect.Int32Kind:  "ValueInt64",
+	protoreflect.FloatKind:  "ValueFloat64",
+	protoreflect.DoubleKind: "ValueFloat64",
+	protoreflect.BoolKind:   "ValueBool",
+}
+
 var (
 	newlinePattern  = regexp.MustCompile(`\n//`)
 	variablePattern = regexp.MustCompile(`[ ]*\$[^\/]+[ ]*`)
@@ -75,7 +85,6 @@ type resourceMetadata struct {
 }
 type schemaMetadata struct {
 	hasResult bool //create a computed result field
-	hasType   bool //create a computed @type field
 }
 type datasourceMetadata struct {
 	schemaIdentifiers []string
@@ -226,47 +235,6 @@ var resourceMetadataMap = resourceMap{
 			schemaIdentifiers: []string{"id"},
 			schemaMetadata: &schemaMetadata{
 				hasResult: true,
-				hasType:   true,
-			},
-		},
-	},
-	"CorsConfig": &metadata{
-		resourceMetadata: nil,
-		datasourceMetadata: &datasourceMetadata{
-			schemaIdentifiers: []string{"id"},
-			schemaMetadata: &schemaMetadata{
-				hasResult: true,
-				hasType:   true,
-			},
-		},
-	},
-	"LoggingConfig": &metadata{
-		resourceMetadata: nil,
-		datasourceMetadata: &datasourceMetadata{
-			schemaIdentifiers: []string{"id"},
-			schemaMetadata: &schemaMetadata{
-				hasResult: true,
-				hasType:   true,
-			},
-		},
-	},
-	"AuthorizationConfig": &metadata{
-		resourceMetadata: nil,
-		datasourceMetadata: &datasourceMetadata{
-			schemaIdentifiers: []string{"id"},
-			schemaMetadata: &schemaMetadata{
-				hasResult: true,
-				hasType:   true,
-			},
-		},
-	},
-	"ScopesConfig": &metadata{
-		resourceMetadata: nil,
-		datasourceMetadata: &datasourceMetadata{
-			schemaIdentifiers: []string{"id"},
-			schemaMetadata: &schemaMetadata{
-				hasResult: true,
-				hasType:   true,
 			},
 		},
 	},

@@ -27,7 +27,17 @@ type providerGitHubDataSourceModel struct {
 }
 
 func (r *providerGitHubDataSource) computeResult(ctx context.Context, m *providerGitHubDataSourceModel) (*jsontypes.Normalized, error) {
-	j, err := json.Marshal(m)
+
+	converted := map[string]any{
+		"@type":         "type.googleapis.com/authwise.types.core.v1alpha1.ProviderGitHub",
+		"allow_signup":  m.AllowSignup.ValueBool(),
+		"client_id":     m.ClientId.ValueString(),
+		"client_secret": m.ClientSecret.ValueString(),
+		"display":       m.Display.ValueString(),
+		"prompt":        m.Prompt.ValueString(),
+		"scope":         m.Scope.ValueString(),
+	}
+	j, err := json.Marshal(converted)
 
 	if err != nil {
 		return nil, err

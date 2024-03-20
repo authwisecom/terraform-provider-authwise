@@ -25,7 +25,15 @@ type providerOktaDataSourceModel struct {
 }
 
 func (r *providerOktaDataSource) computeResult(ctx context.Context, m *providerOktaDataSourceModel) (*jsontypes.Normalized, error) {
-	j, err := json.Marshal(m)
+
+	converted := map[string]any{
+		"@type":         "type.googleapis.com/authwise.types.core.v1alpha1.ProviderOkta",
+		"client_id":     m.ClientId.ValueString(),
+		"client_secret": m.ClientSecret.ValueString(),
+		"scope":         m.Scope.ValueString(),
+		"tenant_url":    m.TenantUrl.ValueString(),
+	}
+	j, err := json.Marshal(converted)
 
 	if err != nil {
 		return nil, err

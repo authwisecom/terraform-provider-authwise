@@ -134,7 +134,6 @@ func (s *configDataSourceHandler) modelFields(fields []*protogen.Field, l zerolo
 		case protoreflect.MessageKind:
 			typeName = "Object"
 		default:
-			l.Debug().Msgf("test: %v", f.Desc)
 			panic("unknown type")
 		}
 		log.Debug().Str("kind", f.Desc.Kind().GoString()).Msg("processing model field")
@@ -149,43 +148,64 @@ func (s *configDataSourceHandler) modelFields(fields []*protogen.Field, l zerolo
 	return result
 }
 
-// TODO - do we need a method here?
 func (s *configDataSourceHandler) computeResult(f *j.File, m *protogen.Message, structName string, l zerolog.Logger) {
+
+	//converted fields
+	var conversions []j.Code
+	errCheck := j.If(j.Id("err").Op("!=").Nil().Block(j.Return(j.Nil(), j.Id("err")))).Line()
+	for _, v := range m.Fields {
+		tfName := fmt.Sprintf("%s", v.Desc.FullName().Name())
+		//only list/struct/map fields
+		if v.Desc.IsList() {
+			if v.Desc.Kind() == protoreflect.MessageKind {
+				code := j.Commentf("TODO - %s unsupported list type", v.GoName).Line().
+					Id(ConversionName(strings.ToLower(tfName))).Op(":=").Id("map[string]any{}")
+				conversions = append(conversions, code)
+			} else {
+				code := j.List(
+					j.Id(ConversionName(strings.ToLower(tfName))),
+					j.Id("err")).Op(":=").Qual(Util, "ListToSlice").
+					Types(j.Id(v.Desc.Kind().String())).Call(j.Id("m").Dot(v.GoName)).Line().Add(errCheck)
+				conversions = append(conversions, code)
+			}
+		} else if v.Desc.IsMap() {
+			panic("computeResult: unimplemented")
+		} else if v.Desc.Kind() == protoreflect.MessageKind {
+			//concrete
+			code := j.List(
+				j.Id(ConversionName(strings.ToLower(tfName))),
+				j.Id("err")).Op(":=").Qual(Util, "ObjectToMap").
+				Call(j.Id("m").Dot(v.GoName)).Line().Add(errCheck)
+			conversions = append(conversions, code)
+		}
+	}
+
 	f.Func().Params(j.Id("r").Op("*").Id(structName)).Id("computeResult").Params(j.List(
 		j.Id("ctx").Qual("context", "Context"),
 		j.Id("m").Op("*").Id(s.dataModelName(m))),
 	).Parens(j.List(j.Op("*").Qual(JSONTypes, "Normalized"), j.Id("error"))).Block(
-		//j.Id("tMap").Op(":=").Map(j.String()).Qual(Attr, "Type").Values(
-		//	j.DictFunc(func(d j.Dict) {
-		//		d[j.Lit("@type")] = j.Qual(Types, "StringType")
-		//		for _, v := range m.Fields {
-		//			name := v.GoName
-		//			if name == "Result" {
-		//				continue
-		//			}
-		//			d[j.Lit(fmt.Sprintf("%s", v.Desc.FullName().Name()))] = j.Id("m").Dot(name).Dot("Type").Call(j.Id("ctx"))
-		//		}
-		//	}),
-		//),
-		//j.Id("vMap").Op(":=").Map(j.String()).Qual(Attr, "Value").Values(
-		//	j.DictFunc(func(d j.Dict) {
-		//		d[j.Lit("@type")] = j.Qual(Types, "StringValue").Call(j.Lit(fmt.Sprintf("type.googleapis.com/%s", m.Desc.FullName())))
-		//		for _, v := range m.Fields {
-		//			name := v.GoName
-		//			if name == "Result" {
-		//				continue
-		//			}
-		//
-		//			d[j.Lit(fmt.Sprintf("%s", v.Desc.FullName().Name()))] = j.Id("m").Dot(name)
-		//		}
-		//	}),
-		//),
-		//j.List(j.Id("obj"), j.Id("diag")).Op(":=").Qual(Types, "ObjectValue").Call(j.Id("tMap"), j.Id("vMap")).Line(),
-		//j.If(j.Id("diag").Dot("HasError").Call()).Block(
-		//	j.Return(j.List(j.Nil(), j.Id("diag"))),
-		//).Line(),
-		//j.Return(j.List(j.Op("&").Id("obj"), j.Nil())),
-		j.List(j.Id("j"), j.Id("err")).Op(":=").Qual("encoding/json", "Marshal").Call(j.Id("m")).Line(),
+		j.Add(conversions...).Line().Id("converted").Op(":=").Map(j.String()).Any().Values(
+			//map assignment
+			j.DictFunc(func(d j.Dict) {
+				//add type field
+				d[j.Lit("@type")] = j.Lit(fmt.Sprintf("type.googleapis.com/%s", m.Desc.FullName()))
+				for _, v := range m.Fields {
+					tfName := fmt.Sprintf("%s", v.Desc.FullName().Name())
+					if tfName == "result" {
+						continue
+					}
+					t, ok := valueTypeMap[v.Desc.Kind()]
+					if ok && !v.Desc.IsList() && !v.Desc.IsMap() {
+						//standard
+						d[j.Lit(tfName)] = j.Id("m").Dot(v.GoName).Dot(t).Call()
+					} else {
+						//converted object/list
+						d[j.Lit(tfName)] = j.Id(ConversionName(strings.ToLower(tfName)))
+					}
+				}
+			}),
+		),
+		j.List(j.Id("j"), j.Id("err")).Op(":=").Qual("encoding/json", "Marshal").Call(j.Id("converted")).Line(),
 		j.If(j.Id("err").Op("!=").Nil()).Block(
 			j.Return(j.List(j.Nil(), j.Id("err"))),
 		).Line(),

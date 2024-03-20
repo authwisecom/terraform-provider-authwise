@@ -26,7 +26,16 @@ type providerMicrosoftDataSourceModel struct {
 }
 
 func (r *providerMicrosoftDataSource) computeResult(ctx context.Context, m *providerMicrosoftDataSourceModel) (*jsontypes.Normalized, error) {
-	j, err := json.Marshal(m)
+
+	converted := map[string]any{
+		"@type":         "type.googleapis.com/authwise.types.core.v1alpha1.ProviderMicrosoft",
+		"client_id":     m.ClientId.ValueString(),
+		"client_secret": m.ClientSecret.ValueString(),
+		"prompt_style":  m.PromptStyle.ValueString(),
+		"scope":         m.Scope.ValueString(),
+		"tenant":        m.Tenant.ValueString(),
+	}
+	j, err := json.Marshal(converted)
 
 	if err != nil {
 		return nil, err
