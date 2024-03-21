@@ -1,17 +1,34 @@
 package e2e
 
 import (
+	"bytes"
+	"encoding/json"
+	"fmt"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
+	"github.com/stretchr/testify/require"
+	"testing"
 )
 
-func testAccCheckClientConfiguration(resourceName string, key string, expected *ClientConfig) resource.TestCheckFunc {
+// TODO -remove nil from response? API adds nil fields
+func testAccJSONConfig(t *testing.T, resourceName string, key string, expected string) resource.TestCheckFunc {
 	return func(s *terraform.State) error {
-		//rs, ok := s.RootModule().Resources[resourceName]
-		//if !ok {
-		//	return fmt.Errorf("not found: %s", resourceName)
-		//}
-		//fmt.Printf("test: %v", rs.Primary)
+		rs, ok := s.RootModule().Resources[resourceName]
+		if !ok {
+			return fmt.Errorf("resource not found: %s", resourceName)
+		}
+		j, ok := rs.Primary.Attributes[key]
+		if !ok {
+			return fmt.Errorf("key not found: %s", key)
+		}
+		expectedJson := new(bytes.Buffer)
+
+		err := json.Compact(expectedJson, []byte(expected))
+		if err != nil {
+			return fmt.Errorf("invalid json")
+		}
+
+		require.JSONEq(t, expectedJson.String(), j)
 
 		return nil
 	}
