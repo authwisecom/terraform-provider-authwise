@@ -29,6 +29,7 @@ func (r *permissionResource) toName(data permissionModel) string {
 	return fmt.Sprintf("audiences/%s/permissions/%s", data.AudienceId.ValueString(), data.Id.ValueString())
 }
 func (r *permissionResource) toProto(m *permissionModel) (*v1alpha11.Permission, error) {
+
 	return &v1alpha11.Permission{
 		AudienceId: m.AudienceId.ValueString(),
 		Id:         m.Id.ValueString(),

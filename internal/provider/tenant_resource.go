@@ -36,6 +36,7 @@ func (r *tenantResource) toProto(m *tenantModel) (*v1alpha11.Tenant, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return &v1alpha11.Tenant{
 		AppearanceProfileId: m.AppearanceProfileId.ValueString(),
 		Config:              converted_config,
@@ -48,6 +49,7 @@ func (r *tenantResource) toModel(p *v1alpha11.Tenant, m *tenantModel) error {
 	m.Id = types.StringValue(p.Id)
 	m.Name = types.StringValue(p.Name)
 	m.AppearanceProfileId = types.StringValue(p.AppearanceProfileId)
+	// TODO - fieldToModel
 	return nil
 }
 

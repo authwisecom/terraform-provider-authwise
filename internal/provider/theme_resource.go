@@ -42,6 +42,7 @@ func (r *themeResource) toProto(m *themeModel) (*v1alpha11.Theme, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return &v1alpha11.Theme{
 		Content:              converted_content,
 		Id:                   m.Id.ValueString(),

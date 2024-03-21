@@ -46,6 +46,7 @@ func (r *clientResource) toProto(m *clientModel) (*v1alpha11.Client, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return &v1alpha11.Client{
 		Alias:               m.Alias.ValueString(),
 		AppearanceProfileId: m.AppearanceProfileId.ValueString(),

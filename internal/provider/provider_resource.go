@@ -37,6 +37,7 @@ func (r *providerResource) toProto(m *providerModel) (*v1alpha11.Provider, error
 	if err != nil {
 		return nil, err
 	}
+
 	return &v1alpha11.Provider{
 		Config:       converted_config,
 		Id:           m.Id.ValueString(),

@@ -22,6 +22,50 @@ func TestSimpleClientInlineConfig(t *testing.T) {
 		Steps: []resource.TestStep{
 			// Create and Read testing
 			{
+				Config: providerConfig + testAccClientResourceConfig(params),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr(clientName, "name", params.clientName),
+					resource.TestCheckResourceAttr(clientName, "grant_type", "client_credentials"),
+					resource.TestCheckResourceAttrSet(clientName, "audience_id"),
+					testAccCheckClientConfiguration(clientName, "config", expectedClientConfig),
+				),
+			},
+			// ImportState testing
+			//{
+			//	ResourceName:      clientName,
+			//	ImportState:       true,
+			//	ImportStateVerify: true,
+			//},
+			// Update and Read testing
+			//{
+			//	Config: testAccClientResourceConfig(newTestSimpleClientParams()),
+			//	Check: resource.ComposeAggregateTestCheckFunc(
+			//		resource.TestCheckResourceAttr("authwise_client.test", "name", "two"),
+			//		resource.TestCheckResourceAttr("authwise_client.test", "alias", ""),
+			//		resource.TestCheckResourceAttr("authwise_client.test", "login_url", ""),
+			//		resource.TestCheckResourceAttr("authwise_client.test", "grant_type", ""),
+			//		resource.TestCheckResourceAttr("authwise_client.test", "logo_id", ""),
+			//		resource.TestCheckResourceAttr("authwise_client.test", "audience_id", ""),
+			//		resource.TestCheckResourceAttr("authwise_client.test", "appearance_profile_id", ""),
+			//	),
+			//},
+			// Delete tests
+		},
+	})
+}
+
+func TestSimpleClientDataSourceConfig(t *testing.T) {
+	params := newTestSimpleClientParams()
+	clientName := "authwise_client.default"
+	expectedClientConfig := &ClientConfig{
+		accessTokenExpireSeconds: 7200,
+	}
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// Create and Read testing
+			{
 				Config: providerConfig + testAccClientResourceConfigWithDataSource(params),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(clientName, "name", params.clientName),

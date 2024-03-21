@@ -30,6 +30,7 @@ func (r *assetResource) toName(data assetModel) string {
 	return fmt.Sprintf("assets/%s", data.Id.ValueString())
 }
 func (r *assetResource) toProto(m *assetModel) (*v1alpha11.Asset, error) {
+
 	return &v1alpha11.Asset{
 		Id:       m.Id.ValueString(),
 		MimeType: m.MimeType.ValueString(),

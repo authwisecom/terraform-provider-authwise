@@ -38,6 +38,7 @@ func (r *audienceResource) toProto(m *audienceModel) (*v1alpha11.Audience, error
 	if err != nil {
 		return nil, err
 	}
+
 	return &v1alpha11.Audience{
 		AppearanceProfileId: m.AppearanceProfileId.ValueString(),
 		Config:              converted_config,
@@ -54,6 +55,7 @@ func (r *audienceResource) toModel(p *v1alpha11.Audience, m *audienceModel) erro
 	m.Name = types.StringValue(p.Name)
 	m.AppearanceProfileId = types.StringValue(p.AppearanceProfileId)
 	m.Description = types.StringValue(p.Description)
+	// TODO - fieldToModel
 	return nil
 }
 

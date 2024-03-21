@@ -31,6 +31,7 @@ func (r *realmResource) toName(data realmModel) string {
 	return fmt.Sprintf("realms/%s", data.Id.ValueString())
 }
 func (r *realmResource) toProto(m *realmModel) (*v1alpha11.Realm, error) {
+
 	return &v1alpha11.Realm{
 		Description:      m.Description.ValueString(),
 		Id:               m.Id.ValueString(),

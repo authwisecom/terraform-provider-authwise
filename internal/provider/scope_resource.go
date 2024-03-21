@@ -30,6 +30,7 @@ func (r *scopeResource) toName(data scopeModel) string {
 	return fmt.Sprintf("audiences/%s/scopes/%s", data.AudienceId.ValueString(), data.Id.ValueString())
 }
 func (r *scopeResource) toProto(m *scopeModel) (*v1alpha11.Scope, error) {
+
 	return &v1alpha11.Scope{
 		AudienceId: m.AudienceId.ValueString(),
 		Auto:       m.Auto.ValueBool(),

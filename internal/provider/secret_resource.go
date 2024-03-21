@@ -46,6 +46,7 @@ func (r *secretResource) toModel(p *v1alpha11.Secret, m *secretModel) error {
 	m.Id = types.StringValue(p.Id)
 	m.TenantId = types.StringValue(p.TenantId)
 	m.Name = types.StringValue(p.Name)
+	m.Encoding = types.Int64Value(int64(p.Encoding))
 	m.Value = types.StringValue(p.Value)
 	return nil
 }

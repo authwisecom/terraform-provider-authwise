@@ -83,7 +83,7 @@ func fieldsDataSource(l zerolog.Logger, m *protogen.Message) j.Dict {
 		injected[k] = true
 	}
 
-	l.Debug().Msgf("test: %v", m.GoIdent.GoName)
+	//add result field
 	meta := resourceMetadataMap[m.GoIdent.GoName]
 	if meta != nil {
 		s := meta.schemaMetadata

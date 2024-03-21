@@ -52,6 +52,16 @@ var valueTypeMap = map[protoreflect.Kind]string{
 	protoreflect.BoolKind:   "ValueBool",
 }
 
+var valueMap = map[protoreflect.Kind]string{
+	protoreflect.StringKind: "StringValue",
+	protoreflect.BytesKind:  "StringValue",
+	protoreflect.Int64Kind:  "Int64Value",
+	protoreflect.Int32Kind:  "Int64Value",
+	protoreflect.FloatKind:  "Float64Value",
+	protoreflect.DoubleKind: "Float64Value",
+	protoreflect.BoolKind:   "BoolValue",
+}
+
 var (
 	newlinePattern  = regexp.MustCompile(`\n//`)
 	variablePattern = regexp.MustCompile(`[ ]*\$[^\/]+[ ]*`)

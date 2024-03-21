@@ -35,6 +35,7 @@ func (r *tenantUrlResource) toProto(m *tenantUrlModel) (*v1alpha11.TenantUrl, er
 	if err != nil {
 		return nil, err
 	}
+
 	return &v1alpha11.TenantUrl{
 		Config:   converted_config,
 		Id:       m.Id.ValueString(),
@@ -45,6 +46,7 @@ func (r *tenantUrlResource) toProto(m *tenantUrlModel) (*v1alpha11.TenantUrl, er
 func (r *tenantUrlResource) toModel(p *v1alpha11.TenantUrl, m *tenantUrlModel) error {
 	m.Id = types.StringValue(p.Id)
 	m.TenantId = types.StringValue(p.TenantId)
+	// TODO - fieldToModel
 	return nil
 }
 

@@ -42,6 +42,7 @@ func (r *appearanceProfileResource) toProto(m *appearanceProfileModel) (*v1alpha
 	if err != nil {
 		return nil, err
 	}
+
 	return &v1alpha11.AppearanceProfile{
 		Content:              converted_content,
 		Id:                   m.Id.ValueString(),

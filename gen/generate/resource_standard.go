@@ -179,47 +179,76 @@ func (s *standardResourceHandler) toName(f *j.File, m *protogen.Message, structN
 		),
 	)
 }
+func (s *standardResourceHandler) convertFieldForProto(f *protogen.Field, structName string, l zerolog.Logger) j.Code {
+	return j.Id("")
+}
+
+// populate dictionary and return conversion code
+func (s *standardResourceHandler) fieldToProto(f *protogen.Field, d *j.Dict, l zerolog.Logger) *j.Statement {
+	var res *j.Statement
+
+	res = nil
+
+	l.Debug().Msgf("Field To Proto: %s", f.GoIdent.GoName)
+
+	errCheck := j.If(j.Id("err").Op("!=").Nil().Block(j.Return(j.Nil(), j.Id("err")))).Line()
+
+	if f.Desc.IsMap() {
+		panic("fieldToProto: unhandled map")
+	} else if f.Desc.IsList() {
+		panic("fieldToProto: unhandled list")
+	} else {
+		valueFunc, ok := valueTypeMap[f.Desc.Kind()]
+		//standard field
+		if ok {
+			(*d)[j.Id(f.GoName)] = j.Id("m").Dot(f.GoName).Dot(valueFunc).Call()
+		} else {
+			//types requiring conversion
+			switch f.Desc.Kind() {
+			case protoreflect.MessageKind:
+				//objects
+				switch f.Desc.Message().FullName().Name() {
+				case "Any":
+					res = j.List(
+						j.Id(ConversionName(strings.ToLower(f.GoName))),
+						j.Id("err")).Op(":=").Qual(Util, "JsonToProtoAny").Call(j.Id("m").
+						Dot(f.GoName)).Line().Add(errCheck)
+				case "Struct":
+					res = j.List(
+						j.Id(ConversionName(strings.ToLower(f.GoName))),
+						j.Id("err")).Op(":=").Qual(Util, "JsonToProtoStruct").Call(j.Id("m").
+						Dot(f.GoName)).Line().Add(errCheck)
+				default:
+					res = j.List(
+						j.Id(ConversionName(strings.ToLower(f.GoName))),
+						j.Id("err")).Op(":=").Qual(Util, "JsonToProtoConcrete").
+						Types(j.Qual(TypesCore, ConfigurationObjectName(string(f.Message.Desc.FullName().Name())))).
+						Call(j.Id("m").Dot(f.GoName)).Line().Add(errCheck)
+				}
+			case protoreflect.EnumKind:
+				res = j.Id(ConversionName(string(f.Desc.FullName().Name()))).Op(":=").
+					Qual(TypesCore, ConfigurationObjectName(string(f.Desc.Enum().FullName().Name()))).Call(j.Id("m").
+					Dot(f.GoName).Dot("ValueInt64").Call()).Line()
+			default:
+				panic("fieldToProto: unsupported field type")
+			}
+			(*d)[j.Id(f.GoName)] = j.Id(ConversionName(strings.ToLower(f.GoName)))
+		}
+	}
+	return res
+}
 
 // TODO - handle objects
 func (s *standardResourceHandler) toProto(f *j.File, m *protogen.Message, structName string, l zerolog.Logger) {
 	name := m.GoIdent.GoName
-	//type field fi.Desc.FullName()
-
-	errCheck := j.If(j.Id("err").Op("!=").Nil().Block(j.Return(j.Nil(), j.Id("err"))))
-
 	var conversions []j.Code
+
 	dict := j.DictFunc(func(d j.Dict) {
 		for _, fi := range m.Fields {
-			valueFunc, ok := valueTypeMap[fi.Desc.Kind()]
-			if ok {
-				d[j.Id(fi.GoName)] = j.Id("m").Dot(fi.GoName).Dot(valueFunc).Call()
-			} else {
-				switch fi.Desc.Kind() {
-				case protoreflect.MessageKind:
-					//objects
-					switch fi.Desc.Message().FullName().Name() {
-					case "Any":
-						code := j.List(
-							j.Id(ConversionName(strings.ToLower(fi.GoName))),
-							j.Id("err")).Op(":=").Qual(Util, "JsonToProtoAny").Call(j.Id("m").Dot(fi.GoName)).Line().Add(errCheck)
-						conversions = append(conversions, code)
-					case "Struct":
-						code := j.List(
-							j.Id(ConversionName(strings.ToLower(fi.GoName))),
-							j.Id("err")).Op(":=").Qual(Util, "JsonToProtoStruct").Call(j.Id("m").Dot(fi.GoName)).Line().Add(errCheck)
-						conversions = append(conversions, code)
-					default:
-						code := j.List(
-							j.Id(ConversionName(strings.ToLower(fi.GoName))),
-							j.Id("err")).Op(":=").Qual(Util, "JsonToProtoConcrete").Types(j.Qual(TypesCore, ConfigurationObjectName(string(fi.Message.Desc.FullName().Name())))).Call(j.Id("m").Dot(fi.GoName)).Line().Add(errCheck)
-						conversions = append(conversions, code)
-					}
-				case protoreflect.EnumKind:
-					code := j.Id(ConversionName(string(fi.Desc.FullName().Name()))).Op(":=").
-						Qual(TypesCore, ConfigurationObjectName(string(fi.Desc.Enum().FullName().Name()))).Call(j.Id("m").Dot(fi.GoName).Dot("ValueInt64").Call()).Line()
-					conversions = append(conversions, code)
-				}
-				d[j.Id(fi.GoName)] = j.Id(ConversionName(strings.ToLower(fi.GoName)))
+			c := s.fieldToProto(fi, &d, l)
+			//add conversion code
+			if c != nil {
+				conversions = append(conversions, c)
 			}
 		}
 	})
@@ -227,16 +256,53 @@ func (s *standardResourceHandler) toProto(f *j.File, m *protogen.Message, struct
 	f.Func().Params(j.Id("r").Op("*").Id(structName)).Id("toProto").Params(
 		j.Id("m").Op("*").Qual("", s.modelName(m)),
 	).Parens(j.List(j.Op("*").Qual(TypesCore, name), j.Id("error"))).Block(
-		append(conversions, j.Return(
+		j.Add(conversions...).Line().Return(
 			j.Op("&").Qual(TypesCore, name).Values(
 				dict,
 			),
 			j.Nil(),
-		))...,
+		),
 	).Line()
 }
+func (s *standardResourceHandler) fieldToModel(f *protogen.Field, l zerolog.Logger) j.Code {
 
-// TODO - handle objects
+	errCheck := j.If(j.Id("err").Op("!=").Nil().Block(j.Return(j.Id("err")))).Line()
+	if f.Desc.IsMap() {
+		panic("fieldToModel: unhandled map")
+	} else if f.Desc.IsList() {
+		panic("fieldToModel: unhandled list")
+	} else {
+		valueFunc, ok := valueMap[f.Desc.Kind()]
+		if ok {
+			//standard type
+			return j.Id("m").Dot(f.GoName).Op("=").Qual(Types, valueFunc).Call(j.Id("p").Dot(f.GoName))
+		} else {
+			//requires conversion
+			switch f.Desc.Kind() {
+			case protoreflect.MessageKind:
+				//handle object conversions
+				switch f.Desc.Message().FullName().Name() {
+				case "Any":
+					return j.List(
+						j.Id(ConversionName(strings.ToLower(f.GoName))),
+						j.Id("err")).Op(":=").Qual(Util, "ProtoAnyToJson").Call(j.Id("p").Dot(f.GoName)).Line().Add(errCheck).
+						Id("m").Dot(f.GoName).Op("=").Op("*").Id(ConversionName(strings.ToLower(f.GoName)))
+				case "Struct":
+					return j.List(
+						j.Id(ConversionName(strings.ToLower(f.GoName))),
+						j.Id("err")).Op(":=").Qual(Util, "ProtoStructToJson").Call(j.Id("p").Dot(f.GoName)).Line().Add(errCheck).
+						Id("m").Dot(f.GoName).Op("=").Op("*").Id(ConversionName(strings.ToLower(f.GoName)))
+				}
+			case protoreflect.EnumKind:
+				return j.Id("m").Dot(f.GoName).Op("=").Qual(Types, valueMap[protoreflect.Int64Kind]).Call(j.Id("int64").Call(j.Id("p").Dot(f.GoName)))
+			default:
+				panic(fmt.Sprintf("fieldToModel: unsupported type %v", f.Desc.Kind()))
+			}
+		}
+	}
+	return j.Comment("//TODO - fieldToModel")
+}
+
 func (s *standardResourceHandler) toModel(f *j.File, m *protogen.Message, structName string, l zerolog.Logger) {
 	name := m.GoIdent.GoName
 
@@ -244,38 +310,9 @@ func (s *standardResourceHandler) toModel(f *j.File, m *protogen.Message, struct
 		j.Id("p").Op("*").Qual(TypesCore, name),
 		j.Id("m").Op("*").Id(s.modelName(m)),
 	).Id("error").BlockFunc(func(group *j.Group) {
-		errCheck := j.If(j.Id("err").Op("!=").Nil().Block(j.Return(j.Id("err"))))
 		for _, fi := range m.Fields {
-			path := Types
-			typesFunc := ""
-
-			switch fi.Desc.Kind() {
-			case protoreflect.StringKind:
-				typesFunc = "StringValue"
-			case protoreflect.BoolKind:
-				typesFunc = "BoolValue"
-			case protoreflect.MessageKind:
-				//handle object conversions
-				switch fi.Desc.Message().FullName().Name() {
-				case "Any":
-					group.List(
-						j.Id(ConversionName(strings.ToLower(fi.GoName))),
-						j.Id("err")).Op(":=").Qual(Util, "ProtoAnyToJson").Call(j.Id("p").Dot(fi.GoName)).Line().Add(errCheck)
-					group.Id("m").Dot(fi.GoName).Op("=").Op("*").Id(ConversionName(strings.ToLower(fi.GoName)))
-				case "Struct":
-					group.List(
-						j.Id(ConversionName(strings.ToLower(fi.GoName))),
-						j.Id("err")).Op(":=").Qual(Util, "ProtoStructToJson").Call(j.Id("p").Dot(fi.GoName)).Line().Add(errCheck)
-					group.Id("m").Dot(fi.GoName).Op("=").Op("*").Id(ConversionName(strings.ToLower(fi.GoName)))
-				}
-			default:
-				//TODO - fail here
-				typesFunc = ""
-			}
-
-			if typesFunc != "" {
-				group.Id("m").Dot(fi.GoName).Op("=").Qual(path, typesFunc).Call(j.Id("p").Dot(fi.GoName))
-			}
+			v := s.fieldToModel(fi, l)
+			group.Add(v)
 		}
 		group.Return(j.Nil())
 	}).Line()
