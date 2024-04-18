@@ -9,6 +9,7 @@ stdenv.mkDerivation {
     terraform
     go_1_21
     protoc-gen-go
+    terraform-plugin-docs
     buf
   ];
 
