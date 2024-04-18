@@ -80,6 +80,14 @@ func (p *AuthwiseProvider) Resources(ctx context.Context) []func() resource.Reso
 		NewAudience,
 		NewAsset,
 		NewAppearanceProfile,
+		NewProvider,
+		NewRole,
+		NewScope,
+		NewPermission,
+		NewSecret,
+		NewTenant,
+		NewTenantUrl,
+		NewTheme,
 	}
 }
 
