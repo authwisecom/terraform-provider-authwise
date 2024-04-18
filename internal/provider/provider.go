@@ -94,6 +94,22 @@ func (p *AuthwiseProvider) Resources(ctx context.Context) []func() resource.Reso
 func (p *AuthwiseProvider) DataSources(ctx context.Context) []func() datasource.DataSource {
 	return []func() datasource.DataSource{
 		NewInteractiveClientConfig,
+		NewClientDataSource,
+		NewRealmDataSource,
+		NewAudienceDataSource,
+		NewAssetDataSource,
+		NewAppearanceProfileDataSource,
+		NewProviderDataSource,
+		NewRoleDataSource,
+		NewScopeDataSource,
+		NewPermissionDataSource,
+		NewSecretDataSource,
+		NewTenantDataSource,
+		NewTenantUrlConfig,
+		NewTenantUrlDataSource,
+		NewThemeDataSource,
+		NewAudienceConfig,
+		NewTenantConfig,
 	}
 }
 
