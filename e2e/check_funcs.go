@@ -10,7 +10,6 @@ import (
 	"testing"
 )
 
-// TODO -remove nil from response? API adds nil fields
 func testAccJSONConfig(t *testing.T, resourceName string, key string, expected string) resource.TestCheckFunc {
 	return func(s *terraform.State) error {
 		rs, ok := s.RootModule().Resources[resourceName]

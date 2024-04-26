@@ -1,31 +1,66 @@
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
 package e2e
 
 import (
-	"terraform-provider-authwise/internal/provider"
+	"fmt"
 	"testing"
 
-	"github.com/hashicorp/terraform-plugin-framework/providerserver"
-	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
+	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 )
 
-const (
-	providerConfig = `
-provider "authwise" {
-  endpoint = "test"
+func TestSimpleProvider(t *testing.T) {
+	params := newTestSimpleProviderParams()
+	providerName := "authwise_provider.default"
+	expectedConfig := `{}`
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { testAccPreCheck(t) },
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			// Create and Read testing
+			{
+				Config: providerConfig + testAccProviderResource(params),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr(providerName, "name", params.providerName),
+					resource.TestCheckResourceAttr(providerName, "provider_type", "client_credentials"),
+					testAccJSONConfig(t, providerName, "config", expectedConfig),
+				),
+			},
+		},
+	})
 }
-`
-)
 
-// testAccProtoV6ProviderFactories are used to instantiate a provider during
-// acceptance testing. The factory function will be invoked for every Terraform
-// CLI command executed to create a provider server to which the CLI can
-// reattach.
-var testAccProtoV6ProviderFactories = map[string]func() (tfprotov6.ProviderServer, error){
-	"authwise": providerserver.NewProtocol6WithError(provider.New("test")()),
+type testSimpleProviderParams struct {
+	providerName string
+	realmName    string
 }
 
-func testAccPreCheck(t *testing.T) {
-	// You can add code here to run prior to any test case execution, for example assertions
-	// about the appropriate environment variables being set are common to see in a pre-check
-	// function.
+func newTestSimpleProviderParams() *testSimpleProviderParams {
+	return &testSimpleProviderParams{
+		providerName: randomString(8),
+		realmName:    randomString(8),
+	}
+}
+
+// TODO - computed user database type???
+// TODO - backend not saving description field of realm
+func testAccProviderResource(params *testSimpleProviderParams) string {
+	return fmt.Sprintf(`
+
+resource "authwise_realm" "default" {
+  name = %[1]q
+  description = "test realm"
+  user_database_type = "mysql"
+}
+
+resource "authwise_provider" "default" {
+  name = %[2]q
+  provider_type = "client_credentials"
+  realm_id = authwise_realm.default.id
+  config = <<EOF
+{}
+EOF
+}
+`, params.realmName, params.providerName)
 }
