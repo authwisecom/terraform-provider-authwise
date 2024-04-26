@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/hashicorp/terraform-plugin-framework-jsontypes/jsontypes"
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
@@ -120,6 +121,33 @@ func ListToSlice[T any](l types.List) ([]T, error) {
 	return res, nil
 }
 
+/*
+	protoreflect.StringKind: "StringType",
+	protoreflect.BytesKind:  "StringType",
+	protoreflect.Int32Kind:  "Int64Type",
+	protoreflect.Int64Kind:  "Int64Type",
+	protoreflect.EnumKind:   "Int64Type",
+	protoreflect.FloatKind:  "Float64Type",
+	protoreflect.DoubleKind: "Float64Type",
+	protoreflect.BoolKind:   "BoolType",
+*/
+
+// converts tf list type to underlying primitive slice
+// removes nil values
+func tfListToPrimitiveSlice[T any](ctx context.Context, v attr.Value) ([]T, error) {
+	list := v.(types.List)
+	if list.Elements() == nil {
+		return nil, nil
+	}
+
+	elements := make([]T, 0, len(list.Elements()))
+	diag := list.ElementsAs(ctx, &elements, true)
+	if diag.HasError() {
+		return elements, errors.New("can not convert types.list to underlying type slice")
+	}
+	return elements, nil
+}
+
 // TODO - add cases for each list type
 func ObjectToMap(obj types.Object) (map[string]any, error) {
 	ctx := context.Background()
@@ -132,36 +160,52 @@ func ObjectToMap(obj types.Object) (map[string]any, error) {
 			res[k] = v.(types.String).ValueString()
 		case types.Int64Type:
 			res[k] = v.(types.Int64).ValueInt64()
+		case types.Float64Type:
+			res[k] = v.(types.Float64).ValueFloat64()
 		case types.BoolType:
 			res[k] = v.(types.Bool).ValueBool()
 		case types.ListType{
 			ElemType: types.StringType,
 		}:
-			elements := make([]string, 0, len(v.(types.List).Elements()))
-			diag := v.(types.List).ElementsAs(ctx, &elements, false)
-			if diag.HasError() {
-				return res, errors.New("can not convert types.list(types.string) to []string")
+			elements, err := tfListToPrimitiveSlice[string](ctx, v)
+			if err != nil {
+				return res, err
 			}
-			res[k] = elements
+			if elements != nil {
+				res[k] = elements
+			}
 		case types.ListType{
 			ElemType: types.Int64Type,
 		}:
-			elements := make([]int, 0, len(v.(types.List).Elements()))
-			diag := v.(types.List).ElementsAs(ctx, &elements, false)
-			if diag.HasError() {
-				return res, errors.New("can not convert types.list(types.int64) to []int64")
+			elements, err := tfListToPrimitiveSlice[int](ctx, v)
+			if err != nil {
+				return res, err
 			}
-			res[k] = elements
+			if elements != nil {
+				res[k] = elements
+			}
 		case types.ListType{
 			ElemType: types.BoolType,
 		}:
-			elements := make([]bool, 0, len(v.(types.List).Elements()))
-			diag := v.(types.List).ElementsAs(ctx, &elements, false)
-			if diag.HasError() {
-				return res, errors.New("can not convert types.list(types.bool) to []bool")
+			elements, err := tfListToPrimitiveSlice[bool](ctx, v)
+			if err != nil {
+				return res, err
 			}
-			res[k] = elements
+			if elements != nil {
+				res[k] = elements
+			}
+		case types.ListType{
+			ElemType: types.Float64Type,
+		}:
+			elements, err := tfListToPrimitiveSlice[float64](ctx, v)
+			if err != nil {
+				return res, err
+			}
+			if elements != nil {
+				res[k] = elements
+			}
 		default:
+			//TODO - maps
 			//handle objects
 			ret, err := ObjectToMap(v.(types.Object))
 			if err != nil {
