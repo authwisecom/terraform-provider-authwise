@@ -71,15 +71,15 @@ func GenSchemaProvider(ctx context.Context) schema.Schema {
 		},
 		"name": schema.StringAttribute{
 			Description: "",
-			Optional:    true,
+			Required:    true,
 		},
 		"provider_type": schema.StringAttribute{
 			Description: "",
-			Optional:    true,
+			Required:    true,
 		},
 		"realm_id": schema.StringAttribute{
 			Description: "",
-			Optional:    true,
+			Required:    true,
 		},
 	}}
 }
@@ -87,10 +87,6 @@ func GenSchemaProvider(ctx context.Context) schema.Schema {
 // GenSchemaRealm returns tfsdk.Schema definition for Realm
 func GenSchemaRealm(ctx context.Context) schema.Schema {
 	return schema.Schema{Attributes: map[string]schema.Attribute{
-		"description": schema.StringAttribute{
-			Description: "",
-			Optional:    true,
-		},
 		"id": schema.StringAttribute{
 			Computed:    true,
 			Description: "",
@@ -98,7 +94,7 @@ func GenSchemaRealm(ctx context.Context) schema.Schema {
 		},
 		"name": schema.StringAttribute{
 			Description: "",
-			Optional:    true,
+			Required:    true,
 		},
 		"tenant_id": schema.StringAttribute{
 			Computed:    true,
@@ -106,6 +102,8 @@ func GenSchemaRealm(ctx context.Context) schema.Schema {
 			Optional:    true,
 		},
 		"user_database_type": schema.StringAttribute{
+			Computed:    true,
+			Default:     stringdefault.StaticString(""),
 			Description: "",
 			Optional:    true,
 		},

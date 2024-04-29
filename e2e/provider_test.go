@@ -44,13 +44,11 @@ func newTestSimpleProviderParams() *testSimpleProviderParams {
 }
 
 // TODO - computed user database type???
-// TODO - backend not saving description field of realm
 func testAccProviderResource(params *testSimpleProviderParams) string {
 	return fmt.Sprintf(`
 
 resource "authwise_realm" "default" {
   name = %[1]q
-  description = "test realm"
   user_database_type = "mysql"
 }
 

@@ -24,7 +24,6 @@ type realmModel struct {
 	TenantId         types.String `tfsdk:"tenant_id"`
 	UserDatabaseType types.String `tfsdk:"user_database_type"`
 	Name             types.String `tfsdk:"name"`
-	Description      types.String `tfsdk:"description"`
 }
 
 func (r *realmResource) toName(data realmModel) string {
@@ -33,7 +32,6 @@ func (r *realmResource) toName(data realmModel) string {
 func (r *realmResource) toProto(m *realmModel) (*v1alpha11.Realm, error) {
 
 	return &v1alpha11.Realm{
-		Description:      m.Description.ValueString(),
 		Id:               m.Id.ValueString(),
 		Name:             m.Name.ValueString(),
 		TenantId:         m.TenantId.ValueString(),
@@ -46,7 +44,6 @@ func (r *realmResource) toModel(p *v1alpha11.Realm, m *realmModel) error {
 	m.TenantId = types.StringValue(p.TenantId)
 	m.UserDatabaseType = types.StringValue(p.UserDatabaseType)
 	m.Name = types.StringValue(p.Name)
-	m.Description = types.StringValue(p.Description)
 	return nil
 }
 

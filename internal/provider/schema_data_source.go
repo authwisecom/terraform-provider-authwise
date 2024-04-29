@@ -596,10 +596,6 @@ func GenSchemaProviderDataSource(ctx context.Context) schema.Schema {
 // GenSchemaRealmDataSource returns tfsdk.Schema definition for Realm
 func GenSchemaRealmDataSource(ctx context.Context) schema.Schema {
 	return schema.Schema{Attributes: map[string]schema.Attribute{
-		"description": schema.StringAttribute{
-			Description: "",
-			Optional:    true,
-		},
 		"id": schema.StringAttribute{
 			Description: "",
 			Optional:    true,

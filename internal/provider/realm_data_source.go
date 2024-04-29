@@ -28,7 +28,6 @@ func (r *realmDataSource) toModel(p *v1alpha11.Realm, m *realmDataSourceModel) {
 	m.TenantId = types.StringValue(p.TenantId)
 	m.UserDatabaseType = types.StringValue(p.UserDatabaseType)
 	m.Name = types.StringValue(p.Name)
-	m.Description = types.StringValue(p.Description)
 }
 
 type realmDataSourceModel struct {
@@ -36,7 +35,6 @@ type realmDataSourceModel struct {
 	TenantId         types.String `tfsdk:"tenant_id"`
 	UserDatabaseType types.String `tfsdk:"user_database_type"`
 	Name             types.String `tfsdk:"name"`
-	Description      types.String `tfsdk:"description"`
 }
 
 func (r *realmDataSource) Configure(ctx context.Context, request datasource.ConfigureRequest, response *datasource.ConfigureResponse) {
