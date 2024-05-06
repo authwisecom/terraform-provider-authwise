@@ -13,7 +13,9 @@ import (
 func TestSimpleProvider(t *testing.T) {
 	params := newTestSimpleProviderParams()
 	providerName := "authwise_provider.default"
-	expectedConfig := `{}`
+	expectedConfig := `{
+	"test": "new"
+}`
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
 		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
@@ -57,7 +59,9 @@ resource "authwise_provider" "default" {
   provider_type = "client_credentials"
   realm_id = authwise_realm.default.id
   config = <<EOF
-{}
+{
+	"test":"new"
+}
 EOF
 }
 `, params.realmName, params.providerName)
