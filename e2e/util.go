@@ -16,11 +16,21 @@ func randomString(length int) string {
 	return string(b)
 }
 
-func resourceBuilder(resource string, name string, values map[string]string, config map[string]string) (string, error) {
+func resourceBuilder(resource string, name string, values map[string]string, identifiers map[string]string, config map[string]string) (string, error) {
 	sb := strings.Builder{}
 	_, err := sb.WriteString("resource \"" + resource + "\" \"" + name + "\" {\n")
 	if err != nil {
 		return "", err
+	}
+
+	for k, v := range identifiers {
+		if v == "" {
+			continue
+		}
+		_, err = sb.WriteString(k + " = " + v + "\n")
+		if err != nil {
+			return "", err
+		}
 	}
 
 	for k, v := range values {

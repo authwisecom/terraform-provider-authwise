@@ -32,15 +32,17 @@ func (r *TestSimpleClientFunc) check(t *testing.T) resource.TestCheckFunc {
 
 func (r *TestSimpleClientFunc) resource() string {
 	valueMap := map[string]string{
-		"name":        r.name,
-		"grant_type":  r.grantType,
+		"name":       r.name,
+		"grant_type": r.grantType,
+	}
+	identifierMap := map[string]string{
 		"audience_id": r.audienceIdentifier,
 	}
 	configMap := map[string]string{
 		"config": r.config,
 	}
 
-	val, err := resourceBuilder("authwise_client", "default", valueMap, configMap)
+	val, err := resourceBuilder("authwise_client", "default", valueMap, identifierMap, configMap)
 	if err != nil {
 		panic("error building resource")
 	}
@@ -70,7 +72,7 @@ func (r *TestSimpleRealmFunc) resource() string {
 		"user_database_type": r.userDatabaseType,
 	}
 
-	val, err := resourceBuilder("authwise_realm", "default", valueMap, nil)
+	val, err := resourceBuilder("authwise_realm", "default", valueMap, nil, nil)
 	if err != nil {
 		panic("error building resource")
 	}
@@ -100,14 +102,16 @@ func (r *TestSimpleProviderFunc) check(t *testing.T) resource.TestCheckFunc {
 func (r *TestSimpleProviderFunc) resource() string {
 	valueMap := map[string]string{
 		"name":          r.name,
-		"realm_id":      r.realmIdentifier,
 		"provider_type": r.providerType,
+	}
+	identifierMap := map[string]string{
+		"realm_id": r.realmIdentifier,
 	}
 	configMap := map[string]string{
 		"config": r.config,
 	}
 
-	val, err := resourceBuilder("authwise_provider", "default", valueMap, configMap)
+	val, err := resourceBuilder("authwise_provider", "default", valueMap, identifierMap, configMap)
 	if err != nil {
 		panic("error building resource")
 	}
@@ -137,7 +141,7 @@ func (r *TestSimpleAssetFunc) resource() string {
 		"mime_type": r.mimeType,
 	}
 
-	val, err := resourceBuilder("authwise_asset", "default", valueMap, nil)
+	val, err := resourceBuilder("authwise_asset", "default", valueMap, nil, nil)
 	if err != nil {
 		panic("error building resource")
 	}
@@ -166,15 +170,17 @@ func (r *TestSimpleAudienceFunc) check(t *testing.T) resource.TestCheckFunc {
 
 func (r *TestSimpleAudienceFunc) resource() string {
 	valueMap := map[string]string{
-		"name":                  r.name,
-		"description":           r.description,
+		"name":        r.name,
+		"description": r.description,
+	}
+	identifierMap := map[string]string{
 		"appearance_profile_id": r.appearanceProfileIdentifier,
 	}
 	configMap := map[string]string{
 		"config": r.config,
 	}
 
-	val, err := resourceBuilder("authwise_audience", "default", valueMap, configMap)
+	val, err := resourceBuilder("authwise_audience", "default", valueMap, identifierMap, configMap)
 	if err != nil {
 		panic("error building resource")
 	}
@@ -199,11 +205,13 @@ func (r *TestSimplePermissionFunc) check(t *testing.T) resource.TestCheckFunc {
 
 func (r *TestSimplePermissionFunc) resource() string {
 	valueMap := map[string]string{
-		"name":        r.name,
+		"name": r.name,
+	}
+	identifierMap := map[string]string{
 		"audience_id": r.audienceIdentifier,
 	}
 
-	val, err := resourceBuilder("authwise_permission", "default", valueMap, nil)
+	val, err := resourceBuilder("authwise_permission", "default", valueMap, identifierMap, nil)
 	if err != nil {
 		panic("error building resource")
 	}
@@ -230,12 +238,14 @@ func (r *TestSimpleRoleFunc) check(t *testing.T) resource.TestCheckFunc {
 
 func (r *TestSimpleRoleFunc) resource() string {
 	valueMap := map[string]string{
-		"name":        r.name,
-		"auto":        r.auto,
+		"name": r.name,
+		"auto": r.auto,
+	}
+	identifierMap := map[string]string{
 		"audience_id": r.audienceIdentifier,
 	}
 
-	val, err := resourceBuilder("authwise_role", "default", valueMap, nil)
+	val, err := resourceBuilder("authwise_role", "default", valueMap, identifierMap, nil)
 	if err != nil {
 		panic("error building resource")
 	}
@@ -264,13 +274,15 @@ func (r *TestSimpleScopeFunc) check(t *testing.T) resource.TestCheckFunc {
 
 func (r *TestSimpleScopeFunc) resource() string {
 	valueMap := map[string]string{
-		"id":          r.id,
-		"kind":        r.kind,
-		"auto":        r.auto,
+		"id":   r.id,
+		"kind": r.kind,
+		"auto": r.auto,
+	}
+	identifierMap := map[string]string{
 		"audience_id": r.audienceIdentifier,
 	}
 
-	val, err := resourceBuilder("authwise_scope", "default", valueMap, nil)
+	val, err := resourceBuilder("authwise_scope", "default", valueMap, identifierMap, nil)
 	if err != nil {
 		panic("error building resource")
 	}
@@ -303,7 +315,7 @@ func (r *TestSimpleSecretFunc) resource() string {
 		"value":    r.value,
 	}
 
-	val, err := resourceBuilder("authwise_secret", "default", valueMap, nil)
+	val, err := resourceBuilder("authwise_secret", "default", valueMap, nil, nil)
 	if err != nil {
 		panic("error building resource")
 	}
@@ -333,11 +345,14 @@ func (r *TestSimpleTenantFunc) resource() string {
 		"name":                  r.name,
 		"appearance_profile_id": r.appearanceProfileIdentifier,
 	}
+	identifierMap := map[string]string{
+		"appearance_profile_id": r.appearanceProfileIdentifier,
+	}
 	configMap := map[string]string{
 		"config": r.config,
 	}
 
-	val, err := resourceBuilder("authwise_tenant", "default", valueMap, configMap)
+	val, err := resourceBuilder("authwise_tenant", "default", valueMap, identifierMap, configMap)
 	if err != nil {
 		panic("error building resource")
 	}
@@ -376,7 +391,7 @@ func (r *TestSimpleThemeFunc) resource() string {
 		"content":               r.content,
 	}
 
-	val, err := resourceBuilder("authwise_theme", "default", valueMap, configMap)
+	val, err := resourceBuilder("authwise_theme", "default", valueMap, nil, configMap)
 	if err != nil {
 		panic("error building resource")
 	}
@@ -405,7 +420,9 @@ func (r *TestSimpleAppearanceProfileFunc) check(t *testing.T) resource.TestCheck
 
 func (r *TestSimpleAppearanceProfileFunc) resource() string {
 	valueMap := map[string]string{
-		"name":     r.name,
+		"name": r.name,
+	}
+	identifierMap := map[string]string{
 		"theme_id": r.themeIdentifier,
 	}
 	configMap := map[string]string{
@@ -413,7 +430,7 @@ func (r *TestSimpleAppearanceProfileFunc) resource() string {
 		"content":               r.content,
 	}
 
-	val, err := resourceBuilder("authwise_appearance_profile", "default", valueMap, configMap)
+	val, err := resourceBuilder("authwise_appearance_profile", "default", valueMap, identifierMap, configMap)
 	if err != nil {
 		panic("error building resource")
 	}

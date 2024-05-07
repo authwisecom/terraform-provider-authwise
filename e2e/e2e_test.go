@@ -53,7 +53,6 @@ func NewSimpleE2ETestFuncs() map[string]TestFunc {
 		description:                 randomString(24),
 		config:                      "",
 	}
-
 	client := &TestSimpleClientFunc{
 		audienceIdentifier: audience.resourceName() + ".id",
 		name:               randomString(8),
