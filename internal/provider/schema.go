@@ -49,6 +49,7 @@ func GenSchemaTenantUrl(ctx context.Context) schema.Schema {
 			Optional:    true,
 		},
 		"tenant_id": schema.StringAttribute{
+			Computed:    true,
 			Description: "",
 			Optional:    true,
 		},
@@ -60,7 +61,9 @@ func GenSchemaProvider(ctx context.Context) schema.Schema {
 	return schema.Schema{Attributes: map[string]schema.Attribute{
 		"config": // JSON
 		schema.StringAttribute{
+			Computed:    true,
 			CustomType:  jsontypes.NormalizedType{},
+			Default:     stringdefault.StaticString("{}"),
 			Description: "",
 			Optional:    true,
 		},
@@ -165,14 +168,14 @@ func GenSchemaClient(ctx context.Context) schema.Schema {
 			Optional:    true,
 		},
 		"audience_id": schema.StringAttribute{
-			Computed:    true,
-			Default:     stringdefault.StaticString(""),
 			Description: "",
-			Optional:    true,
+			Required:    true,
 		},
 		"config": // JSON
 		schema.StringAttribute{
+			Computed:    true,
 			CustomType:  jsontypes.NormalizedType{},
+			Default:     stringdefault.StaticString("{}"),
 			Description: "",
 			Optional:    true,
 		},
@@ -217,7 +220,7 @@ func GenSchemaRole(ctx context.Context) schema.Schema {
 	return schema.Schema{Attributes: map[string]schema.Attribute{
 		"audience_id": schema.StringAttribute{
 			Description: "",
-			Optional:    true,
+			Required:    true,
 		},
 		"auto": schema.BoolAttribute{
 			Description: "",
@@ -230,7 +233,7 @@ func GenSchemaRole(ctx context.Context) schema.Schema {
 		},
 		"name": schema.StringAttribute{
 			Description: "",
-			Optional:    true,
+			Required:    true,
 		},
 	}}
 }
@@ -240,7 +243,7 @@ func GenSchemaPermission(ctx context.Context) schema.Schema {
 	return schema.Schema{Attributes: map[string]schema.Attribute{
 		"audience_id": schema.StringAttribute{
 			Description: "",
-			Optional:    true,
+			Required:    true,
 		},
 		"id": schema.StringAttribute{
 			Computed:    true,
@@ -249,7 +252,7 @@ func GenSchemaPermission(ctx context.Context) schema.Schema {
 		},
 		"name": schema.StringAttribute{
 			Description: "",
-			Optional:    true,
+			Required:    true,
 		},
 	}}
 }
@@ -259,7 +262,7 @@ func GenSchemaScope(ctx context.Context) schema.Schema {
 	return schema.Schema{Attributes: map[string]schema.Attribute{
 		"audience_id": schema.StringAttribute{
 			Description: "",
-			Optional:    true,
+			Required:    true,
 		},
 		"auto": schema.BoolAttribute{
 			Description: "",
@@ -282,7 +285,9 @@ func GenSchemaAppearanceProfile(ctx context.Context) schema.Schema {
 	return schema.Schema{Attributes: map[string]schema.Attribute{
 		"content": // JSON
 		schema.StringAttribute{
+			Computed:    true,
 			CustomType:  jsontypes.NormalizedType{},
+			Default:     stringdefault.StaticString("{}"),
 			Description: "",
 			Optional:    true,
 		},
@@ -293,15 +298,18 @@ func GenSchemaAppearanceProfile(ctx context.Context) schema.Schema {
 		},
 		"name": schema.StringAttribute{
 			Description: "",
-			Optional:    true,
+			Required:    true,
 		},
 		"stylesheet_attributes": // JSON
 		schema.StringAttribute{
+			Computed:    true,
 			CustomType:  jsontypes.NormalizedType{},
+			Default:     stringdefault.StaticString("{}"),
 			Description: "",
 			Optional:    true,
 		},
 		"tenant_id": schema.StringAttribute{
+			Computed:    true,
 			Description: "",
 			Optional:    true,
 		},
@@ -317,7 +325,9 @@ func GenSchemaTheme(ctx context.Context) schema.Schema {
 	return schema.Schema{Attributes: map[string]schema.Attribute{
 		"content": // JSON
 		schema.StringAttribute{
+			Computed:    true,
 			CustomType:  jsontypes.NormalizedType{},
+			Default:     stringdefault.StaticString("{}"),
 			Description: "",
 			Optional:    true,
 		},
@@ -328,7 +338,7 @@ func GenSchemaTheme(ctx context.Context) schema.Schema {
 		},
 		"name": schema.StringAttribute{
 			Description: "",
-			Optional:    true,
+			Required:    true,
 		},
 		"stylesheet": schema.StringAttribute{
 			Description: "",
@@ -336,11 +346,14 @@ func GenSchemaTheme(ctx context.Context) schema.Schema {
 		},
 		"stylesheet_attributes": // JSON
 		schema.StringAttribute{
+			Computed:    true,
 			CustomType:  jsontypes.NormalizedType{},
+			Default:     stringdefault.StaticString("{}"),
 			Description: "",
 			Optional:    true,
 		},
 		"tenant_id": schema.StringAttribute{
+			Computed:    true,
 			Description: "",
 			Optional:    true,
 		},
@@ -361,15 +374,16 @@ func GenSchemaSecret(ctx context.Context) schema.Schema {
 		},
 		"name": schema.StringAttribute{
 			Description: "",
-			Optional:    true,
+			Required:    true,
 		},
 		"tenant_id": schema.StringAttribute{
+			Computed:    true,
 			Description: "",
 			Optional:    true,
 		},
 		"value": schema.StringAttribute{
 			Description: "",
-			Optional:    true,
+			Required:    true,
 		},
 	}}
 }
@@ -384,13 +398,14 @@ func GenSchemaAsset(ctx context.Context) schema.Schema {
 		},
 		"mime_type": schema.StringAttribute{
 			Description: "",
-			Optional:    true,
+			Required:    true,
 		},
 		"name": schema.StringAttribute{
 			Description: "",
-			Optional:    true,
+			Required:    true,
 		},
 		"tenant_id": schema.StringAttribute{
+			Computed:    true,
 			Description: "",
 			Optional:    true,
 		},

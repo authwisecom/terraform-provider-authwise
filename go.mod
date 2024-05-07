@@ -14,7 +14,7 @@ require (
 	github.com/iancoleman/strcase v0.3.0
 	github.com/rs/zerolog v1.32.0
 	github.com/stretchr/testify v1.8.4
-	gitlab.authwise.io/authwise/api-client-go v0.0.0-20240429213949-bd6c4030e016
+	gitlab.authwise.io/authwise/api-client-go v0.0.0-20240507211258-f2faa8dd8bc9
 	google.golang.org/genproto/googleapis/api v0.0.0-20240123012728-ef4313101c80
 	google.golang.org/protobuf v1.33.0
 	gopkg.in/yaml.v3 v3.0.1
