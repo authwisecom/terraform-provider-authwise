@@ -90,8 +90,10 @@ func ConfigurationObjectName(fullName string) string {
 }
 
 type resourceMetadata struct {
-	nameFuncPattern     string //pattern, identifiers
-	nameFuncIdentifiers []string
+	nameFuncPattern       string //pattern, identifiers
+	nameFuncIdentifiers   []string
+	parentFuncPattern     string
+	parentFuncIdentifiers []string
 }
 type schemaMetadata struct {
 	hasResult bool //create a computed result field
@@ -201,8 +203,10 @@ var resourceMetadataMap = resourceMap{
 	},
 	"Permission": &metadata{
 		resourceMetadata: &resourceMetadata{
-			nameFuncPattern:     "audiences/%s/permissions/%s",
-			nameFuncIdentifiers: []string{"AudienceId", "Id"},
+			nameFuncPattern:       "audiences/%s/permissions/%s",
+			nameFuncIdentifiers:   []string{"AudienceId", "Id"},
+			parentFuncPattern:     "audiences/%s",
+			parentFuncIdentifiers: []string{"AudienceId"},
 		},
 		datasourceMetadata: &datasourceMetadata{
 			schemaIdentifiers: []string{"id", "audience_id"},
@@ -210,8 +214,10 @@ var resourceMetadataMap = resourceMap{
 	},
 	"Scope": &metadata{
 		resourceMetadata: &resourceMetadata{
-			nameFuncPattern:     "audiences/%s/scopes/%s",
-			nameFuncIdentifiers: []string{"AudienceId", "Id"},
+			nameFuncPattern:       "audiences/%s/scopes/%s",
+			nameFuncIdentifiers:   []string{"AudienceId", "Id"},
+			parentFuncPattern:     "audiences/%s",
+			parentFuncIdentifiers: []string{"AudienceId"},
 		},
 		datasourceMetadata: &datasourceMetadata{
 			schemaIdentifiers: []string{"id", "audience_id"},
@@ -219,8 +225,10 @@ var resourceMetadataMap = resourceMap{
 	},
 	"Role": &metadata{
 		resourceMetadata: &resourceMetadata{
-			nameFuncPattern:     "audiences/%s/roles/%s",
-			nameFuncIdentifiers: []string{"AudienceId", "Id"},
+			nameFuncPattern:       "audiences/%s/roles/%s",
+			nameFuncIdentifiers:   []string{"AudienceId", "Id"},
+			parentFuncPattern:     "audiences/%s",
+			parentFuncIdentifiers: []string{"AudienceId"},
 		},
 		datasourceMetadata: &datasourceMetadata{
 			schemaIdentifiers: []string{"id", "audience_id"},

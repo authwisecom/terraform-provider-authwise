@@ -58,12 +58,13 @@ func (s *standardResourceHandler) resource(f *j.File, m *protogen.Message, l zer
 
 	s.model(f, m, l)
 	s.toName(f, m, structName, resourceMetadataMap, l)
+	s.toParent(f, m, structName, resourceMetadataMap, l)
 	s.toProto(f, m, structName, l)
 	s.toModel(f, m, structName, l)
 	s.configure(f, m, structName, l)
 	s.metadata(f, m, structName, l)
 	s.schema(f, m, structName, l)
-	s.create(f, m, structName, l)
+	s.create(f, m, structName, resourceMetadataMap, l)
 	s.read(f, m, structName, l)
 	s.update(f, m, structName, l)
 	s.delete(f, m, structName, l)
@@ -172,6 +173,35 @@ func (s *standardResourceHandler) toName(f *j.File, m *protogen.Message, structN
 		j.Return(
 			j.Qual("fmt", "Sprintf").Call(
 				j.Lit(val.nameFuncPattern),
+				j.List(
+					fmtParams...,
+				),
+			),
+		),
+	)
+}
+func (s *standardResourceHandler) toParent(f *j.File, m *protogen.Message, structName string, metadata resourceMap, l zerolog.Logger) {
+
+	val, ok := metadata[m.GoIdent.GoName]
+	if !ok {
+		return
+	}
+
+	if val.resourceMetadata.parentFuncPattern == "" {
+		return
+	}
+
+	var fmtParams []j.Code
+	for _, id := range val.resourceMetadata.parentFuncIdentifiers {
+		fmtParams = append(fmtParams, j.Id("data").Dot(id).Dot("ValueString").Call())
+	}
+
+	f.Func().Params(j.Id("r").Op("*").Id(structName)).Id("toParent").Params(
+		j.Id("data").Id(s.modelName(m)),
+	).String().Block(
+		j.Return(
+			j.Qual("fmt", "Sprintf").Call(
+				j.Lit(val.parentFuncPattern),
 				j.List(
 					fmtParams...,
 				),
@@ -371,8 +401,20 @@ func (s *standardResourceHandler) protoConversion(name string) []j.Code {
 }
 
 // TODO - request objects can have arbitrary fields
-func (s *standardResourceHandler) create(f *j.File, m *protogen.Message, structName string, l zerolog.Logger) {
+func (s *standardResourceHandler) create(f *j.File, m *protogen.Message, structName string, metadata resourceMap, l zerolog.Logger) {
 	name := m.GoIdent.GoName
+
+	val, ok := metadata[name]
+	if !ok {
+		return
+	}
+
+	createRequestDict := j.DictFunc(func(d j.Dict) {
+		d[j.Id(name)] = j.Id("val")
+		if val.parentFuncPattern != "" {
+			d[j.Id("Parent")] = j.Id("r").Dot("toParent").Call(j.Id("data"))
+		}
+	})
 
 	s.requestResponseMethod(f, structName, "Create",
 		s.crudMethodTemplate(m, "create", false, true,
@@ -381,9 +423,8 @@ func (s *standardResourceHandler) create(f *j.File, m *protogen.Message, structN
 				AuthwiseManagementClient,
 				fmt.Sprintf("Create%sRequest", name),
 			).Values(
-				j.Dict{
-					j.Id(name): j.Id("val"),
-				}).Line(),
+				createRequestDict,
+			).Line(),
 			j.List(j.Id("resp"), j.Id("err")).Op(":=").Id("r").Dot("client").Dot(
 				fmt.Sprintf("Create%s", name),
 			).Call(j.Id("ctx"), j.Id("req")).Line(),

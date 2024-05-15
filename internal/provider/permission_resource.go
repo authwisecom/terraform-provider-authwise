@@ -28,6 +28,9 @@ type permissionModel struct {
 func (r *permissionResource) toName(data permissionModel) string {
 	return fmt.Sprintf("audiences/%s/permissions/%s", data.AudienceId.ValueString(), data.Id.ValueString())
 }
+func (r *permissionResource) toParent(data permissionModel) string {
+	return fmt.Sprintf("audiences/%s", data.AudienceId.ValueString())
+}
 func (r *permissionResource) toProto(m *permissionModel) (*v1alpha11.Permission, error) {
 
 	return &v1alpha11.Permission{
@@ -79,7 +82,10 @@ func (r *permissionResource) Create(ctx context.Context, request resource.Create
 		return
 	}
 
-	req := &v1alpha1.CreatePermissionRequest{Permission: val}
+	req := &v1alpha1.CreatePermissionRequest{
+		Parent:     r.toParent(data),
+		Permission: val,
+	}
 	resp, err := r.client.CreatePermission(ctx, req)
 	if err != nil {
 		response.Diagnostics.AddError("Error Creating Permission", err.Error())

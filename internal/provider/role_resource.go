@@ -29,6 +29,9 @@ type roleModel struct {
 func (r *roleResource) toName(data roleModel) string {
 	return fmt.Sprintf("audiences/%s/roles/%s", data.AudienceId.ValueString(), data.Id.ValueString())
 }
+func (r *roleResource) toParent(data roleModel) string {
+	return fmt.Sprintf("audiences/%s", data.AudienceId.ValueString())
+}
 func (r *roleResource) toProto(m *roleModel) (*v1alpha11.Role, error) {
 
 	return &v1alpha11.Role{
@@ -82,7 +85,10 @@ func (r *roleResource) Create(ctx context.Context, request resource.CreateReques
 		return
 	}
 
-	req := &v1alpha1.CreateRoleRequest{Role: val}
+	req := &v1alpha1.CreateRoleRequest{
+		Parent: r.toParent(data),
+		Role:   val,
+	}
 	resp, err := r.client.CreateRole(ctx, req)
 	if err != nil {
 		response.Diagnostics.AddError("Error Creating Role", err.Error())

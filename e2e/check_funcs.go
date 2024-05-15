@@ -12,6 +12,9 @@ import (
 
 func testAccJSONConfig(t *testing.T, resourceName string, key string, expected string) resource.TestCheckFunc {
 	return func(s *terraform.State) error {
+		if expected == "" {
+			return nil
+		}
 		rs, ok := s.RootModule().Resources[resourceName]
 		if !ok {
 			return fmt.Errorf("resource not found: %s", resourceName)

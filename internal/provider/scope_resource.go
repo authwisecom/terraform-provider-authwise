@@ -29,6 +29,9 @@ type scopeModel struct {
 func (r *scopeResource) toName(data scopeModel) string {
 	return fmt.Sprintf("audiences/%s/scopes/%s", data.AudienceId.ValueString(), data.Id.ValueString())
 }
+func (r *scopeResource) toParent(data scopeModel) string {
+	return fmt.Sprintf("audiences/%s", data.AudienceId.ValueString())
+}
 func (r *scopeResource) toProto(m *scopeModel) (*v1alpha11.Scope, error) {
 
 	return &v1alpha11.Scope{
@@ -82,7 +85,10 @@ func (r *scopeResource) Create(ctx context.Context, request resource.CreateReque
 		return
 	}
 
-	req := &v1alpha1.CreateScopeRequest{Scope: val}
+	req := &v1alpha1.CreateScopeRequest{
+		Parent: r.toParent(data),
+		Scope:  val,
+	}
 	resp, err := r.client.CreateScope(ctx, req)
 	if err != nil {
 		response.Diagnostics.AddError("Error Creating Scope", err.Error())

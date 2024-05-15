@@ -231,6 +231,8 @@ gitlab.authwise.io/authwise/api-client-go v0.0.0-20240507210424-01f483b5ffef h1:
 gitlab.authwise.io/authwise/api-client-go v0.0.0-20240507210424-01f483b5ffef/go.mod h1:VvgVjbReijvFyE+17wjBgF8SsP3OT1ZpP0AtXUqvv4A=
 gitlab.authwise.io/authwise/api-client-go v0.0.0-20240507211258-f2faa8dd8bc9 h1:U0WdQmjjGgmoKeQH6jysfn8tpqgsSftB28jzimwgBSA=
 gitlab.authwise.io/authwise/api-client-go v0.0.0-20240507211258-f2faa8dd8bc9/go.mod h1:VvgVjbReijvFyE+17wjBgF8SsP3OT1ZpP0AtXUqvv4A=
+gitlab.authwise.io/authwise/api-client-go v0.0.0-20240508223736-987a969343bf h1:v7O1jbr3+mcl4L+5KDVRa+05N3VeZSz9cWKx+VY7qr8=
+gitlab.authwise.io/authwise/api-client-go v0.0.0-20240508223736-987a969343bf/go.mod h1:VvgVjbReijvFyE+17wjBgF8SsP3OT1ZpP0AtXUqvv4A=
 golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2/go.mod h1:djNgcEr1/C05ACkg1iLfiJU5Ep61QUkGW8qpdssI0+w=
 golang.org/x/crypto v0.0.0-20200414173820-0848c9571904/go.mod h1:LzIPMQfyMNhhGPhUkYOs5KpL4U8rLKemX1yGLhDgUto=
 golang.org/x/crypto v0.0.0-20200820211705-5c72a883971a/go.mod h1:LzIPMQfyMNhhGPhUkYOs5KpL4U8rLKemX1yGLhDgUto=
