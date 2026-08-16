@@ -1,25 +1,75 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
-package provider
+package provider_test
 
 import (
+	"context"
 	"testing"
 
-	"github.com/hashicorp/terraform-plugin-framework/providerserver"
-	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
+	"github.com/hashicorp/terraform-plugin-framework/datasource"
+	fwprovider "github.com/hashicorp/terraform-plugin-framework/provider"
+	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"terraform-provider-authwise/internal/provider"
 )
 
-// testAccProtoV6ProviderFactories are used to instantiate a provider during
-// acceptance testing. The factory function will be invoked for every Terraform
-// CLI command executed to create a provider server to which the CLI can
-// reattach.
-var testAccProtoV6ProviderFactories = map[string]func() (tfprotov6.ProviderServer, error){
-	"scaffolding": providerserver.NewProtocol6WithError(New("test")()),
-}
+// TestProviderSurface validates the provider schema plus every generated
+// resource and data source schema: metadata resolves under the provider
+// type name and each schema passes the framework's implementation
+// validation. Full lifecycle coverage runs against a real kit server in the
+// acceptance suite.
+func TestProviderSurface(t *testing.T) {
 
-func testAccPreCheck(t *testing.T) {
-	// You can add code here to run prior to any test case execution, for example assertions
-	// about the appropriate environment variables being set are common to see in a pre-check
-	// function.
+	ctx := context.Background()
+	p := provider.New("test")()
+
+	schemaResp := &fwprovider.SchemaResponse{}
+	p.Schema(ctx, fwprovider.SchemaRequest{}, schemaResp)
+	require.False(t, schemaResp.Diagnostics.HasError(), schemaResp.Diagnostics)
+	diags := schemaResp.Schema.ValidateImplementation(ctx)
+	require.False(t, diags.HasError(), diags)
+
+	metaResp := &fwprovider.MetadataResponse{}
+	p.Metadata(ctx, fwprovider.MetadataRequest{}, metaResp)
+	require.Equal(t, "authwise", metaResp.TypeName)
+
+	resourceTypes := map[string]bool{}
+	for _, newResource := range p.Resources(ctx) {
+
+		r := newResource()
+
+		m := &resource.MetadataResponse{}
+		r.Metadata(ctx, resource.MetadataRequest{ProviderTypeName: "authwise"}, m)
+		assert.NotEmpty(t, m.TypeName)
+		assert.False(t, resourceTypes[m.TypeName], "duplicate resource type %s", m.TypeName)
+		resourceTypes[m.TypeName] = true
+
+		s := &resource.SchemaResponse{}
+		r.Schema(ctx, resource.SchemaRequest{}, s)
+		require.False(t, s.Diagnostics.HasError(), s.Diagnostics)
+		diags := s.Schema.ValidateImplementation(ctx)
+		require.False(t, diags.HasError(), "%s: %v", m.TypeName, diags)
+	}
+	assert.Len(t, resourceTypes, 15)
+
+	dataSourceTypes := map[string]bool{}
+	for _, newDataSource := range p.DataSources(ctx) {
+
+		d := newDataSource()
+
+		m := &datasource.MetadataResponse{}
+		d.Metadata(ctx, datasource.MetadataRequest{ProviderTypeName: "authwise"}, m)
+		assert.NotEmpty(t, m.TypeName)
+		assert.False(t, dataSourceTypes[m.TypeName], "duplicate data source type %s", m.TypeName)
+		dataSourceTypes[m.TypeName] = true
+
+		s := &datasource.SchemaResponse{}
+		d.Schema(ctx, datasource.SchemaRequest{}, s)
+		require.False(t, s.Diagnostics.HasError(), s.Diagnostics)
+		diags := s.Schema.ValidateImplementation(ctx)
+		require.False(t, diags.HasError(), "%s: %v", m.TypeName, diags)
+	}
+	// 15 singular entity data sources + 10 config builder data sources.
+	assert.Len(t, dataSourceTypes, 25)
+
 }
