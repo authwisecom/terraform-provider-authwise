@@ -10,6 +10,7 @@ import (
 	"sync"
 	"testing"
 
+	identitypb "github.com/authwisecom/api-client-go/authwise/identity/v1alpha1"
 	corepb "github.com/authwisecom/api-client-go/authwise/types/core/v1alpha1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -17,8 +18,6 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/emptypb"
-
-	identitypb "github.com/authwisecom/api-client-go/authwise/identity/v1alpha1"
 )
 
 // fakeIdentityServer is an in-memory AIP server for the acceptance tier:
@@ -199,7 +198,7 @@ func newHarness(t *testing.T) *harness {
 
 	h := &harness{fake: newFakeIdentityServer()}
 
-	lis, err := net.Listen("tcp", "127.0.0.1:0")
+	lis, err := new(net.ListenConfig).Listen(t.Context(), "tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
 	}

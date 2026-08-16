@@ -13,12 +13,11 @@ import (
 	"regexp"
 	"testing"
 
+	corepb "github.com/authwisecom/api-client-go/authwise/types/core/v1alpha1"
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
-
-	corepb "github.com/authwisecom/api-client-go/authwise/types/core/v1alpha1"
 
 	"terraform-provider-authwise/internal/provider"
 )
