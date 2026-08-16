@@ -62,3 +62,22 @@ Use it with:
     }
   }
 EOF
+
+# An explicit provider_installation block in the CLI config disables the
+# implied local mirror this script installs into.
+if grep -qs "provider_installation" "${HOME}/.terraformrc"; then
+  cat <<EOF
+
+NOTE: ~/.terraformrc has an explicit provider_installation block, which
+disables Terraform's implied local mirror. For this provider to resolve,
+the block must include:
+
+  filesystem_mirror {
+    path    = "${HOME}/.terraform.d/plugins"
+    include = ["registry.terraform.io/authwisecom/*"]
+  }
+  direct {
+    exclude = ["registry.terraform.io/authwisecom/*"]
+  }
+EOF
+fi
