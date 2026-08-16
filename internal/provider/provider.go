@@ -1,8 +1,12 @@
+// Package provider wires the tfinfra-generated Authwise surface into a
+// Terraform Plugin Framework provider: configuration, authentication, and
+// registration.
 package provider
 
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"os"
 
 	tfruntime "github.com/activatedio/tfinfra/pkg/tf"
@@ -35,30 +39,33 @@ type AuthwiseProvider struct {
 
 type authwiseProviderModel struct {
 	Endpoint     types.String `tfsdk:"endpoint"`
-	TokenUrl     types.String `tfsdk:"token_url"`
-	ClientId     types.String `tfsdk:"client_id"`
+	TokenURL     types.String `tfsdk:"token_url"`
+	ClientID     types.String `tfsdk:"client_id"`
 	ClientSecret types.String `tfsdk:"client_secret"`
 	Audience     types.String `tfsdk:"audience"`
 	Insecure     types.Bool   `tfsdk:"insecure"`
 
 	// Scope identifier defaults; per-resource attributes override them.
-	TenantId   types.String `tfsdk:"tenant_id"`
-	IssuerId   types.String `tfsdk:"issuer_id"`
-	RealmId    types.String `tfsdk:"realm_id"`
-	AudienceId types.String `tfsdk:"audience_id"`
+	TenantID   types.String `tfsdk:"tenant_id"`
+	IssuerID   types.String `tfsdk:"issuer_id"`
+	RealmID    types.String `tfsdk:"realm_id"`
+	AudienceID types.String `tfsdk:"audience_id"`
 }
 
+// New returns the provider factory, stamped with the release version.
 func New(version string) func() provider.Provider {
 	return func() provider.Provider {
 		return &AuthwiseProvider{version: version}
 	}
 }
 
+// Metadata implements provider.Provider.
 func (p *AuthwiseProvider) Metadata(_ context.Context, _ provider.MetadataRequest, resp *provider.MetadataResponse) {
 	resp.TypeName = "authwise"
 	resp.Version = p.version
 }
 
+// Schema implements provider.Provider.
 func (p *AuthwiseProvider) Schema(_ context.Context, _ provider.SchemaRequest, resp *provider.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Manages Authwise identity objects over the published gRPC API.",
@@ -108,6 +115,29 @@ func (p *AuthwiseProvider) Schema(_ context.Context, _ provider.SchemaRequest, r
 	}
 }
 
+// bearerServiceFor selects the token source: the client_credentials grant
+// when a client_id is configured, otherwise the local awctl credential
+// store as the development fallback.
+func bearerServiceFor(config authwiseProviderModel) (bearer.Service, error) {
+
+	tokenURL := stringOr(config.TokenURL, "AUTHWISE_TOKEN_URL")
+	clientID := stringOr(config.ClientID, "AUTHWISE_CLIENT_ID")
+	clientSecret := stringOr(config.ClientSecret, "AUTHWISE_CLIENT_SECRET")
+
+	if clientID == "" {
+		return bearer.NewDefaultService(), nil
+	}
+	if tokenURL == "" || clientSecret == "" {
+		return nil, errors.New("client_id is set, so token_url and client_secret are required (attributes or AUTHWISE_TOKEN_URL / AUTHWISE_CLIENT_SECRET)")
+	}
+	return bearer.NewClientCredentialsService(bearer.ClientCredentialsParams{
+		TokenURL:     tokenURL,
+		ClientID:     clientID,
+		ClientSecret: clientSecret,
+		Audience:     stringOr(config.Audience, "AUTHWISE_AUDIENCE"),
+	}), nil
+}
+
 // stringOr returns the attribute value, falling back to the environment
 // variable when the attribute is null or unknown.
 func stringOr(v types.String, env string) string {
@@ -117,6 +147,9 @@ func stringOr(v types.String, env string) string {
 	return os.Getenv(env)
 }
 
+// Configure implements provider.Provider: it builds the authenticated gRPC
+// client and hands tf.ProviderData to every generated resource and data
+// source.
 func (p *AuthwiseProvider) Configure(ctx context.Context, req provider.ConfigureRequest, resp *provider.ConfigureResponse) {
 
 	var config authwiseProviderModel
@@ -133,27 +166,11 @@ func (p *AuthwiseProvider) Configure(ctx context.Context, req provider.Configure
 		return
 	}
 
-	tokenURL := stringOr(config.TokenUrl, "AUTHWISE_TOKEN_URL")
-	clientID := stringOr(config.ClientId, "AUTHWISE_CLIENT_ID")
-	clientSecret := stringOr(config.ClientSecret, "AUTHWISE_CLIENT_SECRET")
-
-	var bearerService bearer.Service
-	if clientID != "" {
-		if tokenURL == "" || clientSecret == "" {
-			resp.Diagnostics.AddAttributeError(path.Root("client_id"),
-				"incomplete client_credentials configuration",
-				"client_id is set, so token_url and client_secret are required (attributes or AUTHWISE_TOKEN_URL / AUTHWISE_CLIENT_SECRET)")
-			return
-		}
-		bearerService = bearer.NewClientCredentialsService(bearer.ClientCredentialsParams{
-			TokenURL:     tokenURL,
-			ClientID:     clientID,
-			ClientSecret: clientSecret,
-			Audience:     stringOr(config.Audience, "AUTHWISE_AUDIENCE"),
-		})
-	} else {
-		// Development fallback: the local awctl credential store.
-		bearerService = bearer.NewDefaultService()
+	bearerService, err := bearerServiceFor(config)
+	if err != nil {
+		resp.Diagnostics.AddAttributeError(path.Root("client_id"),
+			"incomplete client_credentials configuration", err.Error())
+		return
 	}
 
 	transport := credentials.NewTLS(&tls.Config{MinVersion: tls.VersionTLS12})
@@ -172,10 +189,10 @@ func (p *AuthwiseProvider) Configure(ctx context.Context, req provider.Configure
 
 	defaults := map[string]string{}
 	for attr, v := range map[string]types.String{
-		"tenant_id":   config.TenantId,
-		"issuer_id":   config.IssuerId,
-		"realm_id":    config.RealmId,
-		"audience_id": config.AudienceId,
+		"tenant_id":   config.TenantID,
+		"issuer_id":   config.IssuerID,
+		"realm_id":    config.RealmID,
+		"audience_id": config.AudienceID,
 	} {
 		if !v.IsNull() && !v.IsUnknown() {
 			defaults[attr] = v.ValueString()
@@ -193,10 +210,12 @@ func (p *AuthwiseProvider) Configure(ctx context.Context, req provider.Configure
 	resp.DataSourceData = providerData
 }
 
+// Resources implements provider.Provider with the generated constructors.
 func (p *AuthwiseProvider) Resources(_ context.Context) []func() resource.Resource {
 	return generated.Resources()
 }
 
+// DataSources implements provider.Provider with the generated constructors.
 func (p *AuthwiseProvider) DataSources(_ context.Context) []func() datasource.DataSource {
 	return generated.DataSources()
 }

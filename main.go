@@ -1,3 +1,5 @@
+// The terraform-provider-authwise entry point: serves the tfinfra-generated
+// Authwise provider over the Terraform plugin protocol (v6).
 package main
 
 import (
