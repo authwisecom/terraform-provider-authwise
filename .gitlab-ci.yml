@@ -3,9 +3,9 @@
 # the version is computed from annotated git tags, never stored in a file,
 # and cutting a release is nothing more than pushing an annotated vX.Y.Z tag.
 #
-# Registry publication (goreleaser + signing) is tracked separately in the
-# release task; this pipeline verifies every push and builds stamped,
-# versioned artifacts on release tags.
+# Terraform Registry publication (signing + publication mechanics) is tracked
+# separately in the release task; this pipeline verifies every push and
+# builds stamped, versioned artifacts on release tags.
 
 variables:
   # The version computation needs full history and tags; GitLab clones

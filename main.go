@@ -12,7 +12,7 @@ import (
 	"terraform-provider-authwise/internal/provider"
 )
 
-// version is set by goreleaser at build time.
+// version is stamped via -ldflags at build time (make build / CI).
 var version = "dev"
 
 func main() {
