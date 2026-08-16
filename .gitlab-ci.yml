@@ -82,24 +82,56 @@ lint:
     - if: '$CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/'
     - if: '$CI_COMMIT_BRANCH'
 
-# Push an annotated vX.Y.Z tag -> stamped release binaries. needs the
-# version job (the annotated-tag gate) and verify (tests must pass).
+# The stamped multi-platform build, shared by the tag release and the dev
+# publish so both ship identical artifacts.
+.dist:
+  script:
+    - |
+      mkdir -p dist
+      for platform in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64; do
+        GOOS="${platform%/*}"; GOARCH="${platform#*/}"
+        ext=""; [ "$GOOS" = "windows" ] && ext=".exe"
+        CGO_ENABLED=0 GOOS="$GOOS" GOARCH="$GOARCH" \
+          go build -trimpath -ldflags "-s -w -X main.version=${VERSION}" \
+          -o "dist/terraform-provider-authwise_${VERSION}_${GOOS}_${GOARCH}${ext}" .
+      done
+    - (cd dist && shasum -a 256 terraform-provider-authwise_* > "terraform-provider-authwise_${VERSION}_SHA256SUMS")
+
+# Upload the dist tree to the GitLab generic package registry. Consumers
+# install into Terraform's implied local mirror via scripts/install.sh;
+# real Terraform Registry publication (signing etc.) stays tracked in #12.
+.registry-upload:
+  script:
+    - |
+      for f in dist/*; do
+        name=$(basename "$f")
+        curl -sS --fail-with-body -H "JOB-TOKEN: ${CI_JOB_TOKEN}" --upload-file "$f" \
+          "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/terraform-provider-authwise/${VERSION}/${name}" >/dev/null
+        echo "published terraform-provider-authwise/${VERSION}/${name}"
+      done
+
+# Every develop push ships a dev build (X.Y.Z-<sha8>) to the package
+# registry — the in-progress provider is always installable.
+publish-dev:
+  stage: release
+  extends: .go-cache
+  needs: [version, test, lint]
+  script:
+    - !reference [.dist, script]
+    - !reference [.registry-upload, script]
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+
+# Push an annotated vX.Y.Z tag -> stamped release binaries in the package
+# registry and as pipeline artifacts. Needs the version job (the
+# annotated-tag gate) and test/lint (must pass).
 release:
   stage: release
   extends: .go-cache
   needs: [version, test, lint]
   script:
-    - |
-      for platform in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64; do
-        GOOS="${platform%/*}"; GOARCH="${platform#*/}"
-        ext=""; [ "$GOOS" = "windows" ] && ext=".exe"
-        out="dist/terraform-provider-authwise_${VERSION}_${GOOS}_${GOARCH}"
-        mkdir -p "$out"
-        CGO_ENABLED=0 GOOS="$GOOS" GOARCH="$GOARCH" \
-          go build -trimpath -ldflags "-s -w -X main.version=${VERSION}" \
-          -o "$out/terraform-provider-authwise_v${VERSION}${ext}" .
-      done
-    - (cd dist && find . -type f | sort && shasum -a 256 */terraform-provider-authwise_* > "terraform-provider-authwise_${VERSION}_SHA256SUMS")
+    - !reference [.dist, script]
+    - !reference [.registry-upload, script]
   artifacts:
     name: "terraform-provider-authwise-${VERSION}"
     paths:
