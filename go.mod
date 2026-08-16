@@ -15,6 +15,7 @@ require (
 
 require (
 	github.com/activatedio/gen v0.2.0 // indirect
+	github.com/activatedio/go-version v0.1.1 // indirect
 	github.com/dave/jennifer v1.7.1 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/fatih/color v1.18.0 // indirect
@@ -45,3 +46,5 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260526163538-3dc84a4a5aaa // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
+
+tool github.com/activatedio/go-version/cmd/go-version

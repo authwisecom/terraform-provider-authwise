@@ -1,5 +1,7 @@
 github.com/activatedio/gen v0.2.0 h1:sPj7o6ogYaVd+g6hM16zw5whfXjgm1zdKRthGTOs8wo=
 github.com/activatedio/gen v0.2.0/go.mod h1:24nhBII0r/EO8li//ksDWc5tNc1nIoHyVga4gJMxjOQ=
+github.com/activatedio/go-version v0.1.1 h1:i+w5K9QvD+A64UF0HppC64srKWJfjiMbcD0QvfkF6pM=
+github.com/activatedio/go-version v0.1.1/go.mod h1:/1Vzqb+QjBhSFZlbTstSYEE4KpMMXPnNoxMf2bOQekc=
 github.com/activatedio/tfinfra v0.0.3 h1:+TJpnEpiCFca6tZ+JpLkVLE8JnVDcDqLABBmCOPGGmE=
 github.com/activatedio/tfinfra v0.0.3/go.mod h1:WaZzaT3LIRKX/gbTbFFTc0aStIYgt1u4R4CGiFi1fDw=
 github.com/authwisecom/api-client-go v0.1.0 h1:hA/Mifo2BweCVCyw33V6/E9CyDQqB8j6ldXyLeXWzK8=
