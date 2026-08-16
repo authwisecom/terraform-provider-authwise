@@ -15,6 +15,7 @@ import (
 	path "github.com/hashicorp/terraform-plugin-framework/path"
 	resource "github.com/hashicorp/terraform-plugin-framework/resource"
 	schema "github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	mapplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
 	planmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	stringplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
@@ -26,21 +27,33 @@ import (
 func AudienceResourceSchema() schema.Schema {
 	return schema.Schema{
 		Attributes: map[string]schema.Attribute{
-			"appearance_profile_id": schema.StringAttribute{Optional: true},
+			"appearance_profile_id": schema.StringAttribute{
+				Computed:      true,
+				Optional:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
 			"config": schema.StringAttribute{
+				Computed:            true,
 				CustomType:          jsontypes.NormalizedType{},
 				MarkdownDescription: "`config` as the protojson encoding of AudienceConfig.",
 				Optional:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
-			"display_name": schema.StringAttribute{Optional: true},
+			"display_name": schema.StringAttribute{
+				Computed:      true,
+				Optional:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
 			"issuer_id": schema.StringAttribute{
 				MarkdownDescription: "Parent identifier `issuer_id`; overrides the provider default. Changing it replaces the resource.",
 				Optional:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"labels": schema.MapAttribute{
-				ElementType: types.StringType,
-				Optional:    true,
+				Computed:      true,
+				ElementType:   types.StringType,
+				Optional:      true,
+				PlanModifiers: []planmodifier.Map{mapplanmodifier.UseStateForUnknown()},
 			},
 			"name": schema.StringAttribute{
 				Computed:            true,

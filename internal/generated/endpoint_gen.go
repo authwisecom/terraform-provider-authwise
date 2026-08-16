@@ -14,6 +14,8 @@ import (
 	diag "github.com/hashicorp/terraform-plugin-framework/diag"
 	resource "github.com/hashicorp/terraform-plugin-framework/resource"
 	schema "github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	boolplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
+	mapplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
 	planmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	stringplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	validator "github.com/hashicorp/terraform-plugin-framework/schema/validator"
@@ -25,16 +27,32 @@ import (
 func EndpointResourceSchema() schema.Schema {
 	return schema.Schema{
 		Attributes: map[string]schema.Attribute{
-			"address":      schema.StringAttribute{Optional: true},
-			"display_name": schema.StringAttribute{Optional: true},
-			"endpoint_type": schema.StringAttribute{
-				Optional:   true,
-				Validators: []validator.String{stringvalidator.OneOf("REST", "GRPC")},
+			"address": schema.StringAttribute{
+				Computed:      true,
+				Optional:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
-			"insecure": schema.BoolAttribute{Optional: true},
+			"display_name": schema.StringAttribute{
+				Computed:      true,
+				Optional:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
+			"endpoint_type": schema.StringAttribute{
+				Computed:      true,
+				Optional:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+				Validators:    []validator.String{stringvalidator.OneOf("REST", "GRPC")},
+			},
+			"insecure": schema.BoolAttribute{
+				Computed:      true,
+				Optional:      true,
+				PlanModifiers: []planmodifier.Bool{boolplanmodifier.UseStateForUnknown()},
+			},
 			"labels": schema.MapAttribute{
-				ElementType: types.StringType,
-				Optional:    true,
+				Computed:      true,
+				ElementType:   types.StringType,
+				Optional:      true,
+				PlanModifiers: []planmodifier.Map{mapplanmodifier.UseStateForUnknown()},
 			},
 			"name": schema.StringAttribute{
 				Computed:            true,

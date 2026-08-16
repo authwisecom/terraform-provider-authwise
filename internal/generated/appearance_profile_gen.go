@@ -15,6 +15,7 @@ import (
 	path "github.com/hashicorp/terraform-plugin-framework/path"
 	resource "github.com/hashicorp/terraform-plugin-framework/resource"
 	schema "github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	mapplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
 	planmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	stringplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
@@ -28,14 +29,22 @@ func AppearanceProfileResourceSchema() schema.Schema {
 	return schema.Schema{
 		Attributes: map[string]schema.Attribute{
 			"content": schema.StringAttribute{
+				Computed:            true,
 				CustomType:          jsontypes.NormalizedType{},
 				MarkdownDescription: "`content` as a JSON object.",
 				Optional:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
-			"display_name": schema.StringAttribute{Optional: true},
+			"display_name": schema.StringAttribute{
+				Computed:      true,
+				Optional:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
 			"labels": schema.MapAttribute{
-				ElementType: types.StringType,
-				Optional:    true,
+				Computed:      true,
+				ElementType:   types.StringType,
+				Optional:      true,
+				PlanModifiers: []planmodifier.Map{mapplanmodifier.UseStateForUnknown()},
 			},
 			"name": schema.StringAttribute{
 				Computed:            true,
@@ -43,16 +52,22 @@ func AppearanceProfileResourceSchema() schema.Schema {
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"stylesheet_attributes": schema.StringAttribute{
+				Computed:            true,
 				CustomType:          jsontypes.NormalizedType{},
 				MarkdownDescription: "`stylesheet_attributes` as a JSON object.",
 				Optional:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"tenant_id": schema.StringAttribute{
 				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default. Changing it replaces the resource.",
 				Optional:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
-			"theme_id": schema.StringAttribute{Optional: true},
+			"theme_id": schema.StringAttribute{
+				Computed:      true,
+				Optional:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
 		},
 		MarkdownDescription: "AppearanceProfile resource.",
 	}

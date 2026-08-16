@@ -13,6 +13,7 @@ import (
 	diag "github.com/hashicorp/terraform-plugin-framework/diag"
 	resource "github.com/hashicorp/terraform-plugin-framework/resource"
 	schema "github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	boolplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	planmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	stringplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
@@ -28,8 +29,16 @@ func RoleResourceSchema() schema.Schema {
 				Optional:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
-			"auto":         schema.BoolAttribute{Optional: true},
-			"display_name": schema.StringAttribute{Optional: true},
+			"auto": schema.BoolAttribute{
+				Computed:      true,
+				Optional:      true,
+				PlanModifiers: []planmodifier.Bool{boolplanmodifier.UseStateForUnknown()},
+			},
+			"display_name": schema.StringAttribute{
+				Computed:      true,
+				Optional:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
 			"issuer_id": schema.StringAttribute{
 				MarkdownDescription: "Parent identifier `issuer_id`; overrides the provider default. Changing it replaces the resource.",
 				Optional:            true,

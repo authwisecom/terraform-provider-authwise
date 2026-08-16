@@ -1,0 +1,244 @@
+package acctest_test
+
+import (
+	"context"
+	"fmt"
+	"net"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"sync"
+	"testing"
+
+	corepb "github.com/authwisecom/api-client-go/authwise/types/core/v1alpha1"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/emptypb"
+
+	identitypb "github.com/authwisecom/api-client-go/authwise/identity/v1alpha1"
+)
+
+// fakeIdentityServer is an in-memory AIP server for the acceptance tier:
+// real terraform CLI + the real provider + the real client_credentials
+// exchange, with only the Authwise API replaced. It implements the
+// resources the acceptance tests touch; everything else stays
+// Unimplemented.
+type fakeIdentityServer struct {
+	identitypb.UnimplementedAuthwiseIdentityServiceServer
+
+	mu     sync.Mutex
+	realms map[string]*corepb.Realm
+	roles  map[string]*corepb.Role
+	seq    int
+
+	// lastAuthorization records the auth metadata of the most recent call
+	// so tests can assert the bearer flow end to end.
+	lastAuthorization string
+}
+
+func newFakeIdentityServer() *fakeIdentityServer {
+	return &fakeIdentityServer{
+		realms: map[string]*corepb.Realm{},
+		roles:  map[string]*corepb.Role{},
+	}
+}
+
+func (f *fakeIdentityServer) recordAuth(ctx context.Context) {
+	if md, ok := metadata.FromIncomingContext(ctx); ok {
+		if v := md.Get("authorization"); len(v) > 0 {
+			f.lastAuthorization = v[0]
+		}
+	}
+}
+
+func (f *fakeIdentityServer) nextID(prefix string) string {
+	f.seq++
+	return fmt.Sprintf("%s-%08d", prefix, f.seq)
+}
+
+// --- Realm ---
+
+func (f *fakeIdentityServer) GetRealm(ctx context.Context, in *identitypb.GetRealmRequest) (*corepb.Realm, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.recordAuth(ctx)
+	r, ok := f.realms[in.GetName()]
+	if !ok {
+		return nil, status.Errorf(codes.NotFound, "realm %q not found", in.GetName())
+	}
+	return proto.Clone(r).(*corepb.Realm), nil
+}
+
+func (f *fakeIdentityServer) ListRealms(ctx context.Context, in *identitypb.ListRealmsRequest) (*identitypb.ListRealmsResponse, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.recordAuth(ctx)
+	res := &identitypb.ListRealmsResponse{}
+	for name, r := range f.realms {
+		if strings.HasPrefix(name, in.GetParent()+"/") {
+			res.Realms = append(res.Realms, proto.Clone(r).(*corepb.Realm))
+		}
+	}
+	return res, nil
+}
+
+func (f *fakeIdentityServer) CreateRealm(ctx context.Context, in *identitypb.CreateRealmRequest) (*corepb.Realm, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.recordAuth(ctx)
+	r := proto.Clone(in.GetRealm()).(*corepb.Realm)
+	r.Name = in.GetParent() + "/realms/" + f.nextID("r")
+	f.realms[r.GetName()] = r
+	return proto.Clone(r).(*corepb.Realm), nil
+}
+
+func (f *fakeIdentityServer) PatchRealm(ctx context.Context, in *identitypb.PatchRealmRequest) (*corepb.Realm, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.recordAuth(ctx)
+	existing, ok := f.realms[in.GetName()]
+	if !ok {
+		return nil, status.Errorf(codes.NotFound, "realm %q not found", in.GetName())
+	}
+	for _, path := range in.GetUpdateMask().GetPaths() {
+		switch path {
+		case "display_name":
+			existing.DisplayName = in.GetRealm().GetDisplayName()
+		case "user_database_type":
+			existing.UserDatabaseType = in.GetRealm().GetUserDatabaseType()
+		case "labels":
+			existing.Labels = in.GetRealm().GetLabels()
+		default:
+			return nil, status.Errorf(codes.InvalidArgument, "unsupported update_mask path %q", path)
+		}
+	}
+	return proto.Clone(existing).(*corepb.Realm), nil
+}
+
+func (f *fakeIdentityServer) DeleteRealm(ctx context.Context, in *identitypb.DeleteRealmRequest) (*emptypb.Empty, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.recordAuth(ctx)
+	if _, ok := f.realms[in.GetName()]; !ok {
+		return nil, status.Errorf(codes.NotFound, "realm %q not found", in.GetName())
+	}
+	delete(f.realms, in.GetName())
+	return &emptypb.Empty{}, nil
+}
+
+// --- Role (audience-scoped: proves three-level parent composition) ---
+
+func (f *fakeIdentityServer) GetRole(ctx context.Context, in *identitypb.GetRoleRequest) (*corepb.Role, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.recordAuth(ctx)
+	r, ok := f.roles[in.GetName()]
+	if !ok {
+		return nil, status.Errorf(codes.NotFound, "role %q not found", in.GetName())
+	}
+	return proto.Clone(r).(*corepb.Role), nil
+}
+
+func (f *fakeIdentityServer) CreateRole(ctx context.Context, in *identitypb.CreateRoleRequest) (*corepb.Role, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.recordAuth(ctx)
+	r := proto.Clone(in.GetRole()).(*corepb.Role)
+	r.Name = in.GetParent() + "/roles/" + f.nextID("ro")
+	f.roles[r.GetName()] = r
+	return proto.Clone(r).(*corepb.Role), nil
+}
+
+func (f *fakeIdentityServer) PatchRole(ctx context.Context, in *identitypb.PatchRoleRequest) (*corepb.Role, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.recordAuth(ctx)
+	existing, ok := f.roles[in.GetName()]
+	if !ok {
+		return nil, status.Errorf(codes.NotFound, "role %q not found", in.GetName())
+	}
+	for _, path := range in.GetUpdateMask().GetPaths() {
+		switch path {
+		case "display_name":
+			existing.DisplayName = in.GetRole().GetDisplayName()
+		case "auto":
+			existing.Auto = in.GetRole().GetAuto()
+		default:
+			return nil, status.Errorf(codes.InvalidArgument, "unsupported update_mask path %q", path)
+		}
+	}
+	return proto.Clone(existing).(*corepb.Role), nil
+}
+
+func (f *fakeIdentityServer) DeleteRole(ctx context.Context, in *identitypb.DeleteRoleRequest) (*emptypb.Empty, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.recordAuth(ctx)
+	if _, ok := f.roles[in.GetName()]; !ok {
+		return nil, status.Errorf(codes.NotFound, "role %q not found", in.GetName())
+	}
+	delete(f.roles, in.GetName())
+	return &emptypb.Empty{}, nil
+}
+
+// harness boots the fake gRPC server plus a fake OAuth token endpoint and
+// renders the provider block pointing at them.
+type harness struct {
+	fake        *fakeIdentityServer
+	grpcAddr    string
+	tokenServer *httptest.Server
+	tokenCalls  int
+}
+
+func newHarness(t *testing.T) *harness {
+
+	t.Helper()
+
+	h := &harness{fake: newFakeIdentityServer()}
+
+	lis, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	h.grpcAddr = lis.Addr().String()
+
+	s := grpc.NewServer()
+	identitypb.RegisterAuthwiseIdentityServiceServer(s, h.fake)
+	go func() { _ = s.Serve(lis) }()
+	t.Cleanup(s.Stop)
+
+	h.tokenServer = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		h.tokenCalls++
+		if err := r.ParseForm(); err != nil || r.PostForm.Get("grant_type") != "client_credentials" {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		fmt.Fprint(w, `{"access_token":"acc-test-token","expires_in":3600}`)
+	}))
+	t.Cleanup(h.tokenServer.Close)
+
+	return h
+}
+
+// providerConfig renders the provider block for the fake stack. Scope
+// defaults live at the provider level; per-resource overrides are part of
+// the individual test configs.
+func (h *harness) providerConfig() string {
+	return fmt.Sprintf(`
+provider "authwise" {
+  endpoint      = %q
+  insecure      = true
+  token_url     = %q
+  client_id     = "acc-client"
+  client_secret = "acc-secret"
+  audience      = "https://api.test"
+
+  tenant_id   = "t-1"
+  issuer_id   = "i-1"
+  audience_id = "a-1"
+}
+`, h.grpcAddr, h.tokenServer.URL+"/oauth/token")
+}

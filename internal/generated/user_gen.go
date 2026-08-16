@@ -15,6 +15,8 @@ import (
 	path "github.com/hashicorp/terraform-plugin-framework/path"
 	resource "github.com/hashicorp/terraform-plugin-framework/resource"
 	schema "github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	boolplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
+	mapplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
 	planmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	stringplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
@@ -29,40 +31,106 @@ import (
 func UserResourceSchema() schema.Schema {
 	return schema.Schema{
 		Attributes: map[string]schema.Attribute{
-			"birthdate":      schema.StringAttribute{Optional: true},
-			"display_name":   schema.StringAttribute{Optional: true},
-			"email":          schema.StringAttribute{Optional: true},
-			"email_verified": schema.BoolAttribute{Optional: true},
+			"birthdate": schema.StringAttribute{
+				Computed:      true,
+				Optional:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
+			"display_name": schema.StringAttribute{
+				Computed:      true,
+				Optional:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
+			"email": schema.StringAttribute{
+				Computed:      true,
+				Optional:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
+			"email_verified": schema.BoolAttribute{
+				Computed:      true,
+				Optional:      true,
+				PlanModifiers: []planmodifier.Bool{boolplanmodifier.UseStateForUnknown()},
+			},
 			"extra_fields": schema.StringAttribute{
+				Computed:            true,
 				CustomType:          jsontypes.NormalizedType{},
 				MarkdownDescription: "`extra_fields` as a JSON object.",
 				Optional:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
-			"family_name": schema.StringAttribute{Optional: true},
-			"gender":      schema.StringAttribute{Optional: true},
-			"given_name":  schema.StringAttribute{Optional: true},
+			"family_name": schema.StringAttribute{
+				Computed:      true,
+				Optional:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
+			"gender": schema.StringAttribute{
+				Computed:      true,
+				Optional:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
+			"given_name": schema.StringAttribute{
+				Computed:      true,
+				Optional:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
 			"labels": schema.MapAttribute{
-				ElementType: types.StringType,
-				Optional:    true,
+				Computed:      true,
+				ElementType:   types.StringType,
+				Optional:      true,
+				PlanModifiers: []planmodifier.Map{mapplanmodifier.UseStateForUnknown()},
 			},
-			"locale": schema.StringAttribute{Optional: true},
+			"locale": schema.StringAttribute{
+				Computed:      true,
+				Optional:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
 			"metadata": schema.StringAttribute{
+				Computed:            true,
 				CustomType:          jsontypes.NormalizedType{},
 				MarkdownDescription: "`metadata` as a JSON object.",
 				Optional:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
-			"middle_name": schema.StringAttribute{Optional: true},
+			"middle_name": schema.StringAttribute{
+				Computed:      true,
+				Optional:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
 			"name": schema.StringAttribute{
 				Computed:            true,
 				MarkdownDescription: "Full resource name; serves as the Terraform ID.",
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
-			"nickname":              schema.StringAttribute{Optional: true},
-			"phone_number":          schema.StringAttribute{Optional: true},
-			"phone_number_verified": schema.BoolAttribute{Optional: true},
-			"picture":               schema.StringAttribute{Optional: true},
-			"preferred_username":    schema.StringAttribute{Optional: true},
-			"profile":               schema.StringAttribute{Optional: true},
+			"nickname": schema.StringAttribute{
+				Computed:      true,
+				Optional:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
+			"phone_number": schema.StringAttribute{
+				Computed:      true,
+				Optional:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
+			"phone_number_verified": schema.BoolAttribute{
+				Computed:      true,
+				Optional:      true,
+				PlanModifiers: []planmodifier.Bool{boolplanmodifier.UseStateForUnknown()},
+			},
+			"picture": schema.StringAttribute{
+				Computed:      true,
+				Optional:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
+			"preferred_username": schema.StringAttribute{
+				Computed:      true,
+				Optional:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
+			"profile": schema.StringAttribute{
+				Computed:      true,
+				Optional:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
 			"realm_id": schema.StringAttribute{
 				MarkdownDescription: "Parent identifier `realm_id`; overrides the provider default. Changing it replaces the resource.",
 				Optional:            true,
@@ -78,8 +146,16 @@ func UserResourceSchema() schema.Schema {
 				MarkdownDescription: "`updated_at` as an RFC 3339 timestamp.",
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
-			"website":  schema.StringAttribute{Optional: true},
-			"zoneinfo": schema.StringAttribute{Optional: true},
+			"website": schema.StringAttribute{
+				Computed:      true,
+				Optional:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
+			"zoneinfo": schema.StringAttribute{
+				Computed:      true,
+				Optional:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
 		},
 		MarkdownDescription: "User resource.",
 	}

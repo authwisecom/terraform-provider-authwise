@@ -13,6 +13,7 @@ import (
 	diag "github.com/hashicorp/terraform-plugin-framework/diag"
 	resource "github.com/hashicorp/terraform-plugin-framework/resource"
 	schema "github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	boolplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	planmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	stringplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
@@ -28,13 +29,21 @@ func ScopeResourceSchema() schema.Schema {
 				Optional:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
-			"auto": schema.BoolAttribute{Optional: true},
+			"auto": schema.BoolAttribute{
+				Computed:      true,
+				Optional:      true,
+				PlanModifiers: []planmodifier.Bool{boolplanmodifier.UseStateForUnknown()},
+			},
 			"issuer_id": schema.StringAttribute{
 				MarkdownDescription: "Parent identifier `issuer_id`; overrides the provider default. Changing it replaces the resource.",
 				Optional:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
-			"kind": schema.StringAttribute{Optional: true},
+			"kind": schema.StringAttribute{
+				Computed:      true,
+				Optional:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
 			"name": schema.StringAttribute{
 				Computed:            true,
 				MarkdownDescription: "Full resource name; serves as the Terraform ID.",

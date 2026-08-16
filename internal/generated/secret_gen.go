@@ -14,6 +14,7 @@ import (
 	diag "github.com/hashicorp/terraform-plugin-framework/diag"
 	resource "github.com/hashicorp/terraform-plugin-framework/resource"
 	schema "github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	mapplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
 	planmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	stringplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	validator "github.com/hashicorp/terraform-plugin-framework/schema/validator"
@@ -25,14 +26,22 @@ import (
 func SecretResourceSchema() schema.Schema {
 	return schema.Schema{
 		Attributes: map[string]schema.Attribute{
-			"display_name": schema.StringAttribute{Optional: true},
+			"display_name": schema.StringAttribute{
+				Computed:      true,
+				Optional:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
 			"encoding": schema.StringAttribute{
-				Optional:   true,
-				Validators: []validator.String{stringvalidator.OneOf("Plain", "Base64")},
+				Computed:      true,
+				Optional:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+				Validators:    []validator.String{stringvalidator.OneOf("Plain", "Base64")},
 			},
 			"labels": schema.MapAttribute{
-				ElementType: types.StringType,
-				Optional:    true,
+				Computed:      true,
+				ElementType:   types.StringType,
+				Optional:      true,
+				PlanModifiers: []planmodifier.Map{mapplanmodifier.UseStateForUnknown()},
 			},
 			"name": schema.StringAttribute{
 				Computed:            true,
@@ -45,8 +54,10 @@ func SecretResourceSchema() schema.Schema {
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"value": schema.StringAttribute{
-				Optional:  true,
-				Sensitive: true,
+				Computed:      true,
+				Optional:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+				Sensitive:     true,
 			},
 		},
 		MarkdownDescription: "Secret resource.",

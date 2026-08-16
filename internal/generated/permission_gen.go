@@ -28,7 +28,11 @@ func PermissionResourceSchema() schema.Schema {
 				Optional:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
-			"display_name": schema.StringAttribute{Optional: true},
+			"display_name": schema.StringAttribute{
+				Computed:      true,
+				Optional:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
 			"issuer_id": schema.StringAttribute{
 				MarkdownDescription: "Parent identifier `issuer_id`; overrides the provider default. Changing it replaces the resource.",
 				Optional:            true,
