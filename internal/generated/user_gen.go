@@ -5,8 +5,6 @@ package generated
 import (
 	"context"
 	"fmt"
-	"time"
-
 	tf "github.com/activatedio/tfinfra/pkg/tf"
 	v1alpha11 "github.com/authwisecom/api-client-go/authwise/identity/v1alpha1"
 	v1alpha1 "github.com/authwisecom/api-client-go/authwise/types/core/v1alpha1"
@@ -24,6 +22,7 @@ import (
 	fieldmaskpb "google.golang.org/protobuf/types/known/fieldmaskpb"
 	structpb "google.golang.org/protobuf/types/known/structpb"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
+	"time"
 )
 
 // UserResourceSchema returns the Terraform schema for the User resource.
