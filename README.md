@@ -20,7 +20,7 @@ provider "authwise" {
   tenant_id = "t-1"                           # default scope for resources
 
   # Client credentials (CI / automation); falls back to AUTHWISE_* env.
-  # Omit all three to use the local `awctl login` credential store instead.
+  # Omit all three to use the local `awctl auth login` credential store instead.
   token_url     = "https://auth.example.authwise.io/oauth/token"
   client_id     = "c-terraform"
   client_secret = var.authwise_client_secret
@@ -57,7 +57,7 @@ Two lanes, the same bearer credentials as awctl:
   plus optional `audience`). Partial configuration is an error naming the
   gaps.
 - **awctl store** — with no client credentials configured, the provider
-  reads the token stored by `awctl login`
+  reads the token stored by `awctl auth login`
   (`~/.awctl.d/credentials/credentials.json`) — convenient for local
   development.
 
