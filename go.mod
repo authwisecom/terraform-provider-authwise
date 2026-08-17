@@ -4,14 +4,14 @@ go 1.25.8
 
 require (
 	github.com/activatedio/tfinfra v0.0.8
-	github.com/authwisecom/api-client-go v0.1.0
-	github.com/authwisecom/api-client-support v0.1.0
 	github.com/hashicorp/terraform-plugin-framework v1.19.0
 	github.com/hashicorp/terraform-plugin-framework-jsontypes v0.2.0
 	github.com/hashicorp/terraform-plugin-framework-validators v0.19.0
 	github.com/hashicorp/terraform-plugin-go v0.31.0
 	github.com/hashicorp/terraform-plugin-testing v1.16.0
 	github.com/stretchr/testify v1.11.1
+	gitlab.authwise.io/authwise/api-client-go v0.1.0
+	gitlab.authwise.io/authwise/api-client-support v0.1.0
 	google.golang.org/grpc v1.83.0
 	google.golang.org/protobuf v1.36.12
 )

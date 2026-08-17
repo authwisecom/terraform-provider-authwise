@@ -2,7 +2,7 @@
 
 The Authwise Terraform provider: a [tfinfra](https://github.com/activatedio/tfinfra)-
 generated surface over the published
-[api-client-go](https://github.com/authwisecom/api-client-go) — identity
+[api-client-go](https://gitlab.authwise.io/authwise/api-client-go) — identity
 resources, config-builder data sources, and provider-level scope defaults.
 
 ```hcl

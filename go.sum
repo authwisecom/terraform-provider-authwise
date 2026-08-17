@@ -15,10 +15,6 @@ github.com/agext/levenshtein v1.2.3/go.mod h1:JEDfjyjHDjOF/1e4FlBE/PkbqA9OfWu2ki
 github.com/apparentlymart/go-textseg/v12 v12.0.0/go.mod h1:S/4uRK2UtaQttw1GenVJEynmyUenKwP++x/+DdGV/Ec=
 github.com/apparentlymart/go-textseg/v15 v15.0.0 h1:uYvfpb3DyLSCGWnctWKGj857c6ew1u1fNQOlOtuGxQY=
 github.com/apparentlymart/go-textseg/v15 v15.0.0/go.mod h1:K8XmNZdhEBkdlyDdvbmmsvpAG721bKi0joRfFdHIWJ4=
-github.com/authwisecom/api-client-go v0.1.0 h1:hA/Mifo2BweCVCyw33V6/E9CyDQqB8j6ldXyLeXWzK8=
-github.com/authwisecom/api-client-go v0.1.0/go.mod h1:kldpQjwnXRqWpyQ69u4Zm9uQu3Xhm7ne6vfSMjecSlw=
-github.com/authwisecom/api-client-support v0.1.0 h1:DlWH/yCKQkTuiuYpjC8gwYU4+5tNtp5o9XM2Q7BzW+8=
-github.com/authwisecom/api-client-support v0.1.0/go.mod h1:/5gNMDyd7/lUmUdULgoGReAUqHkfVZYWkbNSPRdFF6A=
 github.com/bufbuild/protocompile v0.14.1 h1:iA73zAf/fyljNjQKwYzUHD6AD4R8KMasmwa/FBatYVw=
 github.com/bufbuild/protocompile v0.14.1/go.mod h1:ppVdAIhbr2H8asPk6k4pY7t9zB1OU5DoEw9xY/FUi1c=
 github.com/cespare/xxhash/v2 v2.3.0 h1:UL815xU9SqsFlibzuggzjXhog7bL6oX9BbNZnL2UFvs=
@@ -182,6 +178,10 @@ github.com/zclconf/go-cty v1.18.1 h1:yEGE8M4iIZlyKQURZNb2SnEyZlZHUcBCnx6KF81KuwM
 github.com/zclconf/go-cty v1.18.1/go.mod h1:qpnV6EDNgC1sns/AleL1fvatHw72j+S+nS+MJ+T2CSg=
 github.com/zclconf/go-cty-debug v0.0.0-20240509010212-0d6042c53940 h1:4r45xpDWB6ZMSMNJFMOjqrGHynW3DIBuR2H9j0ug+Mo=
 github.com/zclconf/go-cty-debug v0.0.0-20240509010212-0d6042c53940/go.mod h1:CmBdvvj3nqzfzJ6nTCIwDTPZ56aVGvDrmztiO5g3qrM=
+gitlab.authwise.io/authwise/api-client-go v0.1.0 h1:hO39A1LTuaOoWGcN0Ki9Tq1xgfX64BynoXwAUhVAU6U=
+gitlab.authwise.io/authwise/api-client-go v0.1.0/go.mod h1:rYmT7HdfyibDnYuoxfLX3qgmA2W2DRyONoR8vgCOKKA=
+gitlab.authwise.io/authwise/api-client-support v0.1.0 h1:VXUObLZQuqGG9tbgsd9gQXpEbDbnocnDqJo+wLNvUrc=
+gitlab.authwise.io/authwise/api-client-support v0.1.0/go.mod h1:/TLz5fw6/6RvKnVbkCwBjDhmoK3awU7UPl+rmxdMnas=
 go.opentelemetry.io/auto/sdk v1.2.1 h1:jXsnJ4Lmnqd11kwkBV2LgLoFMZKizbCi5fNZ/ipaZ64=
 go.opentelemetry.io/auto/sdk v1.2.1/go.mod h1:KRTj+aOaElaLi+wW1kO/DZRXwkF4C5xPbEe3ZiIhN7Y=
 go.opentelemetry.io/otel v1.44.0 h1:JjwHmHpA4iZ3wBxluu2fbbE7j4kqlE8jXyAyPXH7HqU=

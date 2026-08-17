@@ -11,8 +11,8 @@ import (
 	"sync"
 	"testing"
 
-	identitypb "github.com/authwisecom/api-client-go/authwise/identity/v1alpha1"
-	corepb "github.com/authwisecom/api-client-go/authwise/types/core/v1alpha1"
+	identitypb "gitlab.authwise.io/authwise/api-client-go/authwise/identity/v1alpha1"
+	corepb "gitlab.authwise.io/authwise/api-client-go/authwise/types/core/v1alpha1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
