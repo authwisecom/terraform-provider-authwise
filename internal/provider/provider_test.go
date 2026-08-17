@@ -50,7 +50,9 @@ func TestProviderSurface(t *testing.T) {
 		diags := s.Schema.ValidateImplementation(ctx)
 		require.False(t, diags.HasError(), "%s: %v", m.TypeName, diags)
 	}
-	assert.Len(t, resourceTypes, 15)
+	// 15 entity resources + 4 association resources (user_roles,
+	// client_roles, role_permissions, scope_permissions).
+	assert.Len(t, resourceTypes, 19)
 
 	dataSourceTypes := map[string]bool{}
 	for _, newDataSource := range p.DataSources(ctx) {

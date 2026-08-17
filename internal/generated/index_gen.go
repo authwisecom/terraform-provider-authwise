@@ -9,7 +9,7 @@ import (
 
 // Resources returns the generated resource constructors for provider registration.
 func Resources() []func() resource.Resource {
-	return []func() resource.Resource{NewDomainResource, NewIssuerResource, NewRealmResource, NewThemeResource, NewAppearanceProfileResource, NewSecretResource, NewAssetResource, NewEndpointResource, NewUserResource, NewProviderResource, NewClientResource, NewAudienceResource, NewRoleResource, NewPermissionResource, NewScopeResource}
+	return []func() resource.Resource{NewDomainResource, NewIssuerResource, NewRealmResource, NewThemeResource, NewAppearanceProfileResource, NewSecretResource, NewAssetResource, NewEndpointResource, NewUserResource, NewUserRolesResource, NewProviderResource, NewClientResource, NewClientRolesResource, NewAudienceResource, NewRoleResource, NewRolePermissionsResource, NewPermissionResource, NewScopeResource, NewScopePermissionsResource}
 }
 
 // DataSources returns the generated data source constructors for provider registration.

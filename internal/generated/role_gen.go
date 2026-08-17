@@ -294,3 +294,110 @@ func (d *roleDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 	}
 	d.crud.ReadDataSource(ctx, req, resp)
 }
+
+// newRolePermissionsAssociation builds the role_permissions runtime from provider data; it returns nil (no error) before the provider is configured.
+func newRolePermissionsAssociation(providerData any) (*tf.Association, diag.Diagnostics) {
+	var diags diag.Diagnostics
+	if providerData == nil {
+		return nil, diags
+	}
+	pd, ok := providerData.(*tf.ProviderData)
+	if !ok {
+		diags.AddError("unexpected provider data", fmt.Sprintf("expected *tf.ProviderData, got %T", providerData))
+		return nil, diags
+	}
+	client, ok := pd.Clients["identity"].(v1alpha11.AuthwiseIdentityServiceClient)
+	if !ok {
+		diags.AddError("missing client", "provider data key \"identity\" is not a github.com/authwisecom/api-client-go/authwise/identity/v1alpha1.AuthwiseIdentityServiceClient")
+		return nil, diags
+	}
+	return tf.NewAssociation(tf.AssociationParams{
+		Attribute: "permissions",
+		Client: tf.AssociationClient{
+			Associate: func(ctx context.Context, name string, set, remove []string) error {
+				_, err := client.AssociatePermissionsToRole(ctx, &v1alpha11.AssociatePermissionsToRoleRequest{
+					Association: &v1alpha1.AssociationRequest{
+						Remove: remove,
+						Set:    set,
+					},
+					Name: name,
+				})
+				return err
+			},
+			ListBy: func(ctx context.Context, name, pageToken string) ([]string, string, error) {
+				out, err := client.ListPermissionsByRole(ctx, &v1alpha11.ListPermissionsByRoleRequest{
+					Name:      name,
+					PageToken: pageToken,
+				})
+				if err != nil {
+					return nil, "", err
+				}
+				names := make([]string, 0, len(out.Permissions))
+				for _, item := range out.Permissions {
+					names = append(names, item.GetName())
+				}
+				return names, out.NextPageToken, nil
+			},
+		},
+		Collection:      "roles",
+		EntityAttribute: "role",
+		Scope:           tf.NewScope("tenants", "issuers", "audiences"),
+		TypeName:        "role_permissions",
+	}), diags
+}
+
+// rolePermissionsResource is the generated authoritative association resource for a role's permissions.
+type rolePermissionsResource struct {
+	assoc *tf.Association
+}
+
+// NewRolePermissionsResource returns the generated role_permissions resource; its client arrives via Configure from tf.ProviderData.
+func NewRolePermissionsResource() resource.Resource {
+	return &rolePermissionsResource{}
+}
+func (r *rolePermissionsResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_role_permissions"
+}
+func (r *rolePermissionsResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
+	resp.Schema = tf.AssociationSchema("role", "permissions")
+}
+func (r *rolePermissionsResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
+	assoc, diags := newRolePermissionsAssociation(req.ProviderData)
+	resp.Diagnostics.Append(diags...)
+	r.assoc = assoc
+}
+func (r *rolePermissionsResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+	if r.assoc == nil {
+		resp.Diagnostics.AddError("role_permissions resource not configured", "Configure was not called with tf.ProviderData")
+		return
+	}
+	r.assoc.Create(ctx, req, resp)
+}
+func (r *rolePermissionsResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	if r.assoc == nil {
+		resp.Diagnostics.AddError("role_permissions resource not configured", "Configure was not called with tf.ProviderData")
+		return
+	}
+	r.assoc.Read(ctx, req, resp)
+}
+func (r *rolePermissionsResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+	if r.assoc == nil {
+		resp.Diagnostics.AddError("role_permissions resource not configured", "Configure was not called with tf.ProviderData")
+		return
+	}
+	r.assoc.Update(ctx, req, resp)
+}
+func (r *rolePermissionsResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+	if r.assoc == nil {
+		resp.Diagnostics.AddError("role_permissions resource not configured", "Configure was not called with tf.ProviderData")
+		return
+	}
+	r.assoc.Delete(ctx, req, resp)
+}
+func (r *rolePermissionsResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	if r.assoc == nil {
+		resp.Diagnostics.AddError("role_permissions resource not configured", "Configure was not called with tf.ProviderData")
+		return
+	}
+	r.assoc.ImportState(ctx, req, resp)
+}

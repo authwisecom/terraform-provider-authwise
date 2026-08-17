@@ -32,6 +32,29 @@ resource "authwise_realm" "employees" {
 }
 ```
 
+## Associations
+
+Role/permission edges are managed as **authoritative set resources**
+(`authwise_user_roles`, `authwise_client_roles`,
+`authwise_role_permissions`, `authwise_scope_permissions`): the resource
+owns the entity's full association set, so members associated out of band
+are removed on the next apply. Members are full resource names; import by
+the entity's full name.
+
+```hcl
+resource "authwise_role_permissions" "admin" {
+  role        = authwise_role.admin.name
+  permissions = [
+    authwise_permission.read.name,
+    authwise_permission.write.name,
+  ]
+}
+```
+
+(The awctl `add-*`/`remove-*` verbs are the imperative view of the same
+API; the provider intentionally exposes only the declarative whole-set
+form.)
+
 ## Installing in-progress builds
 
 The provider is not on a public Terraform registry yet (that's tracked in

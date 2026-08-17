@@ -3,7 +3,7 @@ module terraform-provider-authwise
 go 1.25.8
 
 require (
-	github.com/activatedio/tfinfra v0.0.4
+	github.com/activatedio/tfinfra v0.0.8
 	github.com/authwisecom/api-client-go v0.1.0
 	github.com/hashicorp/terraform-plugin-framework v1.19.0
 	github.com/hashicorp/terraform-plugin-framework-jsontypes v0.2.0

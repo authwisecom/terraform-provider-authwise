@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"sort"
 	"strings"
 	"sync"
 	"testing"
@@ -28,10 +29,11 @@ import (
 type fakeIdentityServer struct {
 	identitypb.UnimplementedAuthwiseIdentityServiceServer
 
-	mu     sync.Mutex
-	realms map[string]*corepb.Realm
-	roles  map[string]*corepb.Role
-	seq    int
+	mu        sync.Mutex
+	realms    map[string]*corepb.Realm
+	roles     map[string]*corepb.Role
+	rolePerms map[string]map[string]bool
+	seq       int
 
 	// lastAuthorization records the auth metadata of the most recent call
 	// so tests can assert the bearer flow end to end.
@@ -40,8 +42,9 @@ type fakeIdentityServer struct {
 
 func newFakeIdentityServer() *fakeIdentityServer {
 	return &fakeIdentityServer{
-		realms: map[string]*corepb.Realm{},
-		roles:  map[string]*corepb.Role{},
+		realms:    map[string]*corepb.Realm{},
+		roles:     map[string]*corepb.Role{},
+		rolePerms: map[string]map[string]bool{},
 	}
 }
 
@@ -181,6 +184,81 @@ func (f *fakeIdentityServer) DeleteRole(ctx context.Context, in *identitypb.Dele
 	}
 	delete(f.roles, in.GetName())
 	return &emptypb.Empty{}, nil
+}
+
+// --- Role ↔ Permission association (the tf.Associate family) ---
+
+// AssociatePermissionsToRole applies set/remove semantics over the role's
+// permission set.
+func (f *fakeIdentityServer) AssociatePermissionsToRole(ctx context.Context, in *identitypb.AssociatePermissionsToRoleRequest) (*emptypb.Empty, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.recordAuth(ctx)
+	if _, ok := f.roles[in.GetName()]; !ok {
+		return nil, status.Errorf(codes.NotFound, "role %q not found", in.GetName())
+	}
+	if f.rolePerms[in.GetName()] == nil {
+		f.rolePerms[in.GetName()] = map[string]bool{}
+	}
+	for _, n := range in.GetAssociation().GetSet() {
+		f.rolePerms[in.GetName()][n] = true
+	}
+	for _, n := range in.GetAssociation().GetRemove() {
+		delete(f.rolePerms[in.GetName()], n)
+	}
+	return &emptypb.Empty{}, nil
+}
+
+// ListPermissionsByRole pages one permission at a time so the runtime's
+// next-page-token walk is exercised by every refresh.
+func (f *fakeIdentityServer) ListPermissionsByRole(ctx context.Context, in *identitypb.ListPermissionsByRoleRequest) (*identitypb.ListPermissionsByRoleResponse, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.recordAuth(ctx)
+	if _, ok := f.roles[in.GetName()]; !ok {
+		return nil, status.Errorf(codes.NotFound, "role %q not found", in.GetName())
+	}
+	names := f.rolePermissionsLocked(in.GetName())
+	start := 0
+	if in.GetPageToken() != "" {
+		fmt.Sscanf(in.GetPageToken(), "%d", &start)
+	}
+	res := &identitypb.ListPermissionsByRoleResponse{}
+	if start < len(names) {
+		res.Permissions = []*corepb.Permission{{Name: names[start]}}
+		if start+1 < len(names) {
+			res.NextPageToken = fmt.Sprintf("%d", start+1)
+		}
+	}
+	return res, nil
+}
+
+// rolePermissionsLocked returns the role's permission names, sorted; the
+// caller holds f.mu.
+func (f *fakeIdentityServer) rolePermissionsLocked(role string) []string {
+	names := make([]string, 0, len(f.rolePerms[role]))
+	for n := range f.rolePerms[role] {
+		names = append(names, n)
+	}
+	sort.Strings(names)
+	return names
+}
+
+// rolePermissions is the test-facing variant of rolePermissionsLocked.
+func (f *fakeIdentityServer) rolePermissions(role string) []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.rolePermissionsLocked(role)
+}
+
+// addRolePermission seeds an out-of-band association.
+func (f *fakeIdentityServer) addRolePermission(role, permission string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.rolePerms[role] == nil {
+		f.rolePerms[role] = map[string]bool{}
+	}
+	f.rolePerms[role][permission] = true
 }
 
 // harness boots the fake gRPC server plus a fake OAuth token endpoint and

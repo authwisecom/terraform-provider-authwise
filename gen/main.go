@@ -11,8 +11,8 @@
 //   - ClientSecret (write-once hash/salt; needs write-only arguments)
 //   - ProviderUsernamePassword config (repeated message field)
 //   - access surface (AccessRole, AccessPermission, AccessCondition,
-//     AccessBinding) — follows once the identity surface settles
-//   - association edges (roles/permissions; tf.Associate, task #13)
+//     AccessBinding) — follows once the identity surface settles; its
+//     AccessRole → access-permissions association edge rides with it
 package main
 
 //go:generate go run .
@@ -45,15 +45,27 @@ func resource(scope tf.Scope) gentf.Resource {
 	}
 }
 
-func crud[E any](scope tf.Scope, mutate ...func(r *gentf.Resource)) gentf.Entry {
+func crud[E any](scope tf.Scope, opts ...any) gentf.Entry {
 	r := resource(scope)
-	for _, m := range mutate {
-		m(&r)
+	impls := []any{}
+	for _, o := range opts {
+		switch v := o.(type) {
+		case func(r *gentf.Resource):
+			v(&r)
+		default:
+			impls = append(impls, o)
+		}
 	}
 	return gentf.Entry{
 		Type:            reflect.TypeFor[E](),
-		Implementations: []any{r, gentf.DataSource{}},
+		Implementations: append([]any{r, gentf.DataSource{}}, impls...),
 	}
+}
+
+// associate declares one authoritative association edge (the CLI's
+// add-*/remove-*/list-* verb family becomes one set-valued resource).
+func associate[T any]() gentf.Associate {
+	return gentf.Associate{Target: reflect.TypeFor[T]()}
 }
 
 func withJSON(fields ...string) func(r *gentf.Resource) {
@@ -99,17 +111,18 @@ func main() {
 			crud[corepb.User](scopeRealm,
 				withJSON("metadata", "extra_fields"),
 				withComputed("updated_at"),
+				associate[corepb.Role](),
 			),
 			crud[corepb.Provider](scopeRealm, withJSON("config")),
 
 			// Issuer-scoped.
-			crud[corepb.Client](scopeIssuer, withJSON("config")),
+			crud[corepb.Client](scopeIssuer, withJSON("config"), associate[corepb.Role]()),
 			crud[corepb.Audience](scopeIssuer, withJSON("config")),
 
 			// Audience-scoped.
-			crud[corepb.Role](scopeAudience),
+			crud[corepb.Role](scopeAudience, associate[corepb.Permission]()),
 			crud[corepb.Permission](scopeAudience),
-			crud[corepb.Scope](scopeAudience),
+			crud[corepb.Scope](scopeAudience, associate[corepb.Permission]()),
 
 			// Config builder data sources for Any-packed configs
 			// (Provider.config, Client.config).
