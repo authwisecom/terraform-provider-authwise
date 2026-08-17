@@ -6,13 +6,14 @@ package provider
 import (
 	"context"
 	"crypto/tls"
-	"errors"
+	"fmt"
 	"os"
 
 	tfruntime "github.com/activatedio/tfinfra/pkg/tf"
 	"github.com/authwisecom/api-client-go/authwise"
 	identitypb "github.com/authwisecom/api-client-go/authwise/identity/v1alpha1"
 	"github.com/authwisecom/api-client-go/credentials/bearer"
+	supportcreds "github.com/authwisecom/api-client-support/credentials"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/provider"
@@ -115,27 +116,23 @@ func (p *AuthwiseProvider) Schema(_ context.Context, _ provider.SchemaRequest, r
 	}
 }
 
-// bearerServiceFor selects the token source: the client_credentials grant
-// when a client_id is configured, otherwise the local awctl credential
-// store as the development fallback.
+// bearerServiceFor selects the token source via the shared support
+// library: the client_credentials grant when fully configured, otherwise
+// the local awctl credential store as the development fallback. Partial
+// client credentials are an error naming the gaps.
 func bearerServiceFor(config authwiseProviderModel) (bearer.Service, error) {
 
-	tokenURL := stringOr(config.TokenURL, "AUTHWISE_TOKEN_URL")
-	clientID := stringOr(config.ClientID, "AUTHWISE_CLIENT_ID")
-	clientSecret := stringOr(config.ClientSecret, "AUTHWISE_CLIENT_SECRET")
-
-	if clientID == "" {
-		return bearer.NewDefaultService(), nil
-	}
-	if tokenURL == "" || clientSecret == "" {
-		return nil, errors.New("client_id is set, so token_url and client_secret are required (attributes or AUTHWISE_TOKEN_URL / AUTHWISE_CLIENT_SECRET)")
-	}
-	return bearer.NewClientCredentialsService(bearer.ClientCredentialsParams{
-		TokenURL:     tokenURL,
-		ClientID:     clientID,
-		ClientSecret: clientSecret,
+	svc, err := supportcreds.Select(supportcreds.SelectParams{
+		TokenURL:     stringOr(config.TokenURL, "AUTHWISE_TOKEN_URL"),
+		ClientID:     stringOr(config.ClientID, "AUTHWISE_CLIENT_ID"),
+		ClientSecret: stringOr(config.ClientSecret, "AUTHWISE_CLIENT_SECRET"),
 		Audience:     stringOr(config.Audience, "AUTHWISE_AUDIENCE"),
-	}), nil
+		Hint:         "no valid credentials: run `awctl auth login` for the local development store, or set token_url, client_id, and client_secret (or the AUTHWISE_TOKEN_URL / AUTHWISE_CLIENT_ID / AUTHWISE_CLIENT_SECRET environment variables)",
+	})
+	if err != nil {
+		return nil, fmt.Errorf("%w; set the provider attributes or the AUTHWISE_* environment variables", err)
+	}
+	return svc, nil
 }
 
 // stringOr returns the attribute value, falling back to the environment
