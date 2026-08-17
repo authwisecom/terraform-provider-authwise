@@ -27,6 +27,11 @@ stages:
   before_script:
     - mkdir -p .go
     - export GOPATH="$CI_PROJECT_DIR/.go"
+    # Private Authwise modules (api-client-go, api-client-support): fetch
+    # same-instance projects with the job token (those projects allowlist
+    # this one).
+    - export GOPRIVATE=gitlab.authwise.io/*
+    - git config --global url."https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.authwise.io/".insteadOf "https://gitlab.authwise.io/"
     - '[ -e ".golangci-lint/bin/golangci-lint" ] || (mkdir -p .golangci-lint/bin && curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/HEAD/install.sh | sh -s -- -b .golangci-lint/bin v2.12.2)'
   cache:
     - key:
