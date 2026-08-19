@@ -22,8 +22,8 @@ import (
 
 	gentf "github.com/activatedio/tfinfra/genlib/tf"
 	tf "github.com/activatedio/tfinfra/pkg/tf"
-	identitypb "gitlab.authwise.io/authwise/api-client-go/authwise/identity/v1alpha1"
-	corepb "gitlab.authwise.io/authwise/api-client-go/authwise/types/core/v1alpha1"
+	identitypb "git.authwise.com/authwise/api-client-go/authwise/identity/v1alpha1"
+	corepb "git.authwise.com/authwise/api-client-go/authwise/types/core/v1alpha1"
 )
 
 // The Authwise scope table (mirrors kit's families.Scope).

@@ -4,12 +4,12 @@ package generated
 
 import (
 	"context"
+	v1alpha1 "git.authwise.com/authwise/api-client-go/authwise/types/core/v1alpha1"
 	jsontypes "github.com/hashicorp/terraform-plugin-framework-jsontypes/jsontypes"
 	datasource "github.com/hashicorp/terraform-plugin-framework/datasource"
 	schema "github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	diag "github.com/hashicorp/terraform-plugin-framework/diag"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
-	v1alpha1 "gitlab.authwise.io/authwise/api-client-go/authwise/types/core/v1alpha1"
 	protojson "google.golang.org/protobuf/encoding/protojson"
 	anypb "google.golang.org/protobuf/types/known/anypb"
 )

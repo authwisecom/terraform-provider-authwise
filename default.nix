@@ -13,7 +13,6 @@ stdenv.mkDerivation {
   shellHook = ''
     export GOPATH=$HOME/go
     export PATH=$PATH:$HOME/go/bin
-    export GOPRIVATE=gitlab.authwise.io/*
   '';
 
 }

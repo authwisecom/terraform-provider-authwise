@@ -9,7 +9,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
 
-	"terraform-provider-authwise/internal/provider"
+	"git.authwise.com/authwise/terraform-provider-authwise/internal/provider"
 )
 
 // version is stamped via -ldflags at build time (make build / CI).

@@ -16,15 +16,15 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/provider/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"gitlab.authwise.io/authwise/api-client-go/authwise"
-	identitypb "gitlab.authwise.io/authwise/api-client-go/authwise/identity/v1alpha1"
-	"gitlab.authwise.io/authwise/api-client-go/credentials/bearer"
-	supportcreds "gitlab.authwise.io/authwise/api-client-support/credentials"
+	"git.authwise.com/authwise/api-client-support/authwise"
+	identitypb "git.authwise.com/authwise/api-client-go/authwise/identity/v1alpha1"
+	"git.authwise.com/authwise/api-client-support/credentials/bearer"
+	supportcreds "git.authwise.com/authwise/api-client-support/credentials"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 
-	"terraform-provider-authwise/internal/generated"
+	"git.authwise.com/authwise/terraform-provider-authwise/internal/generated"
 )
 
 var _ provider.Provider = &AuthwiseProvider{}

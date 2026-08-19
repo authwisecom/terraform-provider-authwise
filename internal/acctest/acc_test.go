@@ -17,9 +17,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
-	corepb "gitlab.authwise.io/authwise/api-client-go/authwise/types/core/v1alpha1"
+	corepb "git.authwise.com/authwise/api-client-go/authwise/types/core/v1alpha1"
 
-	"terraform-provider-authwise/internal/provider"
+	"git.authwise.com/authwise/terraform-provider-authwise/internal/provider"
 )
 
 // checkServer wraps a fake-server assertion as a state check.

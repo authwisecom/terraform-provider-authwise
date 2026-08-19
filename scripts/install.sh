@@ -17,7 +17,7 @@
 # Without a version argument the newest published package is installed.
 set -eu
 
-API="${AUTHWISE_GITLAB_API:-https://gitlab.authwise.io/api/v4/projects/112}"
+API="${AUTHWISE_GITLAB_API:-https://git.authwise.com/api/v4/projects/7}"
 TOKEN="${GITLAB_TOKEN:?set GITLAB_TOKEN to a GitLab token with read_api}"
 
 VERSION="${1:-}"

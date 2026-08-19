@@ -14,8 +14,8 @@ variables:
   GIT_FETCH_EXTRA_FLAGS: "--tags"
 
 default:
-  tags: ['ubuntu-amd64']
-  image: registry.authwise.io/authwise/build-containers/go-build:15
+  tags: ['pub-amd64']
+  image: registry.authwise.com/authwise/build-containers/go-build:15
 
 stages:
   - test
@@ -27,11 +27,8 @@ stages:
   before_script:
     - mkdir -p .go
     - export GOPATH="$CI_PROJECT_DIR/.go"
-    # Private Authwise modules (api-client-go, api-client-support): fetch
-    # same-instance projects with the job token (those projects allowlist
-    # this one).
-    - export GOPRIVATE=gitlab.authwise.io/*
-    - git config --global url."https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.authwise.io/".insteadOf "https://gitlab.authwise.io/"
+    # api-client-go and api-client-support are public modules now: no
+    # GOPRIVATE, no credential helper, no job-token allowlist entry needed.
     - '[ -e ".golangci-lint/bin/golangci-lint" ] || (mkdir -p .golangci-lint/bin && curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/HEAD/install.sh | sh -s -- -b .golangci-lint/bin v2.12.2)'
   cache:
     - key:

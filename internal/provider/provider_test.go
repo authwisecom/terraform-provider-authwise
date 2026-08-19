@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"terraform-provider-authwise/internal/provider"
+	"git.authwise.com/authwise/terraform-provider-authwise/internal/provider"
 )
 
 // TestProviderSurface validates the provider schema plus every generated
