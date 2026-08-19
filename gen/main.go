@@ -20,10 +20,10 @@ package main
 import (
 	"reflect"
 
-	gentf "github.com/activatedio/tfinfra/genlib/tf"
-	tf "github.com/activatedio/tfinfra/pkg/tf"
 	identitypb "git.authwise.com/authwise/api-client-go/authwise/identity/v1alpha1"
 	corepb "git.authwise.com/authwise/api-client-go/authwise/types/core/v1alpha1"
+	gentf "github.com/activatedio/tfinfra/genlib/tf"
+	tf "github.com/activatedio/tfinfra/pkg/tf"
 )
 
 // The Authwise scope table (mirrors kit's families.Scope).

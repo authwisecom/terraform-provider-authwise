@@ -4,13 +4,12 @@ import (
 	"context"
 	"testing"
 
+	"git.authwise.com/authwise/terraform-provider-authwise/internal/provider"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	fwprovider "github.com/hashicorp/terraform-plugin-framework/provider"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"git.authwise.com/authwise/terraform-provider-authwise/internal/provider"
 )
 
 // TestProviderSurface validates the provider schema plus every generated

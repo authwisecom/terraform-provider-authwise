@@ -9,6 +9,11 @@ import (
 	"fmt"
 	"os"
 
+	identitypb "git.authwise.com/authwise/api-client-go/authwise/identity/v1alpha1"
+	"git.authwise.com/authwise/api-client-support/authwise"
+	supportcreds "git.authwise.com/authwise/api-client-support/credentials"
+	"git.authwise.com/authwise/api-client-support/credentials/bearer"
+	"git.authwise.com/authwise/terraform-provider-authwise/internal/generated"
 	tfruntime "github.com/activatedio/tfinfra/pkg/tf"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -16,15 +21,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/provider/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"git.authwise.com/authwise/api-client-support/authwise"
-	identitypb "git.authwise.com/authwise/api-client-go/authwise/identity/v1alpha1"
-	"git.authwise.com/authwise/api-client-support/credentials/bearer"
-	supportcreds "git.authwise.com/authwise/api-client-support/credentials"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
-
-	"git.authwise.com/authwise/terraform-provider-authwise/internal/generated"
 )
 
 var _ provider.Provider = &AuthwiseProvider{}

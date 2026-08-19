@@ -7,9 +7,8 @@ import (
 	"flag"
 	"log"
 
-	"github.com/hashicorp/terraform-plugin-framework/providerserver"
-
 	"git.authwise.com/authwise/terraform-provider-authwise/internal/provider"
+	"github.com/hashicorp/terraform-plugin-framework/providerserver"
 )
 
 // version is stamped via -ldflags at build time (make build / CI).
