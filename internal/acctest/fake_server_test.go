@@ -11,6 +11,7 @@ import (
 	"sync"
 	"testing"
 
+	accesspb "git.authwise.com/authwise/api-client-go/authwise/access/v1alpha1"
 	identitypb "git.authwise.com/authwise/api-client-go/authwise/identity/v1alpha1"
 	corepb "git.authwise.com/authwise/api-client-go/authwise/types/core/v1alpha1"
 	"google.golang.org/grpc"
@@ -33,6 +34,8 @@ type fakeIdentityServer struct {
 	realms    map[string]*corepb.Realm
 	roles     map[string]*corepb.Role
 	rolePerms map[string]map[string]bool
+	audiences map[string]*corepb.Audience
+	clients   map[string]*corepb.Client
 	seq       int
 
 	// lastAuthorization records the auth metadata of the most recent call
@@ -45,6 +48,8 @@ func newFakeIdentityServer() *fakeIdentityServer {
 		realms:    map[string]*corepb.Realm{},
 		roles:     map[string]*corepb.Role{},
 		rolePerms: map[string]map[string]bool{},
+		audiences: map[string]*corepb.Audience{},
+		clients:   map[string]*corepb.Client{},
 	}
 }
 
@@ -186,6 +191,124 @@ func (f *fakeIdentityServer) DeleteRole(ctx context.Context, in *identitypb.Dele
 	return &emptypb.Empty{}, nil
 }
 
+// --- Audience and Client (issuer-scoped; the console pair guard needs) ---
+
+func (f *fakeIdentityServer) GetAudience(ctx context.Context, in *identitypb.GetAudienceRequest) (*corepb.Audience, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.recordAuth(ctx)
+	a, ok := f.audiences[in.GetName()]
+	if !ok {
+		return nil, status.Errorf(codes.NotFound, "audience %q not found", in.GetName())
+	}
+	return proto.Clone(a).(*corepb.Audience), nil
+}
+
+func (f *fakeIdentityServer) CreateAudience(ctx context.Context, in *identitypb.CreateAudienceRequest) (*corepb.Audience, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.recordAuth(ctx)
+	a := proto.Clone(in.GetAudience()).(*corepb.Audience)
+	a.Name = in.GetParent() + "/audiences/" + f.nextID("a")
+	f.audiences[a.GetName()] = a
+	return proto.Clone(a).(*corepb.Audience), nil
+}
+
+func (f *fakeIdentityServer) PatchAudience(ctx context.Context, in *identitypb.PatchAudienceRequest) (*corepb.Audience, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.recordAuth(ctx)
+	existing, ok := f.audiences[in.GetName()]
+	if !ok {
+		return nil, status.Errorf(codes.NotFound, "audience %q not found", in.GetName())
+	}
+	for _, path := range in.GetUpdateMask().GetPaths() {
+		switch path {
+		case "display_name":
+			existing.DisplayName = in.GetAudience().GetDisplayName()
+		case "labels":
+			existing.Labels = in.GetAudience().GetLabels()
+		case "config":
+			existing.Config = in.GetAudience().GetConfig()
+		case "appearance_profile_id":
+			existing.AppearanceProfileId = in.GetAudience().GetAppearanceProfileId()
+		default:
+			return nil, status.Errorf(codes.InvalidArgument, "unsupported update_mask path %q", path)
+		}
+	}
+	return proto.Clone(existing).(*corepb.Audience), nil
+}
+
+func (f *fakeIdentityServer) DeleteAudience(ctx context.Context, in *identitypb.DeleteAudienceRequest) (*emptypb.Empty, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.recordAuth(ctx)
+	if _, ok := f.audiences[in.GetName()]; !ok {
+		return nil, status.Errorf(codes.NotFound, "audience %q not found", in.GetName())
+	}
+	delete(f.audiences, in.GetName())
+	return &emptypb.Empty{}, nil
+}
+
+func (f *fakeIdentityServer) GetClient(ctx context.Context, in *identitypb.GetClientRequest) (*corepb.Client, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.recordAuth(ctx)
+	c, ok := f.clients[in.GetName()]
+	if !ok {
+		return nil, status.Errorf(codes.NotFound, "client %q not found", in.GetName())
+	}
+	return proto.Clone(c).(*corepb.Client), nil
+}
+
+func (f *fakeIdentityServer) CreateClient(ctx context.Context, in *identitypb.CreateClientRequest) (*corepb.Client, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.recordAuth(ctx)
+	c := proto.Clone(in.GetClient()).(*corepb.Client)
+	c.Name = in.GetParent() + "/clients/" + f.nextID("c")
+	f.clients[c.GetName()] = c
+	return proto.Clone(c).(*corepb.Client), nil
+}
+
+func (f *fakeIdentityServer) PatchClient(ctx context.Context, in *identitypb.PatchClientRequest) (*corepb.Client, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.recordAuth(ctx)
+	existing, ok := f.clients[in.GetName()]
+	if !ok {
+		return nil, status.Errorf(codes.NotFound, "client %q not found", in.GetName())
+	}
+	for _, path := range in.GetUpdateMask().GetPaths() {
+		switch path {
+		case "display_name":
+			existing.DisplayName = in.GetClient().GetDisplayName()
+		case "audience_id":
+			existing.AudienceId = in.GetClient().GetAudienceId()
+		case "grant_type":
+			existing.GrantType = in.GetClient().GetGrantType()
+		case "config":
+			existing.Config = in.GetClient().GetConfig()
+		case "labels":
+			existing.Labels = in.GetClient().GetLabels()
+		default:
+			return nil, status.Errorf(codes.InvalidArgument, "unsupported update_mask path %q", path)
+		}
+	}
+	return proto.Clone(existing).(*corepb.Client), nil
+}
+
+func (f *fakeIdentityServer) DeleteClient(ctx context.Context, in *identitypb.DeleteClientRequest) (*emptypb.Empty, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.recordAuth(ctx)
+	if _, ok := f.clients[in.GetName()]; !ok {
+		return nil, status.Errorf(codes.NotFound, "client %q not found", in.GetName())
+	}
+	delete(f.clients, in.GetName())
+	return &emptypb.Empty{}, nil
+}
+
 // --- Role ↔ Permission association (the tf.Associate family) ---
 
 // AssociatePermissionsToRole applies set/remove semantics over the role's
@@ -265,6 +388,7 @@ func (f *fakeIdentityServer) addRolePermission(role, permission string) {
 // renders the provider block pointing at them.
 type harness struct {
 	fake        *fakeIdentityServer
+	access      *fakeAccessServer
 	grpcAddr    string
 	tokenServer *httptest.Server
 	tokenCalls  int
@@ -274,7 +398,7 @@ func newHarness(t *testing.T) *harness {
 
 	t.Helper()
 
-	h := &harness{fake: newFakeIdentityServer()}
+	h := &harness{fake: newFakeIdentityServer(), access: newFakeAccessServer()}
 
 	lis, err := new(net.ListenConfig).Listen(t.Context(), "tcp", "127.0.0.1:0")
 	if err != nil {
@@ -284,6 +408,7 @@ func newHarness(t *testing.T) *harness {
 
 	s := grpc.NewServer()
 	identitypb.RegisterAuthwiseIdentityServiceServer(s, h.fake)
+	accesspb.RegisterAuthwiseAccessServiceServer(s, h.access)
 	go func() { _ = s.Serve(lis) }()
 	t.Cleanup(s.Stop)
 

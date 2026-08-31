@@ -49,6 +49,11 @@ func ScopeResourceSchema() schema.Schema {
 				MarkdownDescription: "Full resource name; serves as the Terraform ID.",
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
+			"scope_id": schema.StringAttribute{
+				MarkdownDescription: "Caller-assigned resource id — the last segment of `name`, which the server composes from the parent and this id. Changing it replaces the resource.",
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Required:            true,
+			},
 			"tenant_id": schema.StringAttribute{
 				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default. Changing it replaces the resource.",
 				Optional:            true,
@@ -62,6 +67,7 @@ func ScopeResourceSchema() schema.Schema {
 // ScopeModel is the Terraform plan/state model for Scope.
 type ScopeModel struct {
 	Name       types.String `tfsdk:"name"`
+	ScopeId    types.String `tfsdk:"scope_id"`
 	TenantId   types.String `tfsdk:"tenant_id"`
 	IssuerId   types.String `tfsdk:"issuer_id"`
 	AudienceId types.String `tfsdk:"audience_id"`
@@ -77,6 +83,7 @@ func NewScopeModel() *ScopeModel {
 		IssuerId:   types.StringNull(),
 		Kind:       types.StringNull(),
 		Name:       types.StringNull(),
+		ScopeId:    types.StringNull(),
 		TenantId:   types.StringNull(),
 	}
 }
@@ -185,11 +192,12 @@ func newScopeCrud(providerData any) (*tf.Crud[*v1alpha1.Scope, *ScopeModel], dia
 				})
 			},
 		},
-		Collection: "scopes",
-		Defaults:   pd.Defaults,
-		NewModel:   NewScopeModel,
-		Scope:      tf.NewScope("tenants", "issuers", "audiences"),
-		TypeName:   "scope",
+		Collection:  "scopes",
+		Defaults:    pd.Defaults,
+		IDAttribute: "scope_id",
+		NewModel:    NewScopeModel,
+		Scope:       tf.NewScope("tenants", "issuers", "audiences"),
+		TypeName:    "scope",
 	}), diags
 }
 
@@ -260,6 +268,10 @@ func ScopeDataSourceSchema() schema1.Schema {
 			"name": schema1.StringAttribute{
 				MarkdownDescription: "Full resource name of the object to read.",
 				Required:            true,
+			},
+			"scope_id": schema1.StringAttribute{
+				Computed:            true,
+				MarkdownDescription: "Caller-assigned resource id — the last segment of `name`.",
 			},
 			"tenant_id": schema1.StringAttribute{Computed: true},
 		},

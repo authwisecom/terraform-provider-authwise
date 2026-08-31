@@ -10,9 +10,6 @@
 //   - Event (read-only; needs standalone data sources / DataSourceList)
 //   - ClientSecret (write-once hash/salt; needs write-only arguments)
 //   - ProviderUsernamePassword config (repeated message field)
-//   - access surface (AccessRole, AccessPermission, AccessCondition,
-//     AccessBinding) — follows once the identity surface settles; its
-//     AccessRole → access-permissions association edge rides with it
 package main
 
 //go:generate go run .
@@ -20,6 +17,7 @@ package main
 import (
 	"reflect"
 
+	accesspb "git.authwise.com/authwise/api-client-go/authwise/access/v1alpha1"
 	identitypb "git.authwise.com/authwise/api-client-go/authwise/identity/v1alpha1"
 	corepb "git.authwise.com/authwise/api-client-go/authwise/types/core/v1alpha1"
 	gentf "github.com/activatedio/tfinfra/genlib/tf"
@@ -34,7 +32,10 @@ var (
 	scopeAudience = tf.NewScope("tenants", "issuers", "audiences")
 )
 
-var identityClient = reflect.TypeFor[identitypb.AuthwiseIdentityServiceClient]()
+var (
+	identityClient = reflect.TypeFor[identitypb.AuthwiseIdentityServiceClient]()
+	accessClient   = reflect.TypeFor[accesspb.AuthwiseAccessServiceClient]()
+)
 
 // resource builds the standard identity resource marker.
 func resource(scope tf.Scope) gentf.Resource {
@@ -68,6 +69,30 @@ func associate[T any]() gentf.Associate {
 	return gentf.Associate{Target: reflect.TypeFor[T]()}
 }
 
+// access retargets an entry at the Access service client; the whole access
+// surface is audience-scoped.
+func access(r *gentf.Resource) {
+	r.ClientType = accessClient
+	r.Client = "access"
+}
+
+// callerNamed marks the entities kit keys by a name the caller supplies
+// (the create request carries it in the entity's name field) rather than by
+// a generated AWID: the resource gains a required "<type>_id" attribute.
+func callerNamed(r *gentf.Resource) {
+	r.CallerNamed = true
+}
+
+// withCollection overrides the derived AIP collection segment; kit's access
+// collections are kebab-case ("access-roles", not "accessRoles").
+func withCollection(collection string) func(r *gentf.Resource) {
+	return func(r *gentf.Resource) { r.Collection = collection }
+}
+
+func withRequired(fields ...string) func(r *gentf.Resource) {
+	return func(r *gentf.Resource) { r.Required = fields }
+}
+
 func withJSON(fields ...string) func(r *gentf.Resource) {
 	return func(r *gentf.Resource) { r.JSON = fields }
 }
@@ -95,7 +120,7 @@ func main() {
 		Package: "generated",
 		Entries: []gentf.Entry{
 			// Tenant-scoped.
-			crud[corepb.Domain](scopeTenant, withJSON("config")),
+			crud[corepb.Domain](scopeTenant, callerNamed, withJSON("config")),
 			crud[corepb.Issuer](scopeTenant, withJSON("config")),
 			crud[corepb.Realm](scopeTenant),
 			crud[corepb.Theme](scopeTenant, withJSON(
@@ -122,7 +147,23 @@ func main() {
 			// Audience-scoped.
 			crud[corepb.Role](scopeAudience, associate[corepb.Permission]()),
 			crud[corepb.Permission](scopeAudience),
-			crud[corepb.Scope](scopeAudience, associate[corepb.Permission]()),
+			crud[corepb.Scope](scopeAudience, callerNamed, associate[corepb.Permission]()),
+
+			// Access service (audience-scoped). AccessPermission and
+			// AccessRole are name-keyed in kit — the catalog's vocabulary is
+			// the deployer's to choose ("guardcontrol.tenants.get") — while
+			// AccessCondition and AccessBinding are AWID-keyed.
+			crud[corepb.AccessPermission](scopeAudience, access, callerNamed,
+				withCollection("access-permissions")),
+			crud[corepb.AccessRole](scopeAudience, access, callerNamed,
+				withCollection("access-roles"),
+				associate[corepb.AccessPermission]()),
+			crud[corepb.AccessCondition](scopeAudience, access,
+				withCollection("access-conditions")),
+			crud[corepb.AccessBinding](scopeAudience, access,
+				withCollection("access-bindings"),
+				withRequired("subject_type", "subject_id", "role_name"),
+				withComputed("created_by")),
 
 			// Config builder data sources for Any-packed configs
 			// (Provider.config, Client.config).

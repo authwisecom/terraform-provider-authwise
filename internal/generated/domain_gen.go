@@ -34,6 +34,11 @@ func DomainResourceSchema() schema.Schema {
 				Optional:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
+			"domain_id": schema.StringAttribute{
+				MarkdownDescription: "Caller-assigned resource id — the last segment of `name`, which the server composes from the parent and this id. Changing it replaces the resource.",
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Required:            true,
+			},
 			"labels": schema.MapAttribute{
 				Computed:      true,
 				ElementType:   types.StringType,
@@ -58,6 +63,7 @@ func DomainResourceSchema() schema.Schema {
 // DomainModel is the Terraform plan/state model for Domain.
 type DomainModel struct {
 	Name     types.String         `tfsdk:"name"`
+	DomainId types.String         `tfsdk:"domain_id"`
 	TenantId types.String         `tfsdk:"tenant_id"`
 	Labels   types.Map            `tfsdk:"labels"`
 	Config   jsontypes.Normalized `tfsdk:"config"`
@@ -67,6 +73,7 @@ type DomainModel struct {
 func NewDomainModel() *DomainModel {
 	return &DomainModel{
 		Config:   jsontypes.NewNormalizedNull(),
+		DomainId: types.StringNull(),
 		Labels:   types.MapNull(types.StringType),
 		Name:     types.StringNull(),
 		TenantId: types.StringNull(),
@@ -195,11 +202,12 @@ func newDomainCrud(providerData any) (*tf.Crud[*v1alpha1.Domain, *DomainModel], 
 				})
 			},
 		},
-		Collection: "domains",
-		Defaults:   pd.Defaults,
-		NewModel:   NewDomainModel,
-		Scope:      tf.NewScope("tenants"),
-		TypeName:   "domain",
+		Collection:  "domains",
+		Defaults:    pd.Defaults,
+		IDAttribute: "domain_id",
+		NewModel:    NewDomainModel,
+		Scope:       tf.NewScope("tenants"),
+		TypeName:    "domain",
 	}), diags
 }
 
@@ -266,6 +274,10 @@ func DomainDataSourceSchema() schema1.Schema {
 			"config": schema1.StringAttribute{
 				Computed:   true,
 				CustomType: jsontypes.NormalizedType{},
+			},
+			"domain_id": schema1.StringAttribute{
+				Computed:            true,
+				MarkdownDescription: "Caller-assigned resource id — the last segment of `name`.",
 			},
 			"labels": schema1.MapAttribute{
 				Computed:    true,

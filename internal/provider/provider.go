@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 
+	accesspb "git.authwise.com/authwise/api-client-go/authwise/access/v1alpha1"
 	identitypb "git.authwise.com/authwise/api-client-go/authwise/identity/v1alpha1"
 	"git.authwise.com/authwise/api-client-support/authwise"
 	supportcreds "git.authwise.com/authwise/api-client-support/credentials"
@@ -59,9 +60,12 @@ func New(version string) func() provider.Provider {
 	}
 }
 
+// providerTypeName prefixes every resource and data source type.
+const providerTypeName = "authwise"
+
 // Metadata implements provider.Provider.
 func (p *AuthwiseProvider) Metadata(_ context.Context, _ provider.MetadataRequest, resp *provider.MetadataResponse) {
-	resp.TypeName = "authwise"
+	resp.TypeName = providerTypeName
 	resp.Version = p.version
 }
 
@@ -198,6 +202,7 @@ func (p *AuthwiseProvider) Configure(ctx context.Context, req provider.Configure
 	providerData := &tfruntime.ProviderData{
 		Clients: map[string]any{
 			"identity": identitypb.NewAuthwiseIdentityServiceClient(conn),
+			"access":   accesspb.NewAuthwiseAccessServiceClient(conn),
 		},
 		Defaults: defaults,
 	}
@@ -206,9 +211,31 @@ func (p *AuthwiseProvider) Configure(ctx context.Context, req provider.Configure
 	resp.DataSourceData = providerData
 }
 
-// Resources implements provider.Provider with the generated constructors.
-func (p *AuthwiseProvider) Resources(_ context.Context) []func() resource.Resource {
-	return generated.Resources()
+// Resources implements provider.Provider with the generated constructors,
+// substituting the hand-written wrappers that add behavior the generator does
+// not express.
+func (p *AuthwiseProvider) Resources(ctx context.Context) []func() resource.Resource {
+	return substitute(ctx, generated.Resources(), map[string]func() resource.Resource{
+		accessBindingTypeName: newAccessBindingResource,
+	})
+}
+
+// substitute replaces generated constructors with wrappers, matched on the
+// Terraform type name each resource reports rather than on list position.
+func substitute(ctx context.Context, generated []func() resource.Resource, wrappers map[string]func() resource.Resource) []func() resource.Resource {
+
+	out := make([]func() resource.Resource, 0, len(generated))
+
+	for _, factory := range generated {
+		resp := &resource.MetadataResponse{}
+		factory().Metadata(ctx, resource.MetadataRequest{ProviderTypeName: providerTypeName}, resp)
+		if w, ok := wrappers[resp.TypeName]; ok {
+			factory = w
+		}
+		out = append(out, factory)
+	}
+
+	return out
 }
 
 // DataSources implements provider.Provider with the generated constructors.

@@ -2,8 +2,10 @@ package provider_test
 
 import (
 	"context"
+	"reflect"
 	"testing"
 
+	"git.authwise.com/authwise/terraform-provider-authwise/internal/generated"
 	"git.authwise.com/authwise/terraform-provider-authwise/internal/provider"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	fwprovider "github.com/hashicorp/terraform-plugin-framework/provider"
@@ -49,9 +51,19 @@ func TestProviderSurface(t *testing.T) {
 		diags := s.Schema.ValidateImplementation(ctx)
 		require.False(t, diags.HasError(), "%s: %v", m.TypeName, diags)
 	}
-	// 15 entity resources + 4 association resources (user_roles,
-	// client_roles, role_permissions, scope_permissions).
-	assert.Len(t, resourceTypes, 19)
+	// 19 entity resources + 5 association resources (user_roles,
+	// client_roles, role_permissions, scope_permissions,
+	// access_role_access_permissions).
+	assert.Len(t, resourceTypes, 24)
+	for _, want := range []string{
+		"authwise_access_permission",
+		"authwise_access_role",
+		"authwise_access_role_access_permissions",
+		"authwise_access_condition",
+		"authwise_access_binding",
+	} {
+		assert.True(t, resourceTypes[want], "missing resource %s", want)
+	}
 
 	dataSourceTypes := map[string]bool{}
 	for _, newDataSource := range p.DataSources(ctx) {
@@ -70,7 +82,35 @@ func TestProviderSurface(t *testing.T) {
 		diags := s.Schema.ValidateImplementation(ctx)
 		require.False(t, diags.HasError(), "%s: %v", m.TypeName, diags)
 	}
-	// 15 singular entity data sources + 10 config builder data sources.
-	assert.Len(t, dataSourceTypes, 25)
+	// 19 singular entity data sources + 10 config builder data sources.
+	assert.Len(t, dataSourceTypes, 29)
+}
 
+// TestAccessBindingIsWrapped asserts the substitution actually happened:
+// authwise_access_binding must be the wrapper carrying the role-reference
+// check, not the bare generated resource, and it must still present the
+// generated schema.
+func TestAccessBindingIsWrapped(t *testing.T) {
+
+	ctx := context.Background()
+	p := provider.New("test")()
+
+	var found resource.Resource
+	for _, newResource := range p.Resources(ctx) {
+		r := newResource()
+		m := &resource.MetadataResponse{}
+		r.Metadata(ctx, resource.MetadataRequest{ProviderTypeName: "authwise"}, m)
+		if m.TypeName == "authwise_access_binding" {
+			found = r
+		}
+	}
+
+	require.NotNil(t, found)
+	assert.NotEqual(t, reflect.TypeOf(generated.NewAccessBindingResource()), reflect.TypeOf(found),
+		"authwise_access_binding must be the validating wrapper")
+
+	s := &resource.SchemaResponse{}
+	found.Schema(ctx, resource.SchemaRequest{}, s)
+	require.False(t, s.Diagnostics.HasError(), s.Diagnostics)
+	assert.Contains(t, s.Schema.Attributes, "role_name")
 }

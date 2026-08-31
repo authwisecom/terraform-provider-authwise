@@ -32,11 +32,55 @@ resource "authwise_realm" "employees" {
 }
 ```
 
+## Caller-named resources
+
+Most resources get a server-assigned AWID, and `name` — the full AIP
+resource name — is computed. A few are keyed by a name the caller chooses
+instead: the access catalog's vocabulary (`authwise_access_permission`,
+`authwise_access_role`) and `authwise_domain` / `authwise_scope`. Those
+carry a required `<type>_id` attribute holding that id, and changing it
+replaces the resource:
+
+```hcl
+resource "authwise_access_permission" "tenants_get" {
+  access_permission_id = "guardcontrol.tenants.get"   # the id IS the name
+  service              = "guardcontrol"
+  kind                 = "custom"                     # vs kit's own `system` catalog
+
+  # name (computed) = tenants/t-01/issuers/i-01/audiences/a-01
+  #                     /access-permissions/guardcontrol.tenants.get
+}
+```
+
+`name` stays the Terraform ID and the import ID; importing fills the id
+attribute from the name's last segment.
+
+## The access surface
+
+`authwise_access_permission`, `authwise_access_role`,
+`authwise_access_role_access_permissions`, `authwise_access_condition` and
+`authwise_access_binding` manage an audience's authorization catalog.
+`examples/guard-catalog` is a complete worked example — guard-control's
+prerequisite catalog, applied by the acceptance suite on every run.
+
+Two things worth knowing:
+
+- **Requires kit >= 1.10.0.** The role's permission set is refreshed
+  through `ListAccessPermissionsByAccessRole`, which was not audience-scoped
+  before that release (kit#312): against an older install a refresh reports
+  other audiences' edges, inventing drift or hiding it.
+- **`authwise_access_binding` validates `role_name` before writing.** The
+  API accepts a binding naming a role that does not exist in its audience,
+  stores it, and grants nothing — with a clean plan forever after (kit#296).
+  The provider resolves the role in the binding's own audience first and
+  fails the apply instead.
+
 ## Associations
 
 Role/permission edges are managed as **authoritative set resources**
 (`authwise_user_roles`, `authwise_client_roles`,
-`authwise_role_permissions`, `authwise_scope_permissions`): the resource
+`authwise_role_permissions`, `authwise_scope_permissions`,
+`authwise_access_role_access_permissions`): the resource
 owns the entity's full association set, so members associated out of band
 are removed on the next apply. Members are full resource names; import by
 the entity's full name.
