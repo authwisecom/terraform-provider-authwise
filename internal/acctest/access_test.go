@@ -24,18 +24,15 @@ func TestAccAccessCatalog_Lifecycle(t *testing.T) {
 resource "authwise_access_permission" "get" {
   access_permission_id = "guardcontrol.tenants.get"
   service              = "guardcontrol"
-  kind                 = "custom"
 }
 
 resource "authwise_access_permission" "update" {
   access_permission_id = "guardcontrol.tenants.update"
   service              = "guardcontrol"
-  kind                 = "custom"
 }
 
 resource "authwise_access_role" "admin" {
   access_role_id = "guardcontrol.admin"
-  kind           = "custom"
   description    = %q
 }
 

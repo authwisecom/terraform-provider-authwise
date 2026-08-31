@@ -76,20 +76,22 @@ locals {
 # 1. The vocabulary. One permission per guard-control API method, named by the
 #    deployer rather than the server — access_permission_id IS the name the
 #    authorization engine matches on.
+#
+#    `kind` is deliberately unset. It is documented as provenance (`system`
+#    for kit's own catalog, `custom` for an operator's), but nothing in kit
+#    reads it, defaults it or validates it, and the catalog these entries live
+#    in is already identified by its audience and by `service`. Tracked as
+#    kit#322; if that lands on keeping the field, set kind = "custom" here.
 resource "authwise_access_permission" "guardcontrol" {
   for_each = toset(local.guardcontrol_permissions)
 
   access_permission_id = each.value
   service              = "guardcontrol"
-  # `custom` marks the entry as operator-defined, as opposed to the `system`
-  # catalog kit ships and bootstraps for its own methods.
-  kind = "custom"
 }
 
 # 2. What you actually grant.
 resource "authwise_access_role" "guardcontrol_admin" {
   access_role_id = "guardcontrol.admin"
-  kind           = "custom"
   description    = "Full guard-control console administration."
 }
 

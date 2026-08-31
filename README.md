@@ -45,7 +45,6 @@ replaces the resource:
 resource "authwise_access_permission" "tenants_get" {
   access_permission_id = "guardcontrol.tenants.get"   # the id IS the name
   service              = "guardcontrol"
-  kind                 = "custom"                     # vs kit's own `system` catalog
 
   # name (computed) = tenants/t-01/issuers/i-01/audiences/a-01
   #                     /access-permissions/guardcontrol.tenants.get
