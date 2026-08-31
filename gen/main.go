@@ -83,8 +83,9 @@ func callerNamed(r *gentf.Resource) {
 	r.CallerNamed = true
 }
 
-// withCollection overrides the derived AIP collection segment; kit's access
-// collections are kebab-case ("access-roles", not "accessRoles").
+// withCollection overrides the derived AIP collection segment. kit's
+// collections are kebab-case ("access-roles", "appearance-profiles"), while
+// tfinfra derives the AIP-122 lower-camel default.
 func withCollection(collection string) func(r *gentf.Resource) {
 	return func(r *gentf.Resource) { r.Collection = collection }
 }
@@ -127,7 +128,6 @@ func main() {
 				"stylesheet_attributes", "content",
 				"placeholder_stylesheet_attributes", "placeholder_content",
 			)),
-			crud[corepb.AppearanceProfile](scopeTenant, withJSON("stylesheet_attributes", "content")),
 			crud[corepb.Secret](scopeTenant, withSensitive("value")),
 			crud[corepb.Asset](scopeTenant),
 			crud[corepb.Endpoint](scopeTenant),
@@ -143,6 +143,9 @@ func main() {
 			// Issuer-scoped.
 			crud[corepb.Client](scopeIssuer, withJSON("config"), associate[corepb.Role]()),
 			crud[corepb.Audience](scopeIssuer, withJSON("config")),
+			crud[corepb.AppearanceProfile](scopeIssuer,
+				withCollection("appearance-profiles"),
+				withJSON("stylesheet_attributes", "content")),
 
 			// Audience-scoped.
 			crud[corepb.Role](scopeAudience, associate[corepb.Permission]()),

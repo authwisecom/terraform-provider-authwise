@@ -40,6 +40,11 @@ func AppearanceProfileResourceSchema() schema.Schema {
 				Optional:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
+			"issuer_id": schema.StringAttribute{
+				MarkdownDescription: "Parent identifier `issuer_id`; overrides the provider default. Changing it replaces the resource.",
+				Optional:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
+			},
 			"labels": schema.MapAttribute{
 				Computed:      true,
 				ElementType:   types.StringType,
@@ -77,6 +82,7 @@ func AppearanceProfileResourceSchema() schema.Schema {
 type AppearanceProfileModel struct {
 	Name                 types.String         `tfsdk:"name"`
 	TenantId             types.String         `tfsdk:"tenant_id"`
+	IssuerId             types.String         `tfsdk:"issuer_id"`
 	Labels               types.Map            `tfsdk:"labels"`
 	DisplayName          types.String         `tfsdk:"display_name"`
 	ThemeId              types.String         `tfsdk:"theme_id"`
@@ -89,6 +95,7 @@ func NewAppearanceProfileModel() *AppearanceProfileModel {
 	return &AppearanceProfileModel{
 		Content:              jsontypes.NewNormalizedNull(),
 		DisplayName:          types.StringNull(),
+		IssuerId:             types.StringNull(),
 		Labels:               types.MapNull(types.StringType),
 		Name:                 types.StringNull(),
 		StylesheetAttributes: jsontypes.NewNormalizedNull(),
@@ -177,7 +184,10 @@ func (m *AppearanceProfileModel) GetName() types.String {
 
 // ScopeIdentifiers implements tf.Model: per-resource scope attribute values, null as "".
 func (m *AppearanceProfileModel) ScopeIdentifiers() map[string]string {
-	return map[string]string{"tenant_id": m.TenantId.ValueString()}
+	return map[string]string{
+		"issuer_id": m.IssuerId.ValueString(),
+		"tenant_id": m.TenantId.ValueString(),
+	}
 }
 
 // UpdateMask implements tf.Model: proto field paths whose values differ from prior, skipping name and computed fields.
@@ -260,10 +270,10 @@ func newAppearanceProfileCrud(providerData any) (*tf.Crud[*v1alpha1.AppearancePr
 				})
 			},
 		},
-		Collection: "appearanceProfiles",
+		Collection: "appearance-profiles",
 		Defaults:   pd.Defaults,
 		NewModel:   NewAppearanceProfileModel,
-		Scope:      tf.NewScope("tenants"),
+		Scope:      tf.NewScope("tenants", "issuers"),
 		TypeName:   "appearance_profile",
 	}), diags
 }
@@ -333,6 +343,7 @@ func AppearanceProfileDataSourceSchema() schema1.Schema {
 				CustomType: jsontypes.NormalizedType{},
 			},
 			"display_name": schema1.StringAttribute{Computed: true},
+			"issuer_id":    schema1.StringAttribute{Computed: true},
 			"labels": schema1.MapAttribute{
 				Computed:    true,
 				ElementType: types.StringType,

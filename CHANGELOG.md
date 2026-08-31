@@ -20,3 +20,9 @@ BREAKING CHANGES:
   `scope_id` attributes. kit keys both by a caller-supplied name, which the
   provider had no way to send — it created rows under an empty key — so
   neither resource could be used before this release.
+* `authwise_appearance_profile` is issuer-scoped, matching kit
+  (`tenants/*/issuers/*/appearance-profiles/*`): it gains an `issuer_id`
+  attribute, its parent gains the issuer segment, and its import IDs use
+  the `appearance-profiles` collection rather than `appearanceProfiles`.
+  Import was the only operation the old collection name reached, and it
+  rejected every real name.
