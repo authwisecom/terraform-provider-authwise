@@ -7,7 +7,7 @@ stdenv.mkDerivation {
   buildInputs = with pkgs; [
     gnumake
     terraform
-    go_1_21
+    go
   ];
 
   shellHook = ''
