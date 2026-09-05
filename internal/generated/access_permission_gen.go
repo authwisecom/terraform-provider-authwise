@@ -43,11 +43,6 @@ func AccessPermissionResourceSchema() schema.Schema {
 				Optional:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
-			"kind": schema.StringAttribute{
-				Computed:      true,
-				Optional:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
-			},
 			"name": schema.StringAttribute{
 				Computed:            true,
 				MarkdownDescription: "Full resource name; serves as the Terraform ID.",
@@ -83,7 +78,6 @@ type AccessPermissionModel struct {
 	Service            types.String `tfsdk:"service"`
 	ResourceType       types.String `tfsdk:"resource_type"`
 	Description        types.String `tfsdk:"description"`
-	Kind               types.String `tfsdk:"kind"`
 }
 
 // NewAccessPermissionModel returns a model with every attribute set to its typed null; collection types cannot be zero-valued.
@@ -93,7 +87,6 @@ func NewAccessPermissionModel() *AccessPermissionModel {
 		AudienceId:         types.StringNull(),
 		Description:        types.StringNull(),
 		IssuerId:           types.StringNull(),
-		Kind:               types.StringNull(),
 		Name:               types.StringNull(),
 		ResourceType:       types.StringNull(),
 		Service:            types.StringNull(),
@@ -109,7 +102,6 @@ func (m *AccessPermissionModel) ToProto(ctx context.Context) (*v1alpha1.AccessPe
 	out.Service = m.Service.ValueString()
 	out.ResourceType = m.ResourceType.ValueString()
 	out.Description = m.Description.ValueString()
-	out.Kind = m.Kind.ValueString()
 	return out, diags
 }
 
@@ -131,11 +123,6 @@ func (m *AccessPermissionModel) FromProto(ctx context.Context, e *v1alpha1.Acces
 		m.Description = types.StringNull()
 	} else {
 		m.Description = types.StringValue(e.Description)
-	}
-	if e.Kind == "" {
-		m.Kind = types.StringNull()
-	} else {
-		m.Kind = types.StringValue(e.Kind)
 	}
 	return diags
 }
@@ -165,9 +152,6 @@ func (m *AccessPermissionModel) UpdateMask(ctx context.Context, prior *AccessPer
 	}
 	if !m.Description.Equal(prior.Description) {
 		paths = append(paths, "description")
-	}
-	if !m.Kind.Equal(prior.Kind) {
-		paths = append(paths, "kind")
 	}
 	return paths
 }
@@ -303,7 +287,6 @@ func AccessPermissionDataSourceSchema() schema1.Schema {
 			"audience_id": schema1.StringAttribute{Computed: true},
 			"description": schema1.StringAttribute{Computed: true},
 			"issuer_id":   schema1.StringAttribute{Computed: true},
-			"kind":        schema1.StringAttribute{Computed: true},
 			"name": schema1.StringAttribute{
 				MarkdownDescription: "Full resource name of the object to read.",
 				Required:            true,

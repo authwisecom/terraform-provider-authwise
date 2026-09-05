@@ -13,7 +13,6 @@ import (
 	diag "github.com/hashicorp/terraform-plugin-framework/diag"
 	resource "github.com/hashicorp/terraform-plugin-framework/resource"
 	schema "github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	boolplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	planmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	stringplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
@@ -28,11 +27,6 @@ func RoleResourceSchema() schema.Schema {
 				MarkdownDescription: "Parent identifier `audience_id`; overrides the provider default. Changing it replaces the resource.",
 				Optional:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
-			},
-			"auto": schema.BoolAttribute{
-				Computed:      true,
-				Optional:      true,
-				PlanModifiers: []planmodifier.Bool{boolplanmodifier.UseStateForUnknown()},
 			},
 			"display_name": schema.StringAttribute{
 				Computed:      true,
@@ -66,14 +60,12 @@ type RoleModel struct {
 	IssuerId    types.String `tfsdk:"issuer_id"`
 	AudienceId  types.String `tfsdk:"audience_id"`
 	DisplayName types.String `tfsdk:"display_name"`
-	Auto        types.Bool   `tfsdk:"auto"`
 }
 
 // NewRoleModel returns a model with every attribute set to its typed null; collection types cannot be zero-valued.
 func NewRoleModel() *RoleModel {
 	return &RoleModel{
 		AudienceId:  types.StringNull(),
-		Auto:        types.BoolNull(),
 		DisplayName: types.StringNull(),
 		IssuerId:    types.StringNull(),
 		Name:        types.StringNull(),
@@ -87,7 +79,6 @@ func (m *RoleModel) ToProto(ctx context.Context) (*v1alpha1.Role, diag.Diagnosti
 	out := &v1alpha1.Role{}
 	out.Name = m.Name.ValueString()
 	out.DisplayName = m.DisplayName.ValueString()
-	out.Auto = m.Auto.ValueBool()
 	return out, diags
 }
 
@@ -100,7 +91,6 @@ func (m *RoleModel) FromProto(ctx context.Context, e *v1alpha1.Role) diag.Diagno
 	} else {
 		m.DisplayName = types.StringValue(e.DisplayName)
 	}
-	m.Auto = types.BoolValue(e.Auto)
 	return diags
 }
 
@@ -123,9 +113,6 @@ func (m *RoleModel) UpdateMask(ctx context.Context, prior *RoleModel) []string {
 	var paths []string
 	if !m.DisplayName.Equal(prior.DisplayName) {
 		paths = append(paths, "display_name")
-	}
-	if !m.Auto.Equal(prior.Auto) {
-		paths = append(paths, "auto")
 	}
 	return paths
 }
@@ -254,7 +241,6 @@ func RoleDataSourceSchema() schema1.Schema {
 	return schema1.Schema{
 		Attributes: map[string]schema1.Attribute{
 			"audience_id":  schema1.StringAttribute{Computed: true},
-			"auto":         schema1.BoolAttribute{Computed: true},
 			"display_name": schema1.StringAttribute{Computed: true},
 			"issuer_id":    schema1.StringAttribute{Computed: true},
 			"name": schema1.StringAttribute{

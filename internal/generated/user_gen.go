@@ -51,6 +51,10 @@ func UserResourceSchema() schema.Schema {
 				Optional:      true,
 				PlanModifiers: []planmodifier.Bool{boolplanmodifier.UseStateForUnknown()},
 			},
+			"enrollment": schema.StringAttribute{
+				Computed:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
 			"extra_fields": schema.StringAttribute{
 				Computed:            true,
 				CustomType:          jsontypes.NormalizedType{},
@@ -106,6 +110,10 @@ func UserResourceSchema() schema.Schema {
 				Optional:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
+			"origin": schema.StringAttribute{
+				Computed:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
 			"phone_number": schema.StringAttribute{
 				Computed:      true,
 				Optional:      true,
@@ -135,6 +143,11 @@ func UserResourceSchema() schema.Schema {
 				MarkdownDescription: "Parent identifier `realm_id`; overrides the provider default. Changing it replaces the resource.",
 				Optional:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
+			},
+			"status": schema.StringAttribute{
+				Computed:      true,
+				Optional:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"tenant_id": schema.StringAttribute{
 				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default. Changing it replaces the resource.",
@@ -187,6 +200,9 @@ type UserModel struct {
 	Metadata            jsontypes.Normalized `tfsdk:"metadata"`
 	ExtraFields         jsontypes.Normalized `tfsdk:"extra_fields"`
 	UpdatedAt           types.String         `tfsdk:"updated_at"`
+	Status              types.String         `tfsdk:"status"`
+	Origin              types.String         `tfsdk:"origin"`
+	Enrollment          types.String         `tfsdk:"enrollment"`
 }
 
 // NewUserModel returns a model with every attribute set to its typed null; collection types cannot be zero-valued.
@@ -196,6 +212,7 @@ func NewUserModel() *UserModel {
 		DisplayName:         types.StringNull(),
 		Email:               types.StringNull(),
 		EmailVerified:       types.BoolNull(),
+		Enrollment:          types.StringNull(),
 		ExtraFields:         jsontypes.NewNormalizedNull(),
 		FamilyName:          types.StringNull(),
 		Gender:              types.StringNull(),
@@ -206,12 +223,14 @@ func NewUserModel() *UserModel {
 		MiddleName:          types.StringNull(),
 		Name:                types.StringNull(),
 		Nickname:            types.StringNull(),
+		Origin:              types.StringNull(),
 		PhoneNumber:         types.StringNull(),
 		PhoneNumberVerified: types.BoolNull(),
 		Picture:             types.StringNull(),
 		PreferredUsername:   types.StringNull(),
 		Profile:             types.StringNull(),
 		RealmId:             types.StringNull(),
+		Status:              types.StringNull(),
 		TenantId:            types.StringNull(),
 		UpdatedAt:           types.StringNull(),
 		Website:             types.StringNull(),
@@ -268,6 +287,9 @@ func (m *UserModel) ToProto(ctx context.Context) (*v1alpha1.User, diag.Diagnosti
 			out.UpdatedAt = timestamppb.New(t)
 		}
 	}
+	out.Status = m.Status.ValueString()
+	out.Origin = m.Origin.ValueString()
+	out.Enrollment = m.Enrollment.ValueString()
 	return out, diags
 }
 
@@ -384,6 +406,21 @@ func (m *UserModel) FromProto(ctx context.Context, e *v1alpha1.User) diag.Diagno
 	} else {
 		m.UpdatedAt = types.StringValue(e.UpdatedAt.AsTime().Format(time.RFC3339))
 	}
+	if e.Status == "" {
+		m.Status = types.StringNull()
+	} else {
+		m.Status = types.StringValue(e.Status)
+	}
+	if e.Origin == "" {
+		m.Origin = types.StringNull()
+	} else {
+		m.Origin = types.StringValue(e.Origin)
+	}
+	if e.Enrollment == "" {
+		m.Enrollment = types.StringNull()
+	} else {
+		m.Enrollment = types.StringValue(e.Enrollment)
+	}
 	return diags
 }
 
@@ -466,6 +503,9 @@ func (m *UserModel) UpdateMask(ctx context.Context, prior *UserModel) []string {
 		if eq, _ := m.ExtraFields.StringSemanticEquals(ctx, prior.ExtraFields); !eq {
 			paths = append(paths, "extra_fields")
 		}
+	}
+	if !m.Status.Equal(prior.Status) {
+		paths = append(paths, "status")
 	}
 	return paths
 }
@@ -597,6 +637,7 @@ func UserDataSourceSchema() schema1.Schema {
 			"display_name":   schema1.StringAttribute{Computed: true},
 			"email":          schema1.StringAttribute{Computed: true},
 			"email_verified": schema1.BoolAttribute{Computed: true},
+			"enrollment":     schema1.StringAttribute{Computed: true},
 			"extra_fields": schema1.StringAttribute{
 				Computed:   true,
 				CustomType: jsontypes.NormalizedType{},
@@ -619,12 +660,14 @@ func UserDataSourceSchema() schema1.Schema {
 				Required:            true,
 			},
 			"nickname":              schema1.StringAttribute{Computed: true},
+			"origin":                schema1.StringAttribute{Computed: true},
 			"phone_number":          schema1.StringAttribute{Computed: true},
 			"phone_number_verified": schema1.BoolAttribute{Computed: true},
 			"picture":               schema1.StringAttribute{Computed: true},
 			"preferred_username":    schema1.StringAttribute{Computed: true},
 			"profile":               schema1.StringAttribute{Computed: true},
 			"realm_id":              schema1.StringAttribute{Computed: true},
+			"status":                schema1.StringAttribute{Computed: true},
 			"tenant_id":             schema1.StringAttribute{Computed: true},
 			"updated_at":            schema1.StringAttribute{Computed: true},
 			"website":               schema1.StringAttribute{Computed: true},

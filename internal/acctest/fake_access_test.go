@@ -106,8 +106,6 @@ func (f *fakeAccessServer) PatchAccessPermission(_ context.Context, in *accesspb
 			existing.ResourceType = in.GetAccessPermission().GetResourceType()
 		case "description":
 			existing.Description = in.GetAccessPermission().GetDescription()
-		case "kind":
-			existing.Kind = in.GetAccessPermission().GetKind()
 		default:
 			return nil, status.Errorf(codes.InvalidArgument, "unsupported update_mask path %q", path)
 		}
@@ -170,8 +168,6 @@ func (f *fakeAccessServer) PatchAccessRole(_ context.Context, in *accesspb.Patch
 
 	for _, path := range in.GetUpdateMask().GetPaths() {
 		switch path {
-		case "kind":
-			existing.Kind = in.GetAccessRole().GetKind()
 		case "description":
 			existing.Description = in.GetAccessRole().GetDescription()
 		default:

@@ -51,8 +51,7 @@ func TestAccRealm_Lifecycle(t *testing.T) {
 	realm := func(displayName string) string {
 		return h.providerConfig() + fmt.Sprintf(`
 resource "authwise_realm" "test" {
-  display_name       = %q
-  user_database_type = "internal"
+  display_name = %q
   labels = {
     team = "platform"
   }
@@ -82,8 +81,12 @@ resource "authwise_realm" "test" {
 						if r.GetDisplayName() != "Staff" {
 							return fmt.Errorf("server display_name = %q", r.GetDisplayName())
 						}
-						if r.GetUserDatabaseType() != "internal" {
-							return fmt.Errorf("untouched field changed: %q", r.GetUserDatabaseType())
+						// labels is the witness that the patch was surgical:
+						// it is set in the fixture, semantically unrelated to
+						// display_name, and carried by the retired
+						// user_database_type before kit#334 removed it.
+						if r.GetLabels()["team"] != "platform" {
+							return fmt.Errorf("untouched field changed: labels = %v", r.GetLabels())
 						}
 						return nil
 					}),

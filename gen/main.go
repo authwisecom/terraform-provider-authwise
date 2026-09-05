@@ -123,7 +123,7 @@ func main() {
 			// Tenant-scoped.
 			crud[corepb.Domain](scopeTenant, callerNamed, withJSON("config")),
 			crud[corepb.Issuer](scopeTenant, withJSON("config")),
-			crud[corepb.Realm](scopeTenant),
+			crud[corepb.Realm](scopeTenant, withJSON("config")),
 			crud[corepb.Theme](scopeTenant, withJSON(
 				"stylesheet_attributes", "content",
 				"placeholder_stylesheet_attributes", "placeholder_content",
@@ -135,7 +135,12 @@ func main() {
 			// Realm-scoped.
 			crud[corepb.User](scopeRealm,
 				withJSON("metadata", "extra_fields"),
-				withComputed("updated_at"),
+				// origin is write-once and enrollment is derived and never
+				// stored (kit#304, kit#324): kit refuses a differing value on
+				// update rather than ignoring it, so neither may be written.
+				// status stays writable — the default Optional+Computed shape
+				// already covers its ""-means-unchanged semantics.
+				withComputed("updated_at", "origin", "enrollment"),
 				associate[corepb.Role](),
 			),
 			crud[corepb.Provider](scopeRealm, withJSON("config")),

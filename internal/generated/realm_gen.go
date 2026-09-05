@@ -8,15 +8,18 @@ import (
 	v1alpha11 "git.authwise.com/authwise/api-client-go/authwise/identity/v1alpha1"
 	v1alpha1 "git.authwise.com/authwise/api-client-go/authwise/types/core/v1alpha1"
 	tf "github.com/activatedio/tfinfra/pkg/tf"
+	jsontypes "github.com/hashicorp/terraform-plugin-framework-jsontypes/jsontypes"
 	datasource "github.com/hashicorp/terraform-plugin-framework/datasource"
 	schema1 "github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	diag "github.com/hashicorp/terraform-plugin-framework/diag"
+	path "github.com/hashicorp/terraform-plugin-framework/path"
 	resource "github.com/hashicorp/terraform-plugin-framework/resource"
 	schema "github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	mapplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
 	planmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	stringplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
+	protojson "google.golang.org/protobuf/encoding/protojson"
 	fieldmaskpb "google.golang.org/protobuf/types/known/fieldmaskpb"
 )
 
@@ -24,6 +27,13 @@ import (
 func RealmResourceSchema() schema.Schema {
 	return schema.Schema{
 		Attributes: map[string]schema.Attribute{
+			"config": schema.StringAttribute{
+				Computed:            true,
+				CustomType:          jsontypes.NormalizedType{},
+				MarkdownDescription: "`config` as the protojson encoding of RealmConfig.",
+				Optional:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
 			"display_name": schema.StringAttribute{
 				Computed:      true,
 				Optional:      true,
@@ -45,11 +55,6 @@ func RealmResourceSchema() schema.Schema {
 				Optional:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
-			"user_database_type": schema.StringAttribute{
-				Computed:      true,
-				Optional:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
-			},
 		},
 		MarkdownDescription: "Realm resource.",
 	}
@@ -57,21 +62,21 @@ func RealmResourceSchema() schema.Schema {
 
 // RealmModel is the Terraform plan/state model for Realm.
 type RealmModel struct {
-	Name             types.String `tfsdk:"name"`
-	TenantId         types.String `tfsdk:"tenant_id"`
-	Labels           types.Map    `tfsdk:"labels"`
-	DisplayName      types.String `tfsdk:"display_name"`
-	UserDatabaseType types.String `tfsdk:"user_database_type"`
+	Name        types.String         `tfsdk:"name"`
+	TenantId    types.String         `tfsdk:"tenant_id"`
+	Labels      types.Map            `tfsdk:"labels"`
+	DisplayName types.String         `tfsdk:"display_name"`
+	Config      jsontypes.Normalized `tfsdk:"config"`
 }
 
 // NewRealmModel returns a model with every attribute set to its typed null; collection types cannot be zero-valued.
 func NewRealmModel() *RealmModel {
 	return &RealmModel{
-		DisplayName:      types.StringNull(),
-		Labels:           types.MapNull(types.StringType),
-		Name:             types.StringNull(),
-		TenantId:         types.StringNull(),
-		UserDatabaseType: types.StringNull(),
+		Config:      jsontypes.NewNormalizedNull(),
+		DisplayName: types.StringNull(),
+		Labels:      types.MapNull(types.StringType),
+		Name:        types.StringNull(),
+		TenantId:    types.StringNull(),
 	}
 }
 
@@ -84,7 +89,14 @@ func (m *RealmModel) ToProto(ctx context.Context) (*v1alpha1.Realm, diag.Diagnos
 		diags.Append(m.Labels.ElementsAs(ctx, &out.Labels, false)...)
 	}
 	out.DisplayName = m.DisplayName.ValueString()
-	out.UserDatabaseType = m.UserDatabaseType.ValueString()
+	if !m.Config.IsNull() && !m.Config.IsUnknown() {
+		v := &v1alpha1.RealmConfig{}
+		if err := protojson.Unmarshal([]byte(m.Config.ValueString()), v); err != nil {
+			diags.AddAttributeError(path.Root("config"), "invalid RealmConfig JSON", err.Error())
+		} else {
+			out.Config = v
+		}
+	}
 	return out, diags
 }
 
@@ -104,10 +116,15 @@ func (m *RealmModel) FromProto(ctx context.Context, e *v1alpha1.Realm) diag.Diag
 	} else {
 		m.DisplayName = types.StringValue(e.DisplayName)
 	}
-	if e.UserDatabaseType == "" {
-		m.UserDatabaseType = types.StringNull()
+	if e.Config == nil {
+		m.Config = jsontypes.NewNormalizedNull()
 	} else {
-		m.UserDatabaseType = types.StringValue(e.UserDatabaseType)
+		b, err := protojson.Marshal(e.Config)
+		if err != nil {
+			diags.AddError("cannot encode config", err.Error())
+		} else {
+			m.Config = jsontypes.NewNormalizedValue(string(b))
+		}
 	}
 	return diags
 }
@@ -131,8 +148,10 @@ func (m *RealmModel) UpdateMask(ctx context.Context, prior *RealmModel) []string
 	if !m.DisplayName.Equal(prior.DisplayName) {
 		paths = append(paths, "display_name")
 	}
-	if !m.UserDatabaseType.Equal(prior.UserDatabaseType) {
-		paths = append(paths, "user_database_type")
+	if !m.Config.Equal(prior.Config) {
+		if eq, _ := m.Config.StringSemanticEquals(ctx, prior.Config); !eq {
+			paths = append(paths, "config")
+		}
 	}
 	return paths
 }
@@ -260,6 +279,10 @@ func (r *realmResource) ImportState(ctx context.Context, req resource.ImportStat
 func RealmDataSourceSchema() schema1.Schema {
 	return schema1.Schema{
 		Attributes: map[string]schema1.Attribute{
+			"config": schema1.StringAttribute{
+				Computed:   true,
+				CustomType: jsontypes.NormalizedType{},
+			},
 			"display_name": schema1.StringAttribute{Computed: true},
 			"labels": schema1.MapAttribute{
 				Computed:    true,
@@ -269,8 +292,7 @@ func RealmDataSourceSchema() schema1.Schema {
 				MarkdownDescription: "Full resource name of the object to read.",
 				Required:            true,
 			},
-			"tenant_id":          schema1.StringAttribute{Computed: true},
-			"user_database_type": schema1.StringAttribute{Computed: true},
+			"tenant_id": schema1.StringAttribute{Computed: true},
 		},
 		MarkdownDescription: "Realm data source: reads one Realm by its full resource name.",
 	}

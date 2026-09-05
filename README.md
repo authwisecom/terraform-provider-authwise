@@ -27,8 +27,7 @@ provider "authwise" {
 }
 
 resource "authwise_realm" "employees" {
-  display_name       = "Employees"
-  user_database_type = "internal"
+  display_name = "Employees"
 }
 ```
 

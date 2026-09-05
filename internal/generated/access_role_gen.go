@@ -43,11 +43,6 @@ func AccessRoleResourceSchema() schema.Schema {
 				Optional:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
-			"kind": schema.StringAttribute{
-				Computed:      true,
-				Optional:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
-			},
 			"name": schema.StringAttribute{
 				Computed:            true,
 				MarkdownDescription: "Full resource name; serves as the Terraform ID.",
@@ -70,7 +65,6 @@ type AccessRoleModel struct {
 	TenantId     types.String `tfsdk:"tenant_id"`
 	IssuerId     types.String `tfsdk:"issuer_id"`
 	AudienceId   types.String `tfsdk:"audience_id"`
-	Kind         types.String `tfsdk:"kind"`
 	Description  types.String `tfsdk:"description"`
 }
 
@@ -81,7 +75,6 @@ func NewAccessRoleModel() *AccessRoleModel {
 		AudienceId:   types.StringNull(),
 		Description:  types.StringNull(),
 		IssuerId:     types.StringNull(),
-		Kind:         types.StringNull(),
 		Name:         types.StringNull(),
 		TenantId:     types.StringNull(),
 	}
@@ -92,7 +85,6 @@ func (m *AccessRoleModel) ToProto(ctx context.Context) (*v1alpha1.AccessRole, di
 	var diags diag.Diagnostics
 	out := &v1alpha1.AccessRole{}
 	out.Name = m.Name.ValueString()
-	out.Kind = m.Kind.ValueString()
 	out.Description = m.Description.ValueString()
 	return out, diags
 }
@@ -101,11 +93,6 @@ func (m *AccessRoleModel) ToProto(ctx context.Context) (*v1alpha1.AccessRole, di
 func (m *AccessRoleModel) FromProto(ctx context.Context, e *v1alpha1.AccessRole) diag.Diagnostics {
 	var diags diag.Diagnostics
 	m.Name = types.StringValue(e.Name)
-	if e.Kind == "" {
-		m.Kind = types.StringNull()
-	} else {
-		m.Kind = types.StringValue(e.Kind)
-	}
 	if e.Description == "" {
 		m.Description = types.StringNull()
 	} else {
@@ -131,9 +118,6 @@ func (m *AccessRoleModel) ScopeIdentifiers() map[string]string {
 // UpdateMask implements tf.Model: proto field paths whose values differ from prior, skipping name and computed fields.
 func (m *AccessRoleModel) UpdateMask(ctx context.Context, prior *AccessRoleModel) []string {
 	var paths []string
-	if !m.Kind.Equal(prior.Kind) {
-		paths = append(paths, "kind")
-	}
 	if !m.Description.Equal(prior.Description) {
 		paths = append(paths, "description")
 	}
@@ -271,7 +255,6 @@ func AccessRoleDataSourceSchema() schema1.Schema {
 			"audience_id": schema1.StringAttribute{Computed: true},
 			"description": schema1.StringAttribute{Computed: true},
 			"issuer_id":   schema1.StringAttribute{Computed: true},
-			"kind":        schema1.StringAttribute{Computed: true},
 			"name": schema1.StringAttribute{
 				MarkdownDescription: "Full resource name of the object to read.",
 				Required:            true,

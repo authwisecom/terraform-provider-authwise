@@ -1,7 +1,7 @@
 dario.cat/mergo v1.0.0 h1:AGCNq9Evsj31mOgNPcLyXc+4PNABt905YmuqPYYpBWk=
 dario.cat/mergo v1.0.0/go.mod h1:uNxQE+84aUszobStD9th8a29P2fMDhsBdgRYvZOxGmk=
-git.authwise.com/authwise/api-client-go v0.2.0 h1:zbHbY/I5X1PSFj3BxziCMEkqYmlU/AFaGqpZGJYxA+k=
-git.authwise.com/authwise/api-client-go v0.2.0/go.mod h1:y+IyWF6o3hrSiBQ/di+mvpsiEQjwL3vJLKQhJQ0diks=
+git.authwise.com/authwise/api-client-go v0.3.0 h1:wQmCHvy90bi8QRkWuv43wAGKpzvPQl89HRjdq/uIWYY=
+git.authwise.com/authwise/api-client-go v0.3.0/go.mod h1:cC9gJM0TeXyxwdApH9zUN2MAU+9w0RIsu7eSgSOYxnM=
 git.authwise.com/authwise/api-client-support v0.2.0 h1:XWVnseQJvb6cLpH5Fv2A/Tb7FgWaPaFpfj7DzIFaxxY=
 git.authwise.com/authwise/api-client-support v0.2.0/go.mod h1:UOzeVWHyp/vdRW8QPh4oBN2YSnDPcyPv0fcBNj6C14g=
 github.com/Microsoft/go-winio v0.6.2 h1:F2VQgta7ecxGYO8k3ZZz3RS8fVIXVxONVUPlNERoyfY=

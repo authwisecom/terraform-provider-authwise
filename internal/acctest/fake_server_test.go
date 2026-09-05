@@ -114,8 +114,8 @@ func (f *fakeIdentityServer) PatchRealm(ctx context.Context, in *identitypb.Patc
 		switch path {
 		case "display_name":
 			existing.DisplayName = in.GetRealm().GetDisplayName()
-		case "user_database_type":
-			existing.UserDatabaseType = in.GetRealm().GetUserDatabaseType()
+		case "config":
+			existing.Config = in.GetRealm().GetConfig()
 		case "labels":
 			existing.Labels = in.GetRealm().GetLabels()
 		default:
@@ -171,8 +171,6 @@ func (f *fakeIdentityServer) PatchRole(ctx context.Context, in *identitypb.Patch
 		switch path {
 		case "display_name":
 			existing.DisplayName = in.GetRole().GetDisplayName()
-		case "auto":
-			existing.Auto = in.GetRole().GetAuto()
 		default:
 			return nil, status.Errorf(codes.InvalidArgument, "unsupported update_mask path %q", path)
 		}
