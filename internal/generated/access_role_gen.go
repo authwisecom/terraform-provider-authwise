@@ -5,8 +5,8 @@ package generated
 import (
 	"context"
 	"fmt"
-	v1alpha11 "git.authwise.com/authwise/api-client-go/authwise/access/v1alpha1"
-	v1alpha1 "git.authwise.com/authwise/api-client-go/authwise/types/core/v1alpha1"
+	v1alpha11 "git.authwise.com/authwise/apis/authwise/access/v1alpha1"
+	v1alpha1 "git.authwise.com/authwise/apis/authwise/types/core/v1alpha1"
 	tf "github.com/activatedio/tfinfra/pkg/tf"
 	datasource "github.com/hashicorp/terraform-plugin-framework/datasource"
 	schema1 "github.com/hashicorp/terraform-plugin-framework/datasource/schema"
@@ -137,7 +137,7 @@ func newAccessRoleCrud(providerData any) (*tf.Crud[*v1alpha1.AccessRole, *Access
 	}
 	client, ok := pd.Clients["access"].(v1alpha11.AuthwiseAccessServiceClient)
 	if !ok {
-		diags.AddError("missing client", "provider data key \"access\" is not a git.authwise.com/authwise/api-client-go/authwise/access/v1alpha1.AuthwiseAccessServiceClient")
+		diags.AddError("missing client", "provider data key \"access\" is not a git.authwise.com/authwise/apis/authwise/access/v1alpha1.AuthwiseAccessServiceClient")
 		return nil, diags
 	}
 	return tf.NewCrud(tf.CrudParams[*v1alpha1.AccessRole, *AccessRoleModel]{
@@ -306,7 +306,7 @@ func newAccessRoleAccessPermissionsAssociation(providerData any) (*tf.Associatio
 	}
 	client, ok := pd.Clients["access"].(v1alpha11.AuthwiseAccessServiceClient)
 	if !ok {
-		diags.AddError("missing client", "provider data key \"access\" is not a git.authwise.com/authwise/api-client-go/authwise/access/v1alpha1.AuthwiseAccessServiceClient")
+		diags.AddError("missing client", "provider data key \"access\" is not a git.authwise.com/authwise/apis/authwise/access/v1alpha1.AuthwiseAccessServiceClient")
 		return nil, diags
 	}
 	return tf.NewAssociation(tf.AssociationParams{

@@ -7,8 +7,8 @@ import (
 	"strings"
 	"sync"
 
-	accesspb "git.authwise.com/authwise/api-client-go/authwise/access/v1alpha1"
-	corepb "git.authwise.com/authwise/api-client-go/authwise/types/core/v1alpha1"
+	accesspb "git.authwise.com/authwise/apis/authwise/access/v1alpha1"
+	corepb "git.authwise.com/authwise/apis/authwise/types/core/v1alpha1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"

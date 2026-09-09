@@ -11,9 +11,9 @@ import (
 	"sync"
 	"testing"
 
-	accesspb "git.authwise.com/authwise/api-client-go/authwise/access/v1alpha1"
-	identitypb "git.authwise.com/authwise/api-client-go/authwise/identity/v1alpha1"
-	corepb "git.authwise.com/authwise/api-client-go/authwise/types/core/v1alpha1"
+	accesspb "git.authwise.com/authwise/apis/authwise/access/v1alpha1"
+	identitypb "git.authwise.com/authwise/apis/authwise/identity/v1alpha1"
+	corepb "git.authwise.com/authwise/apis/authwise/types/core/v1alpha1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"

@@ -4,7 +4,7 @@ package generated
 
 import (
 	"context"
-	v1alpha1 "git.authwise.com/authwise/api-client-go/authwise/types/core/v1alpha1"
+	v1alpha1 "git.authwise.com/authwise/apis/authwise/types/core/v1alpha1"
 	jsontypes "github.com/hashicorp/terraform-plugin-framework-jsontypes/jsontypes"
 	datasource "github.com/hashicorp/terraform-plugin-framework/datasource"
 	schema "github.com/hashicorp/terraform-plugin-framework/datasource/schema"
@@ -38,10 +38,6 @@ func InteractiveClientConfigDataSourceSchema() schema.Schema {
 				Optional:   true,
 			},
 			"interaction_forward_uri": schema.StringAttribute{Optional: true},
-			"logging": schema.StringAttribute{
-				CustomType: jsontypes.NormalizedType{},
-				Optional:   true,
-			},
 		},
 		MarkdownDescription: "Builds a InteractiveClientConfig config and exposes its google.protobuf.Any encoding as `any`. Makes no API calls.",
 	}
@@ -53,7 +49,6 @@ type InteractiveClientConfigModel struct {
 	AllowedRedirectUris      types.List           `tfsdk:"allowed_redirect_uris"`
 	AccessTokenExpireSeconds types.Int64          `tfsdk:"access_token_expire_seconds"`
 	Cors                     jsontypes.Normalized `tfsdk:"cors"`
-	Logging                  jsontypes.Normalized `tfsdk:"logging"`
 	FlowIntegrationConfig    jsontypes.Normalized `tfsdk:"flow_integration_config"`
 	Any                      jsontypes.Normalized `tfsdk:"any"`
 }
@@ -67,7 +62,6 @@ func NewInteractiveClientConfigModel() *InteractiveClientConfigModel {
 		Cors:                     jsontypes.NewNormalizedNull(),
 		FlowIntegrationConfig:    jsontypes.NewNormalizedNull(),
 		InteractionForwardUri:    types.StringNull(),
-		Logging:                  jsontypes.NewNormalizedNull(),
 	}
 }
 
@@ -86,14 +80,6 @@ func (m *InteractiveClientConfigModel) ToProto(ctx context.Context) (*v1alpha1.I
 			diags.AddAttributeError(path.Root("cors"), "invalid CorsConfig JSON", err.Error())
 		} else {
 			out.Cors = v
-		}
-	}
-	if !m.Logging.IsNull() && !m.Logging.IsUnknown() {
-		v := &v1alpha1.LoggingConfig{}
-		if err := protojson.Unmarshal([]byte(m.Logging.ValueString()), v); err != nil {
-			diags.AddAttributeError(path.Root("logging"), "invalid LoggingConfig JSON", err.Error())
-		} else {
-			out.Logging = v
 		}
 	}
 	if !m.FlowIntegrationConfig.IsNull() && !m.FlowIntegrationConfig.IsUnknown() {

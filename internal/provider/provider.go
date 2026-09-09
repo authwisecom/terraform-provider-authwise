@@ -9,11 +9,11 @@ import (
 	"fmt"
 	"os"
 
-	accesspb "git.authwise.com/authwise/api-client-go/authwise/access/v1alpha1"
-	identitypb "git.authwise.com/authwise/api-client-go/authwise/identity/v1alpha1"
 	"git.authwise.com/authwise/api-client-support/authwise"
 	supportcreds "git.authwise.com/authwise/api-client-support/credentials"
 	"git.authwise.com/authwise/api-client-support/credentials/bearer"
+	accesspb "git.authwise.com/authwise/apis/authwise/access/v1alpha1"
+	identitypb "git.authwise.com/authwise/apis/authwise/identity/v1alpha1"
 	"git.authwise.com/authwise/terraform-provider-authwise/internal/generated"
 	tfruntime "github.com/activatedio/tfinfra/pkg/tf"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"

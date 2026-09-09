@@ -27,7 +27,7 @@ stages:
   before_script:
     - mkdir -p .go
     - export GOPATH="$CI_PROJECT_DIR/.go"
-    # api-client-go and api-client-support are public modules now: no
+    # apis and api-client-support are public modules now: no
     # GOPRIVATE, no credential helper, no job-token allowlist entry needed.
     - '[ -e ".golangci-lint/bin/golangci-lint" ] || (mkdir -p .golangci-lint/bin && curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/HEAD/install.sh | sh -s -- -b .golangci-lint/bin v2.12.2)'
   cache:

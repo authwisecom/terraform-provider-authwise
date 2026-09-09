@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	accesspb "git.authwise.com/authwise/api-client-go/authwise/access/v1alpha1"
+	accesspb "git.authwise.com/authwise/apis/authwise/access/v1alpha1"
 	"git.authwise.com/authwise/terraform-provider-authwise/internal/generated"
 	"github.com/activatedio/tfinfra/pkg/aip"
 	tfruntime "github.com/activatedio/tfinfra/pkg/tf"

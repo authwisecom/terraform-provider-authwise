@@ -5,8 +5,8 @@ package generated
 import (
 	"context"
 	"fmt"
-	v1alpha11 "git.authwise.com/authwise/api-client-go/authwise/identity/v1alpha1"
-	v1alpha1 "git.authwise.com/authwise/api-client-go/authwise/types/core/v1alpha1"
+	v1alpha11 "git.authwise.com/authwise/apis/authwise/identity/v1alpha1"
+	v1alpha1 "git.authwise.com/authwise/apis/authwise/types/core/v1alpha1"
 	tf "github.com/activatedio/tfinfra/pkg/tf"
 	jsontypes "github.com/hashicorp/terraform-plugin-framework-jsontypes/jsontypes"
 	datasource "github.com/hashicorp/terraform-plugin-framework/datasource"
@@ -282,7 +282,7 @@ func newClientCrud(providerData any) (*tf.Crud[*v1alpha1.Client, *ClientModel], 
 	}
 	client, ok := pd.Clients["identity"].(v1alpha11.AuthwiseIdentityServiceClient)
 	if !ok {
-		diags.AddError("missing client", "provider data key \"identity\" is not a git.authwise.com/authwise/api-client-go/authwise/identity/v1alpha1.AuthwiseIdentityServiceClient")
+		diags.AddError("missing client", "provider data key \"identity\" is not a git.authwise.com/authwise/apis/authwise/identity/v1alpha1.AuthwiseIdentityServiceClient")
 		return nil, diags
 	}
 	return tf.NewCrud(tf.CrudParams[*v1alpha1.Client, *ClientModel]{
@@ -462,7 +462,7 @@ func newClientRolesAssociation(providerData any) (*tf.Association, diag.Diagnost
 	}
 	client, ok := pd.Clients["identity"].(v1alpha11.AuthwiseIdentityServiceClient)
 	if !ok {
-		diags.AddError("missing client", "provider data key \"identity\" is not a git.authwise.com/authwise/api-client-go/authwise/identity/v1alpha1.AuthwiseIdentityServiceClient")
+		diags.AddError("missing client", "provider data key \"identity\" is not a git.authwise.com/authwise/apis/authwise/identity/v1alpha1.AuthwiseIdentityServiceClient")
 		return nil, diags
 	}
 	return tf.NewAssociation(tf.AssociationParams{

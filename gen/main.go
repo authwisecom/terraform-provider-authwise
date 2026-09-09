@@ -1,5 +1,5 @@
 // The generator entry point for the Authwise provider: the declarative spec
-// table over the published api-client-go pb types. Regenerate with
+// table over the published apis pb types. Regenerate with
 // `go generate ./...` or `go run .` from this directory.
 //
 // The behavioral layer here (Required / Immutable / Computed / Sensitive /
@@ -17,9 +17,9 @@ package main
 import (
 	"reflect"
 
-	accesspb "git.authwise.com/authwise/api-client-go/authwise/access/v1alpha1"
-	identitypb "git.authwise.com/authwise/api-client-go/authwise/identity/v1alpha1"
-	corepb "git.authwise.com/authwise/api-client-go/authwise/types/core/v1alpha1"
+	accesspb "git.authwise.com/authwise/apis/authwise/access/v1alpha1"
+	identitypb "git.authwise.com/authwise/apis/authwise/identity/v1alpha1"
+	corepb "git.authwise.com/authwise/apis/authwise/types/core/v1alpha1"
 	gentf "github.com/activatedio/tfinfra/genlib/tf"
 	tf "github.com/activatedio/tfinfra/pkg/tf"
 )
@@ -193,7 +193,7 @@ func main() {
 				Type: reflect.TypeFor[corepb.InteractiveClientConfig](),
 				Implementations: []any{
 					gentf.ConfigDataSource{
-						JSON: []string{"cors", "logging", "flow_integration_config"},
+						JSON: []string{"cors", "flow_integration_config"},
 					},
 				},
 			},

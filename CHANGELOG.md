@@ -1,5 +1,12 @@
 ## 0.1.0 (Unreleased)
 
+NOTES:
+
+* The provider now builds against `git.authwise.com/authwise/apis` (v0.4.0),
+  which is `api-client-go` renamed — the published module stopped being a
+  client library when kit's `.proto` sources joined the generated stubs. No
+  practitioner-visible change; the package layout is identical.
+
 FEATURES:
 
 * **New resources:** `authwise_access_permission`, `authwise_access_role`,
@@ -15,6 +22,16 @@ FEATURES:
   the console audience and OIDC client), applied by the acceptance suite.
 
 BREAKING CHANGES:
+
+* The `logging` attribute is removed from `authwise_interactive_client_config`.
+  It carried a `LoggingConfig` JSON document — a log level plus three flags —
+  that kit accepted, validated, persisted and echoed back, and that nothing in
+  kit ever read. Log level is set by the server's `LOG_LEVEL` environment
+  variable; there was never a path from this attribute to it. Remove it from
+  your configuration: it has never had an effect, so nothing about the running
+  system changes when you do. kit removed the field in `e6269682` and reserved
+  both its field number and its JSON name, so state and stored configuration
+  still carrying the key are read back unchanged.
 
 * `authwise_domain` and `authwise_scope` gain required `domain_id` /
   `scope_id` attributes. kit keys both by a caller-supplied name, which the
