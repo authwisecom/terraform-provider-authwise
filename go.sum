@@ -1,7 +1,5 @@
 dario.cat/mergo v1.0.0 h1:AGCNq9Evsj31mOgNPcLyXc+4PNABt905YmuqPYYpBWk=
 dario.cat/mergo v1.0.0/go.mod h1:uNxQE+84aUszobStD9th8a29P2fMDhsBdgRYvZOxGmk=
-git.authwise.com/authwise/api-client-go v0.3.0 h1:wQmCHvy90bi8QRkWuv43wAGKpzvPQl89HRjdq/uIWYY=
-git.authwise.com/authwise/api-client-go v0.3.0/go.mod h1:cC9gJM0TeXyxwdApH9zUN2MAU+9w0RIsu7eSgSOYxnM=
 git.authwise.com/authwise/api-client-support v0.2.0 h1:XWVnseQJvb6cLpH5Fv2A/Tb7FgWaPaFpfj7DzIFaxxY=
 git.authwise.com/authwise/api-client-support v0.2.0/go.mod h1:UOzeVWHyp/vdRW8QPh4oBN2YSnDPcyPv0fcBNj6C14g=
 git.authwise.com/authwise/apis v0.4.0 h1:38WYeurjhXn4d+xvhN6jhP7232cByyj6VS+1t3vXReE=
