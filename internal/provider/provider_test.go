@@ -51,16 +51,17 @@ func TestProviderSurface(t *testing.T) {
 		diags := s.Schema.ValidateImplementation(ctx)
 		require.False(t, diags.HasError(), "%s: %v", m.TypeName, diags)
 	}
-	// 19 entity resources + 5 association resources (user_roles,
+	// 20 entity resources + 5 association resources (user_roles,
 	// client_roles, role_permissions, scope_permissions,
 	// access_role_access_permissions).
-	assert.Len(t, resourceTypes, 24)
+	assert.Len(t, resourceTypes, 25)
 	for _, want := range []string{
 		"authwise_access_permission",
 		"authwise_access_role",
 		"authwise_access_role_access_permissions",
 		"authwise_access_condition",
 		"authwise_access_binding",
+		"authwise_certificate",
 	} {
 		assert.True(t, resourceTypes[want], "missing resource %s", want)
 	}
@@ -82,8 +83,15 @@ func TestProviderSurface(t *testing.T) {
 		diags := s.Schema.ValidateImplementation(ctx)
 		require.False(t, diags.HasError(), "%s: %v", m.TypeName, diags)
 	}
-	// 19 singular entity data sources + 10 config builder data sources.
-	assert.Len(t, dataSourceTypes, 29)
+	// 20 singular entity data sources + 12 config builder data sources.
+	assert.Len(t, dataSourceTypes, 32)
+	for _, want := range []string{
+		"authwise_certificate",
+		"authwise_provider_saml",
+		"authwise_saml_relying_party_config",
+	} {
+		assert.True(t, dataSourceTypes[want], "missing data source %s", want)
+	}
 }
 
 // TestAccessBindingIsWrapped asserts the substitution actually happened:

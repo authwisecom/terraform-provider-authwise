@@ -106,13 +106,35 @@ func withSensitive(fields ...string) func(r *gentf.Resource) {
 	return func(r *gentf.Resource) { r.Sensitive = fields }
 }
 
-func providerConfig[E any](typeName string) gentf.Entry {
+func withImmutable(fields ...string) func(r *gentf.Resource) {
+	return func(r *gentf.Resource) { r.Immutable = fields }
+}
+
+// withInputOnly marks the fields kit consumes but never echoes back.
+// Without it the default Optional+Computed shape nulls them on every
+// refresh, which for a create-only field means replacement on every plan.
+func withInputOnly(fields ...string) func(r *gentf.Resource) {
+	return func(r *gentf.Resource) { r.InputOnly = fields }
+}
+
+// config declares a typed builder data source over a config message,
+// masking the named fields in output.
+func config[E any](typeName string, sensitive ...string) gentf.Entry {
 	return gentf.Entry{
 		Type: reflect.TypeFor[E](),
 		Implementations: []any{
-			gentf.ConfigDataSource{TypeName: typeName, Sensitive: []string{"client_secret"}},
+			gentf.ConfigDataSource{TypeName: typeName, Sensitive: sensitive},
 		},
 	}
+}
+
+// providerConfig declares an upstream OAuth provider's config: every one of
+// them is keyed by a client id and a client secret. Configs that carry no
+// shared secret — SAML trusts a certificate instead — use config directly,
+// since naming a field that the message does not have panics at generation
+// time.
+func providerConfig[E any](typeName string) gentf.Entry {
+	return config[E](typeName, "client_secret")
 }
 
 func main() {
@@ -131,6 +153,18 @@ func main() {
 			crud[corepb.Secret](scopeTenant, withSensitive("value")),
 			crud[corepb.Asset](scopeTenant),
 			crud[corepb.Endpoint](scopeTenant),
+			// The SAML trust anchors (kit#487). certificate_pem is the
+			// public certificate of any row, minted or imported, and is
+			// read-only; importing a partner's PEM is a separate input-only
+			// field on create, not an RPC of its own.
+			crud[corepb.Certificate](scopeTenant,
+				withRequired("display_name", "use"),
+				withComputed("key_id", "origin", "subject", "not_before", "not_after",
+					"fingerprint_sha256", "certificate_pem", "has_private_key"),
+				// The mint parameters describe how to make the key pair, not
+				// what was made, and kit only reads them on create.
+				withImmutable("subject_common_name", "validity_days", "key_size", "import_certificate_pem"),
+				withInputOnly("subject_common_name", "validity_days", "key_size", "import_certificate_pem")),
 
 			// Realm-scoped.
 			crud[corepb.User](scopeRealm,
@@ -189,6 +223,13 @@ func main() {
 			providerConfig[corepb.ProviderDropbox]("provider_dropbox"),
 			providerConfig[corepb.ProviderOkta]("provider_okta"),
 			providerConfig[corepb.ProviderAuth0]("provider_auth0"),
+			// SAML 2.0, both roles: ProviderSaml is kit as the SP (on a
+			// Provider), SamlRelyingPartyConfig is kit as the IdP (on a
+			// Client). Neither carries a client secret. claim_map is a
+			// nested block rather than a JSON blob — tfinfra v0.0.10 renders
+			// a singular message as a typed nested attribute.
+			config[corepb.ProviderSaml]("provider_saml"),
+			config[corepb.SamlRelyingPartyConfig]("saml_relying_party_config"),
 			{
 				Type: reflect.TypeFor[corepb.InteractiveClientConfig](),
 				Implementations: []any{

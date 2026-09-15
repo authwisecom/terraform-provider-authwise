@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	accesspb "git.authwise.com/authwise/apis/authwise/access/v1alpha1"
 	identitypb "git.authwise.com/authwise/apis/authwise/identity/v1alpha1"
@@ -20,7 +21,12 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/emptypb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
+
+// certNotBefore is the fixed issue instant the fake stamps on every minted
+// certificate, so not_before and not_after are assertable.
+var certNotBefore = time.Date(2026, 9, 14, 0, 0, 0, 0, time.UTC)
 
 // fakeIdentityServer is an in-memory AIP server for the acceptance tier:
 // real terraform CLI + the real provider + the real client_credentials
@@ -36,7 +42,14 @@ type fakeIdentityServer struct {
 	rolePerms map[string]map[string]bool
 	audiences map[string]*corepb.Audience
 	clients   map[string]*corepb.Client
+	providers map[string]*corepb.Provider
+	certs     map[string]*corepb.Certificate
 	seq       int
+
+	// lastMint records the input-only create parameters of the most recent
+	// CreateCertificate. The stored row deliberately keeps none of them, so
+	// this is the only way a test can see what the provider actually sent.
+	lastMint *corepb.Certificate
 
 	// lastAuthorization records the auth metadata of the most recent call
 	// so tests can assert the bearer flow end to end.
@@ -50,6 +63,8 @@ func newFakeIdentityServer() *fakeIdentityServer {
 		rolePerms: map[string]map[string]bool{},
 		audiences: map[string]*corepb.Audience{},
 		clients:   map[string]*corepb.Client{},
+		providers: map[string]*corepb.Provider{},
+		certs:     map[string]*corepb.Certificate{},
 	}
 }
 
@@ -304,6 +319,179 @@ func (f *fakeIdentityServer) DeleteClient(ctx context.Context, in *identitypb.De
 		return nil, status.Errorf(codes.NotFound, "client %q not found", in.GetName())
 	}
 	delete(f.clients, in.GetName())
+	return &emptypb.Empty{}, nil
+}
+
+// --- Provider (realm-scoped; carries the SAML SP-role config) ---
+
+func (f *fakeIdentityServer) GetProvider(ctx context.Context, in *identitypb.GetProviderRequest) (*corepb.Provider, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.recordAuth(ctx)
+	p, ok := f.providers[in.GetName()]
+	if !ok {
+		return nil, status.Errorf(codes.NotFound, "provider %q not found", in.GetName())
+	}
+	return proto.Clone(p).(*corepb.Provider), nil
+}
+
+func (f *fakeIdentityServer) CreateProvider(ctx context.Context, in *identitypb.CreateProviderRequest) (*corepb.Provider, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.recordAuth(ctx)
+	p := proto.Clone(in.GetProvider()).(*corepb.Provider)
+	p.Name = in.GetParent() + "/providers/" + f.nextID("p")
+	f.providers[p.GetName()] = p
+	return proto.Clone(p).(*corepb.Provider), nil
+}
+
+func (f *fakeIdentityServer) PatchProvider(ctx context.Context, in *identitypb.PatchProviderRequest) (*corepb.Provider, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.recordAuth(ctx)
+	existing, ok := f.providers[in.GetName()]
+	if !ok {
+		return nil, status.Errorf(codes.NotFound, "provider %q not found", in.GetName())
+	}
+	for _, path := range in.GetUpdateMask().GetPaths() {
+		switch path {
+		case "display_name":
+			existing.DisplayName = in.GetProvider().GetDisplayName()
+		case "provider_type":
+			existing.ProviderType = in.GetProvider().GetProviderType()
+		case "config":
+			existing.Config = in.GetProvider().GetConfig()
+		case "labels":
+			existing.Labels = in.GetProvider().GetLabels()
+		default:
+			return nil, status.Errorf(codes.InvalidArgument, "unsupported update_mask path %q", path)
+		}
+	}
+	return proto.Clone(existing).(*corepb.Provider), nil
+}
+
+func (f *fakeIdentityServer) DeleteProvider(ctx context.Context, in *identitypb.DeleteProviderRequest) (*emptypb.Empty, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.recordAuth(ctx)
+	if _, ok := f.providers[in.GetName()]; !ok {
+		return nil, status.Errorf(codes.NotFound, "provider %q not found", in.GetName())
+	}
+	delete(f.providers, in.GetName())
+	return &emptypb.Empty{}, nil
+}
+
+// --- Certificate (tenant-scoped; the SAML trust anchors) ---
+
+func (f *fakeIdentityServer) GetCertificate(ctx context.Context, in *identitypb.GetCertificateRequest) (*corepb.Certificate, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.recordAuth(ctx)
+	c, ok := f.certs[in.GetName()]
+	if !ok {
+		return nil, status.Errorf(codes.NotFound, "certificate %q not found", in.GetName())
+	}
+	return proto.Clone(c).(*corepb.Certificate), nil
+}
+
+func (f *fakeIdentityServer) ListCertificates(ctx context.Context, in *identitypb.ListCertificatesRequest) (*identitypb.ListCertificatesResponse, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.recordAuth(ctx)
+	res := &identitypb.ListCertificatesResponse{}
+	for name, c := range f.certs {
+		if strings.HasPrefix(name, in.GetParent()+"/") {
+			res.Certificates = append(res.Certificates, proto.Clone(c).(*corepb.Certificate))
+		}
+	}
+	return res, nil
+}
+
+// CreateCertificate mirrors kit's two modes off one field: a non-empty
+// import_certificate_pem imports the partner's certificate, an empty one
+// mints a key pair. Either way the input-only fields are consumed and never
+// stored, which is what the provider's InputOnly markers are built against.
+func (f *fakeIdentityServer) CreateCertificate(ctx context.Context, in *identitypb.CreateCertificateRequest) (*corepb.Certificate, error) {
+
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.recordAuth(ctx)
+
+	c := proto.Clone(in.GetCertificate()).(*corepb.Certificate)
+	f.lastMint = proto.Clone(c).(*corepb.Certificate)
+
+	c.Name = in.GetParent() + "/certificates/" + f.nextID("cert")
+	c.KeyId = f.nextID("key")
+	c.Status = corepb.CertificateStatus_CERTIFICATE_STATUS_ACTIVE
+
+	if pem := c.GetImportCertificatePem(); pem != "" {
+		c.Origin = corepb.CertificateOrigin_CERTIFICATE_ORIGIN_IMPORTED
+		c.HasPrivateKey = false
+		c.CertificatePem = pem
+		c.Subject = "CN=partner"
+	} else {
+		c.Origin = corepb.CertificateOrigin_CERTIFICATE_ORIGIN_GENERATED
+		c.HasPrivateKey = true
+		c.CertificatePem = "-----BEGIN CERTIFICATE-----\nminted\n-----END CERTIFICATE-----\n"
+		cn := c.GetSubjectCommonName()
+		if cn == "" {
+			cn = c.GetDisplayName()
+		}
+		c.Subject = "CN=" + cn
+	}
+
+	days := c.GetValidityDays()
+	if days == 0 {
+		days = 825
+	}
+	c.NotBefore = timestamppb.New(certNotBefore)
+	c.NotAfter = timestamppb.New(certNotBefore.AddDate(0, 0, int(days)))
+	c.FingerprintSha256 = fmt.Sprintf("%064x", f.seq)
+
+	// Input only: kit reads these off the create request and never writes
+	// them to the row, so a read can never echo them back.
+	c.SubjectCommonName = ""
+	c.ValidityDays = 0
+	c.KeySize = 0
+	c.ImportCertificatePem = ""
+
+	f.certs[c.GetName()] = c
+	return proto.Clone(c).(*corepb.Certificate), nil
+}
+
+func (f *fakeIdentityServer) PatchCertificate(ctx context.Context, in *identitypb.PatchCertificateRequest) (*corepb.Certificate, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.recordAuth(ctx)
+	existing, ok := f.certs[in.GetName()]
+	if !ok {
+		return nil, status.Errorf(codes.NotFound, "certificate %q not found", in.GetName())
+	}
+	for _, path := range in.GetUpdateMask().GetPaths() {
+		switch path {
+		case "display_name":
+			existing.DisplayName = in.GetCertificate().GetDisplayName()
+		case "labels":
+			existing.Labels = in.GetCertificate().GetLabels()
+		case "status":
+			existing.Status = in.GetCertificate().GetStatus()
+		case "use":
+			existing.Use = in.GetCertificate().GetUse()
+		default:
+			return nil, status.Errorf(codes.InvalidArgument, "unsupported update_mask path %q", path)
+		}
+	}
+	return proto.Clone(existing).(*corepb.Certificate), nil
+}
+
+func (f *fakeIdentityServer) DeleteCertificate(ctx context.Context, in *identitypb.DeleteCertificateRequest) (*emptypb.Empty, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.recordAuth(ctx)
+	if _, ok := f.certs[in.GetName()]; !ok {
+		return nil, status.Errorf(codes.NotFound, "certificate %q not found", in.GetName())
+	}
+	delete(f.certs, in.GetName())
 	return &emptypb.Empty{}, nil
 }
 
