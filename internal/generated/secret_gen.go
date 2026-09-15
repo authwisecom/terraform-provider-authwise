@@ -102,7 +102,7 @@ func (m *SecretModel) ToProto(ctx context.Context) (*v1alpha1.Secret, diag.Diagn
 	return out, diags
 }
 
-// FromProto populates the model from its proto message. Scope identifier attributes are left untouched.
+// FromProto populates the model from its proto message. Scope identifier attributes and input-only attributes are left untouched.
 func (m *SecretModel) FromProto(ctx context.Context, e *v1alpha1.Secret) diag.Diagnostics {
 	var diags diag.Diagnostics
 	m.Name = types.StringValue(e.Name)

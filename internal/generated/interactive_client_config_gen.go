@@ -37,7 +37,10 @@ func InteractiveClientConfigDataSourceSchema() schema.Schema {
 				CustomType: jsontypes.NormalizedType{},
 				Optional:   true,
 			},
-			"interaction_forward_uri": schema.StringAttribute{Optional: true},
+			"interaction_forward_uri":               schema.StringAttribute{Optional: true},
+			"refresh_token_absolute_expire_seconds": schema.Int64Attribute{Optional: true},
+			"refresh_token_expire_seconds":          schema.Int64Attribute{Optional: true},
+			"require_consent":                       schema.BoolAttribute{Optional: true},
 		},
 		MarkdownDescription: "Builds a InteractiveClientConfig config and exposes its google.protobuf.Any encoding as `any`. Makes no API calls.",
 	}
@@ -45,23 +48,29 @@ func InteractiveClientConfigDataSourceSchema() schema.Schema {
 
 // InteractiveClientConfigModel is the Terraform model for the InteractiveClientConfig config data source.
 type InteractiveClientConfigModel struct {
-	InteractionForwardUri    types.String         `tfsdk:"interaction_forward_uri"`
-	AllowedRedirectUris      types.List           `tfsdk:"allowed_redirect_uris"`
-	AccessTokenExpireSeconds types.Int64          `tfsdk:"access_token_expire_seconds"`
-	Cors                     jsontypes.Normalized `tfsdk:"cors"`
-	FlowIntegrationConfig    jsontypes.Normalized `tfsdk:"flow_integration_config"`
-	Any                      jsontypes.Normalized `tfsdk:"any"`
+	InteractionForwardUri             types.String         `tfsdk:"interaction_forward_uri"`
+	AllowedRedirectUris               types.List           `tfsdk:"allowed_redirect_uris"`
+	AccessTokenExpireSeconds          types.Int64          `tfsdk:"access_token_expire_seconds"`
+	Cors                              jsontypes.Normalized `tfsdk:"cors"`
+	FlowIntegrationConfig             jsontypes.Normalized `tfsdk:"flow_integration_config"`
+	RefreshTokenExpireSeconds         types.Int64          `tfsdk:"refresh_token_expire_seconds"`
+	RefreshTokenAbsoluteExpireSeconds types.Int64          `tfsdk:"refresh_token_absolute_expire_seconds"`
+	RequireConsent                    types.Bool           `tfsdk:"require_consent"`
+	Any                               jsontypes.Normalized `tfsdk:"any"`
 }
 
 // NewInteractiveClientConfigModel returns a model with every attribute set to its typed null.
 func NewInteractiveClientConfigModel() *InteractiveClientConfigModel {
 	return &InteractiveClientConfigModel{
-		AccessTokenExpireSeconds: types.Int64Null(),
-		AllowedRedirectUris:      types.ListNull(types.StringType),
-		Any:                      jsontypes.NewNormalizedNull(),
-		Cors:                     jsontypes.NewNormalizedNull(),
-		FlowIntegrationConfig:    jsontypes.NewNormalizedNull(),
-		InteractionForwardUri:    types.StringNull(),
+		AccessTokenExpireSeconds:          types.Int64Null(),
+		AllowedRedirectUris:               types.ListNull(types.StringType),
+		Any:                               jsontypes.NewNormalizedNull(),
+		Cors:                              jsontypes.NewNormalizedNull(),
+		FlowIntegrationConfig:             jsontypes.NewNormalizedNull(),
+		InteractionForwardUri:             types.StringNull(),
+		RefreshTokenAbsoluteExpireSeconds: types.Int64Null(),
+		RefreshTokenExpireSeconds:         types.Int64Null(),
+		RequireConsent:                    types.BoolNull(),
 	}
 }
 
@@ -90,6 +99,9 @@ func (m *InteractiveClientConfigModel) ToProto(ctx context.Context) (*v1alpha1.I
 			out.FlowIntegrationConfig = v
 		}
 	}
+	out.RefreshTokenExpireSeconds = int32(m.RefreshTokenExpireSeconds.ValueInt64())
+	out.RefreshTokenAbsoluteExpireSeconds = int32(m.RefreshTokenAbsoluteExpireSeconds.ValueInt64())
+	out.RequireConsent = m.RequireConsent.ValueBool()
 	return out, diags
 }
 

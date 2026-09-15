@@ -105,7 +105,7 @@ func (m *AccessPermissionModel) ToProto(ctx context.Context) (*v1alpha1.AccessPe
 	return out, diags
 }
 
-// FromProto populates the model from its proto message. Scope identifier attributes are left untouched.
+// FromProto populates the model from its proto message. Scope identifier attributes and input-only attributes are left untouched.
 func (m *AccessPermissionModel) FromProto(ctx context.Context, e *v1alpha1.AccessPermission) diag.Diagnostics {
 	var diags diag.Diagnostics
 	m.Name = types.StringValue(e.Name)
