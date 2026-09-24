@@ -10,6 +10,12 @@
 //   - Event (read-only; needs standalone data sources / DataSourceList)
 //   - ClientSecret (write-once hash/salt; needs write-only arguments)
 //   - ProviderUsernamePassword config (repeated message field)
+//
+// Hand-written in internal/provider rather than generated, because their
+// shapes are beyond tfinfra: authwise_secret (the material rides the create
+// request and the :addVersion RPC, never the entity) and
+// authwise_realm_authentication_policy (oneofs, repeated messages and
+// durations nested several levels deep inside RealmConfig).
 package main
 
 //go:generate go run .
@@ -102,10 +108,6 @@ func withComputed(fields ...string) func(r *gentf.Resource) {
 	return func(r *gentf.Resource) { r.Computed = fields }
 }
 
-func withSensitive(fields ...string) func(r *gentf.Resource) {
-	return func(r *gentf.Resource) { r.Sensitive = fields }
-}
-
 func withImmutable(fields ...string) func(r *gentf.Resource) {
 	return func(r *gentf.Resource) { r.Immutable = fields }
 }
@@ -128,15 +130,6 @@ func config[E any](typeName string, sensitive ...string) gentf.Entry {
 	}
 }
 
-// providerConfig declares an upstream OAuth provider's config: every one of
-// them is keyed by a client id and a client secret. Configs that carry no
-// shared secret — SAML trusts a certificate instead — use config directly,
-// since naming a field that the message does not have panics at generation
-// time.
-func providerConfig[E any](typeName string) gentf.Entry {
-	return config[E](typeName, "client_secret")
-}
-
 func main() {
 
 	gentf.NewRegistry().RunDirectoryPathHandler("../internal/generated", &gentf.Spec{
@@ -150,9 +143,12 @@ func main() {
 				"stylesheet_attributes", "content",
 				"placeholder_stylesheet_attributes", "placeholder_content",
 			)),
-			crud[corepb.Secret](scopeTenant, withSensitive("value")),
 			crud[corepb.Asset](scopeTenant),
-			crud[corepb.Endpoint](scopeTenant),
+			// auth is a oneof of messages that each hold a SecretRef, which
+			// is deeper than a typed nested attribute goes; it takes the JSON
+			// lane, and a reference inside jsonencode still orders the
+			// endpoint after the secret it names.
+			crud[corepb.Endpoint](scopeTenant, withJSON("auth")),
 			// The SAML trust anchors (kit#487). certificate_pem is the
 			// public certificate of any row, minted or imported, and is
 			// read-only; importing a partner's PEM is a separate input-only
@@ -175,21 +171,26 @@ func main() {
 				// status stays writable — the default Optional+Computed shape
 				// already covers its ""-means-unchanged semantics.
 				withComputed("updated_at", "origin", "enrollment"),
-				associate[corepb.Role](),
 			),
 			crud[corepb.Provider](scopeRealm, withJSON("config")),
+			// A second step the realm offers (kit#544). config is the
+			// per-type Any; the factor_* config data sources below build it.
+			crud[corepb.Factor](scopeRealm,
+				withRequired("display_name", "factor_type"),
+				withImmutable("factor_type"),
+				withJSON("config")),
 
 			// Issuer-scoped.
-			crud[corepb.Client](scopeIssuer, withJSON("config"), associate[corepb.Role]()),
+			crud[corepb.Client](scopeIssuer, withJSON("config")),
 			crud[corepb.Audience](scopeIssuer, withJSON("config")),
 			crud[corepb.AppearanceProfile](scopeIssuer,
 				withCollection("appearance-profiles"),
 				withJSON("stylesheet_attributes", "content")),
 
-			// Audience-scoped.
-			crud[corepb.Role](scopeAudience, associate[corepb.Permission]()),
-			crud[corepb.Permission](scopeAudience),
-			crud[corepb.Scope](scopeAudience, callerNamed, associate[corepb.Permission]()),
+			// Audience-scoped. The identity Role and Permission surface is
+			// gone (apis v0.6.0): roles and permissions live in the Access
+			// catalog, and a scope grants access permissions.
+			crud[corepb.Scope](scopeAudience, callerNamed, associate[corepb.AccessPermission]()),
 
 			// Access service (audience-scoped). AccessPermission and
 			// AccessRole are name-keyed in kit — the catalog's vocabulary is
@@ -215,14 +216,17 @@ func main() {
 					gentf.ConfigDataSource{},
 				},
 			},
-			providerConfig[corepb.ProviderMicrosoft]("provider_microsoft"),
-			providerConfig[corepb.ProviderGoogle]("provider_google"),
-			providerConfig[corepb.ProviderGitHub]("provider_github"),
-			providerConfig[corepb.ProviderLinkedIn]("provider_linkedin"),
-			providerConfig[corepb.ProviderFacebook]("provider_facebook"),
-			providerConfig[corepb.ProviderDropbox]("provider_dropbox"),
-			providerConfig[corepb.ProviderOkta]("provider_okta"),
-			providerConfig[corepb.ProviderAuth0]("provider_auth0"),
+			// The OAuth-shaped upstreams name their client secret by
+			// reference (client_secret_ref, a Secret's name) since kit#370;
+			// the material lives in an authwise_secret, not in the config.
+			config[corepb.ProviderMicrosoft]("provider_microsoft"),
+			config[corepb.ProviderGoogle]("provider_google"),
+			config[corepb.ProviderGitHub]("provider_github"),
+			config[corepb.ProviderLinkedIn]("provider_linkedin"),
+			config[corepb.ProviderFacebook]("provider_facebook"),
+			config[corepb.ProviderDropbox]("provider_dropbox"),
+			config[corepb.ProviderOkta]("provider_okta"),
+			config[corepb.ProviderAuth0]("provider_auth0"),
 			// SAML 2.0, both roles: ProviderSaml is kit as the SP (on a
 			// Provider), SamlRelyingPartyConfig is kit as the IdP (on a
 			// Client). Neither carries a client secret. claim_map is a
@@ -230,6 +234,17 @@ func main() {
 			// a singular message as a typed nested attribute.
 			config[corepb.ProviderSaml]("provider_saml"),
 			config[corepb.SamlRelyingPartyConfig]("saml_relying_party_config"),
+			// Factor configs, one per type that has one (otp-email, otp-sms
+			// and recovery-code take none).
+			config[corepb.FactorTOTP]("factor_totp"),
+			config[corepb.FactorWebAuthn]("factor_webauthn"),
+			config[corepb.FactorDuo]("factor_duo"),
+			{
+				Type: reflect.TypeFor[corepb.FactorExternal](),
+				Implementations: []any{
+					gentf.ConfigDataSource{TypeName: "factor_external", JSON: []string{"config"}},
+				},
+			},
 			{
 				Type: reflect.TypeFor[corepb.InteractiveClientConfig](),
 				Implementations: []any{

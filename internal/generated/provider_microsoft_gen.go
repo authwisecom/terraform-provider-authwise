@@ -6,10 +6,12 @@ import (
 	"context"
 	v1alpha1 "git.authwise.com/authwise/apis/authwise/types/core/v1alpha1"
 	jsontypes "github.com/hashicorp/terraform-plugin-framework-jsontypes/jsontypes"
+	attr "github.com/hashicorp/terraform-plugin-framework/attr"
 	datasource "github.com/hashicorp/terraform-plugin-framework/datasource"
 	schema "github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	diag "github.com/hashicorp/terraform-plugin-framework/diag"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
+	basetypes "github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	protojson "google.golang.org/protobuf/encoding/protojson"
 	anypb "google.golang.org/protobuf/types/known/anypb"
 )
@@ -24,9 +26,9 @@ func ProviderMicrosoftDataSourceSchema() schema.Schema {
 				MarkdownDescription: "protojson-encoded google.protobuf.Any (includes `@type`); reference this from Any-typed resource attributes.",
 			},
 			"client_id": schema.StringAttribute{Optional: true},
-			"client_secret": schema.StringAttribute{
-				Optional:  true,
-				Sensitive: true,
+			"client_secret_ref": schema.SingleNestedAttribute{
+				Attributes: map[string]schema.Attribute{"name": schema.StringAttribute{Optional: true}},
+				Optional:   true,
 			},
 			"prompt_style": schema.StringAttribute{Optional: true},
 			"scope":        schema.StringAttribute{Optional: true},
@@ -36,25 +38,35 @@ func ProviderMicrosoftDataSourceSchema() schema.Schema {
 	}
 }
 
+// ProviderMicrosoftClientSecretRefModel is the Terraform model for ProviderMicrosoft's "client_secret_ref" nested attribute.
+type ProviderMicrosoftClientSecretRefModel struct {
+	Name types.String `tfsdk:"name"`
+}
+
+// ProviderMicrosoftClientSecretRefAttrTypes returns the attribute types of the "client_secret_ref" nested attribute.
+func ProviderMicrosoftClientSecretRefAttrTypes() map[string]attr.Type {
+	return map[string]attr.Type{"name": types.StringType}
+}
+
 // ProviderMicrosoftModel is the Terraform model for the ProviderMicrosoft config data source.
 type ProviderMicrosoftModel struct {
-	Scope        types.String         `tfsdk:"scope"`
-	ClientId     types.String         `tfsdk:"client_id"`
-	ClientSecret types.String         `tfsdk:"client_secret"`
-	PromptStyle  types.String         `tfsdk:"prompt_style"`
-	Tenant       types.String         `tfsdk:"tenant"`
-	Any          jsontypes.Normalized `tfsdk:"any"`
+	Scope           types.String         `tfsdk:"scope"`
+	ClientId        types.String         `tfsdk:"client_id"`
+	PromptStyle     types.String         `tfsdk:"prompt_style"`
+	Tenant          types.String         `tfsdk:"tenant"`
+	ClientSecretRef types.Object         `tfsdk:"client_secret_ref"`
+	Any             jsontypes.Normalized `tfsdk:"any"`
 }
 
 // NewProviderMicrosoftModel returns a model with every attribute set to its typed null.
 func NewProviderMicrosoftModel() *ProviderMicrosoftModel {
 	return &ProviderMicrosoftModel{
-		Any:          jsontypes.NewNormalizedNull(),
-		ClientId:     types.StringNull(),
-		ClientSecret: types.StringNull(),
-		PromptStyle:  types.StringNull(),
-		Scope:        types.StringNull(),
-		Tenant:       types.StringNull(),
+		Any:             jsontypes.NewNormalizedNull(),
+		ClientId:        types.StringNull(),
+		ClientSecretRef: types.ObjectNull(ProviderMicrosoftClientSecretRefAttrTypes()),
+		PromptStyle:     types.StringNull(),
+		Scope:           types.StringNull(),
+		Tenant:          types.StringNull(),
 	}
 }
 
@@ -64,9 +76,15 @@ func (m *ProviderMicrosoftModel) ToProto(ctx context.Context) (*v1alpha1.Provide
 	out := &v1alpha1.ProviderMicrosoft{}
 	out.Scope = m.Scope.ValueString()
 	out.ClientId = m.ClientId.ValueString()
-	out.ClientSecret = m.ClientSecret.ValueString()
 	out.PromptStyle = m.PromptStyle.ValueString()
 	out.Tenant = m.Tenant.ValueString()
+	if !m.ClientSecretRef.IsNull() && !m.ClientSecretRef.IsUnknown() {
+		var n ProviderMicrosoftClientSecretRefModel
+		diags.Append(m.ClientSecretRef.As(ctx, &n, basetypes.ObjectAsOptions{})...)
+		v := &v1alpha1.SecretRef{}
+		v.Name = n.Name.ValueString()
+		out.ClientSecretRef = v
+	}
 	return out, diags
 }
 

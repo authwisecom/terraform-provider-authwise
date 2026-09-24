@@ -240,3 +240,42 @@ func TestAccGuardCatalogExample(t *testing.T) {
 		}
 	}
 }
+
+// TestAccAuthnExample applies examples/authn verbatim, then disables the
+// passkey factor the admins rule requires. kit accepts that write with a
+// warning, which must reach the person running terraform twice: as a
+// warning on the apply that caused it, and through the example's check
+// block on every plan after.
+func TestAccAuthnExample(t *testing.T) {
+
+	if os.Getenv("TF_ACC") == "" {
+		t.Skip("acceptance test: set TF_ACC=1 to run")
+	}
+
+	h := newHarness(t)
+	r := newExampleRun(t, h, "authn")
+
+	if out := r.apply(); strings.Contains(out, "kit accepted the write with a warning") {
+		t.Errorf("a clean apply warned:\n%s", out)
+	}
+	r.expectCleanPlan()
+
+	h.fake.mu.Lock()
+	factors, secrets := len(h.fake.factors), len(h.fake.secrets)
+	h.fake.mu.Unlock()
+	if factors != 3 || secrets != 1 {
+		t.Fatalf("%d factors and %d secrets on the server, want 3 and 1", factors, secrets)
+	}
+
+	const want = `rule "admins", requires webauthn, which no active factor offers`
+
+	out := r.run("apply", "-auto-approve", "-var", "passkeys_status=disabled")
+	if !strings.Contains(out, "kit accepted the write with a warning") || !strings.Contains(out, want) {
+		t.Errorf("the apply did not surface kit's warning:\n%s", out)
+	}
+
+	out = r.run("plan", "-var", "passkeys_status=disabled")
+	if !strings.Contains(out, "Check block assertion failed") || !strings.Contains(out, want) {
+		t.Errorf("the check block did not surface kit's warning:\n%s", out)
+	}
+}

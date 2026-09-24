@@ -118,16 +118,16 @@ resource "authwise_realm" "test" {
 	}
 }
 
-func TestAccRole_ScopeOverride(t *testing.T) {
+func TestAccAccessRole_ScopeOverride(t *testing.T) {
 
 	h := newHarness(t)
 
 	// audience_id overridden per-resource; tenant/issuer from provider
 	// defaults — proves three-level parent composition.
 	config := h.providerConfig() + `
-resource "authwise_role" "test" {
-  audience_id  = "a-override"
-  display_name = "Admin"
+resource "authwise_access_role" "test" {
+  audience_id    = "a-override"
+  access_role_id = "admin"
 }
 `
 
@@ -137,9 +137,9 @@ resource "authwise_role" "test" {
 			{
 				Config: config,
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestMatchResourceAttr("authwise_role.test", "name",
-						regexp.MustCompile(`^tenants/t-1/issuers/i-1/audiences/a-override/roles/ro-\d+$`)),
-					resource.TestCheckResourceAttr("authwise_role.test", "audience_id", "a-override"),
+					resource.TestCheckResourceAttr("authwise_access_role.test", "name",
+						"tenants/t-1/issuers/i-1/audiences/a-override/access-roles/admin"),
+					resource.TestCheckResourceAttr("authwise_access_role.test", "audience_id", "a-override"),
 				),
 			},
 		},
@@ -152,9 +152,11 @@ func TestAccProviderGoogleConfig_DataSource(t *testing.T) {
 
 	config := h.providerConfig() + `
 data "authwise_provider_google" "sso" {
-  client_id     = "google-client"
-  client_secret = "google-secret"
-  scope         = "openid email"
+  client_id = "google-client"
+  client_secret_ref = {
+    name = "tenants/t-1/secrets/google"
+  }
+  scope = "openid email"
 }
 `
 
@@ -168,6 +170,10 @@ data "authwise_provider_google" "sso" {
 						regexp.MustCompile(`"@type":\s*"type.googleapis.com/authwise.types.core.v1alpha1.ProviderGoogle"`)),
 					resource.TestMatchResourceAttr("data.authwise_provider_google.sso", "any",
 						regexp.MustCompile(`"clientId":\s*"google-client"`)),
+					// The secret travels by reference; the config has no field
+					// that could hold the material.
+					resource.TestMatchResourceAttr("data.authwise_provider_google.sso", "any",
+						regexp.MustCompile(`"clientSecretRef":\s*\{\s*"name":\s*"tenants/t-1/secrets/google"`)),
 				),
 			},
 		},
@@ -203,104 +209,6 @@ resource "authwise_realm" "test" {
 				Config:             config,
 				ExpectNonEmptyPlan: false,
 			},
-		},
-	})
-}
-
-func TestAccRolePermissions_Authoritative(t *testing.T) {
-
-	h := newHarness(t)
-
-	perms := func(list string) string {
-		return h.providerConfig() + fmt.Sprintf(`
-resource "authwise_role" "test" {
-  display_name = "Admin"
-}
-
-resource "authwise_role_permissions" "test" {
-  role        = authwise_role.test.name
-  permissions = [%s]
-}
-`, list)
-	}
-
-	const (
-		read  = `"tenants/t-1/issuers/i-1/audiences/a-1/permissions/read"`
-		write = `"tenants/t-1/issuers/i-1/audiences/a-1/permissions/write"`
-		admin = `"tenants/t-1/issuers/i-1/audiences/a-1/permissions/admin"`
-	)
-
-	onlyRole := func() string {
-		h.fake.mu.Lock()
-		defer h.fake.mu.Unlock()
-		for name := range h.fake.roles {
-			return name
-		}
-		return ""
-	}
-
-	wantServer := func(want ...string) resource.TestCheckFunc {
-		return checkServer(func() error {
-			got := h.fake.rolePermissions(onlyRole())
-			if fmt.Sprint(got) != fmt.Sprint(want) {
-				return fmt.Errorf("server permissions = %v, want %v", got, want)
-			}
-			return nil
-		})
-	}
-
-	resource.Test(t, resource.TestCase{
-		ProtoV6ProviderFactories: protoFactories(),
-		Steps: []resource.TestStep{
-			{
-				Config: perms(read + ", " + write),
-				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("authwise_role_permissions.test", "permissions.#", "2"),
-					wantServer(
-						"tenants/t-1/issuers/i-1/audiences/a-1/permissions/read",
-						"tenants/t-1/issuers/i-1/audiences/a-1/permissions/write",
-					),
-				),
-			},
-			{
-				// A member associated out of band is removed on the next
-				// apply: the set is authoritative.
-				PreConfig: func() {
-					h.fake.addRolePermission(onlyRole(),
-						"tenants/t-1/issuers/i-1/audiences/a-1/permissions/rogue")
-				},
-				Config: perms(read + ", " + write),
-				Check: wantServer(
-					"tenants/t-1/issuers/i-1/audiences/a-1/permissions/read",
-					"tenants/t-1/issuers/i-1/audiences/a-1/permissions/write",
-				),
-			},
-			{
-				// Update reconciles adds and removes in one call (and the
-				// refresh before it walks the one-item list pages).
-				Config: perms(read + ", " + admin),
-				Check: wantServer(
-					"tenants/t-1/issuers/i-1/audiences/a-1/permissions/admin",
-					"tenants/t-1/issuers/i-1/audiences/a-1/permissions/read",
-				),
-			},
-			{
-				ResourceName: "authwise_role_permissions.test",
-				ImportState:  true,
-				ImportStateIdFunc: func(s *terraform.State) (string, error) {
-					return s.RootModule().Resources["authwise_role_permissions.test"].Primary.Attributes["role"], nil
-				},
-				ImportStateVerify:                    true,
-				ImportStateVerifyIdentifierAttribute: "role",
-			},
-		},
-		CheckDestroy: func(_ *terraform.State) error {
-			for role, members := range h.fake.rolePerms {
-				if len(members) != 0 {
-					return fmt.Errorf("role %s still has %d permissions after destroy", role, len(members))
-				}
-			}
-			return nil
 		},
 	})
 }

@@ -15,6 +15,7 @@ import (
 	path "github.com/hashicorp/terraform-plugin-framework/path"
 	resource "github.com/hashicorp/terraform-plugin-framework/resource"
 	schema "github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	boolplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	mapplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
 	planmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	stringplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
@@ -66,6 +67,17 @@ func ProviderResourceSchema() schema.Schema {
 				Optional:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
+			"trust_upstream_amr": schema.BoolAttribute{
+				Computed:      true,
+				Optional:      true,
+				PlanModifiers: []planmodifier.Bool{boolplanmodifier.UseStateForUnknown()},
+			},
+			"upstream_acr_map": schema.MapAttribute{
+				Computed:      true,
+				ElementType:   types.StringType,
+				Optional:      true,
+				PlanModifiers: []planmodifier.Map{mapplanmodifier.UseStateForUnknown()},
+			},
 		},
 		MarkdownDescription: "Provider resource.",
 	}
@@ -73,25 +85,29 @@ func ProviderResourceSchema() schema.Schema {
 
 // ProviderModel is the Terraform plan/state model for Provider.
 type ProviderModel struct {
-	Name         types.String         `tfsdk:"name"`
-	TenantId     types.String         `tfsdk:"tenant_id"`
-	RealmId      types.String         `tfsdk:"realm_id"`
-	Labels       types.Map            `tfsdk:"labels"`
-	DisplayName  types.String         `tfsdk:"display_name"`
-	ProviderType types.String         `tfsdk:"provider_type"`
-	Config       jsontypes.Normalized `tfsdk:"config"`
+	Name             types.String         `tfsdk:"name"`
+	TenantId         types.String         `tfsdk:"tenant_id"`
+	RealmId          types.String         `tfsdk:"realm_id"`
+	Labels           types.Map            `tfsdk:"labels"`
+	DisplayName      types.String         `tfsdk:"display_name"`
+	ProviderType     types.String         `tfsdk:"provider_type"`
+	Config           jsontypes.Normalized `tfsdk:"config"`
+	TrustUpstreamAmr types.Bool           `tfsdk:"trust_upstream_amr"`
+	UpstreamAcrMap   types.Map            `tfsdk:"upstream_acr_map"`
 }
 
 // NewProviderModel returns a model with every attribute set to its typed null; collection types cannot be zero-valued.
 func NewProviderModel() *ProviderModel {
 	return &ProviderModel{
-		Config:       jsontypes.NewNormalizedNull(),
-		DisplayName:  types.StringNull(),
-		Labels:       types.MapNull(types.StringType),
-		Name:         types.StringNull(),
-		ProviderType: types.StringNull(),
-		RealmId:      types.StringNull(),
-		TenantId:     types.StringNull(),
+		Config:           jsontypes.NewNormalizedNull(),
+		DisplayName:      types.StringNull(),
+		Labels:           types.MapNull(types.StringType),
+		Name:             types.StringNull(),
+		ProviderType:     types.StringNull(),
+		RealmId:          types.StringNull(),
+		TenantId:         types.StringNull(),
+		TrustUpstreamAmr: types.BoolNull(),
+		UpstreamAcrMap:   types.MapNull(types.StringType),
 	}
 }
 
@@ -112,6 +128,10 @@ func (m *ProviderModel) ToProto(ctx context.Context) (*v1alpha1.Provider, diag.D
 		} else {
 			out.Config = v
 		}
+	}
+	out.TrustUpstreamAmr = m.TrustUpstreamAmr.ValueBool()
+	if !m.UpstreamAcrMap.IsNull() && !m.UpstreamAcrMap.IsUnknown() {
+		diags.Append(m.UpstreamAcrMap.ElementsAs(ctx, &out.UpstreamAcrMap, false)...)
 	}
 	return out, diags
 }
@@ -147,6 +167,14 @@ func (m *ProviderModel) FromProto(ctx context.Context, e *v1alpha1.Provider) dia
 			m.Config = jsontypes.NewNormalizedValue(string(b))
 		}
 	}
+	m.TrustUpstreamAmr = types.BoolValue(e.TrustUpstreamAmr)
+	if len(e.UpstreamAcrMap) == 0 {
+		m.UpstreamAcrMap = types.MapNull(types.StringType)
+	} else {
+		v, d := types.MapValueFrom(ctx, types.StringType, e.UpstreamAcrMap)
+		diags.Append(d...)
+		m.UpstreamAcrMap = v
+	}
 	return diags
 }
 
@@ -179,6 +207,12 @@ func (m *ProviderModel) UpdateMask(ctx context.Context, prior *ProviderModel) []
 		if eq, _ := m.Config.StringSemanticEquals(ctx, prior.Config); !eq {
 			paths = append(paths, "config")
 		}
+	}
+	if !m.TrustUpstreamAmr.Equal(prior.TrustUpstreamAmr) {
+		paths = append(paths, "trust_upstream_amr")
+	}
+	if !m.UpstreamAcrMap.Equal(prior.UpstreamAcrMap) {
+		paths = append(paths, "upstream_acr_map")
 	}
 	return paths
 }
@@ -319,9 +353,14 @@ func ProviderDataSourceSchema() schema1.Schema {
 				MarkdownDescription: "Full resource name of the object to read.",
 				Required:            true,
 			},
-			"provider_type": schema1.StringAttribute{Computed: true},
-			"realm_id":      schema1.StringAttribute{Computed: true},
-			"tenant_id":     schema1.StringAttribute{Computed: true},
+			"provider_type":      schema1.StringAttribute{Computed: true},
+			"realm_id":           schema1.StringAttribute{Computed: true},
+			"tenant_id":          schema1.StringAttribute{Computed: true},
+			"trust_upstream_amr": schema1.BoolAttribute{Computed: true},
+			"upstream_acr_map": schema1.MapAttribute{
+				Computed:    true,
+				ElementType: types.StringType,
+			},
 		},
 		MarkdownDescription: "Provider data source: reads one Provider by its full resource name.",
 	}

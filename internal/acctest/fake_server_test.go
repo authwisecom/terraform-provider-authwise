@@ -6,7 +6,6 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
-	"sort"
 	"strings"
 	"sync"
 	"testing"
@@ -38,13 +37,23 @@ type fakeIdentityServer struct {
 
 	mu        sync.Mutex
 	realms    map[string]*corepb.Realm
-	roles     map[string]*corepb.Role
-	rolePerms map[string]map[string]bool
 	audiences map[string]*corepb.Audience
 	clients   map[string]*corepb.Client
 	providers map[string]*corepb.Provider
 	certs     map[string]*corepb.Certificate
+	endpoints map[string]*corepb.Endpoint
+	factors   map[string]*corepb.Factor
+	secrets   map[string]*corepb.Secret
 	seq       int
+
+	// material holds each secret's versions as sent, oldest first. The
+	// stored Secret has no field for it, exactly as kit's does not, so this
+	// is the only place a test can see what the provider sent.
+	material map[string][]string
+
+	// pinned names secrets referenced by something outside the test's
+	// configuration, so deleting them is refused the way kit refuses it.
+	pinned map[string]bool
 
 	// lastMint records the input-only create parameters of the most recent
 	// CreateCertificate. The stored row deliberately keeps none of them, so
@@ -59,12 +68,15 @@ type fakeIdentityServer struct {
 func newFakeIdentityServer() *fakeIdentityServer {
 	return &fakeIdentityServer{
 		realms:    map[string]*corepb.Realm{},
-		roles:     map[string]*corepb.Role{},
-		rolePerms: map[string]map[string]bool{},
 		audiences: map[string]*corepb.Audience{},
 		clients:   map[string]*corepb.Client{},
 		providers: map[string]*corepb.Provider{},
 		certs:     map[string]*corepb.Certificate{},
+		endpoints: map[string]*corepb.Endpoint{},
+		factors:   map[string]*corepb.Factor{},
+		secrets:   map[string]*corepb.Secret{},
+		material:  map[string][]string{},
+		pinned:    map[string]bool{},
 	}
 }
 
@@ -131,12 +143,25 @@ func (f *fakeIdentityServer) PatchRealm(ctx context.Context, in *identitypb.Patc
 			existing.DisplayName = in.GetRealm().GetDisplayName()
 		case "config":
 			existing.Config = in.GetRealm().GetConfig()
+		case "config.authentication":
+			// kit merges a nested path on its own and refuses one whose
+			// parent the request leaves unset (validateMaskParents).
+			if in.GetRealm().GetConfig() == nil {
+				return nil, status.Errorf(codes.InvalidArgument, "update_mask path %q: config is unset", path)
+			}
+			if existing.GetConfig() == nil {
+				existing.Config = &corepb.RealmConfig{}
+			}
+			existing.Config.Authentication = in.GetRealm().GetConfig().GetAuthentication()
 		case "labels":
 			existing.Labels = in.GetRealm().GetLabels()
 		default:
 			return nil, status.Errorf(codes.InvalidArgument, "unsupported update_mask path %q", path)
 		}
 	}
+	// kit#586: warnings describe the realm the write leaves, after it
+	// succeeds.
+	sendWarnings(ctx, f.policyWarningsLocked(in.GetName()))
 	return proto.Clone(existing).(*corepb.Realm), nil
 }
 
@@ -148,59 +173,6 @@ func (f *fakeIdentityServer) DeleteRealm(ctx context.Context, in *identitypb.Del
 		return nil, status.Errorf(codes.NotFound, "realm %q not found", in.GetName())
 	}
 	delete(f.realms, in.GetName())
-	return &emptypb.Empty{}, nil
-}
-
-// --- Role (audience-scoped: proves three-level parent composition) ---
-
-func (f *fakeIdentityServer) GetRole(ctx context.Context, in *identitypb.GetRoleRequest) (*corepb.Role, error) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	f.recordAuth(ctx)
-	r, ok := f.roles[in.GetName()]
-	if !ok {
-		return nil, status.Errorf(codes.NotFound, "role %q not found", in.GetName())
-	}
-	return proto.Clone(r).(*corepb.Role), nil
-}
-
-func (f *fakeIdentityServer) CreateRole(ctx context.Context, in *identitypb.CreateRoleRequest) (*corepb.Role, error) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	f.recordAuth(ctx)
-	r := proto.Clone(in.GetRole()).(*corepb.Role)
-	r.Name = in.GetParent() + "/roles/" + f.nextID("ro")
-	f.roles[r.GetName()] = r
-	return proto.Clone(r).(*corepb.Role), nil
-}
-
-func (f *fakeIdentityServer) PatchRole(ctx context.Context, in *identitypb.PatchRoleRequest) (*corepb.Role, error) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	f.recordAuth(ctx)
-	existing, ok := f.roles[in.GetName()]
-	if !ok {
-		return nil, status.Errorf(codes.NotFound, "role %q not found", in.GetName())
-	}
-	for _, path := range in.GetUpdateMask().GetPaths() {
-		switch path {
-		case "display_name":
-			existing.DisplayName = in.GetRole().GetDisplayName()
-		default:
-			return nil, status.Errorf(codes.InvalidArgument, "unsupported update_mask path %q", path)
-		}
-	}
-	return proto.Clone(existing).(*corepb.Role), nil
-}
-
-func (f *fakeIdentityServer) DeleteRole(ctx context.Context, in *identitypb.DeleteRoleRequest) (*emptypb.Empty, error) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	f.recordAuth(ctx)
-	if _, ok := f.roles[in.GetName()]; !ok {
-		return nil, status.Errorf(codes.NotFound, "role %q not found", in.GetName())
-	}
-	delete(f.roles, in.GetName())
 	return &emptypb.Empty{}, nil
 }
 
@@ -339,6 +311,9 @@ func (f *fakeIdentityServer) CreateProvider(ctx context.Context, in *identitypb.
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.recordAuth(ctx)
+	if err := f.admitLocked(in); err != nil {
+		return nil, err
+	}
 	p := proto.Clone(in.GetProvider()).(*corepb.Provider)
 	p.Name = in.GetParent() + "/providers/" + f.nextID("p")
 	f.providers[p.GetName()] = p
@@ -349,6 +324,9 @@ func (f *fakeIdentityServer) PatchProvider(ctx context.Context, in *identitypb.P
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.recordAuth(ctx)
+	if err := f.admitLocked(in); err != nil {
+		return nil, err
+	}
 	existing, ok := f.providers[in.GetName()]
 	if !ok {
 		return nil, status.Errorf(codes.NotFound, "provider %q not found", in.GetName())
@@ -493,81 +471,6 @@ func (f *fakeIdentityServer) DeleteCertificate(ctx context.Context, in *identity
 	}
 	delete(f.certs, in.GetName())
 	return &emptypb.Empty{}, nil
-}
-
-// --- Role ↔ Permission association (the tf.Associate family) ---
-
-// AssociatePermissionsToRole applies set/remove semantics over the role's
-// permission set.
-func (f *fakeIdentityServer) AssociatePermissionsToRole(ctx context.Context, in *identitypb.AssociatePermissionsToRoleRequest) (*emptypb.Empty, error) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	f.recordAuth(ctx)
-	if _, ok := f.roles[in.GetName()]; !ok {
-		return nil, status.Errorf(codes.NotFound, "role %q not found", in.GetName())
-	}
-	if f.rolePerms[in.GetName()] == nil {
-		f.rolePerms[in.GetName()] = map[string]bool{}
-	}
-	for _, n := range in.GetAssociation().GetSet() {
-		f.rolePerms[in.GetName()][n] = true
-	}
-	for _, n := range in.GetAssociation().GetRemove() {
-		delete(f.rolePerms[in.GetName()], n)
-	}
-	return &emptypb.Empty{}, nil
-}
-
-// ListPermissionsByRole pages one permission at a time so the runtime's
-// next-page-token walk is exercised by every refresh.
-func (f *fakeIdentityServer) ListPermissionsByRole(ctx context.Context, in *identitypb.ListPermissionsByRoleRequest) (*identitypb.ListPermissionsByRoleResponse, error) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	f.recordAuth(ctx)
-	if _, ok := f.roles[in.GetName()]; !ok {
-		return nil, status.Errorf(codes.NotFound, "role %q not found", in.GetName())
-	}
-	names := f.rolePermissionsLocked(in.GetName())
-	start := 0
-	if in.GetPageToken() != "" {
-		fmt.Sscanf(in.GetPageToken(), "%d", &start)
-	}
-	res := &identitypb.ListPermissionsByRoleResponse{}
-	if start < len(names) {
-		res.Permissions = []*corepb.Permission{{Name: names[start]}}
-		if start+1 < len(names) {
-			res.NextPageToken = fmt.Sprintf("%d", start+1)
-		}
-	}
-	return res, nil
-}
-
-// rolePermissionsLocked returns the role's permission names, sorted; the
-// caller holds f.mu.
-func (f *fakeIdentityServer) rolePermissionsLocked(role string) []string {
-	names := make([]string, 0, len(f.rolePerms[role]))
-	for n := range f.rolePerms[role] {
-		names = append(names, n)
-	}
-	sort.Strings(names)
-	return names
-}
-
-// rolePermissions is the test-facing variant of rolePermissionsLocked.
-func (f *fakeIdentityServer) rolePermissions(role string) []string {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	return f.rolePermissionsLocked(role)
-}
-
-// addRolePermission seeds an out-of-band association.
-func (f *fakeIdentityServer) addRolePermission(role, permission string) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	if f.rolePerms[role] == nil {
-		f.rolePerms[role] = map[string]bool{}
-	}
-	f.rolePerms[role][permission] = true
 }
 
 // harness boots the fake gRPC server plus a fake OAuth token endpoint and

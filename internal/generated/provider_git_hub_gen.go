@@ -6,10 +6,12 @@ import (
 	"context"
 	v1alpha1 "git.authwise.com/authwise/apis/authwise/types/core/v1alpha1"
 	jsontypes "github.com/hashicorp/terraform-plugin-framework-jsontypes/jsontypes"
+	attr "github.com/hashicorp/terraform-plugin-framework/attr"
 	datasource "github.com/hashicorp/terraform-plugin-framework/datasource"
 	schema "github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	diag "github.com/hashicorp/terraform-plugin-framework/diag"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
+	basetypes "github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	protojson "google.golang.org/protobuf/encoding/protojson"
 	anypb "google.golang.org/protobuf/types/known/anypb"
 )
@@ -25,9 +27,9 @@ func ProviderGitHubDataSourceSchema() schema.Schema {
 				MarkdownDescription: "protojson-encoded google.protobuf.Any (includes `@type`); reference this from Any-typed resource attributes.",
 			},
 			"client_id": schema.StringAttribute{Optional: true},
-			"client_secret": schema.StringAttribute{
-				Optional:  true,
-				Sensitive: true,
+			"client_secret_ref": schema.SingleNestedAttribute{
+				Attributes: map[string]schema.Attribute{"name": schema.StringAttribute{Optional: true}},
+				Optional:   true,
 			},
 			"display": schema.StringAttribute{Optional: true},
 			"prompt":  schema.StringAttribute{Optional: true},
@@ -37,27 +39,37 @@ func ProviderGitHubDataSourceSchema() schema.Schema {
 	}
 }
 
+// ProviderGitHubClientSecretRefModel is the Terraform model for ProviderGitHub's "client_secret_ref" nested attribute.
+type ProviderGitHubClientSecretRefModel struct {
+	Name types.String `tfsdk:"name"`
+}
+
+// ProviderGitHubClientSecretRefAttrTypes returns the attribute types of the "client_secret_ref" nested attribute.
+func ProviderGitHubClientSecretRefAttrTypes() map[string]attr.Type {
+	return map[string]attr.Type{"name": types.StringType}
+}
+
 // ProviderGitHubModel is the Terraform model for the ProviderGitHub config data source.
 type ProviderGitHubModel struct {
-	ClientId     types.String         `tfsdk:"client_id"`
-	ClientSecret types.String         `tfsdk:"client_secret"`
-	AllowSignup  types.Bool           `tfsdk:"allow_signup"`
-	Prompt       types.String         `tfsdk:"prompt"`
-	Display      types.String         `tfsdk:"display"`
-	Scope        types.String         `tfsdk:"scope"`
-	Any          jsontypes.Normalized `tfsdk:"any"`
+	ClientId        types.String         `tfsdk:"client_id"`
+	AllowSignup     types.Bool           `tfsdk:"allow_signup"`
+	Prompt          types.String         `tfsdk:"prompt"`
+	Display         types.String         `tfsdk:"display"`
+	Scope           types.String         `tfsdk:"scope"`
+	ClientSecretRef types.Object         `tfsdk:"client_secret_ref"`
+	Any             jsontypes.Normalized `tfsdk:"any"`
 }
 
 // NewProviderGitHubModel returns a model with every attribute set to its typed null.
 func NewProviderGitHubModel() *ProviderGitHubModel {
 	return &ProviderGitHubModel{
-		AllowSignup:  types.BoolNull(),
-		Any:          jsontypes.NewNormalizedNull(),
-		ClientId:     types.StringNull(),
-		ClientSecret: types.StringNull(),
-		Display:      types.StringNull(),
-		Prompt:       types.StringNull(),
-		Scope:        types.StringNull(),
+		AllowSignup:     types.BoolNull(),
+		Any:             jsontypes.NewNormalizedNull(),
+		ClientId:        types.StringNull(),
+		ClientSecretRef: types.ObjectNull(ProviderGitHubClientSecretRefAttrTypes()),
+		Display:         types.StringNull(),
+		Prompt:          types.StringNull(),
+		Scope:           types.StringNull(),
 	}
 }
 
@@ -66,11 +78,17 @@ func (m *ProviderGitHubModel) ToProto(ctx context.Context) (*v1alpha1.ProviderGi
 	var diags diag.Diagnostics
 	out := &v1alpha1.ProviderGitHub{}
 	out.ClientId = m.ClientId.ValueString()
-	out.ClientSecret = m.ClientSecret.ValueString()
 	out.AllowSignup = m.AllowSignup.ValueBool()
 	out.Prompt = m.Prompt.ValueString()
 	out.Display = m.Display.ValueString()
 	out.Scope = m.Scope.ValueString()
+	if !m.ClientSecretRef.IsNull() && !m.ClientSecretRef.IsUnknown() {
+		var n ProviderGitHubClientSecretRefModel
+		diags.Append(m.ClientSecretRef.As(ctx, &n, basetypes.ObjectAsOptions{})...)
+		v := &v1alpha1.SecretRef{}
+		v.Name = n.Name.ValueString()
+		out.ClientSecretRef = v
+	}
 	return out, diags
 }
 

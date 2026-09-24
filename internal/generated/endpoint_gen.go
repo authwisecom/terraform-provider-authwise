@@ -8,10 +8,12 @@ import (
 	v1alpha11 "git.authwise.com/authwise/apis/authwise/identity/v1alpha1"
 	v1alpha1 "git.authwise.com/authwise/apis/authwise/types/core/v1alpha1"
 	tf "github.com/activatedio/tfinfra/pkg/tf"
+	jsontypes "github.com/hashicorp/terraform-plugin-framework-jsontypes/jsontypes"
 	stringvalidator "github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	datasource "github.com/hashicorp/terraform-plugin-framework/datasource"
 	schema1 "github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	diag "github.com/hashicorp/terraform-plugin-framework/diag"
+	path "github.com/hashicorp/terraform-plugin-framework/path"
 	resource "github.com/hashicorp/terraform-plugin-framework/resource"
 	schema "github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	boolplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
@@ -20,6 +22,7 @@ import (
 	stringplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	validator "github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
+	protojson "google.golang.org/protobuf/encoding/protojson"
 	fieldmaskpb "google.golang.org/protobuf/types/known/fieldmaskpb"
 )
 
@@ -31,6 +34,13 @@ func EndpointResourceSchema() schema.Schema {
 				Computed:      true,
 				Optional:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
+			"auth": schema.StringAttribute{
+				Computed:            true,
+				CustomType:          jsontypes.NormalizedType{},
+				MarkdownDescription: "`auth` as the protojson encoding of EndpointAuth.",
+				Optional:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"display_name": schema.StringAttribute{
 				Computed:      true,
@@ -71,19 +81,21 @@ func EndpointResourceSchema() schema.Schema {
 
 // EndpointModel is the Terraform plan/state model for Endpoint.
 type EndpointModel struct {
-	Name         types.String `tfsdk:"name"`
-	TenantId     types.String `tfsdk:"tenant_id"`
-	Labels       types.Map    `tfsdk:"labels"`
-	DisplayName  types.String `tfsdk:"display_name"`
-	EndpointType types.String `tfsdk:"endpoint_type"`
-	Address      types.String `tfsdk:"address"`
-	Insecure     types.Bool   `tfsdk:"insecure"`
+	Name         types.String         `tfsdk:"name"`
+	TenantId     types.String         `tfsdk:"tenant_id"`
+	Labels       types.Map            `tfsdk:"labels"`
+	DisplayName  types.String         `tfsdk:"display_name"`
+	EndpointType types.String         `tfsdk:"endpoint_type"`
+	Address      types.String         `tfsdk:"address"`
+	Insecure     types.Bool           `tfsdk:"insecure"`
+	Auth         jsontypes.Normalized `tfsdk:"auth"`
 }
 
 // NewEndpointModel returns a model with every attribute set to its typed null; collection types cannot be zero-valued.
 func NewEndpointModel() *EndpointModel {
 	return &EndpointModel{
 		Address:      types.StringNull(),
+		Auth:         jsontypes.NewNormalizedNull(),
 		DisplayName:  types.StringNull(),
 		EndpointType: types.StringNull(),
 		Insecure:     types.BoolNull(),
@@ -107,6 +119,14 @@ func (m *EndpointModel) ToProto(ctx context.Context) (*v1alpha1.Endpoint, diag.D
 	}
 	out.Address = m.Address.ValueString()
 	out.Insecure = m.Insecure.ValueBool()
+	if !m.Auth.IsNull() && !m.Auth.IsUnknown() {
+		v := &v1alpha1.EndpointAuth{}
+		if err := protojson.Unmarshal([]byte(m.Auth.ValueString()), v); err != nil {
+			diags.AddAttributeError(path.Root("auth"), "invalid EndpointAuth JSON", err.Error())
+		} else {
+			out.Auth = v
+		}
+	}
 	return out, diags
 }
 
@@ -137,6 +157,16 @@ func (m *EndpointModel) FromProto(ctx context.Context, e *v1alpha1.Endpoint) dia
 		m.Address = types.StringValue(e.Address)
 	}
 	m.Insecure = types.BoolValue(e.Insecure)
+	if e.Auth == nil {
+		m.Auth = jsontypes.NewNormalizedNull()
+	} else {
+		b, err := protojson.Marshal(e.Auth)
+		if err != nil {
+			diags.AddError("cannot encode auth", err.Error())
+		} else {
+			m.Auth = jsontypes.NewNormalizedValue(string(b))
+		}
+	}
 	return diags
 }
 
@@ -167,6 +197,11 @@ func (m *EndpointModel) UpdateMask(ctx context.Context, prior *EndpointModel) []
 	}
 	if !m.Insecure.Equal(prior.Insecure) {
 		paths = append(paths, "insecure")
+	}
+	if !m.Auth.Equal(prior.Auth) {
+		if eq, _ := m.Auth.StringSemanticEquals(ctx, prior.Auth); !eq {
+			paths = append(paths, "auth")
+		}
 	}
 	return paths
 }
@@ -294,7 +329,11 @@ func (r *endpointResource) ImportState(ctx context.Context, req resource.ImportS
 func EndpointDataSourceSchema() schema1.Schema {
 	return schema1.Schema{
 		Attributes: map[string]schema1.Attribute{
-			"address":       schema1.StringAttribute{Computed: true},
+			"address": schema1.StringAttribute{Computed: true},
+			"auth": schema1.StringAttribute{
+				Computed:   true,
+				CustomType: jsontypes.NormalizedType{},
+			},
 			"display_name":  schema1.StringAttribute{Computed: true},
 			"endpoint_type": schema1.StringAttribute{Computed: true},
 			"insecure":      schema1.BoolAttribute{Computed: true},

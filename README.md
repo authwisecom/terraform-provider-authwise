@@ -75,20 +75,19 @@ Two things worth knowing:
 
 ## Associations
 
-Role/permission edges are managed as **authoritative set resources**
-(`authwise_user_roles`, `authwise_client_roles`,
-`authwise_role_permissions`, `authwise_scope_permissions`,
+Edges are managed as **authoritative set resources**
+(`authwise_scope_access_permissions`,
 `authwise_access_role_access_permissions`): the resource
 owns the entity's full association set, so members associated out of band
 are removed on the next apply. Members are full resource names; import by
 the entity's full name.
 
 ```hcl
-resource "authwise_role_permissions" "admin" {
-  role        = authwise_role.admin.name
-  permissions = [
-    authwise_permission.read.name,
-    authwise_permission.write.name,
+resource "authwise_access_role_access_permissions" "admin" {
+  access_role        = authwise_access_role.admin.name
+  access_permissions = [
+    authwise_access_permission.read.name,
+    authwise_access_permission.write.name,
   ]
 }
 ```
@@ -96,6 +95,56 @@ resource "authwise_role_permissions" "admin" {
 (The awctl `add-*`/`remove-*` verbs are the imperative view of the same
 API; the provider intentionally exposes only the declarative whole-set
 form.)
+
+## Secrets and references
+
+A credential lives in an `authwise_secret`, and everything that needs it
+names it: the social providers' `client_secret_ref`, the Duo factor's
+`client_secret_ref`, and an endpoint's `auth`. The material goes in through
+`payload_wo`, a **write-only** argument (Terraform 1.11 or later) — it is
+never in the plan or state, and no API call returns it. To rotate, change
+the material and bump `payload_wo_version`.
+
+```hcl
+resource "authwise_secret" "duo" {
+  display_name       = "Duo client secret"
+  payload_wo         = var.duo_client_secret
+  payload_wo_version = 1
+}
+
+data "authwise_factor_duo" "duo" {
+  client_id         = "DIXXXXXXXXXXXXXXXXXX"
+  api_host          = "api-12345678.duosecurity.com"
+  client_secret_ref = { name = authwise_secret.duo.name }
+}
+
+resource "authwise_factor" "duo" {
+  realm_id     = "r-01"
+  display_name = "Duo"
+  factor_type  = "duo"
+  config       = data.authwise_factor_duo.duo.any
+}
+```
+
+Setting a reference needs `identity.secrets.use` on the provider's
+credential. kit refuses to delete a secret while anything references it,
+so reference it by expression, as above: Terraform then destroys or
+repoints the referrer first.
+
+## Authentication policy
+
+`authwise_realm_authentication_policy` manages a realm's rules, floor,
+enrollment, session, throttle, risk and acr levels
+(`RealmConfig.authentication`) apart from `authwise_realm`, which leaves
+that part of the realm's config alone and refuses an `authentication` key
+in its own `config`. kit checks the policy on write, so a bad CEL
+condition fails the apply with kit's reason. Destroying the policy clears
+it and nothing else.
+
+What kit accepts but doubts — a rule requiring a factor type no active
+factor offers — comes back as a warning on the apply that caused it, and
+`authwise_realm_authentication_context_schema` exposes the realm's current
+warnings for a `check` block. `examples/authn` puts it all together.
 
 ## Installing in-progress builds
 
@@ -134,9 +183,12 @@ omitted; per-resource values always override.
 
 ## Development
 
-The whole provider surface generates from `gen/main.go` — the declarative
+Most of the provider surface generates from `gen/main.go` — the declarative
 spec table over the published pb types, mirroring awctl's table for
-CLI/Terraform parity.
+CLI/Terraform parity. The shapes tfinfra does not generate are hand-written
+in `internal/provider`: `authwise_secret`, `authwise_realm_authentication_policy`,
+and the wrappers around the generated `authwise_access_binding` and
+`authwise_realm`.
 
 ```sh
 make generate   # regenerate the provider surface from the spec table

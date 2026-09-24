@@ -307,8 +307,8 @@ func (d *scopeDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 	d.crud.ReadDataSource(ctx, req, resp)
 }
 
-// newScopePermissionsAssociation builds the scope_permissions runtime from provider data; it returns nil (no error) before the provider is configured.
-func newScopePermissionsAssociation(providerData any) (*tf.Association, diag.Diagnostics) {
+// newScopeAccessPermissionsAssociation builds the scope_access_permissions runtime from provider data; it returns nil (no error) before the provider is configured.
+func newScopeAccessPermissionsAssociation(providerData any) (*tf.Association, diag.Diagnostics) {
 	var diags diag.Diagnostics
 	if providerData == nil {
 		return nil, diags
@@ -324,10 +324,10 @@ func newScopePermissionsAssociation(providerData any) (*tf.Association, diag.Dia
 		return nil, diags
 	}
 	return tf.NewAssociation(tf.AssociationParams{
-		Attribute: "permissions",
+		Attribute: "access_permissions",
 		Client: tf.AssociationClient{
 			Associate: func(ctx context.Context, name string, set, remove []string) error {
-				_, err := client.AssociatePermissionsToScope(ctx, &v1alpha11.AssociatePermissionsToScopeRequest{
+				_, err := client.AssociateAccessPermissionsToScope(ctx, &v1alpha11.AssociateAccessPermissionsToScopeRequest{
 					Association: &v1alpha1.AssociationRequest{
 						Remove: remove,
 						Set:    set,
@@ -337,15 +337,15 @@ func newScopePermissionsAssociation(providerData any) (*tf.Association, diag.Dia
 				return err
 			},
 			ListBy: func(ctx context.Context, name, pageToken string) ([]string, string, error) {
-				out, err := client.ListPermissionsByScope(ctx, &v1alpha11.ListPermissionsByScopeRequest{
+				out, err := client.ListAccessPermissionsByScope(ctx, &v1alpha11.ListAccessPermissionsByScopeRequest{
 					Name:      name,
 					PageToken: pageToken,
 				})
 				if err != nil {
 					return nil, "", err
 				}
-				names := make([]string, 0, len(out.Permissions))
-				for _, item := range out.Permissions {
+				names := make([]string, 0, len(out.AccessPermissions))
+				for _, item := range out.AccessPermissions {
 					names = append(names, item.GetName())
 				}
 				return names, out.NextPageToken, nil
@@ -354,61 +354,61 @@ func newScopePermissionsAssociation(providerData any) (*tf.Association, diag.Dia
 		Collection:      "scopes",
 		EntityAttribute: "scope",
 		Scope:           tf.NewScope("tenants", "issuers", "audiences"),
-		TypeName:        "scope_permissions",
+		TypeName:        "scope_access_permissions",
 	}), diags
 }
 
-// scopePermissionsResource is the generated authoritative association resource for a scope's permissions.
-type scopePermissionsResource struct {
+// scopeAccessPermissionsResource is the generated authoritative association resource for a scope's access_permissions.
+type scopeAccessPermissionsResource struct {
 	assoc *tf.Association
 }
 
-// NewScopePermissionsResource returns the generated scope_permissions resource; its client arrives via Configure from tf.ProviderData.
-func NewScopePermissionsResource() resource.Resource {
-	return &scopePermissionsResource{}
+// NewScopeAccessPermissionsResource returns the generated scope_access_permissions resource; its client arrives via Configure from tf.ProviderData.
+func NewScopeAccessPermissionsResource() resource.Resource {
+	return &scopeAccessPermissionsResource{}
 }
-func (r *scopePermissionsResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
-	resp.TypeName = req.ProviderTypeName + "_scope_permissions"
+func (r *scopeAccessPermissionsResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_scope_access_permissions"
 }
-func (r *scopePermissionsResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
-	resp.Schema = tf.AssociationSchema("scope", "permissions")
+func (r *scopeAccessPermissionsResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
+	resp.Schema = tf.AssociationSchema("scope", "access_permissions")
 }
-func (r *scopePermissionsResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
-	assoc, diags := newScopePermissionsAssociation(req.ProviderData)
+func (r *scopeAccessPermissionsResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
+	assoc, diags := newScopeAccessPermissionsAssociation(req.ProviderData)
 	resp.Diagnostics.Append(diags...)
 	r.assoc = assoc
 }
-func (r *scopePermissionsResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+func (r *scopeAccessPermissionsResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	if r.assoc == nil {
-		resp.Diagnostics.AddError("scope_permissions resource not configured", "Configure was not called with tf.ProviderData")
+		resp.Diagnostics.AddError("scope_access_permissions resource not configured", "Configure was not called with tf.ProviderData")
 		return
 	}
 	r.assoc.Create(ctx, req, resp)
 }
-func (r *scopePermissionsResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+func (r *scopeAccessPermissionsResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	if r.assoc == nil {
-		resp.Diagnostics.AddError("scope_permissions resource not configured", "Configure was not called with tf.ProviderData")
+		resp.Diagnostics.AddError("scope_access_permissions resource not configured", "Configure was not called with tf.ProviderData")
 		return
 	}
 	r.assoc.Read(ctx, req, resp)
 }
-func (r *scopePermissionsResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+func (r *scopeAccessPermissionsResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	if r.assoc == nil {
-		resp.Diagnostics.AddError("scope_permissions resource not configured", "Configure was not called with tf.ProviderData")
+		resp.Diagnostics.AddError("scope_access_permissions resource not configured", "Configure was not called with tf.ProviderData")
 		return
 	}
 	r.assoc.Update(ctx, req, resp)
 }
-func (r *scopePermissionsResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+func (r *scopeAccessPermissionsResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	if r.assoc == nil {
-		resp.Diagnostics.AddError("scope_permissions resource not configured", "Configure was not called with tf.ProviderData")
+		resp.Diagnostics.AddError("scope_access_permissions resource not configured", "Configure was not called with tf.ProviderData")
 		return
 	}
 	r.assoc.Delete(ctx, req, resp)
 }
-func (r *scopePermissionsResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+func (r *scopeAccessPermissionsResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	if r.assoc == nil {
-		resp.Diagnostics.AddError("scope_permissions resource not configured", "Configure was not called with tf.ProviderData")
+		resp.Diagnostics.AddError("scope_access_permissions resource not configured", "Configure was not called with tf.ProviderData")
 		return
 	}
 	r.assoc.ImportState(ctx, req, resp)

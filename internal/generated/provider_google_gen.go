@@ -6,10 +6,12 @@ import (
 	"context"
 	v1alpha1 "git.authwise.com/authwise/apis/authwise/types/core/v1alpha1"
 	jsontypes "github.com/hashicorp/terraform-plugin-framework-jsontypes/jsontypes"
+	attr "github.com/hashicorp/terraform-plugin-framework/attr"
 	datasource "github.com/hashicorp/terraform-plugin-framework/datasource"
 	schema "github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	diag "github.com/hashicorp/terraform-plugin-framework/diag"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
+	basetypes "github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	protojson "google.golang.org/protobuf/encoding/protojson"
 	anypb "google.golang.org/protobuf/types/known/anypb"
 )
@@ -24,9 +26,9 @@ func ProviderGoogleDataSourceSchema() schema.Schema {
 				MarkdownDescription: "protojson-encoded google.protobuf.Any (includes `@type`); reference this from Any-typed resource attributes.",
 			},
 			"client_id": schema.StringAttribute{Optional: true},
-			"client_secret": schema.StringAttribute{
-				Optional:  true,
-				Sensitive: true,
+			"client_secret_ref": schema.SingleNestedAttribute{
+				Attributes: map[string]schema.Attribute{"name": schema.StringAttribute{Optional: true}},
+				Optional:   true,
 			},
 			"prompt": schema.StringAttribute{Optional: true},
 			"scope":  schema.StringAttribute{Optional: true},
@@ -35,23 +37,33 @@ func ProviderGoogleDataSourceSchema() schema.Schema {
 	}
 }
 
+// ProviderGoogleClientSecretRefModel is the Terraform model for ProviderGoogle's "client_secret_ref" nested attribute.
+type ProviderGoogleClientSecretRefModel struct {
+	Name types.String `tfsdk:"name"`
+}
+
+// ProviderGoogleClientSecretRefAttrTypes returns the attribute types of the "client_secret_ref" nested attribute.
+func ProviderGoogleClientSecretRefAttrTypes() map[string]attr.Type {
+	return map[string]attr.Type{"name": types.StringType}
+}
+
 // ProviderGoogleModel is the Terraform model for the ProviderGoogle config data source.
 type ProviderGoogleModel struct {
-	ClientId     types.String         `tfsdk:"client_id"`
-	ClientSecret types.String         `tfsdk:"client_secret"`
-	Scope        types.String         `tfsdk:"scope"`
-	Prompt       types.String         `tfsdk:"prompt"`
-	Any          jsontypes.Normalized `tfsdk:"any"`
+	ClientId        types.String         `tfsdk:"client_id"`
+	Scope           types.String         `tfsdk:"scope"`
+	Prompt          types.String         `tfsdk:"prompt"`
+	ClientSecretRef types.Object         `tfsdk:"client_secret_ref"`
+	Any             jsontypes.Normalized `tfsdk:"any"`
 }
 
 // NewProviderGoogleModel returns a model with every attribute set to its typed null.
 func NewProviderGoogleModel() *ProviderGoogleModel {
 	return &ProviderGoogleModel{
-		Any:          jsontypes.NewNormalizedNull(),
-		ClientId:     types.StringNull(),
-		ClientSecret: types.StringNull(),
-		Prompt:       types.StringNull(),
-		Scope:        types.StringNull(),
+		Any:             jsontypes.NewNormalizedNull(),
+		ClientId:        types.StringNull(),
+		ClientSecretRef: types.ObjectNull(ProviderGoogleClientSecretRefAttrTypes()),
+		Prompt:          types.StringNull(),
+		Scope:           types.StringNull(),
 	}
 }
 
@@ -60,9 +72,15 @@ func (m *ProviderGoogleModel) ToProto(ctx context.Context) (*v1alpha1.ProviderGo
 	var diags diag.Diagnostics
 	out := &v1alpha1.ProviderGoogle{}
 	out.ClientId = m.ClientId.ValueString()
-	out.ClientSecret = m.ClientSecret.ValueString()
 	out.Scope = m.Scope.ValueString()
 	out.Prompt = m.Prompt.ValueString()
+	if !m.ClientSecretRef.IsNull() && !m.ClientSecretRef.IsUnknown() {
+		var n ProviderGoogleClientSecretRefModel
+		diags.Append(m.ClientSecretRef.As(ctx, &n, basetypes.ObjectAsOptions{})...)
+		v := &v1alpha1.SecretRef{}
+		v.Name = n.Name.ValueString()
+		out.ClientSecretRef = v
+	}
 	return out, diags
 }
 

@@ -38,6 +38,11 @@ func AccessRoleResourceSchema() schema.Schema {
 				Optional:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
+			"display_name": schema.StringAttribute{
+				Computed:      true,
+				Optional:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
 			"issuer_id": schema.StringAttribute{
 				MarkdownDescription: "Parent identifier `issuer_id`; overrides the provider default. Changing it replaces the resource.",
 				Optional:            true,
@@ -66,6 +71,7 @@ type AccessRoleModel struct {
 	IssuerId     types.String `tfsdk:"issuer_id"`
 	AudienceId   types.String `tfsdk:"audience_id"`
 	Description  types.String `tfsdk:"description"`
+	DisplayName  types.String `tfsdk:"display_name"`
 }
 
 // NewAccessRoleModel returns a model with every attribute set to its typed null; collection types cannot be zero-valued.
@@ -74,6 +80,7 @@ func NewAccessRoleModel() *AccessRoleModel {
 		AccessRoleId: types.StringNull(),
 		AudienceId:   types.StringNull(),
 		Description:  types.StringNull(),
+		DisplayName:  types.StringNull(),
 		IssuerId:     types.StringNull(),
 		Name:         types.StringNull(),
 		TenantId:     types.StringNull(),
@@ -86,6 +93,7 @@ func (m *AccessRoleModel) ToProto(ctx context.Context) (*v1alpha1.AccessRole, di
 	out := &v1alpha1.AccessRole{}
 	out.Name = m.Name.ValueString()
 	out.Description = m.Description.ValueString()
+	out.DisplayName = m.DisplayName.ValueString()
 	return out, diags
 }
 
@@ -97,6 +105,11 @@ func (m *AccessRoleModel) FromProto(ctx context.Context, e *v1alpha1.AccessRole)
 		m.Description = types.StringNull()
 	} else {
 		m.Description = types.StringValue(e.Description)
+	}
+	if e.DisplayName == "" {
+		m.DisplayName = types.StringNull()
+	} else {
+		m.DisplayName = types.StringValue(e.DisplayName)
 	}
 	return diags
 }
@@ -120,6 +133,9 @@ func (m *AccessRoleModel) UpdateMask(ctx context.Context, prior *AccessRoleModel
 	var paths []string
 	if !m.Description.Equal(prior.Description) {
 		paths = append(paths, "description")
+	}
+	if !m.DisplayName.Equal(prior.DisplayName) {
+		paths = append(paths, "display_name")
 	}
 	return paths
 }
@@ -252,9 +268,10 @@ func AccessRoleDataSourceSchema() schema1.Schema {
 				Computed:            true,
 				MarkdownDescription: "Caller-assigned resource id — the last segment of `name`.",
 			},
-			"audience_id": schema1.StringAttribute{Computed: true},
-			"description": schema1.StringAttribute{Computed: true},
-			"issuer_id":   schema1.StringAttribute{Computed: true},
+			"audience_id":  schema1.StringAttribute{Computed: true},
+			"description":  schema1.StringAttribute{Computed: true},
+			"display_name": schema1.StringAttribute{Computed: true},
+			"issuer_id":    schema1.StringAttribute{Computed: true},
 			"name": schema1.StringAttribute{
 				MarkdownDescription: "Full resource name of the object to read.",
 				Required:            true,

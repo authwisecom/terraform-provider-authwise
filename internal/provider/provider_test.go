@@ -51,10 +51,10 @@ func TestProviderSurface(t *testing.T) {
 		diags := s.Schema.ValidateImplementation(ctx)
 		require.False(t, diags.HasError(), "%s: %v", m.TypeName, diags)
 	}
-	// 20 entity resources + 5 association resources (user_roles,
-	// client_roles, role_permissions, scope_permissions,
-	// access_role_access_permissions).
-	assert.Len(t, resourceTypes, 25)
+	// 18 generated entity resources, 2 association resources
+	// (scope_access_permissions, access_role_access_permissions), and the
+	// hand-written secret and realm_authentication_policy.
+	assert.Len(t, resourceTypes, 22)
 	for _, want := range []string{
 		"authwise_access_permission",
 		"authwise_access_role",
@@ -62,6 +62,9 @@ func TestProviderSurface(t *testing.T) {
 		"authwise_access_condition",
 		"authwise_access_binding",
 		"authwise_certificate",
+		"authwise_factor",
+		"authwise_secret",
+		"authwise_realm_authentication_policy",
 	} {
 		assert.True(t, resourceTypes[want], "missing resource %s", want)
 	}
@@ -83,10 +86,17 @@ func TestProviderSurface(t *testing.T) {
 		diags := s.Schema.ValidateImplementation(ctx)
 		require.False(t, diags.HasError(), "%s: %v", m.TypeName, diags)
 	}
-	// 20 singular entity data sources + 12 config builder data sources.
-	assert.Len(t, dataSourceTypes, 32)
+	// 18 generated singular data sources, 16 config builder data sources,
+	// and the hand-written secret and realm_authentication_context_schema.
+	assert.Len(t, dataSourceTypes, 36)
 	for _, want := range []string{
 		"authwise_certificate",
+		"authwise_secret",
+		"authwise_realm_authentication_context_schema",
+		"authwise_factor_totp",
+		"authwise_factor_webauthn",
+		"authwise_factor_duo",
+		"authwise_factor_external",
 		"authwise_provider_saml",
 		"authwise_saml_relying_party_config",
 	} {
@@ -94,31 +104,48 @@ func TestProviderSurface(t *testing.T) {
 	}
 }
 
-// TestAccessBindingIsWrapped asserts the substitution actually happened:
-// authwise_access_binding must be the wrapper carrying the role-reference
-// check, not the bare generated resource, and it must still present the
-// generated schema.
-func TestAccessBindingIsWrapped(t *testing.T) {
+// TestWrappedResources asserts the substitutions actually happened: each
+// type must be its wrapper, not the bare generated resource, and must still
+// present the generated schema.
+func TestWrappedResources(t *testing.T) {
 
-	ctx := context.Background()
-	p := provider.New("test")()
-
-	var found resource.Resource
-	for _, newResource := range p.Resources(ctx) {
-		r := newResource()
-		m := &resource.MetadataResponse{}
-		r.Metadata(ctx, resource.MetadataRequest{ProviderTypeName: "authwise"}, m)
-		if m.TypeName == "authwise_access_binding" {
-			found = r
-		}
+	type s struct {
+		generated resource.Resource
+		attribute string
 	}
 
-	require.NotNil(t, found)
-	assert.NotEqual(t, reflect.TypeOf(generated.NewAccessBindingResource()), reflect.TypeOf(found),
-		"authwise_access_binding must be the validating wrapper")
+	cases := map[string]s{
+		// Carries the role-reference check.
+		"authwise_access_binding": {generated: generated.NewAccessBindingResource(), attribute: "role_name"},
+		// Leaves config.authentication to the policy resource.
+		"authwise_realm": {generated: generated.NewRealmResource(), attribute: "config"},
+		// Reports kit's policy warnings on factor writes.
+		"authwise_factor": {generated: generated.NewFactorResource(), attribute: "factor_type"},
+	}
 
-	s := &resource.SchemaResponse{}
-	found.Schema(ctx, resource.SchemaRequest{}, s)
-	require.False(t, s.Diagnostics.HasError(), s.Diagnostics)
-	assert.Contains(t, s.Schema.Attributes, "role_name")
+	for k, v := range cases {
+		t.Run(k, func(t *testing.T) {
+
+			ctx := context.Background()
+			p := provider.New("test")()
+
+			var found resource.Resource
+			for _, newResource := range p.Resources(ctx) {
+				r := newResource()
+				m := &resource.MetadataResponse{}
+				r.Metadata(ctx, resource.MetadataRequest{ProviderTypeName: "authwise"}, m)
+				if m.TypeName == k {
+					found = r
+				}
+			}
+
+			require.NotNil(t, found)
+			assert.NotEqual(t, reflect.TypeOf(v.generated), reflect.TypeOf(found), "%s must be the wrapper", k)
+
+			resp := &resource.SchemaResponse{}
+			found.Schema(ctx, resource.SchemaRequest{}, resp)
+			require.False(t, resp.Diagnostics.HasError(), resp.Diagnostics)
+			assert.Contains(t, resp.Schema.Attributes, v.attribute)
+		})
+	}
 }

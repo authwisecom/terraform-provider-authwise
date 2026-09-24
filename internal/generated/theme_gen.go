@@ -51,6 +51,11 @@ func ThemeResourceSchema() schema.Schema {
 				Optional:      true,
 				PlanModifiers: []planmodifier.Map{mapplanmodifier.UseStateForUnknown()},
 			},
+			"layout": schema.StringAttribute{
+				Computed:      true,
+				Optional:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
 			"name": schema.StringAttribute{
 				Computed:            true,
 				MarkdownDescription: "Full resource name; serves as the Terraform ID.",
@@ -110,6 +115,7 @@ type ThemeModel struct {
 	StylesheetAttributesSchema      types.String         `tfsdk:"stylesheet_attributes_schema"`
 	PlaceholderStylesheetAttributes jsontypes.Normalized `tfsdk:"placeholder_stylesheet_attributes"`
 	PlaceholderContent              jsontypes.Normalized `tfsdk:"placeholder_content"`
+	Layout                          types.String         `tfsdk:"layout"`
 }
 
 // NewThemeModel returns a model with every attribute set to its typed null; collection types cannot be zero-valued.
@@ -119,6 +125,7 @@ func NewThemeModel() *ThemeModel {
 		ContentSchema:                   types.StringNull(),
 		DisplayName:                     types.StringNull(),
 		Labels:                          types.MapNull(types.StringType),
+		Layout:                          types.StringNull(),
 		Name:                            types.StringNull(),
 		PlaceholderContent:              jsontypes.NewNormalizedNull(),
 		PlaceholderStylesheetAttributes: jsontypes.NewNormalizedNull(),
@@ -173,6 +180,7 @@ func (m *ThemeModel) ToProto(ctx context.Context) (*v1alpha1.Theme, diag.Diagnos
 			out.PlaceholderContent = v
 		}
 	}
+	out.Layout = m.Layout.ValueString()
 	return out, diags
 }
 
@@ -247,6 +255,11 @@ func (m *ThemeModel) FromProto(ctx context.Context, e *v1alpha1.Theme) diag.Diag
 			m.PlaceholderContent = jsontypes.NewNormalizedValue(string(b))
 		}
 	}
+	if e.Layout == "" {
+		m.Layout = types.StringNull()
+	} else {
+		m.Layout = types.StringValue(e.Layout)
+	}
 	return diags
 }
 
@@ -297,6 +310,9 @@ func (m *ThemeModel) UpdateMask(ctx context.Context, prior *ThemeModel) []string
 		if eq, _ := m.PlaceholderContent.StringSemanticEquals(ctx, prior.PlaceholderContent); !eq {
 			paths = append(paths, "placeholder_content")
 		}
+	}
+	if !m.Layout.Equal(prior.Layout) {
+		paths = append(paths, "layout")
 	}
 	return paths
 }
@@ -434,6 +450,7 @@ func ThemeDataSourceSchema() schema1.Schema {
 				Computed:    true,
 				ElementType: types.StringType,
 			},
+			"layout": schema1.StringAttribute{Computed: true},
 			"name": schema1.StringAttribute{
 				MarkdownDescription: "Full resource name of the object to read.",
 				Required:            true,
