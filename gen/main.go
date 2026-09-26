@@ -147,7 +147,10 @@ func main() {
 			// auth is a oneof of messages that each hold a SecretRef, which
 			// is deeper than a typed nested attribute goes; it takes the JSON
 			// lane, and a reference inside jsonencode still orders the
-			// endpoint after the secret it names.
+			// endpoint after the secret or issuer it names. tls is a plain
+			// singular message and takes the typed nested lane; timeout is
+			// the provider's first Duration, a string ("5s", "500ms") that
+			// keeps the spelling written (kit#603, apis v0.9.0).
 			crud[corepb.Endpoint](scopeTenant, withJSON("auth")),
 			// The SAML trust anchors (kit#487). certificate_pem is the
 			// public certificate of any row, minted or imported, and is
@@ -224,7 +227,6 @@ func main() {
 			config[corepb.ProviderGitHub]("provider_github"),
 			config[corepb.ProviderLinkedIn]("provider_linkedin"),
 			config[corepb.ProviderFacebook]("provider_facebook"),
-			config[corepb.ProviderDropbox]("provider_dropbox"),
 			config[corepb.ProviderOkta]("provider_okta"),
 			config[corepb.ProviderAuth0]("provider_auth0"),
 			// SAML 2.0, both roles: ProviderSaml is kit as the SP (on a

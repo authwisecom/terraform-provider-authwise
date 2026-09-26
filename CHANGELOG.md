@@ -9,6 +9,27 @@ NOTES:
 
 FEATURES:
 
+* **Endpoints describe their TLS, their deadline and a kit-signed token
+  (kit#603, #22).** Requires `apis` v0.9.0. Additive: an endpoint written
+  before this reads the same.
+  * `authwise_endpoint` gains `tls`, a typed nested attribute:
+    `ca_pem`, `server_name`, `insecure_skip_verify` and
+    `client_certificate`, which names an `authwise_certificate` holding a
+    private key and presents it for mTLS.
+  * `authwise_endpoint` gains `timeout`, the provider's first duration
+    attribute. It is a string in Go duration syntax (`"5s"`, `"1.5s"`,
+    `"500ms"`, `"1m"`) and keeps the spelling written. An import reads the
+    protojson form (`"60s"`). Needs tfinfra's Duration support.
+  * `auth` takes the new `kitToken = { issuer, audience }` scheme: kit signs
+    a token from the named issuer, and no secret is stored anywhere.
+  * `docs/resources/endpoint.md` documents each `auth` scheme with
+    `jsonencode`, including the lowerCamel keys (`kitToken`). It also
+    covers `insecure`, which means plaintext, applies to gRPC only, and is
+    refused on REST.
+  * `examples/endpoints/{bearer,kit_token,mtls}` are applied by the
+    acceptance suite. The example harness now copies an example's
+    `file()` inputs along with its `main.tf`.
+
 * **Authn + secrets (kit#544, #19).** Requires `apis` v0.7.0 and a kit
   built from `develop` (no kit release carries these RPCs yet).
   * `authwise_factor` — a second step the realm offers
@@ -58,6 +79,24 @@ FEATURES:
 
 BREAKING CHANGES:
 
+* **The social provider configs take `apis` v0.8.0's shapes**, which the
+  bump to v0.9.0 brings in. No kit install could hold a working row of
+  these types, so what breaks is configuration, not stored data:
+  * `authwise_provider_dropbox` is removed. Dropbox is not an identity
+    provider, and kit refuses the type.
+  * `scope` becomes a `scopes` list on `authwise_provider_google`,
+    `_microsoft`, `_github`, `_facebook`, `_okta`, `_auth0` and
+    `_linkedin`.
+  * The parameters kit only forwarded move to `authorization_params`:
+    Google's `prompt`, Microsoft's `prompt_style` (send it as `prompt`),
+    and GitHub's `allow_signup`, `prompt` and `display`.
+  * Okta's and Auth0's `tenant_url` becomes `issuer`.
+  * Facebook's `user_fields` becomes the `fields` list.
+  * LinkedIn's `include_granted_scopes` is removed.
+
+  The new `claim_map`, `authorization_params` and `identifier_claim`
+  attributes come with these changes. The new
+  Apple / OIDC / OAuth data sources are #20.
 * **The identity role surface is gone** (`apis` v0.6.0 removed its RPCs;
   roles and permissions live in the Access catalog now):
   `authwise_role`, `authwise_permission`, `authwise_user_roles`,

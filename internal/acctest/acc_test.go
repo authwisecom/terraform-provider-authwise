@@ -156,7 +156,7 @@ data "authwise_provider_google" "sso" {
   client_secret_ref = {
     name = "tenants/t-1/secrets/google"
   }
-  scope = "openid email"
+  scopes = ["openid", "email"]
 }
 `
 

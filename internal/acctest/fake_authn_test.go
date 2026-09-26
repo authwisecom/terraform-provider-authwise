@@ -3,8 +3,11 @@ package acctest_test
 import (
 	"context"
 	"fmt"
+	"net"
+	"net/url"
 	"sort"
 	"strings"
+	"time"
 
 	identitypb "git.authwise.com/authwise/apis/authwise/identity/v1alpha1"
 	corepb "git.authwise.com/authwise/apis/authwise/types/core/v1alpha1"
@@ -238,6 +241,74 @@ func (f *fakeIdentityServer) onlySecretName() string {
 
 // --- Endpoint ---
 
+// admitEndpointLocked refuses what kit's endpoint validation refuses
+// (kit#603, apis v0.9.0): an address of the wrong shape for its transport,
+// insecure on REST, tls on an insecure row, a timeout outside 100 ms–60 s,
+// and references to an issuer or certificate this tenant does not hold. The
+// caller holds f.mu. The patch path validates a row it has already
+// modified, which kit does inside a transaction the fake does not have.
+func (f *fakeIdentityServer) admitEndpointLocked(tenant string, e *corepb.Endpoint) error {
+
+	invalid := func(format string, args ...any) error {
+		return status.Errorf(codes.InvalidArgument, format, args...)
+	}
+
+	switch e.GetEndpointType() {
+	case corepb.ENDPOINT_TYPE_REST:
+		u, err := url.Parse(e.GetAddress())
+		if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" || u.User != nil {
+			return invalid("a REST address must be an absolute http(s) URL with no userinfo, got %q", e.GetAddress())
+		}
+		if e.GetInsecure() {
+			return invalid("insecure is refused on a REST endpoint: the URL's scheme says whether it is plaintext")
+		}
+	case corepb.ENDPOINT_TYPE_GRPC:
+		if _, _, err := net.SplitHostPort(strings.TrimPrefix(e.GetAddress(), "dns:///")); err != nil {
+			return invalid("a gRPC address must be host:port or dns:///host:port, got %q", e.GetAddress())
+		}
+	}
+
+	if e.GetInsecure() && e.GetTls() != nil {
+		return invalid("tls is refused on an insecure endpoint, which has no TLS")
+	}
+
+	if t := e.GetTimeout(); t != nil {
+		if d := t.AsDuration(); d < 100*time.Millisecond || d > 60*time.Second {
+			return invalid("timeout must be between 100ms and 60s, got %s", d)
+		}
+	}
+
+	if name := e.GetTls().GetClientCertificate(); name != "" {
+		c, ok := f.certs[name]
+		if !ok || !strings.HasPrefix(name, tenant+"/") {
+			return invalid("tls.client_certificate %q names no certificate in this tenant", name)
+		}
+		if !c.GetHasPrivateKey() {
+			return invalid("tls.client_certificate %q holds no private key to present", name)
+		}
+	}
+
+	if kt := e.GetAuth().GetKitToken(); kt != nil {
+		if _, ok := f.issuers[kt.GetIssuer()]; !ok || !strings.HasPrefix(kt.GetIssuer(), tenant+"/") {
+			return invalid("auth.kit_token.issuer %q names no issuer in this tenant", kt.GetIssuer())
+		}
+		if kt.GetAudience() == "" {
+			return invalid("auth.kit_token.audience is required")
+		}
+	}
+
+	return nil
+}
+
+// tenantOf returns the tenants/{t} prefix of a tenant-scoped name.
+func tenantOf(name string) string {
+	parts := strings.SplitN(name, "/", 3)
+	if len(parts) < 2 {
+		return name
+	}
+	return parts[0] + "/" + parts[1]
+}
+
 func (f *fakeIdentityServer) GetEndpoint(ctx context.Context, in *identitypb.GetEndpointRequest) (*corepb.Endpoint, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -254,6 +325,9 @@ func (f *fakeIdentityServer) CreateEndpoint(ctx context.Context, in *identitypb.
 	defer f.mu.Unlock()
 	f.recordAuth(ctx)
 	if err := f.admitLocked(in); err != nil {
+		return nil, err
+	}
+	if err := f.admitEndpointLocked(in.GetParent(), in.GetEndpoint()); err != nil {
 		return nil, err
 	}
 	e := proto.Clone(in.GetEndpoint()).(*corepb.Endpoint)
@@ -283,9 +357,21 @@ func (f *fakeIdentityServer) PatchEndpoint(ctx context.Context, in *identitypb.P
 			existing.Address = in.GetEndpoint().GetAddress()
 		case "auth":
 			existing.Auth = in.GetEndpoint().GetAuth()
+		case "endpoint_type":
+			existing.EndpointType = in.GetEndpoint().GetEndpointType()
+		case "insecure":
+			existing.Insecure = in.GetEndpoint().GetInsecure()
+		case "tls":
+			existing.Tls = in.GetEndpoint().GetTls()
+		case "timeout":
+			existing.Timeout = in.GetEndpoint().GetTimeout()
 		default:
 			return nil, status.Errorf(codes.InvalidArgument, "unsupported update_mask path %q", path)
 		}
+	}
+	// kit validates the row the patch produces, not the patch.
+	if err := f.admitEndpointLocked(tenantOf(in.GetName()), existing); err != nil {
+		return nil, err
 	}
 	return proto.Clone(existing).(*corepb.Endpoint), nil
 }

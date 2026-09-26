@@ -20,20 +20,43 @@ import (
 func ProviderGitHubDataSourceSchema() schema.Schema {
 	return schema.Schema{
 		Attributes: map[string]schema.Attribute{
-			"allow_signup": schema.BoolAttribute{Optional: true},
 			"any": schema.StringAttribute{
 				Computed:            true,
 				CustomType:          jsontypes.NormalizedType{},
 				MarkdownDescription: "protojson-encoded google.protobuf.Any (includes `@type`); reference this from Any-typed resource attributes.",
+			},
+			"authorization_params": schema.MapAttribute{
+				ElementType: types.StringType,
+				Optional:    true,
+			},
+			"base_url": schema.StringAttribute{Optional: true},
+			"claim_map": schema.SingleNestedAttribute{
+				Attributes: map[string]schema.Attribute{
+					"map": schema.MapAttribute{
+						ElementType: types.StringType,
+						Optional:    true,
+					},
+					"passthrough": schema.ListAttribute{
+						ElementType: types.StringType,
+						Optional:    true,
+					},
+					"static": schema.MapAttribute{
+						ElementType: types.StringType,
+						Optional:    true,
+					},
+				},
+				Optional: true,
 			},
 			"client_id": schema.StringAttribute{Optional: true},
 			"client_secret_ref": schema.SingleNestedAttribute{
 				Attributes: map[string]schema.Attribute{"name": schema.StringAttribute{Optional: true}},
 				Optional:   true,
 			},
-			"display": schema.StringAttribute{Optional: true},
-			"prompt":  schema.StringAttribute{Optional: true},
-			"scope":   schema.StringAttribute{Optional: true},
+			"identifier_claim": schema.StringAttribute{Optional: true},
+			"scopes": schema.ListAttribute{
+				ElementType: types.StringType,
+				Optional:    true,
+			},
 		},
 		MarkdownDescription: "Builds a ProviderGitHub config and exposes its google.protobuf.Any encoding as `any`. Makes no API calls.",
 	}
@@ -49,27 +72,45 @@ func ProviderGitHubClientSecretRefAttrTypes() map[string]attr.Type {
 	return map[string]attr.Type{"name": types.StringType}
 }
 
+// ProviderGitHubClaimMapModel is the Terraform model for ProviderGitHub's "claim_map" nested attribute.
+type ProviderGitHubClaimMapModel struct {
+	Map         types.Map  `tfsdk:"map"`
+	Static      types.Map  `tfsdk:"static"`
+	Passthrough types.List `tfsdk:"passthrough"`
+}
+
+// ProviderGitHubClaimMapAttrTypes returns the attribute types of the "claim_map" nested attribute.
+func ProviderGitHubClaimMapAttrTypes() map[string]attr.Type {
+	return map[string]attr.Type{
+		"map":         types.MapType{ElemType: types.StringType},
+		"passthrough": types.ListType{ElemType: types.StringType},
+		"static":      types.MapType{ElemType: types.StringType},
+	}
+}
+
 // ProviderGitHubModel is the Terraform model for the ProviderGitHub config data source.
 type ProviderGitHubModel struct {
-	ClientId        types.String         `tfsdk:"client_id"`
-	AllowSignup     types.Bool           `tfsdk:"allow_signup"`
-	Prompt          types.String         `tfsdk:"prompt"`
-	Display         types.String         `tfsdk:"display"`
-	Scope           types.String         `tfsdk:"scope"`
-	ClientSecretRef types.Object         `tfsdk:"client_secret_ref"`
-	Any             jsontypes.Normalized `tfsdk:"any"`
+	ClientId            types.String         `tfsdk:"client_id"`
+	ClientSecretRef     types.Object         `tfsdk:"client_secret_ref"`
+	Scopes              types.List           `tfsdk:"scopes"`
+	ClaimMap            types.Object         `tfsdk:"claim_map"`
+	AuthorizationParams types.Map            `tfsdk:"authorization_params"`
+	BaseUrl             types.String         `tfsdk:"base_url"`
+	IdentifierClaim     types.String         `tfsdk:"identifier_claim"`
+	Any                 jsontypes.Normalized `tfsdk:"any"`
 }
 
 // NewProviderGitHubModel returns a model with every attribute set to its typed null.
 func NewProviderGitHubModel() *ProviderGitHubModel {
 	return &ProviderGitHubModel{
-		AllowSignup:     types.BoolNull(),
-		Any:             jsontypes.NewNormalizedNull(),
-		ClientId:        types.StringNull(),
-		ClientSecretRef: types.ObjectNull(ProviderGitHubClientSecretRefAttrTypes()),
-		Display:         types.StringNull(),
-		Prompt:          types.StringNull(),
-		Scope:           types.StringNull(),
+		Any:                 jsontypes.NewNormalizedNull(),
+		AuthorizationParams: types.MapNull(types.StringType),
+		BaseUrl:             types.StringNull(),
+		ClaimMap:            types.ObjectNull(ProviderGitHubClaimMapAttrTypes()),
+		ClientId:            types.StringNull(),
+		ClientSecretRef:     types.ObjectNull(ProviderGitHubClientSecretRefAttrTypes()),
+		IdentifierClaim:     types.StringNull(),
+		Scopes:              types.ListNull(types.StringType),
 	}
 }
 
@@ -78,10 +119,6 @@ func (m *ProviderGitHubModel) ToProto(ctx context.Context) (*v1alpha1.ProviderGi
 	var diags diag.Diagnostics
 	out := &v1alpha1.ProviderGitHub{}
 	out.ClientId = m.ClientId.ValueString()
-	out.AllowSignup = m.AllowSignup.ValueBool()
-	out.Prompt = m.Prompt.ValueString()
-	out.Display = m.Display.ValueString()
-	out.Scope = m.Scope.ValueString()
 	if !m.ClientSecretRef.IsNull() && !m.ClientSecretRef.IsUnknown() {
 		var n ProviderGitHubClientSecretRefModel
 		diags.Append(m.ClientSecretRef.As(ctx, &n, basetypes.ObjectAsOptions{})...)
@@ -89,6 +126,29 @@ func (m *ProviderGitHubModel) ToProto(ctx context.Context) (*v1alpha1.ProviderGi
 		v.Name = n.Name.ValueString()
 		out.ClientSecretRef = v
 	}
+	if !m.Scopes.IsNull() && !m.Scopes.IsUnknown() {
+		diags.Append(m.Scopes.ElementsAs(ctx, &out.Scopes, false)...)
+	}
+	if !m.ClaimMap.IsNull() && !m.ClaimMap.IsUnknown() {
+		var n ProviderGitHubClaimMapModel
+		diags.Append(m.ClaimMap.As(ctx, &n, basetypes.ObjectAsOptions{})...)
+		v := &v1alpha1.ClaimMap{}
+		if !n.Map.IsNull() && !n.Map.IsUnknown() {
+			diags.Append(n.Map.ElementsAs(ctx, &v.Map, false)...)
+		}
+		if !n.Static.IsNull() && !n.Static.IsUnknown() {
+			diags.Append(n.Static.ElementsAs(ctx, &v.Static, false)...)
+		}
+		if !n.Passthrough.IsNull() && !n.Passthrough.IsUnknown() {
+			diags.Append(n.Passthrough.ElementsAs(ctx, &v.Passthrough, false)...)
+		}
+		out.ClaimMap = v
+	}
+	if !m.AuthorizationParams.IsNull() && !m.AuthorizationParams.IsUnknown() {
+		diags.Append(m.AuthorizationParams.ElementsAs(ctx, &out.AuthorizationParams, false)...)
+	}
+	out.BaseUrl = m.BaseUrl.ValueString()
+	out.IdentifierClaim = m.IdentifierClaim.ValueString()
 	return out, diags
 }
 

@@ -25,13 +25,38 @@ func ProviderOktaDataSourceSchema() schema.Schema {
 				CustomType:          jsontypes.NormalizedType{},
 				MarkdownDescription: "protojson-encoded google.protobuf.Any (includes `@type`); reference this from Any-typed resource attributes.",
 			},
+			"authorization_params": schema.MapAttribute{
+				ElementType: types.StringType,
+				Optional:    true,
+			},
+			"claim_map": schema.SingleNestedAttribute{
+				Attributes: map[string]schema.Attribute{
+					"map": schema.MapAttribute{
+						ElementType: types.StringType,
+						Optional:    true,
+					},
+					"passthrough": schema.ListAttribute{
+						ElementType: types.StringType,
+						Optional:    true,
+					},
+					"static": schema.MapAttribute{
+						ElementType: types.StringType,
+						Optional:    true,
+					},
+				},
+				Optional: true,
+			},
 			"client_id": schema.StringAttribute{Optional: true},
 			"client_secret_ref": schema.SingleNestedAttribute{
 				Attributes: map[string]schema.Attribute{"name": schema.StringAttribute{Optional: true}},
 				Optional:   true,
 			},
-			"scope":      schema.StringAttribute{Optional: true},
-			"tenant_url": schema.StringAttribute{Optional: true},
+			"identifier_claim": schema.StringAttribute{Optional: true},
+			"issuer":           schema.StringAttribute{Optional: true},
+			"scopes": schema.ListAttribute{
+				ElementType: types.StringType,
+				Optional:    true,
+			},
 		},
 		MarkdownDescription: "Builds a ProviderOkta config and exposes its google.protobuf.Any encoding as `any`. Makes no API calls.",
 	}
@@ -47,23 +72,45 @@ func ProviderOktaClientSecretRefAttrTypes() map[string]attr.Type {
 	return map[string]attr.Type{"name": types.StringType}
 }
 
+// ProviderOktaClaimMapModel is the Terraform model for ProviderOkta's "claim_map" nested attribute.
+type ProviderOktaClaimMapModel struct {
+	Map         types.Map  `tfsdk:"map"`
+	Static      types.Map  `tfsdk:"static"`
+	Passthrough types.List `tfsdk:"passthrough"`
+}
+
+// ProviderOktaClaimMapAttrTypes returns the attribute types of the "claim_map" nested attribute.
+func ProviderOktaClaimMapAttrTypes() map[string]attr.Type {
+	return map[string]attr.Type{
+		"map":         types.MapType{ElemType: types.StringType},
+		"passthrough": types.ListType{ElemType: types.StringType},
+		"static":      types.MapType{ElemType: types.StringType},
+	}
+}
+
 // ProviderOktaModel is the Terraform model for the ProviderOkta config data source.
 type ProviderOktaModel struct {
-	ClientId        types.String         `tfsdk:"client_id"`
-	Scope           types.String         `tfsdk:"scope"`
-	TenantUrl       types.String         `tfsdk:"tenant_url"`
-	ClientSecretRef types.Object         `tfsdk:"client_secret_ref"`
-	Any             jsontypes.Normalized `tfsdk:"any"`
+	ClientId            types.String         `tfsdk:"client_id"`
+	ClientSecretRef     types.Object         `tfsdk:"client_secret_ref"`
+	Issuer              types.String         `tfsdk:"issuer"`
+	Scopes              types.List           `tfsdk:"scopes"`
+	ClaimMap            types.Object         `tfsdk:"claim_map"`
+	AuthorizationParams types.Map            `tfsdk:"authorization_params"`
+	IdentifierClaim     types.String         `tfsdk:"identifier_claim"`
+	Any                 jsontypes.Normalized `tfsdk:"any"`
 }
 
 // NewProviderOktaModel returns a model with every attribute set to its typed null.
 func NewProviderOktaModel() *ProviderOktaModel {
 	return &ProviderOktaModel{
-		Any:             jsontypes.NewNormalizedNull(),
-		ClientId:        types.StringNull(),
-		ClientSecretRef: types.ObjectNull(ProviderOktaClientSecretRefAttrTypes()),
-		Scope:           types.StringNull(),
-		TenantUrl:       types.StringNull(),
+		Any:                 jsontypes.NewNormalizedNull(),
+		AuthorizationParams: types.MapNull(types.StringType),
+		ClaimMap:            types.ObjectNull(ProviderOktaClaimMapAttrTypes()),
+		ClientId:            types.StringNull(),
+		ClientSecretRef:     types.ObjectNull(ProviderOktaClientSecretRefAttrTypes()),
+		IdentifierClaim:     types.StringNull(),
+		Issuer:              types.StringNull(),
+		Scopes:              types.ListNull(types.StringType),
 	}
 }
 
@@ -72,8 +119,6 @@ func (m *ProviderOktaModel) ToProto(ctx context.Context) (*v1alpha1.ProviderOkta
 	var diags diag.Diagnostics
 	out := &v1alpha1.ProviderOkta{}
 	out.ClientId = m.ClientId.ValueString()
-	out.Scope = m.Scope.ValueString()
-	out.TenantUrl = m.TenantUrl.ValueString()
 	if !m.ClientSecretRef.IsNull() && !m.ClientSecretRef.IsUnknown() {
 		var n ProviderOktaClientSecretRefModel
 		diags.Append(m.ClientSecretRef.As(ctx, &n, basetypes.ObjectAsOptions{})...)
@@ -81,6 +126,29 @@ func (m *ProviderOktaModel) ToProto(ctx context.Context) (*v1alpha1.ProviderOkta
 		v.Name = n.Name.ValueString()
 		out.ClientSecretRef = v
 	}
+	out.Issuer = m.Issuer.ValueString()
+	if !m.Scopes.IsNull() && !m.Scopes.IsUnknown() {
+		diags.Append(m.Scopes.ElementsAs(ctx, &out.Scopes, false)...)
+	}
+	if !m.ClaimMap.IsNull() && !m.ClaimMap.IsUnknown() {
+		var n ProviderOktaClaimMapModel
+		diags.Append(m.ClaimMap.As(ctx, &n, basetypes.ObjectAsOptions{})...)
+		v := &v1alpha1.ClaimMap{}
+		if !n.Map.IsNull() && !n.Map.IsUnknown() {
+			diags.Append(n.Map.ElementsAs(ctx, &v.Map, false)...)
+		}
+		if !n.Static.IsNull() && !n.Static.IsUnknown() {
+			diags.Append(n.Static.ElementsAs(ctx, &v.Static, false)...)
+		}
+		if !n.Passthrough.IsNull() && !n.Passthrough.IsUnknown() {
+			diags.Append(n.Passthrough.ElementsAs(ctx, &v.Passthrough, false)...)
+		}
+		out.ClaimMap = v
+	}
+	if !m.AuthorizationParams.IsNull() && !m.AuthorizationParams.IsUnknown() {
+		diags.Append(m.AuthorizationParams.ElementsAs(ctx, &out.AuthorizationParams, false)...)
+	}
+	out.IdentifierClaim = m.IdentifierClaim.ValueString()
 	return out, diags
 }
 

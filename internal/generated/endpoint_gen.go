@@ -10,6 +10,7 @@ import (
 	tf "github.com/activatedio/tfinfra/pkg/tf"
 	jsontypes "github.com/hashicorp/terraform-plugin-framework-jsontypes/jsontypes"
 	stringvalidator "github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+	attr "github.com/hashicorp/terraform-plugin-framework/attr"
 	datasource "github.com/hashicorp/terraform-plugin-framework/datasource"
 	schema1 "github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	diag "github.com/hashicorp/terraform-plugin-framework/diag"
@@ -18,10 +19,12 @@ import (
 	schema "github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	boolplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	mapplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
+	objectplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/objectplanmodifier"
 	planmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	stringplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	validator "github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
+	basetypes "github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	protojson "google.golang.org/protobuf/encoding/protojson"
 	fieldmaskpb "google.golang.org/protobuf/types/known/fieldmaskpb"
 )
@@ -74,8 +77,55 @@ func EndpointResourceSchema() schema.Schema {
 				Optional:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
+			"timeout": schema.StringAttribute{
+				Computed:            true,
+				MarkdownDescription: "`timeout` as a duration: `\"5s\"`, `\"1.5s\"`, `\"500ms\"`, `\"1m30s\"`.",
+				Optional:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
+			"tls": schema.SingleNestedAttribute{
+				Attributes: map[string]schema.Attribute{
+					"ca_pem": schema.StringAttribute{
+						Computed: true,
+						Optional: true,
+					},
+					"client_certificate": schema.StringAttribute{
+						Computed: true,
+						Optional: true,
+					},
+					"insecure_skip_verify": schema.BoolAttribute{
+						Computed: true,
+						Optional: true,
+					},
+					"server_name": schema.StringAttribute{
+						Computed: true,
+						Optional: true,
+					},
+				},
+				Computed:      true,
+				Optional:      true,
+				PlanModifiers: []planmodifier.Object{objectplanmodifier.UseStateForUnknown()},
+			},
 		},
 		MarkdownDescription: "Endpoint resource.",
+	}
+}
+
+// EndpointTlsModel is the Terraform model for Endpoint's "tls" nested attribute.
+type EndpointTlsModel struct {
+	CaPem              types.String `tfsdk:"ca_pem"`
+	ServerName         types.String `tfsdk:"server_name"`
+	InsecureSkipVerify types.Bool   `tfsdk:"insecure_skip_verify"`
+	ClientCertificate  types.String `tfsdk:"client_certificate"`
+}
+
+// EndpointTlsAttrTypes returns the attribute types of the "tls" nested attribute.
+func EndpointTlsAttrTypes() map[string]attr.Type {
+	return map[string]attr.Type{
+		"ca_pem":               types.StringType,
+		"client_certificate":   types.StringType,
+		"insecure_skip_verify": types.BoolType,
+		"server_name":          types.StringType,
 	}
 }
 
@@ -89,6 +139,8 @@ type EndpointModel struct {
 	Address      types.String         `tfsdk:"address"`
 	Insecure     types.Bool           `tfsdk:"insecure"`
 	Auth         jsontypes.Normalized `tfsdk:"auth"`
+	Tls          types.Object         `tfsdk:"tls"`
+	Timeout      types.String         `tfsdk:"timeout"`
 }
 
 // NewEndpointModel returns a model with every attribute set to its typed null; collection types cannot be zero-valued.
@@ -102,6 +154,8 @@ func NewEndpointModel() *EndpointModel {
 		Labels:       types.MapNull(types.StringType),
 		Name:         types.StringNull(),
 		TenantId:     types.StringNull(),
+		Timeout:      types.StringNull(),
+		Tls:          types.ObjectNull(EndpointTlsAttrTypes()),
 	}
 }
 
@@ -125,6 +179,24 @@ func (m *EndpointModel) ToProto(ctx context.Context) (*v1alpha1.Endpoint, diag.D
 			diags.AddAttributeError(path.Root("auth"), "invalid EndpointAuth JSON", err.Error())
 		} else {
 			out.Auth = v
+		}
+	}
+	if !m.Tls.IsNull() && !m.Tls.IsUnknown() {
+		var n EndpointTlsModel
+		diags.Append(m.Tls.As(ctx, &n, basetypes.ObjectAsOptions{})...)
+		v := &v1alpha1.EndpointTls{}
+		v.CaPem = n.CaPem.ValueString()
+		v.ServerName = n.ServerName.ValueString()
+		v.InsecureSkipVerify = n.InsecureSkipVerify.ValueBool()
+		v.ClientCertificate = n.ClientCertificate.ValueString()
+		out.Tls = v
+	}
+	if !m.Timeout.IsNull() && !m.Timeout.IsUnknown() {
+		d, err := tf.ParseDuration(m.Timeout.ValueString())
+		if err != nil {
+			diags.AddAttributeError(path.Root("timeout"), "invalid duration", err.Error())
+		} else {
+			out.Timeout = d
 		}
 	}
 	return out, diags
@@ -167,6 +239,31 @@ func (m *EndpointModel) FromProto(ctx context.Context, e *v1alpha1.Endpoint) dia
 			m.Auth = jsontypes.NewNormalizedValue(string(b))
 		}
 	}
+	if e.Tls == nil {
+		m.Tls = types.ObjectNull(EndpointTlsAttrTypes())
+	} else {
+		var n EndpointTlsModel
+		if e.Tls.CaPem == "" {
+			n.CaPem = types.StringNull()
+		} else {
+			n.CaPem = types.StringValue(e.Tls.CaPem)
+		}
+		if e.Tls.ServerName == "" {
+			n.ServerName = types.StringNull()
+		} else {
+			n.ServerName = types.StringValue(e.Tls.ServerName)
+		}
+		n.InsecureSkipVerify = types.BoolValue(e.Tls.InsecureSkipVerify)
+		if e.Tls.ClientCertificate == "" {
+			n.ClientCertificate = types.StringNull()
+		} else {
+			n.ClientCertificate = types.StringValue(e.Tls.ClientCertificate)
+		}
+		obj, d := types.ObjectValueFrom(ctx, EndpointTlsAttrTypes(), n)
+		diags.Append(d...)
+		m.Tls = obj
+	}
+	m.Timeout = tf.DurationValue(m.Timeout, e.Timeout)
 	return diags
 }
 
@@ -202,6 +299,12 @@ func (m *EndpointModel) UpdateMask(ctx context.Context, prior *EndpointModel) []
 		if eq, _ := m.Auth.StringSemanticEquals(ctx, prior.Auth); !eq {
 			paths = append(paths, "auth")
 		}
+	}
+	if !m.Tls.Equal(prior.Tls) {
+		paths = append(paths, "tls")
+	}
+	if !m.Timeout.Equal(prior.Timeout) {
+		paths = append(paths, "timeout")
 	}
 	return paths
 }
@@ -346,6 +449,16 @@ func EndpointDataSourceSchema() schema1.Schema {
 				Required:            true,
 			},
 			"tenant_id": schema1.StringAttribute{Computed: true},
+			"timeout":   schema1.StringAttribute{Computed: true},
+			"tls": schema1.SingleNestedAttribute{
+				Attributes: map[string]schema1.Attribute{
+					"ca_pem":               schema1.StringAttribute{Computed: true},
+					"client_certificate":   schema1.StringAttribute{Computed: true},
+					"insecure_skip_verify": schema1.BoolAttribute{Computed: true},
+					"server_name":          schema1.StringAttribute{Computed: true},
+				},
+				Computed: true,
+			},
 		},
 		MarkdownDescription: "Endpoint data source: reads one Endpoint by its full resource name.",
 	}

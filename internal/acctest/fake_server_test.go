@@ -37,6 +37,7 @@ type fakeIdentityServer struct {
 
 	mu        sync.Mutex
 	realms    map[string]*corepb.Realm
+	issuers   map[string]*corepb.Issuer
 	audiences map[string]*corepb.Audience
 	clients   map[string]*corepb.Client
 	providers map[string]*corepb.Provider
@@ -68,6 +69,7 @@ type fakeIdentityServer struct {
 func newFakeIdentityServer() *fakeIdentityServer {
 	return &fakeIdentityServer{
 		realms:    map[string]*corepb.Realm{},
+		issuers:   map[string]*corepb.Issuer{},
 		audiences: map[string]*corepb.Audience{},
 		clients:   map[string]*corepb.Client{},
 		providers: map[string]*corepb.Provider{},
@@ -177,6 +179,63 @@ func (f *fakeIdentityServer) DeleteRealm(ctx context.Context, in *identitypb.Del
 }
 
 // --- Audience and Client (issuer-scoped; the console pair guard needs) ---
+
+// --- Issuer (tenant-scoped; an endpoint's kit_token names one) ---
+
+func (f *fakeIdentityServer) GetIssuer(ctx context.Context, in *identitypb.GetIssuerRequest) (*corepb.Issuer, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.recordAuth(ctx)
+	i, ok := f.issuers[in.GetName()]
+	if !ok {
+		return nil, status.Errorf(codes.NotFound, "issuer %q not found", in.GetName())
+	}
+	return proto.Clone(i).(*corepb.Issuer), nil
+}
+
+func (f *fakeIdentityServer) CreateIssuer(ctx context.Context, in *identitypb.CreateIssuerRequest) (*corepb.Issuer, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.recordAuth(ctx)
+	i := proto.Clone(in.GetIssuer()).(*corepb.Issuer)
+	i.Name = in.GetParent() + "/issuers/" + f.nextID("i")
+	f.issuers[i.GetName()] = i
+	return proto.Clone(i).(*corepb.Issuer), nil
+}
+
+func (f *fakeIdentityServer) PatchIssuer(ctx context.Context, in *identitypb.PatchIssuerRequest) (*corepb.Issuer, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.recordAuth(ctx)
+	existing, ok := f.issuers[in.GetName()]
+	if !ok {
+		return nil, status.Errorf(codes.NotFound, "issuer %q not found", in.GetName())
+	}
+	for _, path := range in.GetUpdateMask().GetPaths() {
+		switch path {
+		case "labels":
+			existing.Labels = in.GetIssuer().GetLabels()
+		case "domain_name":
+			existing.DomainName = in.GetIssuer().GetDomainName()
+		case "path":
+			existing.Path = in.GetIssuer().GetPath()
+		default:
+			return nil, status.Errorf(codes.InvalidArgument, "unsupported update_mask path %q", path)
+		}
+	}
+	return proto.Clone(existing).(*corepb.Issuer), nil
+}
+
+func (f *fakeIdentityServer) DeleteIssuer(ctx context.Context, in *identitypb.DeleteIssuerRequest) (*emptypb.Empty, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.recordAuth(ctx)
+	if _, ok := f.issuers[in.GetName()]; !ok {
+		return nil, status.Errorf(codes.NotFound, "issuer %q not found", in.GetName())
+	}
+	delete(f.issuers, in.GetName())
+	return &emptypb.Empty{}, nil
+}
 
 func (f *fakeIdentityServer) GetAudience(ctx context.Context, in *identitypb.GetAudienceRequest) (*corepb.Audience, error) {
 	f.mu.Lock()

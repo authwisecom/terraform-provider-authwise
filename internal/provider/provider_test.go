@@ -86,9 +86,10 @@ func TestProviderSurface(t *testing.T) {
 		diags := s.Schema.ValidateImplementation(ctx)
 		require.False(t, diags.HasError(), "%s: %v", m.TypeName, diags)
 	}
-	// 18 generated singular data sources, 16 config builder data sources,
-	// and the hand-written secret and realm_authentication_context_schema.
-	assert.Len(t, dataSourceTypes, 36)
+	// 18 generated singular data sources, 15 config builder data sources
+	// (provider_dropbox went with apis v0.8.0), and the hand-written secret
+	// and realm_authentication_context_schema.
+	assert.Len(t, dataSourceTypes, 35)
 	for _, want := range []string{
 		"authwise_certificate",
 		"authwise_secret",

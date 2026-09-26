@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	corepb "git.authwise.com/authwise/apis/authwise/types/core/v1alpha1"
 )
 
 // The shipped examples are applied by the real terraform CLI against the real
@@ -62,19 +64,30 @@ provider_installation {
 		t.Fatal(err)
 	}
 
-	// The example's own resources, verbatim; only the provider block is
-	// replaced, to point at the fake stack instead of a real install.
+	// The example's own files, verbatim — main.tf and whatever it reads with
+	// file(); only the provider block is replaced, to point at the fake
+	// stack instead of a real install.
 	work := filepath.Join(root, "config")
 	if err := os.MkdirAll(work, 0o750); err != nil {
 		t.Fatal(err)
 	}
 
-	body, err := os.ReadFile(filepath.Join("../../examples", example, "main.tf"))
+	src := filepath.Join("../../examples", example)
+	entries, err := os.ReadDir(src)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(work, "main.tf"), body, 0o600); err != nil {
-		t.Fatal(err)
+	for _, e := range entries {
+		if e.IsDir() || e.Name() == "provider.tf" || e.Name() == "README.md" {
+			continue
+		}
+		body, err := os.ReadFile(filepath.Join(src, e.Name()))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(work, e.Name()), body, 0o600); err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	provider := fmt.Sprintf(`
@@ -277,5 +290,82 @@ func TestAccAuthnExample(t *testing.T) {
 	out = r.run("plan", "-var", "passkeys_status=disabled")
 	if !strings.Contains(out, "Check block assertion failed") || !strings.Contains(out, want) {
 		t.Errorf("the check block did not surface kit's warning:\n%s", out)
+	}
+}
+
+// TestAccEndpointExamples applies each examples/endpoints directory verbatim
+// and asserts a re-plan is empty — the proof that timeout keeps the spelling
+// the example wrote ("1500ms" is stored as 1.5s) and that tls and auth read
+// back as they went in.
+func TestAccEndpointExamples(t *testing.T) {
+
+	if os.Getenv("TF_ACC") == "" {
+		t.Skip("acceptance test: set TF_ACC=1 to run")
+	}
+
+	type s struct {
+		assert func(t *testing.T, e *corepb.Endpoint, h *harness)
+	}
+
+	cases := map[string]s{
+		"bearer": {
+			assert: func(t *testing.T, e *corepb.Endpoint, h *harness) {
+				if got := e.GetTimeout().AsDuration(); got != 2*time.Second {
+					t.Errorf("timeout = %s, want 2s", got)
+				}
+				if _, ok := h.fake.secrets[e.GetAuth().GetBearer().GetToken().GetName()]; !ok {
+					t.Errorf("bearer does not name the example's secret: %v", e.GetAuth())
+				}
+			},
+		},
+		"kit_token": {
+			assert: func(t *testing.T, e *corepb.Endpoint, h *harness) {
+				if got := e.GetTimeout().AsDuration(); got != 1500*time.Millisecond {
+					t.Errorf("timeout = %s, want 1.5s", got)
+				}
+				kt := e.GetAuth().GetKitToken()
+				if _, ok := h.fake.issuers[kt.GetIssuer()]; !ok || kt.GetAudience() != "https://ledger.example.com" {
+					t.Errorf("kit_token = %v", kt)
+				}
+				if e.GetTls().GetServerName() != "ledger.internal" {
+					t.Errorf("tls = %v", e.GetTls())
+				}
+			},
+		},
+		"mtls": {
+			assert: func(t *testing.T, e *corepb.Endpoint, h *harness) {
+				c, ok := h.fake.certs[e.GetTls().GetClientCertificate()]
+				if !ok || !c.GetHasPrivateKey() {
+					t.Errorf("tls.client_certificate = %q does not name the minted certificate", e.GetTls().GetClientCertificate())
+				}
+				if !strings.Contains(e.GetTls().GetCaPem(), "BEGIN CERTIFICATE") {
+					t.Errorf("tls.ca_pem did not arrive: %q", e.GetTls().GetCaPem())
+				}
+				if e.GetAuth() != nil {
+					t.Errorf("auth = %v, want none: the client certificate is not an auth scheme", e.GetAuth())
+				}
+			},
+		},
+	}
+
+	for k, v := range cases {
+		t.Run(k, func(t *testing.T) {
+
+			h := newHarness(t)
+			r := newExampleRun(t, h, "endpoints/"+k)
+
+			r.apply()
+			r.expectCleanPlan()
+
+			h.fake.mu.Lock()
+			defer h.fake.mu.Unlock()
+
+			if len(h.fake.endpoints) != 1 {
+				t.Fatalf("%d endpoints on the server, want 1", len(h.fake.endpoints))
+			}
+			for _, e := range h.fake.endpoints {
+				v.assert(t, e, h)
+			}
+		})
 	}
 }

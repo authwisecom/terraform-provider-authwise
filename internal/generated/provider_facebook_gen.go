@@ -25,13 +25,42 @@ func ProviderFacebookDataSourceSchema() schema.Schema {
 				CustomType:          jsontypes.NormalizedType{},
 				MarkdownDescription: "protojson-encoded google.protobuf.Any (includes `@type`); reference this from Any-typed resource attributes.",
 			},
+			"authorization_params": schema.MapAttribute{
+				ElementType: types.StringType,
+				Optional:    true,
+			},
+			"claim_map": schema.SingleNestedAttribute{
+				Attributes: map[string]schema.Attribute{
+					"map": schema.MapAttribute{
+						ElementType: types.StringType,
+						Optional:    true,
+					},
+					"passthrough": schema.ListAttribute{
+						ElementType: types.StringType,
+						Optional:    true,
+					},
+					"static": schema.MapAttribute{
+						ElementType: types.StringType,
+						Optional:    true,
+					},
+				},
+				Optional: true,
+			},
 			"client_id": schema.StringAttribute{Optional: true},
 			"client_secret_ref": schema.SingleNestedAttribute{
 				Attributes: map[string]schema.Attribute{"name": schema.StringAttribute{Optional: true}},
 				Optional:   true,
 			},
-			"scope":       schema.StringAttribute{Optional: true},
-			"user_fields": schema.StringAttribute{Optional: true},
+			"fields": schema.ListAttribute{
+				ElementType: types.StringType,
+				Optional:    true,
+			},
+			"graph_version":    schema.StringAttribute{Optional: true},
+			"identifier_claim": schema.StringAttribute{Optional: true},
+			"scopes": schema.ListAttribute{
+				ElementType: types.StringType,
+				Optional:    true,
+			},
 		},
 		MarkdownDescription: "Builds a ProviderFacebook config and exposes its google.protobuf.Any encoding as `any`. Makes no API calls.",
 	}
@@ -47,23 +76,47 @@ func ProviderFacebookClientSecretRefAttrTypes() map[string]attr.Type {
 	return map[string]attr.Type{"name": types.StringType}
 }
 
+// ProviderFacebookClaimMapModel is the Terraform model for ProviderFacebook's "claim_map" nested attribute.
+type ProviderFacebookClaimMapModel struct {
+	Map         types.Map  `tfsdk:"map"`
+	Static      types.Map  `tfsdk:"static"`
+	Passthrough types.List `tfsdk:"passthrough"`
+}
+
+// ProviderFacebookClaimMapAttrTypes returns the attribute types of the "claim_map" nested attribute.
+func ProviderFacebookClaimMapAttrTypes() map[string]attr.Type {
+	return map[string]attr.Type{
+		"map":         types.MapType{ElemType: types.StringType},
+		"passthrough": types.ListType{ElemType: types.StringType},
+		"static":      types.MapType{ElemType: types.StringType},
+	}
+}
+
 // ProviderFacebookModel is the Terraform model for the ProviderFacebook config data source.
 type ProviderFacebookModel struct {
-	ClientId        types.String         `tfsdk:"client_id"`
-	Scope           types.String         `tfsdk:"scope"`
-	UserFields      types.String         `tfsdk:"user_fields"`
-	ClientSecretRef types.Object         `tfsdk:"client_secret_ref"`
-	Any             jsontypes.Normalized `tfsdk:"any"`
+	ClientId            types.String         `tfsdk:"client_id"`
+	ClientSecretRef     types.Object         `tfsdk:"client_secret_ref"`
+	Scopes              types.List           `tfsdk:"scopes"`
+	Fields              types.List           `tfsdk:"fields"`
+	ClaimMap            types.Object         `tfsdk:"claim_map"`
+	AuthorizationParams types.Map            `tfsdk:"authorization_params"`
+	GraphVersion        types.String         `tfsdk:"graph_version"`
+	IdentifierClaim     types.String         `tfsdk:"identifier_claim"`
+	Any                 jsontypes.Normalized `tfsdk:"any"`
 }
 
 // NewProviderFacebookModel returns a model with every attribute set to its typed null.
 func NewProviderFacebookModel() *ProviderFacebookModel {
 	return &ProviderFacebookModel{
-		Any:             jsontypes.NewNormalizedNull(),
-		ClientId:        types.StringNull(),
-		ClientSecretRef: types.ObjectNull(ProviderFacebookClientSecretRefAttrTypes()),
-		Scope:           types.StringNull(),
-		UserFields:      types.StringNull(),
+		Any:                 jsontypes.NewNormalizedNull(),
+		AuthorizationParams: types.MapNull(types.StringType),
+		ClaimMap:            types.ObjectNull(ProviderFacebookClaimMapAttrTypes()),
+		ClientId:            types.StringNull(),
+		ClientSecretRef:     types.ObjectNull(ProviderFacebookClientSecretRefAttrTypes()),
+		Fields:              types.ListNull(types.StringType),
+		GraphVersion:        types.StringNull(),
+		IdentifierClaim:     types.StringNull(),
+		Scopes:              types.ListNull(types.StringType),
 	}
 }
 
@@ -72,8 +125,6 @@ func (m *ProviderFacebookModel) ToProto(ctx context.Context) (*v1alpha1.Provider
 	var diags diag.Diagnostics
 	out := &v1alpha1.ProviderFacebook{}
 	out.ClientId = m.ClientId.ValueString()
-	out.Scope = m.Scope.ValueString()
-	out.UserFields = m.UserFields.ValueString()
 	if !m.ClientSecretRef.IsNull() && !m.ClientSecretRef.IsUnknown() {
 		var n ProviderFacebookClientSecretRefModel
 		diags.Append(m.ClientSecretRef.As(ctx, &n, basetypes.ObjectAsOptions{})...)
@@ -81,6 +132,32 @@ func (m *ProviderFacebookModel) ToProto(ctx context.Context) (*v1alpha1.Provider
 		v.Name = n.Name.ValueString()
 		out.ClientSecretRef = v
 	}
+	if !m.Scopes.IsNull() && !m.Scopes.IsUnknown() {
+		diags.Append(m.Scopes.ElementsAs(ctx, &out.Scopes, false)...)
+	}
+	if !m.Fields.IsNull() && !m.Fields.IsUnknown() {
+		diags.Append(m.Fields.ElementsAs(ctx, &out.Fields, false)...)
+	}
+	if !m.ClaimMap.IsNull() && !m.ClaimMap.IsUnknown() {
+		var n ProviderFacebookClaimMapModel
+		diags.Append(m.ClaimMap.As(ctx, &n, basetypes.ObjectAsOptions{})...)
+		v := &v1alpha1.ClaimMap{}
+		if !n.Map.IsNull() && !n.Map.IsUnknown() {
+			diags.Append(n.Map.ElementsAs(ctx, &v.Map, false)...)
+		}
+		if !n.Static.IsNull() && !n.Static.IsUnknown() {
+			diags.Append(n.Static.ElementsAs(ctx, &v.Static, false)...)
+		}
+		if !n.Passthrough.IsNull() && !n.Passthrough.IsUnknown() {
+			diags.Append(n.Passthrough.ElementsAs(ctx, &v.Passthrough, false)...)
+		}
+		out.ClaimMap = v
+	}
+	if !m.AuthorizationParams.IsNull() && !m.AuthorizationParams.IsUnknown() {
+		diags.Append(m.AuthorizationParams.ElementsAs(ctx, &out.AuthorizationParams, false)...)
+	}
+	out.GraphVersion = m.GraphVersion.ValueString()
+	out.IdentifierClaim = m.IdentifierClaim.ValueString()
 	return out, diags
 }
 

@@ -1,0 +1,197 @@
+---
+page_title: "authwise_endpoint Resource - terraform-provider-authwise"
+subcategory: ""
+description: |-
+  A service kit calls out to: its transport and address, how kit verifies it, how kit authenticates to it, and the per-call deadline.
+---
+
+# authwise_endpoint (Resource)
+
+A service kit calls out to, such as a risk engine, an external factor or a
+ledger. You describe it once, and consumers refer to it by name. An
+endpoint sets four things:
+
+- the transport and address;
+- how kit verifies the service (`tls`);
+- how kit authenticates to it (`auth`, plus `tls.client_certificate` for
+  mTLS);
+- the deadline for one call (`timeout`).
+
+An endpoint never holds a credential. A static credential lives in an
+[`authwise_secret`](secret.md) and is referenced by name. A token kit signs
+needs no secret at all.
+
+## Example Usage
+
+### Bearer token from a secret (REST)
+
+```terraform
+resource "authwise_secret" "risk_token" {
+  display_name       = "Risk service token"
+  payload_wo         = var.risk_token
+  payload_wo_version = var.risk_token_version
+}
+
+resource "authwise_endpoint" "risk" {
+  display_name = "Risk service"
+  address      = "https://risk.example.com/v1"
+  timeout      = "2s"
+
+  auth = jsonencode({
+    bearer = {
+      token = { name = authwise_secret.risk_token.name }
+    }
+  })
+}
+```
+
+### A token kit signs (gRPC)
+
+```terraform
+resource "authwise_issuer" "internal" {
+  domain_name = "auth.example.com"
+  path        = "/internal"
+}
+
+resource "authwise_endpoint" "ledger" {
+  display_name  = "Ledger"
+  endpoint_type = "GRPC"
+  address       = "ledger.example.com:443"
+  timeout       = "1500ms"
+
+  tls = {
+    server_name = "ledger.internal"
+  }
+
+  auth = jsonencode({
+    kitToken = {
+      issuer   = authwise_issuer.internal.name
+      audience = "https://ledger.example.com"
+    }
+  })
+}
+```
+
+kit signs the token with the issuer's key. It sends it as
+`authorization: Bearer <token>`, with `aud` set to `audience`,
+`sub: authwise-internal` and a five-minute lifetime. The service verifies it
+against the issuer's JWKS.
+
+### Mutual TLS with a certificate kit holds (gRPC)
+
+```terraform
+resource "authwise_certificate" "kit_client" {
+  display_name        = "kit client (payments)"
+  use                 = "CERTIFICATE_USE_SIGNING"
+  subject_common_name = "kit.example.com"
+  validity_days       = 365
+}
+
+resource "authwise_endpoint" "payments" {
+  display_name  = "Payments"
+  endpoint_type = "GRPC"
+  address       = "payments.internal.example.com:8443"
+
+  tls = {
+    ca_pem             = file("${path.module}/payments-ca.pem")
+    client_certificate = authwise_certificate.kit_client.name
+  }
+}
+```
+
+The three configurations apply as they are from
+[`examples/endpoints`](../../examples/endpoints). The acceptance suite runs
+them the same way.
+
+## Transport
+
+| `endpoint_type` | `address` | plaintext |
+| --- | --- | --- |
+| `REST` (the default; leave unset) | an absolute `http(s)://` URL with no userinfo; the base a consumer appends its path to | an `http://` URL |
+| `GRPC` | `host:port` or `dns:///host:port` | `insecure = true` |
+
+`insecure` means **plaintext**: no TLS at all, not "skip verification". It
+applies to gRPC only. kit refuses it on a REST endpoint, where the URL's
+scheme already says whether the connection is plaintext. kit also refuses
+`tls` on an insecure endpoint. To accept any certificate during
+development, use `tls.insecure_skip_verify`.
+
+kit refuses a loopback, private, link-local or unique-local destination
+unless the install sets `integration.allowPrivateAddresses`.
+
+~> Leave `endpoint_type` unset for REST rather than writing `"REST"`. REST
+is the enum's zero value, which reads back as unset. Writing `"REST"`
+explicitly makes Terraform report an inconsistent result after apply.
+
+## `auth`
+
+`auth` is the protojson encoding of `EndpointAuth`, written with
+`jsonencode`. Its keys are **lowerCamel**, such as `kitToken` rather than
+`kit_token`. The value kit returns is compared with the value you wrote, and
+kit returns lowerCamel. It holds exactly one scheme:
+
+| scheme | sends | JSON |
+| --- | --- | --- |
+| `bearer` | `authorization: Bearer <secret>` | `{ bearer = { token = { name = <secret> } } }` |
+| `basic` | HTTP basic; only the password is secret | `{ basic = { username = "kit", password = { name = <secret> } } }` |
+| `header` | any header, lower-cased on the wire | `{ header = { name = "x-api-key", value = { name = <secret> } } }` |
+| `kitToken` | a token kit signs; nothing stored | `{ kitToken = { issuer = <issuer>, audience = "…" } }` |
+
+`<secret>` is an `authwise_secret`'s `name` and `<issuer>` is an
+`authwise_issuer`'s `name`, both of the endpoint's tenant. Referencing them
+inside `jsonencode` orders the endpoint after them. Writing a secret-backed
+scheme needs `identity.secrets.use`. Leaving `auth` unset means kit presents
+nothing.
+
+The client certificate for mTLS is not an `auth` scheme. It sits in
+`tls.client_certificate`, so it can be combined with any of the schemes
+above.
+
+## `timeout`
+
+`timeout` is the deadline for one call, used when the caller sets none. A
+consumer with a bound of its own, such as the risk policy's timeout, keeps
+its own bound. The value must be between 100 ms and 60 s. When it is unset,
+the install's `integration.defaultTimeoutMs` applies (5 s).
+
+It accepts Go duration syntax, which includes the protojson form: `"5s"`,
+`"1.5s"`, `"500ms"`, `"1m"`. State keeps the spelling you wrote for as long
+as kit stores the same length. An import has no spelling to keep and reads
+the protojson form, `"1.5s"`, or `"60s"` rather than `"1m"`.
+
+<!-- schema generated by tfplugindocs -->
+## Schema
+
+### Optional
+
+- `address` (String) gRPC: `host:port` or `dns:///host:port`. REST: an absolute `http(s)://` URL.
+- `auth` (String) `auth` as the protojson encoding of EndpointAuth.
+- `display_name` (String)
+- `endpoint_type` (String) `REST` (the default) or `GRPC`.
+- `insecure` (Boolean) Plaintext, no TLS. gRPC only.
+- `labels` (Map of String)
+- `tenant_id` (String) Parent identifier `tenant_id`; overrides the provider default. Changing it replaces the resource.
+- `timeout` (String) `timeout` as a duration: `"5s"`, `"1.5s"`, `"500ms"`, `"1m30s"`.
+- `tls` (Attributes) How kit verifies the endpoint and, with a client certificate, proves itself to it. (see [below for nested schema](#nestedatt--tls))
+
+### Read-Only
+
+- `name` (String) Full resource name; serves as the Terraform ID.
+
+<a id="nestedatt--tls"></a>
+### Nested Schema for `tls`
+
+Optional:
+
+- `ca_pem` (String) Extra trust anchors, a PEM bundle added to the system roots.
+- `client_certificate` (String) `tenants/{tenant}/certificates/{certificate}`: a certificate of this tenant holding a private key, presented for mTLS.
+- `insecure_skip_verify` (Boolean) Development only: accept any certificate the endpoint presents.
+- `server_name` (String) The name verified, and sent as SNI, when it is not the address's host.
+
+## Import
+
+Import by full resource name:
+
+```shell
+terraform import authwise_endpoint.risk tenants/t-01/endpoints/e-01
+```

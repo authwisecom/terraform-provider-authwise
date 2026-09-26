@@ -25,13 +25,41 @@ func ProviderGoogleDataSourceSchema() schema.Schema {
 				CustomType:          jsontypes.NormalizedType{},
 				MarkdownDescription: "protojson-encoded google.protobuf.Any (includes `@type`); reference this from Any-typed resource attributes.",
 			},
+			"authorization_params": schema.MapAttribute{
+				ElementType: types.StringType,
+				Optional:    true,
+			},
+			"claim_map": schema.SingleNestedAttribute{
+				Attributes: map[string]schema.Attribute{
+					"map": schema.MapAttribute{
+						ElementType: types.StringType,
+						Optional:    true,
+					},
+					"passthrough": schema.ListAttribute{
+						ElementType: types.StringType,
+						Optional:    true,
+					},
+					"static": schema.MapAttribute{
+						ElementType: types.StringType,
+						Optional:    true,
+					},
+				},
+				Optional: true,
+			},
 			"client_id": schema.StringAttribute{Optional: true},
 			"client_secret_ref": schema.SingleNestedAttribute{
 				Attributes: map[string]schema.Attribute{"name": schema.StringAttribute{Optional: true}},
 				Optional:   true,
 			},
-			"prompt": schema.StringAttribute{Optional: true},
-			"scope":  schema.StringAttribute{Optional: true},
+			"hosted_domains": schema.ListAttribute{
+				ElementType: types.StringType,
+				Optional:    true,
+			},
+			"identifier_claim": schema.StringAttribute{Optional: true},
+			"scopes": schema.ListAttribute{
+				ElementType: types.StringType,
+				Optional:    true,
+			},
 		},
 		MarkdownDescription: "Builds a ProviderGoogle config and exposes its google.protobuf.Any encoding as `any`. Makes no API calls.",
 	}
@@ -47,23 +75,45 @@ func ProviderGoogleClientSecretRefAttrTypes() map[string]attr.Type {
 	return map[string]attr.Type{"name": types.StringType}
 }
 
+// ProviderGoogleClaimMapModel is the Terraform model for ProviderGoogle's "claim_map" nested attribute.
+type ProviderGoogleClaimMapModel struct {
+	Map         types.Map  `tfsdk:"map"`
+	Static      types.Map  `tfsdk:"static"`
+	Passthrough types.List `tfsdk:"passthrough"`
+}
+
+// ProviderGoogleClaimMapAttrTypes returns the attribute types of the "claim_map" nested attribute.
+func ProviderGoogleClaimMapAttrTypes() map[string]attr.Type {
+	return map[string]attr.Type{
+		"map":         types.MapType{ElemType: types.StringType},
+		"passthrough": types.ListType{ElemType: types.StringType},
+		"static":      types.MapType{ElemType: types.StringType},
+	}
+}
+
 // ProviderGoogleModel is the Terraform model for the ProviderGoogle config data source.
 type ProviderGoogleModel struct {
-	ClientId        types.String         `tfsdk:"client_id"`
-	Scope           types.String         `tfsdk:"scope"`
-	Prompt          types.String         `tfsdk:"prompt"`
-	ClientSecretRef types.Object         `tfsdk:"client_secret_ref"`
-	Any             jsontypes.Normalized `tfsdk:"any"`
+	ClientId            types.String         `tfsdk:"client_id"`
+	ClientSecretRef     types.Object         `tfsdk:"client_secret_ref"`
+	Scopes              types.List           `tfsdk:"scopes"`
+	HostedDomains       types.List           `tfsdk:"hosted_domains"`
+	ClaimMap            types.Object         `tfsdk:"claim_map"`
+	AuthorizationParams types.Map            `tfsdk:"authorization_params"`
+	IdentifierClaim     types.String         `tfsdk:"identifier_claim"`
+	Any                 jsontypes.Normalized `tfsdk:"any"`
 }
 
 // NewProviderGoogleModel returns a model with every attribute set to its typed null.
 func NewProviderGoogleModel() *ProviderGoogleModel {
 	return &ProviderGoogleModel{
-		Any:             jsontypes.NewNormalizedNull(),
-		ClientId:        types.StringNull(),
-		ClientSecretRef: types.ObjectNull(ProviderGoogleClientSecretRefAttrTypes()),
-		Prompt:          types.StringNull(),
-		Scope:           types.StringNull(),
+		Any:                 jsontypes.NewNormalizedNull(),
+		AuthorizationParams: types.MapNull(types.StringType),
+		ClaimMap:            types.ObjectNull(ProviderGoogleClaimMapAttrTypes()),
+		ClientId:            types.StringNull(),
+		ClientSecretRef:     types.ObjectNull(ProviderGoogleClientSecretRefAttrTypes()),
+		HostedDomains:       types.ListNull(types.StringType),
+		IdentifierClaim:     types.StringNull(),
+		Scopes:              types.ListNull(types.StringType),
 	}
 }
 
@@ -72,8 +122,6 @@ func (m *ProviderGoogleModel) ToProto(ctx context.Context) (*v1alpha1.ProviderGo
 	var diags diag.Diagnostics
 	out := &v1alpha1.ProviderGoogle{}
 	out.ClientId = m.ClientId.ValueString()
-	out.Scope = m.Scope.ValueString()
-	out.Prompt = m.Prompt.ValueString()
 	if !m.ClientSecretRef.IsNull() && !m.ClientSecretRef.IsUnknown() {
 		var n ProviderGoogleClientSecretRefModel
 		diags.Append(m.ClientSecretRef.As(ctx, &n, basetypes.ObjectAsOptions{})...)
@@ -81,6 +129,31 @@ func (m *ProviderGoogleModel) ToProto(ctx context.Context) (*v1alpha1.ProviderGo
 		v.Name = n.Name.ValueString()
 		out.ClientSecretRef = v
 	}
+	if !m.Scopes.IsNull() && !m.Scopes.IsUnknown() {
+		diags.Append(m.Scopes.ElementsAs(ctx, &out.Scopes, false)...)
+	}
+	if !m.HostedDomains.IsNull() && !m.HostedDomains.IsUnknown() {
+		diags.Append(m.HostedDomains.ElementsAs(ctx, &out.HostedDomains, false)...)
+	}
+	if !m.ClaimMap.IsNull() && !m.ClaimMap.IsUnknown() {
+		var n ProviderGoogleClaimMapModel
+		diags.Append(m.ClaimMap.As(ctx, &n, basetypes.ObjectAsOptions{})...)
+		v := &v1alpha1.ClaimMap{}
+		if !n.Map.IsNull() && !n.Map.IsUnknown() {
+			diags.Append(n.Map.ElementsAs(ctx, &v.Map, false)...)
+		}
+		if !n.Static.IsNull() && !n.Static.IsUnknown() {
+			diags.Append(n.Static.ElementsAs(ctx, &v.Static, false)...)
+		}
+		if !n.Passthrough.IsNull() && !n.Passthrough.IsUnknown() {
+			diags.Append(n.Passthrough.ElementsAs(ctx, &v.Passthrough, false)...)
+		}
+		out.ClaimMap = v
+	}
+	if !m.AuthorizationParams.IsNull() && !m.AuthorizationParams.IsUnknown() {
+		diags.Append(m.AuthorizationParams.ElementsAs(ctx, &out.AuthorizationParams, false)...)
+	}
+	out.IdentifierClaim = m.IdentifierClaim.ValueString()
 	return out, diags
 }
 

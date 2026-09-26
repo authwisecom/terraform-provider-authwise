@@ -4,8 +4,8 @@ go 1.25.8
 
 require (
 	git.authwise.com/authwise/api-client-support v0.2.1
-	git.authwise.com/authwise/apis v0.7.0
-	github.com/activatedio/tfinfra v0.0.10
+	git.authwise.com/authwise/apis v0.9.0
+	github.com/activatedio/tfinfra v0.0.11
 	github.com/hashicorp/terraform-plugin-framework v1.19.0
 	github.com/hashicorp/terraform-plugin-framework-jsontypes v0.2.0
 	github.com/hashicorp/terraform-plugin-framework-validators v0.19.0
