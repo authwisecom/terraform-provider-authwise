@@ -45,7 +45,8 @@ func noneLeft(h *harness) resource.TestCheckFunc {
 	return func(_ *terraform.State) error {
 		h.fake.mu.Lock()
 		defer h.fake.mu.Unlock()
-		if n := len(h.fake.factors) + len(h.fake.secrets) + len(h.fake.endpoints) + len(h.fake.realms); n != 0 {
+		if n := len(h.fake.factors) + len(h.fake.secrets) + len(h.fake.endpoints) + len(h.fake.realms) +
+			len(h.fake.providers) + len(h.fake.issuers) + len(h.fake.certs); n != 0 {
 			return fmt.Errorf("%d objects left on the server after destroy", n)
 		}
 		return nil

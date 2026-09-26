@@ -366,11 +366,43 @@ func (f *fakeIdentityServer) GetProvider(ctx context.Context, in *identitypb.Get
 	return proto.Clone(p).(*corepb.Provider), nil
 }
 
+// admitProvider refuses the passwordless configs kit refuses: a config
+// whose type is not the provider type's, and a magic link outside its
+// bounds (a 6–8 digit code, identifiers matched on email only).
+func admitProvider(p *corepb.Provider) error {
+
+	want := map[string]proto.Message{
+		"magicLink": &corepb.ProviderMagicLink{},
+		"passkey":   &corepb.ProviderPasskey{},
+	}[p.GetProviderType()]
+	if want == nil || p.GetConfig() == nil {
+		return nil
+	}
+	if err := p.GetConfig().UnmarshalTo(want); err != nil {
+		return status.Errorf(codes.InvalidArgument, "a %s provider takes a %s config: %v",
+			p.GetProviderType(), want.ProtoReflect().Descriptor().Name(), err)
+	}
+
+	if ml, ok := want.(*corepb.ProviderMagicLink); ok {
+		if n := ml.GetCodeLength(); n != 0 && (n < 6 || n > 8) {
+			return status.Errorf(codes.InvalidArgument, "code_length must be 6 to 8, got %d", n)
+		}
+		if a := ml.GetIdentifierAttribute(); a != "" && a != "email" {
+			return status.Errorf(codes.InvalidArgument, "identifier_attribute must be email, got %q", a)
+		}
+	}
+
+	return nil
+}
+
 func (f *fakeIdentityServer) CreateProvider(ctx context.Context, in *identitypb.CreateProviderRequest) (*corepb.Provider, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.recordAuth(ctx)
 	if err := f.admitLocked(in); err != nil {
+		return nil, err
+	}
+	if err := admitProvider(in.GetProvider()); err != nil {
 		return nil, err
 	}
 	p := proto.Clone(in.GetProvider()).(*corepb.Provider)
@@ -403,6 +435,10 @@ func (f *fakeIdentityServer) PatchProvider(ctx context.Context, in *identitypb.P
 		default:
 			return nil, status.Errorf(codes.InvalidArgument, "unsupported update_mask path %q", path)
 		}
+	}
+	// kit validates the row the patch produces, not the patch.
+	if err := admitProvider(existing); err != nil {
+		return nil, err
 	}
 	return proto.Clone(existing).(*corepb.Provider), nil
 }

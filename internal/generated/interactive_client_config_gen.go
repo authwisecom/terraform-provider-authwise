@@ -30,12 +30,14 @@ func InteractiveClientConfigDataSourceSchema() schema.Schema {
 				MarkdownDescription: "protojson-encoded google.protobuf.Any (includes `@type`); reference this from Any-typed resource attributes.",
 			},
 			"cors": schema.StringAttribute{
-				CustomType: jsontypes.NormalizedType{},
-				Optional:   true,
+				CustomType:          jsontypes.NormalizedType{},
+				MarkdownDescription: "`cors` as the protojson encoding of CorsConfig.",
+				Optional:            true,
 			},
 			"flow_integration_config": schema.StringAttribute{
-				CustomType: jsontypes.NormalizedType{},
-				Optional:   true,
+				CustomType:          jsontypes.NormalizedType{},
+				MarkdownDescription: "`flow_integration_config` as the protojson encoding of IntegrationConfig.",
+				Optional:            true,
 			},
 			"interaction_forward_uri":               schema.StringAttribute{Optional: true},
 			"refresh_token_absolute_expire_seconds": schema.Int64Attribute{Optional: true},

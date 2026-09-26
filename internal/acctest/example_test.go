@@ -369,3 +369,40 @@ func TestAccEndpointExamples(t *testing.T) {
 		})
 	}
 }
+
+// TestAccPasswordlessExample applies examples/passwordless verbatim — a
+// password-or-magic-link realm and a passkey realm beside its webauthn
+// factor — then asserts a re-plan is empty, which is the proof that the
+// magic link's ttl survives the round trip through the provider's Any.
+func TestAccPasswordlessExample(t *testing.T) {
+
+	if os.Getenv("TF_ACC") == "" {
+		t.Skip("acceptance test: set TF_ACC=1 to run")
+	}
+
+	h := newHarness(t)
+	r := newExampleRun(t, h, "passwordless")
+
+	r.apply()
+	r.expectCleanPlan()
+
+	h.fake.mu.Lock()
+	defer h.fake.mu.Unlock()
+
+	types := map[string]int{}
+	for _, p := range h.fake.providers {
+		types[p.GetProviderType()]++
+		if p.GetProviderType() == "magicLink" {
+			ml := &corepb.ProviderMagicLink{}
+			if err := p.GetConfig().UnmarshalTo(ml); err != nil || ml.GetTtl().AsDuration() != 10*time.Minute {
+				t.Errorf("magic link config = %v (%v)", ml, err)
+			}
+		}
+	}
+	if types["usernamePassword"] != 1 || types["magicLink"] != 1 || types["passkey"] != 1 {
+		t.Errorf("providers by type = %v", types)
+	}
+	if len(h.fake.factors) != 1 {
+		t.Errorf("%d factors, want the passkey realm's webauthn factor", len(h.fake.factors))
+	}
+}

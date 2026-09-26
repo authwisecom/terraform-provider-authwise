@@ -236,6 +236,27 @@ func main() {
 			// a singular message as a typed nested attribute.
 			config[corepb.ProviderSaml]("provider_saml"),
 			config[corepb.SamlRelyingPartyConfig]("saml_relying_party_config"),
+			// The passwordless primaries (kit#194, kit#195). ttl is a
+			// Duration, so a string ("10m"); ProviderPasskey has no fields
+			// and its data source exists for the any envelope alone.
+			{
+				Type: reflect.TypeFor[corepb.ProviderMagicLink](),
+				Implementations: []any{
+					gentf.ConfigDataSource{
+						TypeName:    "provider_magic_link",
+						Description: "A one-time link and code sent by email. Unset fields take kit's defaults: a 6-digit code, a 10-minute ttl, `LINK_AND_CODE`.",
+					},
+				},
+			},
+			{
+				Type: reflect.TypeFor[corepb.ProviderPasskey](),
+				Implementations: []any{
+					gentf.ConfigDataSource{
+						TypeName:    "provider_passkey",
+						Description: "The passkey provider signs nobody in without an enabled WebAuthn factor on the realm: kit refuses the first sign-in with \"realm offers no webauthn factor\". Declare an `authwise_factor` of type `webauthn` beside it.",
+					},
+				},
+			},
 			// Factor configs, one per type that has one (otp-email, otp-sms
 			// and recovery-code take none).
 			config[corepb.FactorTOTP]("factor_totp"),

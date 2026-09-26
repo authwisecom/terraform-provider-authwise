@@ -9,6 +9,21 @@ NOTES:
 
 FEATURES:
 
+* **Passwordless primaries (kit#194, kit#195, #21).** Additive; both
+  provider types are live in every shipped kit profile.
+  * `authwise_provider_magic_link` builds a `magicLink` provider's config:
+    `code_length` (6–8), `ttl` (a duration, `"10m"`), `mode`
+    (`LINK_AND_CODE` or `CODE_ONLY`) and `identifier_attribute` (`email`
+    only). Every field has kit's default when unset.
+  * `authwise_provider_passkey` gives a `passkey` provider its `any`
+    envelope. The config has no fields. The provider signs nobody in
+    without an enabled `webauthn` factor on the realm, and the data
+    source's description says so.
+  * `examples/passwordless` has a password-or-magic-link realm and a
+    passkey realm with its webauthn factor. The acceptance suite applies it.
+  * Config data source inputs now describe how to write a value whose type
+    does not say, such as a duration or a JSON document (tfinfra v0.0.12).
+
 * **Endpoints describe their TLS, their deadline and a kit-signed token
   (kit#603, #22).** Requires `apis` v0.9.0. Additive: an endpoint written
   before this reads the same.

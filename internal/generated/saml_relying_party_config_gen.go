@@ -62,10 +62,13 @@ func SamlRelyingPartyConfigDataSourceSchema() schema.Schema {
 			"signing_certificate_id":          schema.StringAttribute{Optional: true},
 			"sp_encryption_certificate_id":    schema.StringAttribute{Optional: true},
 			"sp_entity_id":                    schema.StringAttribute{Optional: true},
-			"sp_metadata_imported_at":         schema.StringAttribute{Optional: true},
-			"sp_metadata_xml":                 schema.StringAttribute{Optional: true},
-			"sp_signing_certificate_id":       schema.StringAttribute{Optional: true},
-			"want_authn_requests_signed":      schema.BoolAttribute{Optional: true},
+			"sp_metadata_imported_at": schema.StringAttribute{
+				MarkdownDescription: "`sp_metadata_imported_at` as an RFC 3339 timestamp.",
+				Optional:            true,
+			},
+			"sp_metadata_xml":            schema.StringAttribute{Optional: true},
+			"sp_signing_certificate_id":  schema.StringAttribute{Optional: true},
+			"want_authn_requests_signed": schema.BoolAttribute{Optional: true},
 		},
 		MarkdownDescription: "Builds a SamlRelyingPartyConfig config and exposes its google.protobuf.Any encoding as `any`. Makes no API calls.",
 	}

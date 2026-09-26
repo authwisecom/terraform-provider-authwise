@@ -26,8 +26,9 @@ func FactorExternalDataSourceSchema() schema.Schema {
 				MarkdownDescription: "protojson-encoded google.protobuf.Any (includes `@type`); reference this from Any-typed resource attributes.",
 			},
 			"config": schema.StringAttribute{
-				CustomType: jsontypes.NormalizedType{},
-				Optional:   true,
+				CustomType:          jsontypes.NormalizedType{},
+				MarkdownDescription: "`config` as a JSON object.",
+				Optional:            true,
 			},
 			"endpoint_name": schema.StringAttribute{Optional: true},
 		},
