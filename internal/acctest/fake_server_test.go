@@ -233,6 +233,12 @@ func (f *fakeIdentityServer) DeleteIssuer(ctx context.Context, in *identitypb.De
 	if _, ok := f.issuers[in.GetName()]; !ok {
 		return nil, status.Errorf(codes.NotFound, "issuer %q not found", in.GetName())
 	}
+	for name, e := range f.endpoints {
+		if e.GetAuth().GetKitToken().GetIssuer() == in.GetName() {
+			return nil, status.Errorf(codes.FailedPrecondition,
+				"issuer %q is in use by endpoint %s (auth.kit_token.issuer)", in.GetName(), name)
+		}
+	}
 	delete(f.issuers, in.GetName())
 	return &emptypb.Empty{}, nil
 }
@@ -563,6 +569,12 @@ func (f *fakeIdentityServer) DeleteCertificate(ctx context.Context, in *identity
 	f.recordAuth(ctx)
 	if _, ok := f.certs[in.GetName()]; !ok {
 		return nil, status.Errorf(codes.NotFound, "certificate %q not found", in.GetName())
+	}
+	for name, e := range f.endpoints {
+		if e.GetTls().GetClientCertificate() == in.GetName() {
+			return nil, status.Errorf(codes.FailedPrecondition,
+				"certificate %q is in use by endpoint %s (tls.client_certificate)", in.GetName(), name)
+		}
 	}
 	delete(f.certs, in.GetName())
 	return &emptypb.Empty{}, nil

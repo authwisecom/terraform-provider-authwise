@@ -25,7 +25,7 @@ FEATURES:
     does not say, such as a duration or a JSON document (tfinfra v0.0.12).
 
 * **Endpoints describe their TLS, their deadline and a kit-signed token
-  (kit#603, #22).** Requires `apis` v0.9.0. Additive: an endpoint written
+  (kit#603, #22).** Requires `apis` v0.10.0 and kit >= 1.22.0. Additive: an endpoint written
   before this reads the same.
   * `authwise_endpoint` gains `tls`, a typed nested attribute:
     `ca_pem`, `server_name`, `insecure_skip_verify` and
@@ -41,6 +41,13 @@ FEATURES:
     `jsonencode`, including the lowerCamel keys (`kitToken`). It also
     covers `insecure`, which means plaintext, applies to gRPC only, and is
     refused on REST.
+  * With `apis` v0.10.0 (kit v1.22.0), kit refuses to delete an endpoint
+    while anything names it, and refuses to delete a certificate or issuer
+    while an endpoint uses it. The error names the holder. The docs cover
+    destroy ordering: a reference, even inside `jsonencode`, orders the
+    destroy, and a literal name string needs `depends_on`. The acceptance
+    stub now enforces the same refusals and serves `:check` and
+    `:referrers`.
   * `examples/endpoints/{bearer,kit_token,mtls}` are applied by the
     acceptance suite. The example harness now copies an example's
     `file()` inputs along with its `main.tf`.

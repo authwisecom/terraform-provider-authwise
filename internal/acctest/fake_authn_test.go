@@ -383,8 +383,150 @@ func (f *fakeIdentityServer) DeleteEndpoint(ctx context.Context, in *identitypb.
 	if _, ok := f.endpoints[in.GetName()]; !ok {
 		return nil, status.Errorf(codes.NotFound, "endpoint %q not found", in.GetName())
 	}
+	if refs := f.endpointReferrersLocked(in.GetName()); len(refs) > 0 {
+		return nil, status.Errorf(codes.FailedPrecondition, "endpoint %q is in use by %s %s (%s)",
+			in.GetName(), refs[0].GetReferrerType(), refs[0].GetReferrerName(), refs[0].GetField())
+	}
 	delete(f.endpoints, in.GetName())
 	return &emptypb.Empty{}, nil
+}
+
+// endpointReferrersLocked finds every row naming the endpoint in any string
+// field, Anys unpacked — kit's referrer index, done by brute force. The
+// caller holds f.mu.
+func (f *fakeIdentityServer) endpointReferrersLocked(endpoint string) []*identitypb.EndpointReferrer {
+
+	var out []*identitypb.EndpointReferrer
+	scan := func(kind string, rows map[string]proto.Message) {
+		names := make([]string, 0, len(rows))
+		for name := range rows {
+			names = append(names, name)
+		}
+		sort.Strings(names)
+		for _, name := range names {
+			for _, field := range stringFieldsEqual(rows[name], endpoint) {
+				out = append(out, &identitypb.EndpointReferrer{ReferrerType: kind, ReferrerName: name, Field: field})
+			}
+		}
+	}
+
+	scan("issuer", asMessages(f.issuers))
+	scan("client", asMessages(f.clients))
+	scan("audience", asMessages(f.audiences))
+	scan("realm", asMessages(f.realms))
+	scan("provider", asMessages(f.providers))
+	scan("factor", asMessages(f.factors))
+
+	return out
+}
+
+func asMessages[M proto.Message](rows map[string]M) map[string]proto.Message {
+	out := make(map[string]proto.Message, len(rows))
+	for k, v := range rows {
+		out[k] = v
+	}
+	return out
+}
+
+// stringFieldsEqual returns the dotted paths of the string fields in m
+// whose value is want, looking inside Anys.
+func stringFieldsEqual(m proto.Message, want string) []string {
+
+	var out []string
+
+	var walk func(msg protoreflect.Message, prefix string)
+	walk = func(msg protoreflect.Message, prefix string) {
+
+		if a, ok := msg.Interface().(*anypb.Any); ok {
+			if inner, err := a.UnmarshalNew(); err == nil {
+				walk(inner.ProtoReflect(), prefix)
+			}
+			return
+		}
+
+		msg.Range(func(fd protoreflect.FieldDescriptor, v protoreflect.Value) bool {
+			path := prefix + string(fd.Name())
+			switch {
+			case fd.IsMap() || fd.IsList():
+			case fd.Kind() == protoreflect.StringKind:
+				if v.String() == want {
+					out = append(out, path)
+				}
+			case fd.Kind() == protoreflect.MessageKind:
+				walk(v.Message(), path+".")
+			}
+			return true
+		})
+	}
+
+	walk(m.ProtoReflect(), "")
+
+	return out
+}
+
+func (f *fakeIdentityServer) ListEndpointReferrers(ctx context.Context, in *identitypb.ListEndpointReferrersRequest) (*identitypb.ListEndpointReferrersResponse, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.recordAuth(ctx)
+	if _, ok := f.endpoints[in.GetName()]; !ok {
+		return nil, status.Errorf(codes.NotFound, "endpoint %q not found", in.GetName())
+	}
+	return &identitypb.ListEndpointReferrersResponse{Referrers: f.endpointReferrersLocked(in.GetName())}, nil
+}
+
+// CheckEndpoint dials the stored row's address over TCP, which is as far as
+// the fake goes: reachable means a connection was made. An endpoint that
+// cannot be reached is a report, not an error, exactly as kit answers it.
+func (f *fakeIdentityServer) CheckEndpoint(ctx context.Context, in *identitypb.CheckEndpointRequest) (*identitypb.CheckEndpointResponse, error) {
+
+	f.mu.Lock()
+	f.recordAuth(ctx)
+	stored, ok := f.endpoints[in.GetName()]
+	if !ok {
+		f.mu.Unlock()
+		return nil, status.Errorf(codes.NotFound, "endpoint %q not found", in.GetName())
+	}
+	e := proto.Clone(stored).(*corepb.Endpoint)
+	resp := &identitypb.CheckEndpointResponse{AuthScheme: "none"}
+	switch auth := e.GetAuth(); {
+	case auth.GetBearer() != nil:
+		resp.AuthScheme = "bearer"
+		_, resp.CredentialResolved = f.secrets[auth.GetBearer().GetToken().GetName()]
+	case auth.GetBasic() != nil:
+		resp.AuthScheme = "basic"
+		_, resp.CredentialResolved = f.secrets[auth.GetBasic().GetPassword().GetName()]
+	case auth.GetHeader() != nil:
+		resp.AuthScheme = "header"
+		_, resp.CredentialResolved = f.secrets[auth.GetHeader().GetValue().GetName()]
+	case auth.GetKitToken() != nil:
+		resp.AuthScheme = "kit_token"
+		_, resp.CredentialResolved = f.issuers[auth.GetKitToken().GetIssuer()]
+	}
+	f.mu.Unlock()
+
+	host := strings.TrimPrefix(e.GetAddress(), "dns:///")
+	if e.GetEndpointType() == corepb.ENDPOINT_TYPE_REST {
+		if u, err := url.Parse(e.GetAddress()); err == nil {
+			host = u.Host
+			if u.Port() == "" {
+				host = net.JoinHostPort(u.Hostname(), map[string]string{"http": "80", "https": "443"}[u.Scheme])
+			}
+		}
+	}
+
+	start := time.Now()
+	conn, err := (&net.Dialer{Timeout: time.Second}).DialContext(ctx, "tcp", host)
+	resp.LatencyMs = int32(time.Since(start).Milliseconds())
+	if err != nil {
+		// Unreachable is the answer, not a failure of the RPC.
+		resp.Error = err.Error()
+		return resp, nil //nolint:nilerr // kit reports a failed dial in the response
+	}
+	resp.Reachable = true
+	resp.ResolvedAddress = conn.RemoteAddr().String()
+	_ = conn.Close()
+
+	return resp, nil
 }
 
 // --- Factor (realm-scoped) ---

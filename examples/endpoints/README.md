@@ -50,6 +50,16 @@ credential. Setting one needs `identity.secrets.use`. The client
 certificate for mTLS is not an `auth` scheme: it sits in
 `tls.client_certificate`, so it can be combined with any of these.
 
+## Deleting
+
+kit refuses to delete an endpoint while anything names it, and the error
+names the holder. It also refuses to delete a certificate or an issuer
+while an endpoint uses it. Name the endpoint by reference
+(`authwise_endpoint.x.name`, even inside `jsonencode`), and Terraform
+destroys the holder first. A literal name string gives Terraform no
+ordering edge, so add `depends_on` to the holder or replace the literal
+with a reference.
+
 ## `timeout`
 
 `timeout` is the deadline for one call, used when the caller sets none. It
