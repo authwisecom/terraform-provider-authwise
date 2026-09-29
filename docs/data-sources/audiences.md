@@ -30,6 +30,7 @@ An API an issuer mints access tokens for, and the audience its Access catalog ha
 Read-Only:
 
 - `appearance_profile_id` (String)
+- `audience_id` (String) Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.
 - `config` (String)
 - `display_name` (String)
 - `labels` (Map of String)

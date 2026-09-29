@@ -45,5 +45,6 @@ A user in a realm. This data source reads one by its full resource name.
 - `status` (String)
 - `tenant_id` (String)
 - `updated_at` (String)
+- `user_id` (String) Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.
 - `website` (String)
 - `zoneinfo` (String)

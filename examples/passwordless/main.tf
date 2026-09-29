@@ -12,7 +12,7 @@ resource "authwise_realm" "customers" {
 }
 
 locals {
-  customers_realm_id = element(split("/", authwise_realm.customers.name), 3)
+  customers_realm_id = authwise_realm.customers.realm_id
 }
 
 resource "authwise_provider" "password" {
@@ -45,7 +45,7 @@ resource "authwise_realm" "workforce" {
 }
 
 locals {
-  workforce_realm_id = element(split("/", authwise_realm.workforce.name), 3)
+  workforce_realm_id = authwise_realm.workforce.realm_id
 }
 
 # The passkey provider has no relying party of its own: it signs people in

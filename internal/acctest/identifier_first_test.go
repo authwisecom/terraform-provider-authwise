@@ -25,7 +25,7 @@ resource "authwise_realm" "partner" {
 }
 
 resource "authwise_provider" "partner_saml" {
-  realm_id      = element(split("/", authwise_realm.partner.name), 3)
+  realm_id      = authwise_realm.partner.realm_id
   provider_type = "saml"
 }
 

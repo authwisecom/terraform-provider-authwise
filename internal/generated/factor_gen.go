@@ -19,6 +19,7 @@ import (
 	mapplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
 	planmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	stringplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	validator "github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
 	protojson "google.golang.org/protobuf/encoding/protojson"
 	anypb "google.golang.org/protobuf/types/known/anypb"
@@ -37,6 +38,11 @@ func FactorResourceSchema() schema.Schema {
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"display_name": schema.StringAttribute{Required: true},
+			"factor_id": schema.StringAttribute{
+				Computed:            true,
+				MarkdownDescription: "Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.",
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
 			"factor_type": schema.StringAttribute{
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 				Required:      true,
@@ -56,6 +62,7 @@ func FactorResourceSchema() schema.Schema {
 				MarkdownDescription: "Parent identifier `realm_id`; overrides the provider default. Changing it replaces the resource.",
 				Optional:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Validators:          []validator.String{tf.ReferenceID("r", "realm", "authwise_realm.<name>.realm_id")},
 			},
 			"status": schema.StringAttribute{
 				Computed:      true,
@@ -66,6 +73,7 @@ func FactorResourceSchema() schema.Schema {
 				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default. Changing it replaces the resource.",
 				Optional:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Validators:          []validator.String{tf.ReferenceID("t", "tenant", "")},
 			},
 		},
 		MarkdownDescription: "A second step a realm offers, such as TOTP, WebAuthn or Duo. `config` comes from the matching config data source; disabling keeps enrolled authenticators, destroying does not.",
@@ -75,6 +83,7 @@ func FactorResourceSchema() schema.Schema {
 // FactorModel is the Terraform plan/state model for Factor.
 type FactorModel struct {
 	Name        types.String         `tfsdk:"name"`
+	FactorId    types.String         `tfsdk:"factor_id"`
 	TenantId    types.String         `tfsdk:"tenant_id"`
 	RealmId     types.String         `tfsdk:"realm_id"`
 	Labels      types.Map            `tfsdk:"labels"`
@@ -89,6 +98,7 @@ func NewFactorModel() *FactorModel {
 	return &FactorModel{
 		Config:      jsontypes.NewNormalizedNull(),
 		DisplayName: types.StringNull(),
+		FactorId:    types.StringNull(),
 		FactorType:  types.StringNull(),
 		Labels:      types.MapNull(types.StringType),
 		Name:        types.StringNull(),
@@ -242,11 +252,12 @@ func newFactorCrud(providerData any) (*tf.Crud[*v1alpha1.Factor, *FactorModel], 
 				})
 			},
 		},
-		Collection: "factors",
-		Defaults:   pd.Defaults,
-		NewModel:   NewFactorModel,
-		Scope:      tf.NewScope("tenants", "realms"),
-		TypeName:   "factor",
+		Collection:  "factors",
+		Defaults:    pd.Defaults,
+		IDAttribute: "factor_id",
+		NewModel:    NewFactorModel,
+		Scope:       tf.NewScope("tenants", "realms"),
+		TypeName:    "factor",
 	}), diags
 }
 
@@ -315,7 +326,11 @@ func FactorDataSourceSchema() schema1.Schema {
 				CustomType: jsontypes.NormalizedType{},
 			},
 			"display_name": schema1.StringAttribute{Computed: true},
-			"factor_type":  schema1.StringAttribute{Computed: true},
+			"factor_id": schema1.StringAttribute{
+				Computed:            true,
+				MarkdownDescription: "Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.",
+			},
+			"factor_type": schema1.StringAttribute{Computed: true},
 			"labels": schema1.MapAttribute{
 				Computed:    true,
 				ElementType: types.StringType,
@@ -362,6 +377,7 @@ func (d *factorDataSource) Read(ctx context.Context, req datasource.ReadRequest,
 
 // FactorItemModel is one element of the factors data source's "factors" list.
 type FactorItemModel struct {
+	FactorId    types.String         `tfsdk:"factor_id"`
 	Name        types.String         `tfsdk:"name"`
 	Labels      types.Map            `tfsdk:"labels"`
 	DisplayName types.String         `tfsdk:"display_name"`
@@ -375,6 +391,7 @@ func FactorItemAttrTypes() map[string]attr.Type {
 	return map[string]attr.Type{
 		"config":       jsontypes.NormalizedType{},
 		"display_name": types.StringType,
+		"factor_id":    types.StringType,
 		"factor_type":  types.StringType,
 		"labels":       types.MapType{ElemType: types.StringType},
 		"name":         types.StringType,
@@ -402,7 +419,11 @@ func FactorListDataSourceSchema() schema1.Schema {
 						CustomType: jsontypes.NormalizedType{},
 					},
 					"display_name": schema1.StringAttribute{Computed: true},
-					"factor_type":  schema1.StringAttribute{Computed: true},
+					"factor_id": schema1.StringAttribute{
+						Computed:            true,
+						MarkdownDescription: "Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.",
+					},
+					"factor_type": schema1.StringAttribute{Computed: true},
 					"labels": schema1.MapAttribute{
 						Computed:    true,
 						ElementType: types.StringType,
@@ -417,10 +438,12 @@ func FactorListDataSourceSchema() schema1.Schema {
 			"realm_id": schema1.StringAttribute{
 				MarkdownDescription: "Parent identifier `realm_id`; overrides the provider default.",
 				Optional:            true,
+				Validators:          []validator.String{tf.ReferenceID("r", "realm", "authwise_realm.<name>.realm_id")},
 			},
 			"tenant_id": schema1.StringAttribute{
 				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default.",
 				Optional:            true,
+				Validators:          []validator.String{tf.ReferenceID("t", "tenant", "")},
 			},
 		},
 		MarkdownDescription: "A second step a realm offers, such as TOTP, WebAuthn or Duo. `config` comes from the matching config data source; disabling keeps enrolled authenticators, destroying does not. This data source lists every one under a parent.",
@@ -456,6 +479,11 @@ func factorItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Factor, *F
 	} else {
 		item.Status = types.StringValue(e.Status)
 	}
+	id, err := crud.IDFromName(e.Name)
+	if err != nil {
+		diags.AddError("unexpected factor name", err.Error())
+	}
+	item.FactorId = types.StringValue(id)
 	obj, d := types.ObjectValueFrom(ctx, FactorItemAttrTypes(), item)
 	diags.Append(d...)
 	return obj, diags

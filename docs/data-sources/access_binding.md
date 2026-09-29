@@ -21,6 +21,7 @@ A binding that grants a subject a role in an audience's Access catalog. This dat
 
 ### Read-Only
 
+- `access_binding_id` (String) Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.
 - `audience_id` (String)
 - `condition_id` (String)
 - `created_by` (String)

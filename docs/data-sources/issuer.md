@@ -24,6 +24,7 @@ An OAuth 2.0 / OpenID Connect issuer: the login a set of clients shares, with it
 - `appearance_profile_id` (String)
 - `config` (String)
 - `domain_name` (String)
+- `issuer_id` (String) Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.
 - `labels` (Map of String)
 - `path` (String)
 - `tenant_id` (String)

@@ -1,4 +1,83 @@
-## 0.1.0 (Unreleased)
+## 0.2.0 (Unreleased)
+
+NOTES:
+
+* **kit v1.23.0.** This release is built against apis v0.12.0, the apis
+  version kit v1.23.0 serves. kit v1.22.x has no in-place upgrade to
+  v1.23.0: drop the store and let bootstrap recreate it.
+* **kit#620 refuses an out-of-scope reference at apply.** A bare-id `*_id`
+  field naming a row outside the writer's scope is refused on create and
+  update as `InvalidArgument`: `<field>: no <noun> <id> in scope`, the same
+  whether the row is missing or belongs to another issuer or tenant. The
+  fields are a client's `audience_id` and `appearance_profile_id`, an
+  audience's or issuer's `appearance_profile_id`, the issuer config's
+  `account_client_id`, an appearance profile's `theme_id`, the SAML
+  certificate ids, and a binding's `condition_id`. A configuration that
+  applied against v1.22.x with a dead reference (a literal id of an
+  audience that does not exist, say) now fails there instead.
+FEATURES:
+
+* **Ids and references (tfinfra v0.0.16, #25, #26).** Additive: nothing is
+  renamed, and a split written before still works.
+  * Every resource, singular data source and plural data source item now
+    exports its own id as `<type>_id`, the last segment of `name`:
+    `audience_id` on `authwise_audience`, `realm_id` on `authwise_realm`,
+    `client_id` on `authwise_client`, `client_secret_id` on
+    `authwise_client_secret`, and so on. It is computed, and a refresh
+    fills it into existing state. On the caller-named resources
+    (`authwise_domain`, `authwise_scope`, `authwise_access_permission`,
+    `authwise_access_role`) it is the required input it already was.
+  * A `*_id` attribute takes another resource's `<type>_id`, so a
+    reference no longer splits `name`:
+
+    ```terraform
+    # before
+    audience_id = element(split("/", authwise_audience.api.name), 5)
+
+    # now
+    audience_id = authwise_audience.api.audience_id
+    ```
+
+    A `*_ref = { name = … }` block and the association resources still take
+    `name`. The README states the rule.
+  * Reference attributes are checked by id prefix in plan: the parent
+    attributes (`tenant_id` `t-`, `issuer_id` `i-`, `realm_id` `r-`,
+    `audience_id` `a-`, `client_id` `c-`, on every resource, plural data
+    source and the provider block), a client's `audience_id` and
+    `appearance_profile_id` (`ap-`), an audience's and issuer's
+    `appearance_profile_id`, an appearance profile's `theme_id` (`th-`) and
+    a binding's `condition_id` (`axc-`). A full name pasted into one fails
+    in plan, and the error names the attribute to reference instead. This
+    is the plan-time half of kit#620. The SAML configs'
+    `*_certificate_id` fields are not checked, since kit also takes a
+    certificate's `name` there, but the examples now pass
+    `certificate_id`.
+  * Every `element(split(...))` in the examples, docs and README now reads
+    the attribute.
+
+* **`authwise_client_secret` (apis v0.12.0, kit#617, #18).** A client's
+  secret, minted through `MintClientSecret`. kit returns the secret exactly
+  once, as `<id>_<plaintext>`, so the sensitive `secret` attribute is kept
+  in state and carried across every refresh. Treat the state as sensitive.
+  `expires_at` changes in place and the secret keeps working. kit offers no
+  rotate verb, so rotate by changing a value in `keepers`, which replaces
+  the resource; with `create_before_destroy` the successor is minted before
+  the old secret is deleted. `terraform import` cannot recover the secret.
+  `authwise_client_secrets` lists a client's secrets, without the secret;
+  there is no singular data source.
+
+  ```terraform
+  resource "authwise_client_secret" "ci" {
+    client_id = authwise_client.ci.client_id
+    keepers   = { rotation = "2026-09" }
+
+    lifecycle {
+      create_before_destroy = true
+    }
+  }
+  ```
+
+## 0.1.0 (September 29, 2026)
 
 NOTES:
 

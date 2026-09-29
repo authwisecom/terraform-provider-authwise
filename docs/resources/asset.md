@@ -25,6 +25,7 @@ A static asset the hosted pages serve, such as a logo.
 
 ### Read-Only
 
+- `asset_id` (String) Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.
 - `name` (String) Full resource name; serves as the Terraform ID.
 
 ## Import

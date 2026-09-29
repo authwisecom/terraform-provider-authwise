@@ -17,6 +17,7 @@ import (
 	boolplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	planmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	stringplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	validator "github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
 	fieldmaskpb "google.golang.org/protobuf/types/known/fieldmaskpb"
 )
@@ -29,6 +30,7 @@ func ScopeResourceSchema() schema.Schema {
 				MarkdownDescription: "Parent identifier `audience_id`; overrides the provider default. Changing it replaces the resource.",
 				Optional:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Validators:          []validator.String{tf.ReferenceID("a", "audience", "authwise_audience.<name>.audience_id")},
 			},
 			"auto": schema.BoolAttribute{
 				Computed:      true,
@@ -39,6 +41,7 @@ func ScopeResourceSchema() schema.Schema {
 				MarkdownDescription: "Parent identifier `issuer_id`; overrides the provider default. Changing it replaces the resource.",
 				Optional:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Validators:          []validator.String{tf.ReferenceID("i", "issuer", "authwise_issuer.<name>.issuer_id")},
 			},
 			"kind": schema.StringAttribute{
 				Computed:      true,
@@ -59,6 +62,7 @@ func ScopeResourceSchema() schema.Schema {
 				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default. Changing it replaces the resource.",
 				Optional:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Validators:          []validator.String{tf.ReferenceID("t", "tenant", "")},
 			},
 		},
 		MarkdownDescription: "An OAuth scope on an audience, and the access permissions it grants. The id is the scope's own name.",
@@ -155,6 +159,7 @@ func newScopeCrud(providerData any) (*tf.Crud[*v1alpha1.Scope, *ScopeModel], dia
 		return nil, diags
 	}
 	return tf.NewCrud(tf.CrudParams[*v1alpha1.Scope, *ScopeModel]{
+		CallerNamed: true,
 		Client: tf.CrudClient[*v1alpha1.Scope]{
 			Create: func(ctx context.Context, parent string, entity *v1alpha1.Scope) (*v1alpha1.Scope, error) {
 				return client.CreateScope(ctx, &v1alpha11.CreateScopeRequest{
@@ -341,10 +346,12 @@ func ScopeListDataSourceSchema() schema1.Schema {
 			"audience_id": schema1.StringAttribute{
 				MarkdownDescription: "Parent identifier `audience_id`; overrides the provider default.",
 				Optional:            true,
+				Validators:          []validator.String{tf.ReferenceID("a", "audience", "authwise_audience.<name>.audience_id")},
 			},
 			"issuer_id": schema1.StringAttribute{
 				MarkdownDescription: "Parent identifier `issuer_id`; overrides the provider default.",
 				Optional:            true,
+				Validators:          []validator.String{tf.ReferenceID("i", "issuer", "authwise_issuer.<name>.issuer_id")},
 			},
 			"scopes": schema1.ListNestedAttribute{
 				Computed:            true,
@@ -365,6 +372,7 @@ func ScopeListDataSourceSchema() schema1.Schema {
 			"tenant_id": schema1.StringAttribute{
 				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default.",
 				Optional:            true,
+				Validators:          []validator.String{tf.ReferenceID("t", "tenant", "")},
 			},
 		},
 		MarkdownDescription: "An OAuth scope on an audience, and the access permissions it grants. The id is the scope's own name. This data source lists every one under a parent.",

@@ -28,6 +28,7 @@ A static asset the hosted pages serve, such as a logo. This data source lists ev
 
 Read-Only:
 
+- `asset_id` (String) Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.
 - `display_name` (String)
 - `labels` (Map of String)
 - `mime_type` (String)

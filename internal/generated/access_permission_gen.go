@@ -16,6 +16,7 @@ import (
 	schema "github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	planmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	stringplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	validator "github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
 	fieldmaskpb "google.golang.org/protobuf/types/known/fieldmaskpb"
 )
@@ -33,6 +34,7 @@ func AccessPermissionResourceSchema() schema.Schema {
 				MarkdownDescription: "Parent identifier `audience_id`; overrides the provider default. Changing it replaces the resource.",
 				Optional:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Validators:          []validator.String{tf.ReferenceID("a", "audience", "authwise_audience.<name>.audience_id")},
 			},
 			"description": schema.StringAttribute{
 				Computed:      true,
@@ -43,6 +45,7 @@ func AccessPermissionResourceSchema() schema.Schema {
 				MarkdownDescription: "Parent identifier `issuer_id`; overrides the provider default. Changing it replaces the resource.",
 				Optional:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Validators:          []validator.String{tf.ReferenceID("i", "issuer", "authwise_issuer.<name>.issuer_id")},
 			},
 			"name": schema.StringAttribute{
 				Computed:            true,
@@ -63,6 +66,7 @@ func AccessPermissionResourceSchema() schema.Schema {
 				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default. Changing it replaces the resource.",
 				Optional:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Validators:          []validator.String{tf.ReferenceID("t", "tenant", "")},
 			},
 		},
 		MarkdownDescription: "A permission in an audience's Access catalog. The id is the permission's own name, such as `guardcontrol.tenants.get`.",
@@ -174,6 +178,7 @@ func newAccessPermissionCrud(providerData any) (*tf.Crud[*v1alpha1.AccessPermiss
 		return nil, diags
 	}
 	return tf.NewCrud(tf.CrudParams[*v1alpha1.AccessPermission, *AccessPermissionModel]{
+		CallerNamed: true,
 		Client: tf.CrudClient[*v1alpha1.AccessPermission]{
 			Create: func(ctx context.Context, parent string, entity *v1alpha1.AccessPermission) (*v1alpha1.AccessPermission, error) {
 				return client.CreateAccessPermission(ctx, &v1alpha11.CreateAccessPermissionRequest{
@@ -380,14 +385,17 @@ func AccessPermissionListDataSourceSchema() schema1.Schema {
 			"audience_id": schema1.StringAttribute{
 				MarkdownDescription: "Parent identifier `audience_id`; overrides the provider default.",
 				Optional:            true,
+				Validators:          []validator.String{tf.ReferenceID("a", "audience", "authwise_audience.<name>.audience_id")},
 			},
 			"issuer_id": schema1.StringAttribute{
 				MarkdownDescription: "Parent identifier `issuer_id`; overrides the provider default.",
 				Optional:            true,
+				Validators:          []validator.String{tf.ReferenceID("i", "issuer", "authwise_issuer.<name>.issuer_id")},
 			},
 			"tenant_id": schema1.StringAttribute{
 				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default.",
 				Optional:            true,
+				Validators:          []validator.String{tf.ReferenceID("t", "tenant", "")},
 			},
 		},
 		MarkdownDescription: "A permission in an audience's Access catalog. The id is the permission's own name, such as `guardcontrol.tenants.get`. This data source lists every one under a parent.",

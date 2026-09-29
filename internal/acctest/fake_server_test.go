@@ -47,12 +47,18 @@ type fakeIdentityServer struct {
 	scopePerms map[string]map[string]bool
 	audiences  map[string]*corepb.Audience
 	clients    map[string]*corepb.Client
-	providers  map[string]*corepb.Provider
-	certs      map[string]*corepb.Certificate
-	endpoints  map[string]*corepb.Endpoint
-	factors    map[string]*corepb.Factor
-	secrets    map[string]*corepb.Secret
-	seq        int
+	// clientSecrets are the minted rows. Like kit's they hold no
+	// credential: the secret exists on the wire only in the mint response.
+	clientSecrets map[string]*corepb.ClientSecret
+	// mints counts MintClientSecret calls, so a test can tell a
+	// replacement from an in-place update.
+	mints     int
+	providers map[string]*corepb.Provider
+	certs     map[string]*corepb.Certificate
+	endpoints map[string]*corepb.Endpoint
+	factors   map[string]*corepb.Factor
+	secrets   map[string]*corepb.Secret
+	seq       int
 
 	// material holds each secret's versions as sent, oldest first. The
 	// stored Secret has no field for it, exactly as kit's does not, so this
@@ -75,21 +81,22 @@ type fakeIdentityServer struct {
 
 func newFakeIdentityServer() *fakeIdentityServer {
 	return &fakeIdentityServer{
-		realms:     map[string]*corepb.Realm{},
-		issuers:    map[string]*corepb.Issuer{},
-		domains:    map[string]*corepb.Domain{},
-		scopes:     map[string]*corepb.Scope{},
-		profiles:   map[string]*corepb.AppearanceProfile{},
-		scopePerms: map[string]map[string]bool{},
-		audiences:  map[string]*corepb.Audience{},
-		clients:    map[string]*corepb.Client{},
-		providers:  map[string]*corepb.Provider{},
-		certs:      map[string]*corepb.Certificate{},
-		endpoints:  map[string]*corepb.Endpoint{},
-		factors:    map[string]*corepb.Factor{},
-		secrets:    map[string]*corepb.Secret{},
-		material:   map[string][]string{},
-		pinned:     map[string]bool{},
+		realms:        map[string]*corepb.Realm{},
+		issuers:       map[string]*corepb.Issuer{},
+		domains:       map[string]*corepb.Domain{},
+		scopes:        map[string]*corepb.Scope{},
+		profiles:      map[string]*corepb.AppearanceProfile{},
+		scopePerms:    map[string]map[string]bool{},
+		audiences:     map[string]*corepb.Audience{},
+		clients:       map[string]*corepb.Client{},
+		clientSecrets: map[string]*corepb.ClientSecret{},
+		providers:     map[string]*corepb.Provider{},
+		certs:         map[string]*corepb.Certificate{},
+		endpoints:     map[string]*corepb.Endpoint{},
+		factors:       map[string]*corepb.Factor{},
+		secrets:       map[string]*corepb.Secret{},
+		material:      map[string][]string{},
+		pinned:        map[string]bool{},
 	}
 }
 
@@ -446,9 +453,26 @@ func (f *fakeIdentityServer) CreateClient(ctx context.Context, in *identitypb.Cr
 	defer f.mu.Unlock()
 	f.recordAuth(ctx)
 	c := proto.Clone(in.GetClient()).(*corepb.Client)
+	if err := f.admitAudience(in.GetParent(), c.GetAudienceId()); err != nil {
+		return nil, err
+	}
 	c.Name = in.GetParent() + "/clients/" + f.nextID("c")
 	f.clients[c.GetName()] = c
 	return proto.Clone(c).(*corepb.Client), nil
+}
+
+// admitAudience is kit#620's scope admission for Client.audience_id: an
+// audience of the client's own issuer, by bare id. A full name, a missing
+// audience and one under another issuer get the same refusal, as in kit.
+// Unset passes; the fake does not model kit's required-field check.
+func (f *fakeIdentityServer) admitAudience(issuer, id string) error {
+	if id == "" {
+		return nil
+	}
+	if _, ok := f.audiences[issuer+"/audiences/"+id]; !ok || strings.Contains(id, "/") {
+		return status.Errorf(codes.InvalidArgument, "audience_id: no audience %s in scope", id)
+	}
+	return nil
 }
 
 func (f *fakeIdentityServer) PatchClient(ctx context.Context, in *identitypb.PatchClientRequest) (*corepb.Client, error) {
@@ -464,6 +488,10 @@ func (f *fakeIdentityServer) PatchClient(ctx context.Context, in *identitypb.Pat
 		case "display_name":
 			existing.DisplayName = in.GetClient().GetDisplayName()
 		case "audience_id":
+			issuer := in.GetName()[:strings.LastIndex(in.GetName(), "/clients/")]
+			if err := f.admitAudience(issuer, in.GetClient().GetAudienceId()); err != nil {
+				return nil, err
+			}
 			existing.AudienceId = in.GetClient().GetAudienceId()
 		case "grant_type":
 			existing.GrantType = in.GetClient().GetGrantType()

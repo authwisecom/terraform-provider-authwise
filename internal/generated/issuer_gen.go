@@ -19,6 +19,7 @@ import (
 	mapplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
 	planmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	stringplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	validator "github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
 	protojson "google.golang.org/protobuf/encoding/protojson"
 	fieldmaskpb "google.golang.org/protobuf/types/known/fieldmaskpb"
@@ -32,6 +33,7 @@ func IssuerResourceSchema() schema.Schema {
 				Computed:      true,
 				Optional:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+				Validators:    []validator.String{tf.ReferenceID("ap", "appearance_profile", "authwise_appearance_profile.<name>.appearance_profile_id")},
 			},
 			"config": schema.StringAttribute{
 				Computed:            true,
@@ -44,6 +46,11 @@ func IssuerResourceSchema() schema.Schema {
 				Computed:      true,
 				Optional:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
+			"issuer_id": schema.StringAttribute{
+				Computed:            true,
+				MarkdownDescription: "Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.",
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"labels": schema.MapAttribute{
 				Computed:      true,
@@ -65,6 +72,7 @@ func IssuerResourceSchema() schema.Schema {
 				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default. Changing it replaces the resource.",
 				Optional:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Validators:          []validator.String{tf.ReferenceID("t", "tenant", "")},
 			},
 		},
 		MarkdownDescription: "An OAuth 2.0 / OpenID Connect issuer: the login a set of clients shares, with its domain, token lifetimes and which realm or realms people sign in to (`config`).",
@@ -74,6 +82,7 @@ func IssuerResourceSchema() schema.Schema {
 // IssuerModel is the Terraform plan/state model for Issuer.
 type IssuerModel struct {
 	Name                types.String         `tfsdk:"name"`
+	IssuerId            types.String         `tfsdk:"issuer_id"`
 	TenantId            types.String         `tfsdk:"tenant_id"`
 	Labels              types.Map            `tfsdk:"labels"`
 	DomainName          types.String         `tfsdk:"domain_name"`
@@ -88,6 +97,7 @@ func NewIssuerModel() *IssuerModel {
 		AppearanceProfileId: types.StringNull(),
 		Config:              jsontypes.NewNormalizedNull(),
 		DomainName:          types.StringNull(),
+		IssuerId:            types.StringNull(),
 		Labels:              types.MapNull(types.StringType),
 		Name:                types.StringNull(),
 		Path:                types.StringNull(),
@@ -244,11 +254,12 @@ func newIssuerCrud(providerData any) (*tf.Crud[*v1alpha1.Issuer, *IssuerModel], 
 				})
 			},
 		},
-		Collection: "issuers",
-		Defaults:   pd.Defaults,
-		NewModel:   NewIssuerModel,
-		Scope:      tf.NewScope("tenants"),
-		TypeName:   "issuer",
+		Collection:  "issuers",
+		Defaults:    pd.Defaults,
+		IDAttribute: "issuer_id",
+		NewModel:    NewIssuerModel,
+		Scope:       tf.NewScope("tenants"),
+		TypeName:    "issuer",
 	}), diags
 }
 
@@ -318,6 +329,10 @@ func IssuerDataSourceSchema() schema1.Schema {
 				CustomType: jsontypes.NormalizedType{},
 			},
 			"domain_name": schema1.StringAttribute{Computed: true},
+			"issuer_id": schema1.StringAttribute{
+				Computed:            true,
+				MarkdownDescription: "Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.",
+			},
 			"labels": schema1.MapAttribute{
 				Computed:    true,
 				ElementType: types.StringType,
@@ -363,6 +378,7 @@ func (d *issuerDataSource) Read(ctx context.Context, req datasource.ReadRequest,
 
 // IssuerItemModel is one element of the issuers data source's "issuers" list.
 type IssuerItemModel struct {
+	IssuerId            types.String         `tfsdk:"issuer_id"`
 	Name                types.String         `tfsdk:"name"`
 	Labels              types.Map            `tfsdk:"labels"`
 	DomainName          types.String         `tfsdk:"domain_name"`
@@ -377,6 +393,7 @@ func IssuerItemAttrTypes() map[string]attr.Type {
 		"appearance_profile_id": types.StringType,
 		"config":                jsontypes.NormalizedType{},
 		"domain_name":           types.StringType,
+		"issuer_id":             types.StringType,
 		"labels":                types.MapType{ElemType: types.StringType},
 		"name":                  types.StringType,
 		"path":                  types.StringType,
@@ -403,6 +420,10 @@ func IssuerListDataSourceSchema() schema1.Schema {
 						CustomType: jsontypes.NormalizedType{},
 					},
 					"domain_name": schema1.StringAttribute{Computed: true},
+					"issuer_id": schema1.StringAttribute{
+						Computed:            true,
+						MarkdownDescription: "Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.",
+					},
 					"labels": schema1.MapAttribute{
 						Computed:    true,
 						ElementType: types.StringType,
@@ -417,6 +438,7 @@ func IssuerListDataSourceSchema() schema1.Schema {
 			"tenant_id": schema1.StringAttribute{
 				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default.",
 				Optional:            true,
+				Validators:          []validator.String{tf.ReferenceID("t", "tenant", "")},
 			},
 		},
 		MarkdownDescription: "An OAuth 2.0 / OpenID Connect issuer: the login a set of clients shares, with its domain, token lifetimes and which realm or realms people sign in to (`config`). This data source lists every one under a parent.",
@@ -460,6 +482,11 @@ func issuerItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Issuer, *I
 	} else {
 		item.AppearanceProfileId = types.StringValue(e.AppearanceProfileId)
 	}
+	id, err := crud.IDFromName(e.Name)
+	if err != nil {
+		diags.AddError("unexpected issuer name", err.Error())
+	}
+	item.IssuerId = types.StringValue(id)
 	obj, d := types.ObjectValueFrom(ctx, IssuerItemAttrTypes(), item)
 	diags.Append(d...)
 	return obj, diags

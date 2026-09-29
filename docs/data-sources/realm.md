@@ -24,4 +24,5 @@ A realm: a population of users with its own providers, factors and authenticatio
 - `config` (String)
 - `display_name` (String)
 - `labels` (Map of String)
+- `realm_id` (String) Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.
 - `tenant_id` (String)

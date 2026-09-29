@@ -62,19 +62,19 @@ resource "authwise_realm" "b" {
 
 resource "authwise_provider" "a" {
   count         = 3
-  realm_id      = element(split("/", authwise_realm.a.name), 3)
+  realm_id      = authwise_realm.a.realm_id
   display_name  = ["one", "two", "three"][count.index]
   provider_type = "usernamePassword"
 }
 
 resource "authwise_provider" "b" {
-  realm_id      = element(split("/", authwise_realm.b.name), 3)
+  realm_id      = authwise_realm.b.realm_id
   display_name  = "elsewhere"
   provider_type = "usernamePassword"
 }
 
 data "authwise_providers" "a" {
-  realm_id   = element(split("/", authwise_realm.a.name), 3)
+  realm_id   = authwise_realm.a.realm_id
   depends_on = [authwise_provider.a, authwise_provider.b]
 }
 `

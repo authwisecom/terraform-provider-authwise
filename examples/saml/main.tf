@@ -66,10 +66,10 @@ data "authwise_provider_saml" "partner" {
   idp_entity_id              = "https://idp.partner-co.example/metadata"
   idp_sso_url                = "https://idp.partner-co.example/sso"
   idp_sso_binding            = "HTTP-Redirect"
-  idp_signing_certificate_id = authwise_certificate.partner_idp_signing.name
+  idp_signing_certificate_id = authwise_certificate.partner_idp_signing.certificate_id
 
   # Ours.
-  signing_certificate_id = authwise_certificate.sp_signing.name
+  signing_certificate_id = authwise_certificate.sp_signing.certificate_id
   sign_authn_requests    = true
 
   # At least one of these must hold: an SP that verifies nothing accepts
@@ -148,11 +148,11 @@ data "authwise_saml_relying_party_config" "app" {
     "https://app.partner-co.example/saml/acs/alt",
   ]
   acs_binding               = "HTTP-POST"
-  sp_signing_certificate_id = authwise_certificate.relying_party_signing.name
+  sp_signing_certificate_id = authwise_certificate.relying_party_signing.certificate_id
 
   # Ours. At least one of sign_response, sign_assertions or
   # encrypt_assertions must hold.
-  signing_certificate_id = authwise_certificate.idp_signing.name
+  signing_certificate_id = authwise_certificate.idp_signing.certificate_id
   sign_response          = true
   sign_assertions        = true
   encrypt_assertions     = false

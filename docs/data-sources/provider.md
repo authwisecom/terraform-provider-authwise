@@ -24,6 +24,7 @@ A way people sign in to a realm: username and password, a magic link, passkeys, 
 - `config` (String)
 - `display_name` (String)
 - `labels` (Map of String)
+- `provider_id` (String) Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.
 - `provider_type` (String)
 - `realm_id` (String)
 - `tenant_id` (String)

@@ -20,6 +20,7 @@ import (
 	mapplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
 	planmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	stringplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	validator "github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
 	protojson "google.golang.org/protobuf/encoding/protojson"
 	fieldmaskpb "google.golang.org/protobuf/types/known/fieldmaskpb"
@@ -144,6 +145,7 @@ func UserResourceSchema() schema.Schema {
 				MarkdownDescription: "Parent identifier `realm_id`; overrides the provider default. Changing it replaces the resource.",
 				Optional:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Validators:          []validator.String{tf.ReferenceID("r", "realm", "authwise_realm.<name>.realm_id")},
 			},
 			"status": schema.StringAttribute{
 				Computed:      true,
@@ -154,10 +156,16 @@ func UserResourceSchema() schema.Schema {
 				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default. Changing it replaces the resource.",
 				Optional:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Validators:          []validator.String{tf.ReferenceID("t", "tenant", "")},
 			},
 			"updated_at": schema.StringAttribute{
 				Computed:            true,
 				MarkdownDescription: "`updated_at` as an RFC 3339 timestamp.",
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
+			"user_id": schema.StringAttribute{
+				Computed:            true,
+				MarkdownDescription: "Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.",
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"website": schema.StringAttribute{
@@ -178,6 +186,7 @@ func UserResourceSchema() schema.Schema {
 // UserModel is the Terraform plan/state model for User.
 type UserModel struct {
 	Name                types.String         `tfsdk:"name"`
+	UserId              types.String         `tfsdk:"user_id"`
 	TenantId            types.String         `tfsdk:"tenant_id"`
 	RealmId             types.String         `tfsdk:"realm_id"`
 	Labels              types.Map            `tfsdk:"labels"`
@@ -234,6 +243,7 @@ func NewUserModel() *UserModel {
 		Status:              types.StringNull(),
 		TenantId:            types.StringNull(),
 		UpdatedAt:           types.StringNull(),
+		UserId:              types.StringNull(),
 		Website:             types.StringNull(),
 		Zoneinfo:            types.StringNull(),
 	}
@@ -566,11 +576,12 @@ func newUserCrud(providerData any) (*tf.Crud[*v1alpha1.User, *UserModel], diag.D
 				})
 			},
 		},
-		Collection: "users",
-		Defaults:   pd.Defaults,
-		NewModel:   NewUserModel,
-		Scope:      tf.NewScope("tenants", "realms"),
-		TypeName:   "user",
+		Collection:  "users",
+		Defaults:    pd.Defaults,
+		IDAttribute: "user_id",
+		NewModel:    NewUserModel,
+		Scope:       tf.NewScope("tenants", "realms"),
+		TypeName:    "user",
 	}), diags
 }
 
@@ -671,8 +682,12 @@ func UserDataSourceSchema() schema1.Schema {
 			"status":                schema1.StringAttribute{Computed: true},
 			"tenant_id":             schema1.StringAttribute{Computed: true},
 			"updated_at":            schema1.StringAttribute{Computed: true},
-			"website":               schema1.StringAttribute{Computed: true},
-			"zoneinfo":              schema1.StringAttribute{Computed: true},
+			"user_id": schema1.StringAttribute{
+				Computed:            true,
+				MarkdownDescription: "Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.",
+			},
+			"website":  schema1.StringAttribute{Computed: true},
+			"zoneinfo": schema1.StringAttribute{Computed: true},
 		},
 		MarkdownDescription: "A user in a realm. This data source reads one by its full resource name.",
 	}
@@ -708,6 +723,7 @@ func (d *userDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 
 // UserItemModel is one element of the users data source's "users" list.
 type UserItemModel struct {
+	UserId              types.String         `tfsdk:"user_id"`
 	Name                types.String         `tfsdk:"name"`
 	Labels              types.Map            `tfsdk:"labels"`
 	DisplayName         types.String         `tfsdk:"display_name"`
@@ -761,6 +777,7 @@ func UserItemAttrTypes() map[string]attr.Type {
 		"profile":               types.StringType,
 		"status":                types.StringType,
 		"updated_at":            types.StringType,
+		"user_id":               types.StringType,
 		"website":               types.StringType,
 		"zoneinfo":              types.StringType,
 	}
@@ -780,10 +797,12 @@ func UserListDataSourceSchema() schema1.Schema {
 			"realm_id": schema1.StringAttribute{
 				MarkdownDescription: "Parent identifier `realm_id`; overrides the provider default.",
 				Optional:            true,
+				Validators:          []validator.String{tf.ReferenceID("r", "realm", "authwise_realm.<name>.realm_id")},
 			},
 			"tenant_id": schema1.StringAttribute{
 				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default.",
 				Optional:            true,
+				Validators:          []validator.String{tf.ReferenceID("t", "tenant", "")},
 			},
 			"users": schema1.ListNestedAttribute{
 				Computed:            true,
@@ -824,8 +843,12 @@ func UserListDataSourceSchema() schema1.Schema {
 					"profile":               schema1.StringAttribute{Computed: true},
 					"status":                schema1.StringAttribute{Computed: true},
 					"updated_at":            schema1.StringAttribute{Computed: true},
-					"website":               schema1.StringAttribute{Computed: true},
-					"zoneinfo":              schema1.StringAttribute{Computed: true},
+					"user_id": schema1.StringAttribute{
+						Computed:            true,
+						MarkdownDescription: "Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.",
+					},
+					"website":  schema1.StringAttribute{Computed: true},
+					"zoneinfo": schema1.StringAttribute{Computed: true},
 				}},
 			},
 		},
@@ -962,6 +985,11 @@ func userItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.User, *UserM
 	} else {
 		item.Enrollment = types.StringValue(e.Enrollment)
 	}
+	id, err := crud.IDFromName(e.Name)
+	if err != nil {
+		diags.AddError("unexpected user name", err.Error())
+	}
+	item.UserId = types.StringValue(id)
 	obj, d := types.ObjectValueFrom(ctx, UserItemAttrTypes(), item)
 	diags.Append(d...)
 	return obj, diags

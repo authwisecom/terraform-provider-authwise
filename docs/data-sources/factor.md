@@ -23,6 +23,7 @@ A second step a realm offers, such as TOTP, WebAuthn or Duo. `config` comes from
 
 - `config` (String)
 - `display_name` (String)
+- `factor_id` (String) Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.
 - `factor_type` (String)
 - `labels` (Map of String)
 - `realm_id` (String)

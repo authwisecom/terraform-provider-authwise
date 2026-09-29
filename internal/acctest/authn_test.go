@@ -25,7 +25,7 @@ resource "authwise_realm" "r" {
 }
 
 locals {
-  realm_id = element(split("/", authwise_realm.r.name), 3)
+  realm_id = authwise_realm.r.realm_id
 }
 `
 

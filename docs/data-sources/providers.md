@@ -33,6 +33,7 @@ Read-Only:
 - `display_name` (String)
 - `labels` (Map of String)
 - `name` (String) Full resource name.
+- `provider_id` (String) Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.
 - `provider_type` (String)
 - `trust_upstream_amr` (Boolean)
 - `upstream_acr_map` (Map of String)

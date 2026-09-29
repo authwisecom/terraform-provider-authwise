@@ -32,6 +32,11 @@ import (
 func CertificateResourceSchema() schema.Schema {
 	return schema.Schema{
 		Attributes: map[string]schema.Attribute{
+			"certificate_id": schema.StringAttribute{
+				Computed:            true,
+				MarkdownDescription: "Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.",
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
 			"certificate_pem": schema.StringAttribute{
 				Computed:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
@@ -104,6 +109,7 @@ func CertificateResourceSchema() schema.Schema {
 				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default. Changing it replaces the resource.",
 				Optional:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Validators:          []validator.String{tf.ReferenceID("t", "tenant", "")},
 			},
 			"use": schema.StringAttribute{
 				Required:   true,
@@ -122,6 +128,7 @@ func CertificateResourceSchema() schema.Schema {
 // CertificateModel is the Terraform plan/state model for Certificate.
 type CertificateModel struct {
 	Name                 types.String `tfsdk:"name"`
+	CertificateId        types.String `tfsdk:"certificate_id"`
 	TenantId             types.String `tfsdk:"tenant_id"`
 	Labels               types.Map    `tfsdk:"labels"`
 	DisplayName          types.String `tfsdk:"display_name"`
@@ -144,6 +151,7 @@ type CertificateModel struct {
 // NewCertificateModel returns a model with every attribute set to its typed null; collection types cannot be zero-valued.
 func NewCertificateModel() *CertificateModel {
 	return &CertificateModel{
+		CertificateId:        types.StringNull(),
 		CertificatePem:       types.StringNull(),
 		DisplayName:          types.StringNull(),
 		FingerprintSha256:    types.StringNull(),
@@ -355,11 +363,12 @@ func newCertificateCrud(providerData any) (*tf.Crud[*v1alpha1.Certificate, *Cert
 				})
 			},
 		},
-		Collection: "certificates",
-		Defaults:   pd.Defaults,
-		NewModel:   NewCertificateModel,
-		Scope:      tf.NewScope("tenants"),
-		TypeName:   "certificate",
+		Collection:  "certificates",
+		Defaults:    pd.Defaults,
+		IDAttribute: "certificate_id",
+		NewModel:    NewCertificateModel,
+		Scope:       tf.NewScope("tenants"),
+		TypeName:    "certificate",
 	}), diags
 }
 
@@ -423,6 +432,10 @@ func (r *certificateResource) ImportState(ctx context.Context, req resource.Impo
 func CertificateDataSourceSchema() schema1.Schema {
 	return schema1.Schema{
 		Attributes: map[string]schema1.Attribute{
+			"certificate_id": schema1.StringAttribute{
+				Computed:            true,
+				MarkdownDescription: "Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.",
+			},
 			"certificate_pem":    schema1.StringAttribute{Computed: true},
 			"display_name":       schema1.StringAttribute{Computed: true},
 			"fingerprint_sha256": schema1.StringAttribute{Computed: true},
@@ -494,6 +507,7 @@ func (d *certificateDataSource) Read(ctx context.Context, req datasource.ReadReq
 
 // CertificateItemModel is one element of the certificates data source's "certificates" list.
 type CertificateItemModel struct {
+	CertificateId     types.String `tfsdk:"certificate_id"`
 	Name              types.String `tfsdk:"name"`
 	Labels            types.Map    `tfsdk:"labels"`
 	DisplayName       types.String `tfsdk:"display_name"`
@@ -512,6 +526,7 @@ type CertificateItemModel struct {
 // CertificateItemAttrTypes returns the attribute types of one certificates list element.
 func CertificateItemAttrTypes() map[string]attr.Type {
 	return map[string]attr.Type{
+		"certificate_id":     types.StringType,
 		"certificate_pem":    types.StringType,
 		"display_name":       types.StringType,
 		"fingerprint_sha256": types.StringType,
@@ -542,6 +557,10 @@ func CertificateListDataSourceSchema() schema1.Schema {
 				Computed:            true,
 				MarkdownDescription: "Every certificate under the parent, in the order the API lists them.",
 				NestedObject: schema1.NestedAttributeObject{Attributes: map[string]schema1.Attribute{
+					"certificate_id": schema1.StringAttribute{
+						Computed:            true,
+						MarkdownDescription: "Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.",
+					},
 					"certificate_pem":    schema1.StringAttribute{Computed: true},
 					"display_name":       schema1.StringAttribute{Computed: true},
 					"fingerprint_sha256": schema1.StringAttribute{Computed: true},
@@ -566,6 +585,7 @@ func CertificateListDataSourceSchema() schema1.Schema {
 			"tenant_id": schema1.StringAttribute{
 				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default.",
 				Optional:            true,
+				Validators:          []validator.String{tf.ReferenceID("t", "tenant", "")},
 			},
 		},
 		MarkdownDescription: "A certificate and, when kit minted it, its private key. The trust anchor SAML connections verify signatures against, and the client certificate an endpoint presents for mTLS. This data source lists every one under a parent.",
@@ -619,6 +639,11 @@ func certificateItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Certi
 	}
 	item.Status = tf.EnumValue(item.Status, int32(e.Status), e.Status.String())
 	item.HasPrivateKey = types.BoolValue(e.HasPrivateKey)
+	id, err := crud.IDFromName(e.Name)
+	if err != nil {
+		diags.AddError("unexpected certificate name", err.Error())
+	}
+	item.CertificateId = types.StringValue(id)
 	obj, d := types.ObjectValueFrom(ctx, CertificateItemAttrTypes(), item)
 	diags.Append(d...)
 	return obj, diags

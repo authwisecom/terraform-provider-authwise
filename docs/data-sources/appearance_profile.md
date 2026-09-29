@@ -21,6 +21,7 @@ An issuer's appearance profile: the stylesheet and content its login pages use. 
 
 ### Read-Only
 
+- `appearance_profile_id` (String) Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.
 - `content` (String)
 - `display_name` (String)
 - `issuer_id` (String)

@@ -9,7 +9,6 @@
 // Deferred entries (tracked in the GitLab plan):
 //   - Event (read-only: tfinfra's data sources, singular and plural, still
 //     require a Resource marker on the entry)
-//   - ClientSecret (write-once hash/salt; needs write-only arguments)
 //   - ProviderUsernamePassword config (repeated message field)
 //
 // Hand-written in internal/provider rather than generated, because their
@@ -37,6 +36,36 @@ var (
 	scopeIssuer   = tf.NewScope("tenants", "issuers")
 	scopeRealm    = tf.NewScope("tenants", "realms")
 	scopeAudience = tf.NewScope("tenants", "issuers", "audiences")
+	scopeClient   = tf.NewScope("tenants", "issuers", "clients")
+)
+
+// References: the bare-AWID fields and what they hold, from kit's
+// RESOURCE_IDENTITY §4 (the rows kit#620 admits by scope) and the AWID
+// prefixes in kit's pkg/lib/model/prefix.go. Each is validated in plan, so
+// a full name pasted into one fails there with the attribute to use rather
+// than at apply. By hand until kit#619 puts google.api.resource_reference
+// on the fields.
+//
+// The SAML configs' certificate fields are left out. kit takes a
+// Certificate's full name there as well as its id, since its own metadata
+// import writes the name (§4.5), and configurations written against it pass
+// `.name`; validating the id alone would break them. They join when kit
+// settles that exception, at its next breaking tag (D8).
+var (
+	refAudience          = gentf.Reference{Target: "audience", Prefix: "a"}
+	refAppearanceProfile = gentf.Reference{Target: "appearance_profile", Prefix: "ap"}
+	refTheme             = gentf.Reference{Target: "theme", Prefix: "th"}
+	refAccessCondition   = gentf.Reference{Target: "access_condition", Prefix: "axc"}
+
+	// The parent attributes: every resource's and every plural data
+	// source's.
+	scopeReferences = map[string]gentf.Reference{
+		"tenant_id":   {Target: "tenant", Prefix: "t"},
+		"issuer_id":   {Target: "issuer", Prefix: "i"},
+		"realm_id":    {Target: "realm", Prefix: "r"},
+		"audience_id": refAudience,
+		"client_id":   {Target: "client", Prefix: "c"},
+	}
 )
 
 var (
@@ -122,10 +151,37 @@ func withInputOnly(fields ...string) func(r *gentf.Resource) {
 	return func(r *gentf.Resource) { r.InputOnly = fields }
 }
 
+// withReferences declares the entity's fields that hold another row's id.
+func withReferences(refs map[string]gentf.Reference) func(r *gentf.Resource) {
+	return func(r *gentf.Resource) { r.References = refs }
+}
+
 // withDescription is what the resource is: its schema description, and so
 // the first thing its documentation page says.
 func withDescription(description string) func(r *gentf.Resource) {
 	return func(r *gentf.Resource) { r.Description = description }
+}
+
+// clientSecret is minted rather than created (kit#617): MintClientSecret
+// returns the secret exactly once, beside the row, and no read returns it
+// again, so it lives in state as a sensitive attribute (the ruling on #18).
+// It is built by hand rather than through crud because a minted entry takes
+// no singular data source: that would share the model, secret and all.
+//
+// hash_enabled is kit's to set; the mint takes only expires_at, which
+// patches in place. keepers is the rotation trigger, since kit offers no
+// rotate verb.
+func clientSecret() gentf.Entry {
+	r := resource(scopeClient)
+	r.Collection = "client-secrets"
+	r.Computed = []string{"hash_enabled"}
+	r.Description = "A client's secret, for authenticating it to the token endpoint. " +
+		"kit mints it and returns it once, so the secret is kept in state: treat the state as sensitive."
+	r.Mint = &gentf.Mint{Method: "MintClientSecret", Once: []string{"secret"}}
+	return gentf.Entry{
+		Type:            reflect.TypeFor[corepb.ClientSecret](),
+		Implementations: []any{r, gentf.DataSourceList{}},
+	}
 }
 
 // config declares a typed builder data source over a config message,
@@ -142,13 +198,16 @@ func config[E any](typeName string, sensitive ...string) gentf.Entry {
 func main() {
 
 	gentf.NewRegistry().RunDirectoryPathHandler("../internal/generated", &gentf.Spec{
-		Package: "generated",
+		Package:          "generated",
+		ProviderTypeName: "authwise",
+		ScopeReferences:  scopeReferences,
 		Entries: []gentf.Entry{
 			// Tenant-scoped.
 			crud[corepb.Domain](scopeTenant,
 				withDescription("A domain the tenant serves logins on. The id is the domain name itself."), callerNamed, withJSON("config")),
 			crud[corepb.Issuer](scopeTenant,
-				withDescription("An OAuth 2.0 / OpenID Connect issuer: the login a set of clients shares, with its domain, token lifetimes and which realm or realms people sign in to (`config`)."), withJSON("config")),
+				withDescription("An OAuth 2.0 / OpenID Connect issuer: the login a set of clients shares, with its domain, token lifetimes and which realm or realms people sign in to (`config`)."), withJSON("config"),
+				withReferences(map[string]gentf.Reference{"appearance_profile_id": refAppearanceProfile})),
 			crud[corepb.Realm](scopeTenant,
 				withDescription("A realm: a population of users with its own providers, factors and authentication policy."), withJSON("config")),
 			crud[corepb.Theme](scopeTenant,
@@ -204,13 +263,17 @@ func main() {
 
 			// Issuer-scoped.
 			crud[corepb.Client](scopeIssuer,
-				withDescription("An OAuth 2.0 client of an issuer: an application that signs people in or calls an API."), withJSON("config")),
+				withDescription("An OAuth 2.0 client of an issuer: an application that signs people in or calls an API."), withJSON("config"),
+				withReferences(map[string]gentf.Reference{"audience_id": refAudience, "appearance_profile_id": refAppearanceProfile})),
+			clientSecret(),
 			crud[corepb.Audience](scopeIssuer,
-				withDescription("An API an issuer mints access tokens for, and the audience its Access catalog hangs off."), withJSON("config")),
+				withDescription("An API an issuer mints access tokens for, and the audience its Access catalog hangs off."), withJSON("config"),
+				withReferences(map[string]gentf.Reference{"appearance_profile_id": refAppearanceProfile})),
 			crud[corepb.AppearanceProfile](scopeIssuer,
 				withDescription("An issuer's appearance profile: the stylesheet and content its login pages use."),
 				withCollection("appearance-profiles"),
-				withJSON("stylesheet_attributes", "content")),
+				withJSON("stylesheet_attributes", "content"),
+				withReferences(map[string]gentf.Reference{"theme_id": refTheme})),
 
 			// Audience-scoped. The identity Role and Permission surface is
 			// gone (apis v0.6.0): roles and permissions live in the Access
@@ -236,7 +299,8 @@ func main() {
 				withDescription("A binding that grants a subject a role in an audience's Access catalog."), access,
 				withCollection("access-bindings"),
 				withRequired("subject_type", "subject_id", "role_name"),
-				withComputed("created_by")),
+				withComputed("created_by"),
+				withReferences(map[string]gentf.Reference{"condition_id": refAccessCondition})),
 
 			// Config builder data sources for Any-packed configs
 			// (Provider.config, Client.config).

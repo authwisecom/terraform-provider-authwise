@@ -16,6 +16,7 @@ import (
 	schema "github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	planmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	stringplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	validator "github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
 	fieldmaskpb "google.golang.org/protobuf/types/known/fieldmaskpb"
 )
@@ -24,10 +25,16 @@ import (
 func AccessConditionResourceSchema() schema.Schema {
 	return schema.Schema{
 		Attributes: map[string]schema.Attribute{
+			"access_condition_id": schema.StringAttribute{
+				Computed:            true,
+				MarkdownDescription: "Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.",
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
 			"audience_id": schema.StringAttribute{
 				MarkdownDescription: "Parent identifier `audience_id`; overrides the provider default. Changing it replaces the resource.",
 				Optional:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Validators:          []validator.String{tf.ReferenceID("a", "audience", "authwise_audience.<name>.audience_id")},
 			},
 			"description": schema.StringAttribute{
 				Computed:      true,
@@ -48,6 +55,7 @@ func AccessConditionResourceSchema() schema.Schema {
 				MarkdownDescription: "Parent identifier `issuer_id`; overrides the provider default. Changing it replaces the resource.",
 				Optional:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Validators:          []validator.String{tf.ReferenceID("i", "issuer", "authwise_issuer.<name>.issuer_id")},
 			},
 			"name": schema.StringAttribute{
 				Computed:            true,
@@ -58,6 +66,7 @@ func AccessConditionResourceSchema() schema.Schema {
 				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default. Changing it replaces the resource.",
 				Optional:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Validators:          []validator.String{tf.ReferenceID("t", "tenant", "")},
 			},
 		},
 		MarkdownDescription: "A condition in an audience's Access catalog, which a binding can require.",
@@ -66,25 +75,27 @@ func AccessConditionResourceSchema() schema.Schema {
 
 // AccessConditionModel is the Terraform plan/state model for AccessCondition.
 type AccessConditionModel struct {
-	Name        types.String `tfsdk:"name"`
-	TenantId    types.String `tfsdk:"tenant_id"`
-	IssuerId    types.String `tfsdk:"issuer_id"`
-	AudienceId  types.String `tfsdk:"audience_id"`
-	DisplayName types.String `tfsdk:"display_name"`
-	Expression  types.String `tfsdk:"expression"`
-	Description types.String `tfsdk:"description"`
+	Name              types.String `tfsdk:"name"`
+	AccessConditionId types.String `tfsdk:"access_condition_id"`
+	TenantId          types.String `tfsdk:"tenant_id"`
+	IssuerId          types.String `tfsdk:"issuer_id"`
+	AudienceId        types.String `tfsdk:"audience_id"`
+	DisplayName       types.String `tfsdk:"display_name"`
+	Expression        types.String `tfsdk:"expression"`
+	Description       types.String `tfsdk:"description"`
 }
 
 // NewAccessConditionModel returns a model with every attribute set to its typed null; collection types cannot be zero-valued.
 func NewAccessConditionModel() *AccessConditionModel {
 	return &AccessConditionModel{
-		AudienceId:  types.StringNull(),
-		Description: types.StringNull(),
-		DisplayName: types.StringNull(),
-		Expression:  types.StringNull(),
-		IssuerId:    types.StringNull(),
-		Name:        types.StringNull(),
-		TenantId:    types.StringNull(),
+		AccessConditionId: types.StringNull(),
+		AudienceId:        types.StringNull(),
+		Description:       types.StringNull(),
+		DisplayName:       types.StringNull(),
+		Expression:        types.StringNull(),
+		IssuerId:          types.StringNull(),
+		Name:              types.StringNull(),
+		TenantId:          types.StringNull(),
 	}
 }
 
@@ -205,11 +216,12 @@ func newAccessConditionCrud(providerData any) (*tf.Crud[*v1alpha1.AccessConditio
 				})
 			},
 		},
-		Collection: "access-conditions",
-		Defaults:   pd.Defaults,
-		NewModel:   NewAccessConditionModel,
-		Scope:      tf.NewScope("tenants", "issuers", "audiences"),
-		TypeName:   "access_condition",
+		Collection:  "access-conditions",
+		Defaults:    pd.Defaults,
+		IDAttribute: "access_condition_id",
+		NewModel:    NewAccessConditionModel,
+		Scope:       tf.NewScope("tenants", "issuers", "audiences"),
+		TypeName:    "access_condition",
 	}), diags
 }
 
@@ -273,6 +285,10 @@ func (r *accessConditionResource) ImportState(ctx context.Context, req resource.
 func AccessConditionDataSourceSchema() schema1.Schema {
 	return schema1.Schema{
 		Attributes: map[string]schema1.Attribute{
+			"access_condition_id": schema1.StringAttribute{
+				Computed:            true,
+				MarkdownDescription: "Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.",
+			},
 			"audience_id":  schema1.StringAttribute{Computed: true},
 			"description":  schema1.StringAttribute{Computed: true},
 			"display_name": schema1.StringAttribute{Computed: true},
@@ -318,19 +334,21 @@ func (d *accessConditionDataSource) Read(ctx context.Context, req datasource.Rea
 
 // AccessConditionItemModel is one element of the access_conditions data source's "access_conditions" list.
 type AccessConditionItemModel struct {
-	Name        types.String `tfsdk:"name"`
-	DisplayName types.String `tfsdk:"display_name"`
-	Expression  types.String `tfsdk:"expression"`
-	Description types.String `tfsdk:"description"`
+	AccessConditionId types.String `tfsdk:"access_condition_id"`
+	Name              types.String `tfsdk:"name"`
+	DisplayName       types.String `tfsdk:"display_name"`
+	Expression        types.String `tfsdk:"expression"`
+	Description       types.String `tfsdk:"description"`
 }
 
 // AccessConditionItemAttrTypes returns the attribute types of one access_conditions list element.
 func AccessConditionItemAttrTypes() map[string]attr.Type {
 	return map[string]attr.Type{
-		"description":  types.StringType,
-		"display_name": types.StringType,
-		"expression":   types.StringType,
-		"name":         types.StringType,
+		"access_condition_id": types.StringType,
+		"description":         types.StringType,
+		"display_name":        types.StringType,
+		"expression":          types.StringType,
+		"name":                types.StringType,
 	}
 }
 
@@ -350,6 +368,10 @@ func AccessConditionListDataSourceSchema() schema1.Schema {
 				Computed:            true,
 				MarkdownDescription: "Every access_condition under the parent, in the order the API lists them.",
 				NestedObject: schema1.NestedAttributeObject{Attributes: map[string]schema1.Attribute{
+					"access_condition_id": schema1.StringAttribute{
+						Computed:            true,
+						MarkdownDescription: "Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.",
+					},
 					"description":  schema1.StringAttribute{Computed: true},
 					"display_name": schema1.StringAttribute{Computed: true},
 					"expression":   schema1.StringAttribute{Computed: true},
@@ -362,14 +384,17 @@ func AccessConditionListDataSourceSchema() schema1.Schema {
 			"audience_id": schema1.StringAttribute{
 				MarkdownDescription: "Parent identifier `audience_id`; overrides the provider default.",
 				Optional:            true,
+				Validators:          []validator.String{tf.ReferenceID("a", "audience", "authwise_audience.<name>.audience_id")},
 			},
 			"issuer_id": schema1.StringAttribute{
 				MarkdownDescription: "Parent identifier `issuer_id`; overrides the provider default.",
 				Optional:            true,
+				Validators:          []validator.String{tf.ReferenceID("i", "issuer", "authwise_issuer.<name>.issuer_id")},
 			},
 			"tenant_id": schema1.StringAttribute{
 				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default.",
 				Optional:            true,
+				Validators:          []validator.String{tf.ReferenceID("t", "tenant", "")},
 			},
 		},
 		MarkdownDescription: "A condition in an audience's Access catalog, which a binding can require. This data source lists every one under a parent.",
@@ -396,6 +421,11 @@ func accessConditionItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.A
 	} else {
 		item.Description = types.StringValue(e.Description)
 	}
+	id, err := crud.IDFromName(e.Name)
+	if err != nil {
+		diags.AddError("unexpected access_condition name", err.Error())
+	}
+	item.AccessConditionId = types.StringValue(id)
 	obj, d := types.ObjectValueFrom(ctx, AccessConditionItemAttrTypes(), item)
 	diags.Append(d...)
 	return obj, diags

@@ -24,6 +24,7 @@ An OAuth 2.0 client of an issuer: an application that signs people in or calls a
 - `appearance_profile_id` (String)
 - `application_url` (String)
 - `audience_id` (String)
+- `client_id` (String) Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.
 - `config` (String)
 - `display_name` (String)
 - `grant_type` (String)

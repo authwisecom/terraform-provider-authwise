@@ -37,6 +37,7 @@ resource "authwise_realm" "employees" {
 ### Read-Only
 
 - `name` (String) Full resource name; serves as the Terraform ID.
+- `realm_id` (String) Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.
 
 ## Import
 

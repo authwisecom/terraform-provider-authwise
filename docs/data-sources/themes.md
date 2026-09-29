@@ -39,3 +39,4 @@ Read-Only:
 - `stylesheet` (String)
 - `stylesheet_attributes` (String)
 - `stylesheet_attributes_schema` (String)
+- `theme_id` (String) Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.

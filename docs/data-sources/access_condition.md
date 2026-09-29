@@ -21,6 +21,7 @@ A condition in an audience's Access catalog, which a binding can require. This d
 
 ### Read-Only
 
+- `access_condition_id` (String) Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.
 - `audience_id` (String)
 - `description` (String)
 - `display_name` (String)

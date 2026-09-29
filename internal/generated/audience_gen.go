@@ -19,6 +19,7 @@ import (
 	mapplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
 	planmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	stringplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	validator "github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
 	protojson "google.golang.org/protobuf/encoding/protojson"
 	fieldmaskpb "google.golang.org/protobuf/types/known/fieldmaskpb"
@@ -32,6 +33,12 @@ func AudienceResourceSchema() schema.Schema {
 				Computed:      true,
 				Optional:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+				Validators:    []validator.String{tf.ReferenceID("ap", "appearance_profile", "authwise_appearance_profile.<name>.appearance_profile_id")},
+			},
+			"audience_id": schema.StringAttribute{
+				Computed:            true,
+				MarkdownDescription: "Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.",
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"config": schema.StringAttribute{
 				Computed:            true,
@@ -49,6 +56,7 @@ func AudienceResourceSchema() schema.Schema {
 				MarkdownDescription: "Parent identifier `issuer_id`; overrides the provider default. Changing it replaces the resource.",
 				Optional:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Validators:          []validator.String{tf.ReferenceID("i", "issuer", "authwise_issuer.<name>.issuer_id")},
 			},
 			"labels": schema.MapAttribute{
 				Computed:      true,
@@ -65,6 +73,7 @@ func AudienceResourceSchema() schema.Schema {
 				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default. Changing it replaces the resource.",
 				Optional:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Validators:          []validator.String{tf.ReferenceID("t", "tenant", "")},
 			},
 		},
 		MarkdownDescription: "An API an issuer mints access tokens for, and the audience its Access catalog hangs off.",
@@ -74,6 +83,7 @@ func AudienceResourceSchema() schema.Schema {
 // AudienceModel is the Terraform plan/state model for Audience.
 type AudienceModel struct {
 	Name                types.String         `tfsdk:"name"`
+	AudienceId          types.String         `tfsdk:"audience_id"`
 	TenantId            types.String         `tfsdk:"tenant_id"`
 	IssuerId            types.String         `tfsdk:"issuer_id"`
 	Labels              types.Map            `tfsdk:"labels"`
@@ -86,6 +96,7 @@ type AudienceModel struct {
 func NewAudienceModel() *AudienceModel {
 	return &AudienceModel{
 		AppearanceProfileId: types.StringNull(),
+		AudienceId:          types.StringNull(),
 		Config:              jsontypes.NewNormalizedNull(),
 		DisplayName:         types.StringNull(),
 		IssuerId:            types.StringNull(),
@@ -238,11 +249,12 @@ func newAudienceCrud(providerData any) (*tf.Crud[*v1alpha1.Audience, *AudienceMo
 				})
 			},
 		},
-		Collection: "audiences",
-		Defaults:   pd.Defaults,
-		NewModel:   NewAudienceModel,
-		Scope:      tf.NewScope("tenants", "issuers"),
-		TypeName:   "audience",
+		Collection:  "audiences",
+		Defaults:    pd.Defaults,
+		IDAttribute: "audience_id",
+		NewModel:    NewAudienceModel,
+		Scope:       tf.NewScope("tenants", "issuers"),
+		TypeName:    "audience",
 	}), diags
 }
 
@@ -307,6 +319,10 @@ func AudienceDataSourceSchema() schema1.Schema {
 	return schema1.Schema{
 		Attributes: map[string]schema1.Attribute{
 			"appearance_profile_id": schema1.StringAttribute{Computed: true},
+			"audience_id": schema1.StringAttribute{
+				Computed:            true,
+				MarkdownDescription: "Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.",
+			},
 			"config": schema1.StringAttribute{
 				Computed:   true,
 				CustomType: jsontypes.NormalizedType{},
@@ -357,6 +373,7 @@ func (d *audienceDataSource) Read(ctx context.Context, req datasource.ReadReques
 
 // AudienceItemModel is one element of the audiences data source's "audiences" list.
 type AudienceItemModel struct {
+	AudienceId          types.String         `tfsdk:"audience_id"`
 	Name                types.String         `tfsdk:"name"`
 	Labels              types.Map            `tfsdk:"labels"`
 	DisplayName         types.String         `tfsdk:"display_name"`
@@ -368,6 +385,7 @@ type AudienceItemModel struct {
 func AudienceItemAttrTypes() map[string]attr.Type {
 	return map[string]attr.Type{
 		"appearance_profile_id": types.StringType,
+		"audience_id":           types.StringType,
 		"config":                jsontypes.NormalizedType{},
 		"display_name":          types.StringType,
 		"labels":                types.MapType{ElemType: types.StringType},
@@ -391,6 +409,10 @@ func AudienceListDataSourceSchema() schema1.Schema {
 				MarkdownDescription: "Every audience under the parent, in the order the API lists them.",
 				NestedObject: schema1.NestedAttributeObject{Attributes: map[string]schema1.Attribute{
 					"appearance_profile_id": schema1.StringAttribute{Computed: true},
+					"audience_id": schema1.StringAttribute{
+						Computed:            true,
+						MarkdownDescription: "Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.",
+					},
 					"config": schema1.StringAttribute{
 						Computed:   true,
 						CustomType: jsontypes.NormalizedType{},
@@ -409,10 +431,12 @@ func AudienceListDataSourceSchema() schema1.Schema {
 			"issuer_id": schema1.StringAttribute{
 				MarkdownDescription: "Parent identifier `issuer_id`; overrides the provider default.",
 				Optional:            true,
+				Validators:          []validator.String{tf.ReferenceID("i", "issuer", "authwise_issuer.<name>.issuer_id")},
 			},
 			"tenant_id": schema1.StringAttribute{
 				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default.",
 				Optional:            true,
+				Validators:          []validator.String{tf.ReferenceID("t", "tenant", "")},
 			},
 		},
 		MarkdownDescription: "An API an issuer mints access tokens for, and the audience its Access catalog hangs off. This data source lists every one under a parent.",
@@ -451,6 +475,11 @@ func audienceItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Audience
 			item.Config = jsontypes.NewNormalizedValue(string(b))
 		}
 	}
+	id, err := crud.IDFromName(e.Name)
+	if err != nil {
+		diags.AddError("unexpected audience name", err.Error())
+	}
+	item.AudienceId = types.StringValue(id)
 	obj, d := types.ObjectValueFrom(ctx, AudienceItemAttrTypes(), item)
 	diags.Append(d...)
 	return obj, diags

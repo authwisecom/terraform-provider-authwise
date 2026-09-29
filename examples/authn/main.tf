@@ -31,7 +31,7 @@ resource "authwise_realm" "workforce" {
 }
 
 locals {
-  realm_id = element(split("/", authwise_realm.workforce.name), 3)
+  realm_id = authwise_realm.workforce.realm_id
 }
 
 # ---------------------------------------------------------------------------

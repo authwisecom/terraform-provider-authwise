@@ -237,7 +237,7 @@ data "authwise_provider_saml" "partner" {
   idp_entity_id          = "https://idp.partner.example/metadata"
   idp_sso_url            = "https://idp.partner.example/sso"
   idp_sso_binding        = "HTTP-Redirect"
-  signing_certificate_id = authwise_certificate.sp_signing.name
+  signing_certificate_id = authwise_certificate.sp_signing.certificate_id
   sign_authn_requests    = true
   want_assertions_signed = true
   clock_skew_seconds     = 120
@@ -339,7 +339,7 @@ data "authwise_saml_relying_party_config" "app" {
   sp_entity_id               = "https://app.example.com/saml/metadata"
   acs_urls                   = ["https://app.example.com/saml/acs", "https://app.example.com/saml/acs2"]
   acs_binding                = "HTTP-POST"
-  signing_certificate_id     = authwise_certificate.idp_signing.name
+  signing_certificate_id     = authwise_certificate.idp_signing.certificate_id
   sign_response              = true
   sign_assertions            = true
   assertion_lifetime_seconds = 300
@@ -353,9 +353,13 @@ data "authwise_saml_relying_party_config" "app" {
   }
 }
 
+resource "authwise_audience" "app" {
+  display_name = "SAML app"
+}
+
 resource "authwise_client" "app" {
   display_name = "SAML app"
-  audience_id  = "a-1"
+  audience_id  = authwise_audience.app.audience_id
   grant_type   = "authorization_code"
   config       = data.authwise_saml_relying_party_config.app.any
 }

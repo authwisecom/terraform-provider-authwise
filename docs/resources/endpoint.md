@@ -219,6 +219,7 @@ with an empty body.
 
 ### Read-Only
 
+- `endpoint_id` (String) Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.
 - `name` (String) Full resource name; serves as the Terraform ID.
 
 <a id="nestedatt--tls"></a>

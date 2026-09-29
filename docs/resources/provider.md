@@ -26,7 +26,7 @@ data "authwise_provider_google" "this" {
 }
 
 resource "authwise_provider" "google" {
-  realm_id      = element(split("/", authwise_realm.employees.name), 3)
+  realm_id      = authwise_realm.employees.realm_id
   display_name  = "Sign in with Google"
   provider_type = "google"
   config        = data.authwise_provider_google.this.any
@@ -50,6 +50,7 @@ resource "authwise_provider" "google" {
 ### Read-Only
 
 - `name` (String) Full resource name; serves as the Terraform ID.
+- `provider_id` (String) Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.
 
 ## Import
 

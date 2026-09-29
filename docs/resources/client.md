@@ -25,7 +25,7 @@ data "authwise_interactive_client_config" "console" {
 
 resource "authwise_client" "console" {
   display_name = "Console"
-  audience_id  = element(split("/", authwise_audience.api.name), 5)
+  audience_id  = authwise_audience.api.audience_id
   grant_type   = "authorization_code"
   config       = data.authwise_interactive_client_config.console.any
 }
@@ -50,6 +50,7 @@ resource "authwise_client" "console" {
 
 ### Read-Only
 
+- `client_id` (String) Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.
 - `name` (String) Full resource name; serves as the Terraform ID.
 
 ## Import

@@ -20,6 +20,7 @@ import (
 	mapplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
 	planmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	stringplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	validator "github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
 	protojson "google.golang.org/protobuf/encoding/protojson"
 	anypb "google.golang.org/protobuf/types/known/anypb"
@@ -34,6 +35,7 @@ func ClientResourceSchema() schema.Schema {
 				Computed:      true,
 				Optional:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+				Validators:    []validator.String{tf.ReferenceID("ap", "appearance_profile", "authwise_appearance_profile.<name>.appearance_profile_id")},
 			},
 			"application_url": schema.StringAttribute{
 				Computed:      true,
@@ -44,6 +46,12 @@ func ClientResourceSchema() schema.Schema {
 				Computed:      true,
 				Optional:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+				Validators:    []validator.String{tf.ReferenceID("a", "audience", "authwise_audience.<name>.audience_id")},
+			},
+			"client_id": schema.StringAttribute{
+				Computed:            true,
+				MarkdownDescription: "Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.",
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"config": schema.StringAttribute{
 				Computed:            true,
@@ -66,6 +74,7 @@ func ClientResourceSchema() schema.Schema {
 				MarkdownDescription: "Parent identifier `issuer_id`; overrides the provider default. Changing it replaces the resource.",
 				Optional:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Validators:          []validator.String{tf.ReferenceID("i", "issuer", "authwise_issuer.<name>.issuer_id")},
 			},
 			"labels": schema.MapAttribute{
 				Computed:      true,
@@ -93,6 +102,7 @@ func ClientResourceSchema() schema.Schema {
 				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default. Changing it replaces the resource.",
 				Optional:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Validators:          []validator.String{tf.ReferenceID("t", "tenant", "")},
 			},
 		},
 		MarkdownDescription: "An OAuth 2.0 client of an issuer: an application that signs people in or calls an API.",
@@ -102,6 +112,7 @@ func ClientResourceSchema() schema.Schema {
 // ClientModel is the Terraform plan/state model for Client.
 type ClientModel struct {
 	Name                   types.String         `tfsdk:"name"`
+	ClientId               types.String         `tfsdk:"client_id"`
 	TenantId               types.String         `tfsdk:"tenant_id"`
 	IssuerId               types.String         `tfsdk:"issuer_id"`
 	Labels                 types.Map            `tfsdk:"labels"`
@@ -121,6 +132,7 @@ func NewClientModel() *ClientModel {
 		AppearanceProfileId:    types.StringNull(),
 		ApplicationUrl:         types.StringNull(),
 		AudienceId:             types.StringNull(),
+		ClientId:               types.StringNull(),
 		Config:                 jsontypes.NewNormalizedNull(),
 		DisplayName:            types.StringNull(),
 		GrantType:              types.StringNull(),
@@ -325,11 +337,12 @@ func newClientCrud(providerData any) (*tf.Crud[*v1alpha1.Client, *ClientModel], 
 				})
 			},
 		},
-		Collection: "clients",
-		Defaults:   pd.Defaults,
-		NewModel:   NewClientModel,
-		Scope:      tf.NewScope("tenants", "issuers"),
-		TypeName:   "client",
+		Collection:  "clients",
+		Defaults:    pd.Defaults,
+		IDAttribute: "client_id",
+		NewModel:    NewClientModel,
+		Scope:       tf.NewScope("tenants", "issuers"),
+		TypeName:    "client",
 	}), diags
 }
 
@@ -396,6 +409,10 @@ func ClientDataSourceSchema() schema1.Schema {
 			"appearance_profile_id": schema1.StringAttribute{Computed: true},
 			"application_url":       schema1.StringAttribute{Computed: true},
 			"audience_id":           schema1.StringAttribute{Computed: true},
+			"client_id": schema1.StringAttribute{
+				Computed:            true,
+				MarkdownDescription: "Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.",
+			},
 			"config": schema1.StringAttribute{
 				Computed:   true,
 				CustomType: jsontypes.NormalizedType{},
@@ -452,6 +469,7 @@ func (d *clientDataSource) Read(ctx context.Context, req datasource.ReadRequest,
 
 // ClientItemModel is one element of the clients data source's "clients" list.
 type ClientItemModel struct {
+	ClientId               types.String         `tfsdk:"client_id"`
 	Name                   types.String         `tfsdk:"name"`
 	Labels                 types.Map            `tfsdk:"labels"`
 	AudienceId             types.String         `tfsdk:"audience_id"`
@@ -470,6 +488,7 @@ func ClientItemAttrTypes() map[string]attr.Type {
 		"appearance_profile_id":     types.StringType,
 		"application_url":           types.StringType,
 		"audience_id":               types.StringType,
+		"client_id":                 types.StringType,
 		"config":                    jsontypes.NormalizedType{},
 		"display_name":              types.StringType,
 		"grant_type":                types.StringType,
@@ -498,6 +517,10 @@ func ClientListDataSourceSchema() schema1.Schema {
 					"appearance_profile_id": schema1.StringAttribute{Computed: true},
 					"application_url":       schema1.StringAttribute{Computed: true},
 					"audience_id":           schema1.StringAttribute{Computed: true},
+					"client_id": schema1.StringAttribute{
+						Computed:            true,
+						MarkdownDescription: "Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.",
+					},
 					"config": schema1.StringAttribute{
 						Computed:   true,
 						CustomType: jsontypes.NormalizedType{},
@@ -522,10 +545,12 @@ func ClientListDataSourceSchema() schema1.Schema {
 			"issuer_id": schema1.StringAttribute{
 				MarkdownDescription: "Parent identifier `issuer_id`; overrides the provider default.",
 				Optional:            true,
+				Validators:          []validator.String{tf.ReferenceID("i", "issuer", "authwise_issuer.<name>.issuer_id")},
 			},
 			"tenant_id": schema1.StringAttribute{
 				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default.",
 				Optional:            true,
+				Validators:          []validator.String{tf.ReferenceID("t", "tenant", "")},
 			},
 		},
 		MarkdownDescription: "An OAuth 2.0 client of an issuer: an application that signs people in or calls an API. This data source lists every one under a parent.",
@@ -591,6 +616,11 @@ func clientItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Client, *C
 			item.Config = jsontypes.NewNormalizedValue(string(b))
 		}
 	}
+	id, err := crud.IDFromName(e.Name)
+	if err != nil {
+		diags.AddError("unexpected client name", err.Error())
+	}
+	item.ClientId = types.StringValue(id)
 	obj, d := types.ObjectValueFrom(ctx, ClientItemAttrTypes(), item)
 	diags.Append(d...)
 	return obj, diags

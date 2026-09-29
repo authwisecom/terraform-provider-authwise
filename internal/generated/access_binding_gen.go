@@ -17,6 +17,7 @@ import (
 	schema "github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	planmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	stringplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	validator "github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
 	fieldmaskpb "google.golang.org/protobuf/types/known/fieldmaskpb"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
@@ -27,15 +28,22 @@ import (
 func AccessBindingResourceSchema() schema.Schema {
 	return schema.Schema{
 		Attributes: map[string]schema.Attribute{
+			"access_binding_id": schema.StringAttribute{
+				Computed:            true,
+				MarkdownDescription: "Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.",
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
 			"audience_id": schema.StringAttribute{
 				MarkdownDescription: "Parent identifier `audience_id`; overrides the provider default. Changing it replaces the resource.",
 				Optional:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Validators:          []validator.String{tf.ReferenceID("a", "audience", "authwise_audience.<name>.audience_id")},
 			},
 			"condition_id": schema.StringAttribute{
 				Computed:      true,
 				Optional:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+				Validators:    []validator.String{tf.ReferenceID("axc", "access_condition", "authwise_access_condition.<name>.access_condition_id")},
 			},
 			"created_by": schema.StringAttribute{
 				Computed:      true,
@@ -51,6 +59,7 @@ func AccessBindingResourceSchema() schema.Schema {
 				MarkdownDescription: "Parent identifier `issuer_id`; overrides the provider default. Changing it replaces the resource.",
 				Optional:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Validators:          []validator.String{tf.ReferenceID("i", "issuer", "authwise_issuer.<name>.issuer_id")},
 			},
 			"name": schema.StringAttribute{
 				Computed:            true,
@@ -74,6 +83,7 @@ func AccessBindingResourceSchema() schema.Schema {
 				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default. Changing it replaces the resource.",
 				Optional:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Validators:          []validator.String{tf.ReferenceID("t", "tenant", "")},
 			},
 		},
 		MarkdownDescription: "A binding that grants a subject a role in an audience's Access catalog.",
@@ -82,35 +92,37 @@ func AccessBindingResourceSchema() schema.Schema {
 
 // AccessBindingModel is the Terraform plan/state model for AccessBinding.
 type AccessBindingModel struct {
-	Name         types.String `tfsdk:"name"`
-	TenantId     types.String `tfsdk:"tenant_id"`
-	IssuerId     types.String `tfsdk:"issuer_id"`
-	AudienceId   types.String `tfsdk:"audience_id"`
-	SubjectType  types.String `tfsdk:"subject_type"`
-	SubjectId    types.String `tfsdk:"subject_id"`
-	RoleName     types.String `tfsdk:"role_name"`
-	ResourceType types.String `tfsdk:"resource_type"`
-	ResourceId   types.String `tfsdk:"resource_id"`
-	ConditionId  types.String `tfsdk:"condition_id"`
-	ExpiresAt    types.String `tfsdk:"expires_at"`
-	CreatedBy    types.String `tfsdk:"created_by"`
+	Name            types.String `tfsdk:"name"`
+	AccessBindingId types.String `tfsdk:"access_binding_id"`
+	TenantId        types.String `tfsdk:"tenant_id"`
+	IssuerId        types.String `tfsdk:"issuer_id"`
+	AudienceId      types.String `tfsdk:"audience_id"`
+	SubjectType     types.String `tfsdk:"subject_type"`
+	SubjectId       types.String `tfsdk:"subject_id"`
+	RoleName        types.String `tfsdk:"role_name"`
+	ResourceType    types.String `tfsdk:"resource_type"`
+	ResourceId      types.String `tfsdk:"resource_id"`
+	ConditionId     types.String `tfsdk:"condition_id"`
+	ExpiresAt       types.String `tfsdk:"expires_at"`
+	CreatedBy       types.String `tfsdk:"created_by"`
 }
 
 // NewAccessBindingModel returns a model with every attribute set to its typed null; collection types cannot be zero-valued.
 func NewAccessBindingModel() *AccessBindingModel {
 	return &AccessBindingModel{
-		AudienceId:   types.StringNull(),
-		ConditionId:  types.StringNull(),
-		CreatedBy:    types.StringNull(),
-		ExpiresAt:    types.StringNull(),
-		IssuerId:     types.StringNull(),
-		Name:         types.StringNull(),
-		ResourceId:   types.StringNull(),
-		ResourceType: types.StringNull(),
-		RoleName:     types.StringNull(),
-		SubjectId:    types.StringNull(),
-		SubjectType:  types.StringNull(),
-		TenantId:     types.StringNull(),
+		AccessBindingId: types.StringNull(),
+		AudienceId:      types.StringNull(),
+		ConditionId:     types.StringNull(),
+		CreatedBy:       types.StringNull(),
+		ExpiresAt:       types.StringNull(),
+		IssuerId:        types.StringNull(),
+		Name:            types.StringNull(),
+		ResourceId:      types.StringNull(),
+		ResourceType:    types.StringNull(),
+		RoleName:        types.StringNull(),
+		SubjectId:       types.StringNull(),
+		SubjectType:     types.StringNull(),
+		TenantId:        types.StringNull(),
 	}
 }
 
@@ -268,11 +280,12 @@ func newAccessBindingCrud(providerData any) (*tf.Crud[*v1alpha1.AccessBinding, *
 				})
 			},
 		},
-		Collection: "access-bindings",
-		Defaults:   pd.Defaults,
-		NewModel:   NewAccessBindingModel,
-		Scope:      tf.NewScope("tenants", "issuers", "audiences"),
-		TypeName:   "access_binding",
+		Collection:  "access-bindings",
+		Defaults:    pd.Defaults,
+		IDAttribute: "access_binding_id",
+		NewModel:    NewAccessBindingModel,
+		Scope:       tf.NewScope("tenants", "issuers", "audiences"),
+		TypeName:    "access_binding",
 	}), diags
 }
 
@@ -336,6 +349,10 @@ func (r *accessBindingResource) ImportState(ctx context.Context, req resource.Im
 func AccessBindingDataSourceSchema() schema1.Schema {
 	return schema1.Schema{
 		Attributes: map[string]schema1.Attribute{
+			"access_binding_id": schema1.StringAttribute{
+				Computed:            true,
+				MarkdownDescription: "Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.",
+			},
 			"audience_id":  schema1.StringAttribute{Computed: true},
 			"condition_id": schema1.StringAttribute{Computed: true},
 			"created_by":   schema1.StringAttribute{Computed: true},
@@ -386,29 +403,31 @@ func (d *accessBindingDataSource) Read(ctx context.Context, req datasource.ReadR
 
 // AccessBindingItemModel is one element of the access_bindings data source's "access_bindings" list.
 type AccessBindingItemModel struct {
-	Name         types.String `tfsdk:"name"`
-	SubjectType  types.String `tfsdk:"subject_type"`
-	SubjectId    types.String `tfsdk:"subject_id"`
-	RoleName     types.String `tfsdk:"role_name"`
-	ResourceType types.String `tfsdk:"resource_type"`
-	ResourceId   types.String `tfsdk:"resource_id"`
-	ConditionId  types.String `tfsdk:"condition_id"`
-	ExpiresAt    types.String `tfsdk:"expires_at"`
-	CreatedBy    types.String `tfsdk:"created_by"`
+	AccessBindingId types.String `tfsdk:"access_binding_id"`
+	Name            types.String `tfsdk:"name"`
+	SubjectType     types.String `tfsdk:"subject_type"`
+	SubjectId       types.String `tfsdk:"subject_id"`
+	RoleName        types.String `tfsdk:"role_name"`
+	ResourceType    types.String `tfsdk:"resource_type"`
+	ResourceId      types.String `tfsdk:"resource_id"`
+	ConditionId     types.String `tfsdk:"condition_id"`
+	ExpiresAt       types.String `tfsdk:"expires_at"`
+	CreatedBy       types.String `tfsdk:"created_by"`
 }
 
 // AccessBindingItemAttrTypes returns the attribute types of one access_bindings list element.
 func AccessBindingItemAttrTypes() map[string]attr.Type {
 	return map[string]attr.Type{
-		"condition_id":  types.StringType,
-		"created_by":    types.StringType,
-		"expires_at":    types.StringType,
-		"name":          types.StringType,
-		"resource_id":   types.StringType,
-		"resource_type": types.StringType,
-		"role_name":     types.StringType,
-		"subject_id":    types.StringType,
-		"subject_type":  types.StringType,
+		"access_binding_id": types.StringType,
+		"condition_id":      types.StringType,
+		"created_by":        types.StringType,
+		"expires_at":        types.StringType,
+		"name":              types.StringType,
+		"resource_id":       types.StringType,
+		"resource_type":     types.StringType,
+		"role_name":         types.StringType,
+		"subject_id":        types.StringType,
+		"subject_type":      types.StringType,
 	}
 }
 
@@ -428,6 +447,10 @@ func AccessBindingListDataSourceSchema() schema1.Schema {
 				Computed:            true,
 				MarkdownDescription: "Every access_binding under the parent, in the order the API lists them.",
 				NestedObject: schema1.NestedAttributeObject{Attributes: map[string]schema1.Attribute{
+					"access_binding_id": schema1.StringAttribute{
+						Computed:            true,
+						MarkdownDescription: "Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.",
+					},
 					"condition_id": schema1.StringAttribute{Computed: true},
 					"created_by":   schema1.StringAttribute{Computed: true},
 					"expires_at":   schema1.StringAttribute{Computed: true},
@@ -445,14 +468,17 @@ func AccessBindingListDataSourceSchema() schema1.Schema {
 			"audience_id": schema1.StringAttribute{
 				MarkdownDescription: "Parent identifier `audience_id`; overrides the provider default.",
 				Optional:            true,
+				Validators:          []validator.String{tf.ReferenceID("a", "audience", "authwise_audience.<name>.audience_id")},
 			},
 			"issuer_id": schema1.StringAttribute{
 				MarkdownDescription: "Parent identifier `issuer_id`; overrides the provider default.",
 				Optional:            true,
+				Validators:          []validator.String{tf.ReferenceID("i", "issuer", "authwise_issuer.<name>.issuer_id")},
 			},
 			"tenant_id": schema1.StringAttribute{
 				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default.",
 				Optional:            true,
+				Validators:          []validator.String{tf.ReferenceID("t", "tenant", "")},
 			},
 		},
 		MarkdownDescription: "A binding that grants a subject a role in an audience's Access catalog. This data source lists every one under a parent.",
@@ -492,6 +518,11 @@ func accessBindingItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Acc
 	} else {
 		item.CreatedBy = types.StringValue(e.CreatedBy)
 	}
+	id, err := crud.IDFromName(e.Name)
+	if err != nil {
+		diags.AddError("unexpected access_binding name", err.Error())
+	}
+	item.AccessBindingId = types.StringValue(id)
 	obj, d := types.ObjectValueFrom(ctx, AccessBindingItemAttrTypes(), item)
 	diags.Append(d...)
 	return obj, diags

@@ -31,6 +31,7 @@ Read-Only:
 
 - `config` (String)
 - `display_name` (String)
+- `factor_id` (String) Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.
 - `factor_type` (String)
 - `labels` (Map of String)
 - `name` (String) Full resource name.

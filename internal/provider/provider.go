@@ -21,6 +21,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/provider"
 	"github.com/hashicorp/terraform-plugin-framework/provider/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -101,21 +102,27 @@ func (p *AuthwiseProvider) Schema(_ context.Context, _ provider.SchemaRequest, r
 				Optional:            true,
 				MarkdownDescription: "Use plaintext gRPC (development only).",
 			},
+			// The defaults are ids, validated like the per-resource
+			// attributes they stand in for.
 			"tenant_id": schema.StringAttribute{
 				Optional:            true,
 				MarkdownDescription: "Default tenant identifier used to compose AIP parents; per-resource `tenant_id` attributes override it.",
+				Validators:          []validator.String{tfruntime.ReferenceID("t", "tenant", "")},
 			},
 			"issuer_id": schema.StringAttribute{
 				Optional:            true,
 				MarkdownDescription: "Default issuer identifier; per-resource `issuer_id` attributes override it.",
+				Validators:          []validator.String{tfruntime.ReferenceID("i", "issuer", "authwise_issuer.<name>.issuer_id")},
 			},
 			"realm_id": schema.StringAttribute{
 				Optional:            true,
 				MarkdownDescription: "Default realm identifier; per-resource `realm_id` attributes override it.",
+				Validators:          []validator.String{tfruntime.ReferenceID("r", "realm", "authwise_realm.<name>.realm_id")},
 			},
 			"audience_id": schema.StringAttribute{
 				Optional:            true,
 				MarkdownDescription: "Default audience identifier; per-resource `audience_id` attributes override it.",
+				Validators:          []validator.String{tfruntime.ReferenceID("a", "audience", "authwise_audience.<name>.audience_id")},
 			},
 		},
 	}

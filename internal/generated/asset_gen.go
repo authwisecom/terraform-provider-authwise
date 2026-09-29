@@ -17,6 +17,7 @@ import (
 	mapplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
 	planmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	stringplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	validator "github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
 	fieldmaskpb "google.golang.org/protobuf/types/known/fieldmaskpb"
 )
@@ -25,6 +26,11 @@ import (
 func AssetResourceSchema() schema.Schema {
 	return schema.Schema{
 		Attributes: map[string]schema.Attribute{
+			"asset_id": schema.StringAttribute{
+				Computed:            true,
+				MarkdownDescription: "Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.",
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
 			"display_name": schema.StringAttribute{
 				Computed:      true,
 				Optional:      true,
@@ -55,6 +61,7 @@ func AssetResourceSchema() schema.Schema {
 				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default. Changing it replaces the resource.",
 				Optional:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Validators:          []validator.String{tf.ReferenceID("t", "tenant", "")},
 			},
 		},
 		MarkdownDescription: "A static asset the hosted pages serve, such as a logo.",
@@ -64,6 +71,7 @@ func AssetResourceSchema() schema.Schema {
 // AssetModel is the Terraform plan/state model for Asset.
 type AssetModel struct {
 	Name        types.String `tfsdk:"name"`
+	AssetId     types.String `tfsdk:"asset_id"`
 	TenantId    types.String `tfsdk:"tenant_id"`
 	Labels      types.Map    `tfsdk:"labels"`
 	DisplayName types.String `tfsdk:"display_name"`
@@ -74,6 +82,7 @@ type AssetModel struct {
 // NewAssetModel returns a model with every attribute set to its typed null; collection types cannot be zero-valued.
 func NewAssetModel() *AssetModel {
 	return &AssetModel{
+		AssetId:     types.StringNull(),
 		DisplayName: types.StringNull(),
 		Labels:      types.MapNull(types.StringType),
 		MimeType:    types.StringNull(),
@@ -209,11 +218,12 @@ func newAssetCrud(providerData any) (*tf.Crud[*v1alpha1.Asset, *AssetModel], dia
 				})
 			},
 		},
-		Collection: "assets",
-		Defaults:   pd.Defaults,
-		NewModel:   NewAssetModel,
-		Scope:      tf.NewScope("tenants"),
-		TypeName:   "asset",
+		Collection:  "assets",
+		Defaults:    pd.Defaults,
+		IDAttribute: "asset_id",
+		NewModel:    NewAssetModel,
+		Scope:       tf.NewScope("tenants"),
+		TypeName:    "asset",
 	}), diags
 }
 
@@ -277,6 +287,10 @@ func (r *assetResource) ImportState(ctx context.Context, req resource.ImportStat
 func AssetDataSourceSchema() schema1.Schema {
 	return schema1.Schema{
 		Attributes: map[string]schema1.Attribute{
+			"asset_id": schema1.StringAttribute{
+				Computed:            true,
+				MarkdownDescription: "Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.",
+			},
 			"display_name": schema1.StringAttribute{Computed: true},
 			"labels": schema1.MapAttribute{
 				Computed:    true,
@@ -324,6 +338,7 @@ func (d *assetDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 
 // AssetItemModel is one element of the assets data source's "assets" list.
 type AssetItemModel struct {
+	AssetId     types.String `tfsdk:"asset_id"`
 	Name        types.String `tfsdk:"name"`
 	Labels      types.Map    `tfsdk:"labels"`
 	DisplayName types.String `tfsdk:"display_name"`
@@ -334,6 +349,7 @@ type AssetItemModel struct {
 // AssetItemAttrTypes returns the attribute types of one assets list element.
 func AssetItemAttrTypes() map[string]attr.Type {
 	return map[string]attr.Type{
+		"asset_id":     types.StringType,
 		"display_name": types.StringType,
 		"labels":       types.MapType{ElemType: types.StringType},
 		"mime_type":    types.StringType,
@@ -356,6 +372,10 @@ func AssetListDataSourceSchema() schema1.Schema {
 				Computed:            true,
 				MarkdownDescription: "Every asset under the parent, in the order the API lists them.",
 				NestedObject: schema1.NestedAttributeObject{Attributes: map[string]schema1.Attribute{
+					"asset_id": schema1.StringAttribute{
+						Computed:            true,
+						MarkdownDescription: "Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.",
+					},
 					"display_name": schema1.StringAttribute{Computed: true},
 					"labels": schema1.MapAttribute{
 						Computed:    true,
@@ -372,6 +392,7 @@ func AssetListDataSourceSchema() schema1.Schema {
 			"tenant_id": schema1.StringAttribute{
 				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default.",
 				Optional:            true,
+				Validators:          []validator.String{tf.ReferenceID("t", "tenant", "")},
 			},
 		},
 		MarkdownDescription: "A static asset the hosted pages serve, such as a logo. This data source lists every one under a parent.",
@@ -405,6 +426,11 @@ func assetItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Asset, *Ass
 	} else {
 		item.MimeType = types.StringValue(e.MimeType)
 	}
+	id, err := crud.IDFromName(e.Name)
+	if err != nil {
+		diags.AddError("unexpected asset name", err.Error())
+	}
+	item.AssetId = types.StringValue(id)
 	obj, d := types.ObjectValueFrom(ctx, AssetItemAttrTypes(), item)
 	diags.Append(d...)
 	return obj, diags

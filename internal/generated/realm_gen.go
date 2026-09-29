@@ -19,6 +19,7 @@ import (
 	mapplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
 	planmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	stringplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	validator "github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
 	protojson "google.golang.org/protobuf/encoding/protojson"
 	fieldmaskpb "google.golang.org/protobuf/types/known/fieldmaskpb"
@@ -51,10 +52,16 @@ func RealmResourceSchema() schema.Schema {
 				MarkdownDescription: "Full resource name; serves as the Terraform ID.",
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
+			"realm_id": schema.StringAttribute{
+				Computed:            true,
+				MarkdownDescription: "Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.",
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
 			"tenant_id": schema.StringAttribute{
 				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default. Changing it replaces the resource.",
 				Optional:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Validators:          []validator.String{tf.ReferenceID("t", "tenant", "")},
 			},
 		},
 		MarkdownDescription: "A realm: a population of users with its own providers, factors and authentication policy.",
@@ -64,6 +71,7 @@ func RealmResourceSchema() schema.Schema {
 // RealmModel is the Terraform plan/state model for Realm.
 type RealmModel struct {
 	Name        types.String         `tfsdk:"name"`
+	RealmId     types.String         `tfsdk:"realm_id"`
 	TenantId    types.String         `tfsdk:"tenant_id"`
 	Labels      types.Map            `tfsdk:"labels"`
 	DisplayName types.String         `tfsdk:"display_name"`
@@ -77,6 +85,7 @@ func NewRealmModel() *RealmModel {
 		DisplayName: types.StringNull(),
 		Labels:      types.MapNull(types.StringType),
 		Name:        types.StringNull(),
+		RealmId:     types.StringNull(),
 		TenantId:    types.StringNull(),
 	}
 }
@@ -212,11 +221,12 @@ func newRealmCrud(providerData any) (*tf.Crud[*v1alpha1.Realm, *RealmModel], dia
 				})
 			},
 		},
-		Collection: "realms",
-		Defaults:   pd.Defaults,
-		NewModel:   NewRealmModel,
-		Scope:      tf.NewScope("tenants"),
-		TypeName:   "realm",
+		Collection:  "realms",
+		Defaults:    pd.Defaults,
+		IDAttribute: "realm_id",
+		NewModel:    NewRealmModel,
+		Scope:       tf.NewScope("tenants"),
+		TypeName:    "realm",
 	}), diags
 }
 
@@ -293,6 +303,10 @@ func RealmDataSourceSchema() schema1.Schema {
 				MarkdownDescription: "Full resource name of the object to read.",
 				Required:            true,
 			},
+			"realm_id": schema1.StringAttribute{
+				Computed:            true,
+				MarkdownDescription: "Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.",
+			},
 			"tenant_id": schema1.StringAttribute{Computed: true},
 		},
 		MarkdownDescription: "A realm: a population of users with its own providers, factors and authentication policy. This data source reads one by its full resource name.",
@@ -329,6 +343,7 @@ func (d *realmDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 
 // RealmItemModel is one element of the realms data source's "realms" list.
 type RealmItemModel struct {
+	RealmId     types.String         `tfsdk:"realm_id"`
 	Name        types.String         `tfsdk:"name"`
 	Labels      types.Map            `tfsdk:"labels"`
 	DisplayName types.String         `tfsdk:"display_name"`
@@ -342,6 +357,7 @@ func RealmItemAttrTypes() map[string]attr.Type {
 		"display_name": types.StringType,
 		"labels":       types.MapType{ElemType: types.StringType},
 		"name":         types.StringType,
+		"realm_id":     types.StringType,
 	}
 }
 
@@ -372,11 +388,16 @@ func RealmListDataSourceSchema() schema1.Schema {
 						Computed:            true,
 						MarkdownDescription: "Full resource name.",
 					},
+					"realm_id": schema1.StringAttribute{
+						Computed:            true,
+						MarkdownDescription: "Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.",
+					},
 				}},
 			},
 			"tenant_id": schema1.StringAttribute{
 				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default.",
 				Optional:            true,
+				Validators:          []validator.String{tf.ReferenceID("t", "tenant", "")},
 			},
 		},
 		MarkdownDescription: "A realm: a population of users with its own providers, factors and authentication policy. This data source lists every one under a parent.",
@@ -410,6 +431,11 @@ func realmItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Realm, *Rea
 			item.Config = jsontypes.NewNormalizedValue(string(b))
 		}
 	}
+	id, err := crud.IDFromName(e.Name)
+	if err != nil {
+		diags.AddError("unexpected realm name", err.Error())
+	}
+	item.RealmId = types.StringValue(id)
 	obj, d := types.ObjectValueFrom(ctx, RealmItemAttrTypes(), item)
 	diags.Append(d...)
 	return obj, diags

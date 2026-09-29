@@ -33,6 +33,7 @@ A binding that grants a subject a role in an audience's Access catalog.
 
 ### Read-Only
 
+- `access_binding_id` (String) Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.
 - `created_by` (String)
 - `name` (String) Full resource name; serves as the Terraform ID.
 

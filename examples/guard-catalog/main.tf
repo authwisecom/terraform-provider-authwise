@@ -69,8 +69,8 @@ locals {
   console_redirect_uri = "https://guard-admin.example.com/"
 
   # The audience AWID kit minted, which the client and any token request
-  # reference. Names are `.../audiences/{awid}`.
-  console_audience_id = element(reverse(split("/", authwise_audience.console.name)), 0)
+  # reference.
+  console_audience_id = authwise_audience.console.audience_id
 }
 
 # 1. The vocabulary. One permission per guard-control API method, named by the
@@ -130,7 +130,7 @@ resource "authwise_client" "console" {
 
 output "console_client_id" {
   description = "Configure guard-admin with this (VITE_CLIENT_ID, or the operator CR's spec.admin.clientId)."
-  value       = element(reverse(split("/", authwise_client.console.name)), 0)
+  value       = authwise_client.console.client_id
 }
 
 output "console_audience_id" {

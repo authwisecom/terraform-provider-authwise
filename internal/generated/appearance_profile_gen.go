@@ -19,6 +19,7 @@ import (
 	mapplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
 	planmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	stringplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	validator "github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
 	protojson "google.golang.org/protobuf/encoding/protojson"
 	fieldmaskpb "google.golang.org/protobuf/types/known/fieldmaskpb"
@@ -29,6 +30,11 @@ import (
 func AppearanceProfileResourceSchema() schema.Schema {
 	return schema.Schema{
 		Attributes: map[string]schema.Attribute{
+			"appearance_profile_id": schema.StringAttribute{
+				Computed:            true,
+				MarkdownDescription: "Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.",
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
 			"content": schema.StringAttribute{
 				Computed:            true,
 				CustomType:          jsontypes.NormalizedType{},
@@ -45,6 +51,7 @@ func AppearanceProfileResourceSchema() schema.Schema {
 				MarkdownDescription: "Parent identifier `issuer_id`; overrides the provider default. Changing it replaces the resource.",
 				Optional:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Validators:          []validator.String{tf.ReferenceID("i", "issuer", "authwise_issuer.<name>.issuer_id")},
 			},
 			"labels": schema.MapAttribute{
 				Computed:      true,
@@ -68,11 +75,13 @@ func AppearanceProfileResourceSchema() schema.Schema {
 				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default. Changing it replaces the resource.",
 				Optional:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Validators:          []validator.String{tf.ReferenceID("t", "tenant", "")},
 			},
 			"theme_id": schema.StringAttribute{
 				Computed:      true,
 				Optional:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+				Validators:    []validator.String{tf.ReferenceID("th", "theme", "authwise_theme.<name>.theme_id")},
 			},
 		},
 		MarkdownDescription: "An issuer's appearance profile: the stylesheet and content its login pages use.",
@@ -82,6 +91,7 @@ func AppearanceProfileResourceSchema() schema.Schema {
 // AppearanceProfileModel is the Terraform plan/state model for AppearanceProfile.
 type AppearanceProfileModel struct {
 	Name                 types.String         `tfsdk:"name"`
+	AppearanceProfileId  types.String         `tfsdk:"appearance_profile_id"`
 	TenantId             types.String         `tfsdk:"tenant_id"`
 	IssuerId             types.String         `tfsdk:"issuer_id"`
 	Labels               types.Map            `tfsdk:"labels"`
@@ -94,6 +104,7 @@ type AppearanceProfileModel struct {
 // NewAppearanceProfileModel returns a model with every attribute set to its typed null; collection types cannot be zero-valued.
 func NewAppearanceProfileModel() *AppearanceProfileModel {
 	return &AppearanceProfileModel{
+		AppearanceProfileId:  types.StringNull(),
 		Content:              jsontypes.NewNormalizedNull(),
 		DisplayName:          types.StringNull(),
 		IssuerId:             types.StringNull(),
@@ -271,11 +282,12 @@ func newAppearanceProfileCrud(providerData any) (*tf.Crud[*v1alpha1.AppearancePr
 				})
 			},
 		},
-		Collection: "appearance-profiles",
-		Defaults:   pd.Defaults,
-		NewModel:   NewAppearanceProfileModel,
-		Scope:      tf.NewScope("tenants", "issuers"),
-		TypeName:   "appearance_profile",
+		Collection:  "appearance-profiles",
+		Defaults:    pd.Defaults,
+		IDAttribute: "appearance_profile_id",
+		NewModel:    NewAppearanceProfileModel,
+		Scope:       tf.NewScope("tenants", "issuers"),
+		TypeName:    "appearance_profile",
 	}), diags
 }
 
@@ -339,6 +351,10 @@ func (r *appearanceProfileResource) ImportState(ctx context.Context, req resourc
 func AppearanceProfileDataSourceSchema() schema1.Schema {
 	return schema1.Schema{
 		Attributes: map[string]schema1.Attribute{
+			"appearance_profile_id": schema1.StringAttribute{
+				Computed:            true,
+				MarkdownDescription: "Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.",
+			},
 			"content": schema1.StringAttribute{
 				Computed:   true,
 				CustomType: jsontypes.NormalizedType{},
@@ -394,6 +410,7 @@ func (d *appearanceProfileDataSource) Read(ctx context.Context, req datasource.R
 
 // AppearanceProfileItemModel is one element of the appearance_profiles data source's "appearance_profiles" list.
 type AppearanceProfileItemModel struct {
+	AppearanceProfileId  types.String         `tfsdk:"appearance_profile_id"`
 	Name                 types.String         `tfsdk:"name"`
 	Labels               types.Map            `tfsdk:"labels"`
 	DisplayName          types.String         `tfsdk:"display_name"`
@@ -405,6 +422,7 @@ type AppearanceProfileItemModel struct {
 // AppearanceProfileItemAttrTypes returns the attribute types of one appearance_profiles list element.
 func AppearanceProfileItemAttrTypes() map[string]attr.Type {
 	return map[string]attr.Type{
+		"appearance_profile_id": types.StringType,
 		"content":               jsontypes.NormalizedType{},
 		"display_name":          types.StringType,
 		"labels":                types.MapType{ElemType: types.StringType},
@@ -429,6 +447,10 @@ func AppearanceProfileListDataSourceSchema() schema1.Schema {
 				Computed:            true,
 				MarkdownDescription: "Every appearance_profile under the parent, in the order the API lists them.",
 				NestedObject: schema1.NestedAttributeObject{Attributes: map[string]schema1.Attribute{
+					"appearance_profile_id": schema1.StringAttribute{
+						Computed:            true,
+						MarkdownDescription: "Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.",
+					},
 					"content": schema1.StringAttribute{
 						Computed:   true,
 						CustomType: jsontypes.NormalizedType{},
@@ -452,10 +474,12 @@ func AppearanceProfileListDataSourceSchema() schema1.Schema {
 			"issuer_id": schema1.StringAttribute{
 				MarkdownDescription: "Parent identifier `issuer_id`; overrides the provider default.",
 				Optional:            true,
+				Validators:          []validator.String{tf.ReferenceID("i", "issuer", "authwise_issuer.<name>.issuer_id")},
 			},
 			"tenant_id": schema1.StringAttribute{
 				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default.",
 				Optional:            true,
+				Validators:          []validator.String{tf.ReferenceID("t", "tenant", "")},
 			},
 		},
 		MarkdownDescription: "An issuer's appearance profile: the stylesheet and content its login pages use. This data source lists every one under a parent.",
@@ -504,6 +528,11 @@ func appearanceProfileItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1
 			item.Content = jsontypes.NewNormalizedValue(string(b))
 		}
 	}
+	id, err := crud.IDFromName(e.Name)
+	if err != nil {
+		diags.AddError("unexpected appearance_profile name", err.Error())
+	}
+	item.AppearanceProfileId = types.StringValue(id)
 	obj, d := types.ObjectValueFrom(ctx, AppearanceProfileItemAttrTypes(), item)
 	diags.Append(d...)
 	return obj, diags

@@ -19,6 +19,7 @@ import (
 	mapplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
 	planmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	stringplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	validator "github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
 	protojson "google.golang.org/protobuf/encoding/protojson"
 	fieldmaskpb "google.golang.org/protobuf/types/known/fieldmaskpb"
@@ -97,6 +98,12 @@ func ThemeResourceSchema() schema.Schema {
 				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default. Changing it replaces the resource.",
 				Optional:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Validators:          []validator.String{tf.ReferenceID("t", "tenant", "")},
+			},
+			"theme_id": schema.StringAttribute{
+				Computed:            true,
+				MarkdownDescription: "Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.",
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 		},
 		MarkdownDescription: "A tenant theme: the stylesheet and content the hosted login pages render with.",
@@ -106,6 +113,7 @@ func ThemeResourceSchema() schema.Schema {
 // ThemeModel is the Terraform plan/state model for Theme.
 type ThemeModel struct {
 	Name                            types.String         `tfsdk:"name"`
+	ThemeId                         types.String         `tfsdk:"theme_id"`
 	TenantId                        types.String         `tfsdk:"tenant_id"`
 	Labels                          types.Map            `tfsdk:"labels"`
 	DisplayName                     types.String         `tfsdk:"display_name"`
@@ -134,6 +142,7 @@ func NewThemeModel() *ThemeModel {
 		StylesheetAttributes:            jsontypes.NewNormalizedNull(),
 		StylesheetAttributesSchema:      types.StringNull(),
 		TenantId:                        types.StringNull(),
+		ThemeId:                         types.StringNull(),
 	}
 }
 
@@ -373,11 +382,12 @@ func newThemeCrud(providerData any) (*tf.Crud[*v1alpha1.Theme, *ThemeModel], dia
 				})
 			},
 		},
-		Collection: "themes",
-		Defaults:   pd.Defaults,
-		NewModel:   NewThemeModel,
-		Scope:      tf.NewScope("tenants"),
-		TypeName:   "theme",
+		Collection:  "themes",
+		Defaults:    pd.Defaults,
+		IDAttribute: "theme_id",
+		NewModel:    NewThemeModel,
+		Scope:       tf.NewScope("tenants"),
+		TypeName:    "theme",
 	}), diags
 }
 
@@ -471,6 +481,10 @@ func ThemeDataSourceSchema() schema1.Schema {
 			},
 			"stylesheet_attributes_schema": schema1.StringAttribute{Computed: true},
 			"tenant_id":                    schema1.StringAttribute{Computed: true},
+			"theme_id": schema1.StringAttribute{
+				Computed:            true,
+				MarkdownDescription: "Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.",
+			},
 		},
 		MarkdownDescription: "A tenant theme: the stylesheet and content the hosted login pages render with. This data source reads one by its full resource name.",
 	}
@@ -506,6 +520,7 @@ func (d *themeDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 
 // ThemeItemModel is one element of the themes data source's "themes" list.
 type ThemeItemModel struct {
+	ThemeId                         types.String         `tfsdk:"theme_id"`
 	Name                            types.String         `tfsdk:"name"`
 	Labels                          types.Map            `tfsdk:"labels"`
 	DisplayName                     types.String         `tfsdk:"display_name"`
@@ -533,6 +548,7 @@ func ThemeItemAttrTypes() map[string]attr.Type {
 		"stylesheet":                        types.StringType,
 		"stylesheet_attributes":             jsontypes.NormalizedType{},
 		"stylesheet_attributes_schema":      types.StringType,
+		"theme_id":                          types.StringType,
 	}
 }
 
@@ -549,6 +565,7 @@ func ThemeListDataSourceSchema() schema1.Schema {
 			"tenant_id": schema1.StringAttribute{
 				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default.",
 				Optional:            true,
+				Validators:          []validator.String{tf.ReferenceID("t", "tenant", "")},
 			},
 			"themes": schema1.ListNestedAttribute{
 				Computed:            true,
@@ -583,6 +600,10 @@ func ThemeListDataSourceSchema() schema1.Schema {
 						CustomType: jsontypes.NormalizedType{},
 					},
 					"stylesheet_attributes_schema": schema1.StringAttribute{Computed: true},
+					"theme_id": schema1.StringAttribute{
+						Computed:            true,
+						MarkdownDescription: "Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.",
+					},
 				}},
 			},
 		},
@@ -667,6 +688,11 @@ func themeItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Theme, *The
 	} else {
 		item.Layout = types.StringValue(e.Layout)
 	}
+	id, err := crud.IDFromName(e.Name)
+	if err != nil {
+		diags.AddError("unexpected theme name", err.Error())
+	}
+	item.ThemeId = types.StringValue(id)
 	obj, d := types.ObjectValueFrom(ctx, ThemeItemAttrTypes(), item)
 	diags.Append(d...)
 	return obj, diags

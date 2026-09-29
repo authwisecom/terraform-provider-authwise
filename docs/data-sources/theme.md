@@ -32,3 +32,4 @@ A tenant theme: the stylesheet and content the hosted login pages render with. T
 - `stylesheet_attributes` (String)
 - `stylesheet_attributes_schema` (String)
 - `tenant_id` (String)
+- `theme_id` (String) Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.

@@ -11,7 +11,7 @@ resource "authwise_realm" "consumers" {
 }
 
 resource "authwise_provider" "password" {
-  realm_id      = element(split("/", authwise_realm.consumers.name), 3)
+  realm_id      = authwise_realm.consumers.realm_id
   display_name  = "Password"
   provider_type = "usernamePassword"
 }
@@ -29,13 +29,13 @@ resource "authwise_certificate" "partner_idp_signing" {
 data "authwise_provider_saml" "partner" {
   idp_entity_id              = "https://idp.partner-co.example/metadata"
   idp_sso_url                = "https://idp.partner-co.example/sso"
-  idp_signing_certificate_id = authwise_certificate.partner_idp_signing.name
+  idp_signing_certificate_id = authwise_certificate.partner_idp_signing.certificate_id
   want_assertions_signed     = true
   name_id_format             = "urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress"
 }
 
 resource "authwise_provider" "partner_saml" {
-  realm_id      = element(split("/", authwise_realm.partner.name), 3)
+  realm_id      = authwise_realm.partner.realm_id
   display_name  = "Partner Co (SAML)"
   provider_type = "saml"
   config        = data.authwise_provider_saml.partner.any

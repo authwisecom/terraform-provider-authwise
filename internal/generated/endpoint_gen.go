@@ -50,6 +50,11 @@ func EndpointResourceSchema() schema.Schema {
 				Optional:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
+			"endpoint_id": schema.StringAttribute{
+				Computed:            true,
+				MarkdownDescription: "Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.",
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
 			"endpoint_type": schema.StringAttribute{
 				Computed:      true,
 				Optional:      true,
@@ -76,6 +81,7 @@ func EndpointResourceSchema() schema.Schema {
 				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default. Changing it replaces the resource.",
 				Optional:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Validators:          []validator.String{tf.ReferenceID("t", "tenant", "")},
 			},
 			"timeout": schema.StringAttribute{
 				Computed:            true,
@@ -132,6 +138,7 @@ func EndpointTlsAttrTypes() map[string]attr.Type {
 // EndpointModel is the Terraform plan/state model for Endpoint.
 type EndpointModel struct {
 	Name         types.String         `tfsdk:"name"`
+	EndpointId   types.String         `tfsdk:"endpoint_id"`
 	TenantId     types.String         `tfsdk:"tenant_id"`
 	Labels       types.Map            `tfsdk:"labels"`
 	DisplayName  types.String         `tfsdk:"display_name"`
@@ -149,6 +156,7 @@ func NewEndpointModel() *EndpointModel {
 		Address:      types.StringNull(),
 		Auth:         jsontypes.NewNormalizedNull(),
 		DisplayName:  types.StringNull(),
+		EndpointId:   types.StringNull(),
 		EndpointType: types.StringNull(),
 		Insecure:     types.BoolNull(),
 		Labels:       types.MapNull(types.StringType),
@@ -363,11 +371,12 @@ func newEndpointCrud(providerData any) (*tf.Crud[*v1alpha1.Endpoint, *EndpointMo
 				})
 			},
 		},
-		Collection: "endpoints",
-		Defaults:   pd.Defaults,
-		NewModel:   NewEndpointModel,
-		Scope:      tf.NewScope("tenants"),
-		TypeName:   "endpoint",
+		Collection:  "endpoints",
+		Defaults:    pd.Defaults,
+		IDAttribute: "endpoint_id",
+		NewModel:    NewEndpointModel,
+		Scope:       tf.NewScope("tenants"),
+		TypeName:    "endpoint",
 	}), diags
 }
 
@@ -436,7 +445,11 @@ func EndpointDataSourceSchema() schema1.Schema {
 				Computed:   true,
 				CustomType: jsontypes.NormalizedType{},
 			},
-			"display_name":  schema1.StringAttribute{Computed: true},
+			"display_name": schema1.StringAttribute{Computed: true},
+			"endpoint_id": schema1.StringAttribute{
+				Computed:            true,
+				MarkdownDescription: "Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.",
+			},
 			"endpoint_type": schema1.StringAttribute{Computed: true},
 			"insecure":      schema1.BoolAttribute{Computed: true},
 			"labels": schema1.MapAttribute{
@@ -493,6 +506,7 @@ func (d *endpointDataSource) Read(ctx context.Context, req datasource.ReadReques
 
 // EndpointItemModel is one element of the endpoints data source's "endpoints" list.
 type EndpointItemModel struct {
+	EndpointId   types.String         `tfsdk:"endpoint_id"`
 	Name         types.String         `tfsdk:"name"`
 	Labels       types.Map            `tfsdk:"labels"`
 	DisplayName  types.String         `tfsdk:"display_name"`
@@ -510,6 +524,7 @@ func EndpointItemAttrTypes() map[string]attr.Type {
 		"address":       types.StringType,
 		"auth":          jsontypes.NormalizedType{},
 		"display_name":  types.StringType,
+		"endpoint_id":   types.StringType,
 		"endpoint_type": types.StringType,
 		"insecure":      types.BoolType,
 		"labels":        types.MapType{ElemType: types.StringType},
@@ -538,7 +553,11 @@ func EndpointListDataSourceSchema() schema1.Schema {
 						Computed:   true,
 						CustomType: jsontypes.NormalizedType{},
 					},
-					"display_name":  schema1.StringAttribute{Computed: true},
+					"display_name": schema1.StringAttribute{Computed: true},
+					"endpoint_id": schema1.StringAttribute{
+						Computed:            true,
+						MarkdownDescription: "Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.",
+					},
 					"endpoint_type": schema1.StringAttribute{Computed: true},
 					"insecure":      schema1.BoolAttribute{Computed: true},
 					"labels": schema1.MapAttribute{
@@ -564,6 +583,7 @@ func EndpointListDataSourceSchema() schema1.Schema {
 			"tenant_id": schema1.StringAttribute{
 				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default.",
 				Optional:            true,
+				Validators:          []validator.String{tf.ReferenceID("t", "tenant", "")},
 			},
 		},
 		MarkdownDescription: "A service kit calls out to: its transport and address, how kit verifies it (`tls`), how kit authenticates to it (`auth`), and the per-call deadline (`timeout`). This data source lists every one under a parent.",
@@ -632,6 +652,11 @@ func endpointItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Endpoint
 		item.Tls = obj
 	}
 	item.Timeout = tf.DurationValue(item.Timeout, e.Timeout)
+	id, err := crud.IDFromName(e.Name)
+	if err != nil {
+		diags.AddError("unexpected endpoint name", err.Error())
+	}
+	item.EndpointId = types.StringValue(id)
 	obj, d := types.ObjectValueFrom(ctx, EndpointItemAttrTypes(), item)
 	diags.Append(d...)
 	return obj, diags

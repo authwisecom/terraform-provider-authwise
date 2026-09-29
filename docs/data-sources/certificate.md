@@ -21,6 +21,7 @@ A certificate and, when kit minted it, its private key. The trust anchor SAML co
 
 ### Read-Only
 
+- `certificate_id` (String) Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.
 - `certificate_pem` (String)
 - `display_name` (String)
 - `fingerprint_sha256` (String)

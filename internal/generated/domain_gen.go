@@ -19,6 +19,7 @@ import (
 	mapplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
 	planmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	stringplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	validator "github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
 	protojson "google.golang.org/protobuf/encoding/protojson"
 	fieldmaskpb "google.golang.org/protobuf/types/known/fieldmaskpb"
@@ -55,6 +56,7 @@ func DomainResourceSchema() schema.Schema {
 				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default. Changing it replaces the resource.",
 				Optional:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Validators:          []validator.String{tf.ReferenceID("t", "tenant", "")},
 			},
 		},
 		MarkdownDescription: "A domain the tenant serves logins on. The id is the domain name itself.",
@@ -165,6 +167,7 @@ func newDomainCrud(providerData any) (*tf.Crud[*v1alpha1.Domain, *DomainModel], 
 		return nil, diags
 	}
 	return tf.NewCrud(tf.CrudParams[*v1alpha1.Domain, *DomainModel]{
+		CallerNamed: true,
 		Client: tf.CrudClient[*v1alpha1.Domain]{
 			Create: func(ctx context.Context, parent string, entity *v1alpha1.Domain) (*v1alpha1.Domain, error) {
 				return client.CreateDomain(ctx, &v1alpha11.CreateDomainRequest{
@@ -375,6 +378,7 @@ func DomainListDataSourceSchema() schema1.Schema {
 			"tenant_id": schema1.StringAttribute{
 				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default.",
 				Optional:            true,
+				Validators:          []validator.String{tf.ReferenceID("t", "tenant", "")},
 			},
 		},
 		MarkdownDescription: "A domain the tenant serves logins on. The id is the domain name itself. This data source lists every one under a parent.",

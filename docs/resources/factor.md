@@ -30,6 +30,7 @@ A second step a realm offers, such as TOTP, WebAuthn or Duo. `config` comes from
 
 ### Read-Only
 
+- `factor_id` (String) Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.
 - `name` (String) Full resource name; serves as the Terraform ID.
 
 ## Import

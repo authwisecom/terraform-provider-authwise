@@ -51,11 +51,13 @@ func TestProviderSurface(t *testing.T) {
 		diags := s.Schema.ValidateImplementation(ctx)
 		require.False(t, diags.HasError(), "%s: %v", m.TypeName, diags)
 	}
-	// 18 generated entity resources, 2 association resources
-	// (scope_access_permissions, access_role_access_permissions), and the
-	// hand-written secret and realm_authentication_policy.
-	assert.Len(t, resourceTypes, 22)
+	// 19 generated entity resources (client_secret, minted, came with
+	// kit#617), 2 association resources (scope_access_permissions,
+	// access_role_access_permissions), and the hand-written secret and
+	// realm_authentication_policy.
+	assert.Len(t, resourceTypes, 23)
 	for _, want := range []string{
+		"authwise_client_secret",
 		"authwise_access_permission",
 		"authwise_access_role",
 		"authwise_access_role_access_permissions",
@@ -86,14 +88,17 @@ func TestProviderSurface(t *testing.T) {
 		diags := s.Schema.ValidateImplementation(ctx)
 		require.False(t, diags.HasError(), "%s: %v", m.TypeName, diags)
 	}
-	// 18 generated singular data sources, 18 plural ones (tfinfra
-	// v0.0.15's DataSourceList), 20 config builder data sources
+	// 18 generated singular data sources, 19 plural ones (tfinfra
+	// v0.0.15's DataSourceList; client_secret has only the plural, since
+	// a minted resource takes no singular one), 20 config builder data sources
 	// (provider_dropbox went with apis v0.8.0; provider_magic_link and
 	// provider_passkey came with #21; provider_apple, provider_oidc and
 	// provider_oauth with #20), and the hand-written secret and
 	// realm_authentication_context_schema.
-	assert.Len(t, dataSourceTypes, 58)
+	assert.Len(t, dataSourceTypes, 59)
+	assert.False(t, dataSourceTypes["authwise_client_secret"], "a minted resource has no singular data source")
 	for _, want := range []string{
+		"authwise_client_secrets",
 		"authwise_certificate",
 		"authwise_secret",
 		"authwise_realm_authentication_context_schema",

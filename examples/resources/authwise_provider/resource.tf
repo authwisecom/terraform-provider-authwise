@@ -11,7 +11,7 @@ data "authwise_provider_google" "this" {
 }
 
 resource "authwise_provider" "google" {
-  realm_id      = element(split("/", authwise_realm.employees.name), 3)
+  realm_id      = authwise_realm.employees.realm_id
   display_name  = "Sign in with Google"
   provider_type = "google"
   config        = data.authwise_provider_google.this.any

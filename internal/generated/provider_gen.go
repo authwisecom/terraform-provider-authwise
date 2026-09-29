@@ -20,6 +20,7 @@ import (
 	mapplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
 	planmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	stringplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	validator "github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
 	protojson "google.golang.org/protobuf/encoding/protojson"
 	anypb "google.golang.org/protobuf/types/known/anypb"
@@ -53,6 +54,11 @@ func ProviderResourceSchema() schema.Schema {
 				MarkdownDescription: "Full resource name; serves as the Terraform ID.",
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
+			"provider_id": schema.StringAttribute{
+				Computed:            true,
+				MarkdownDescription: "Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.",
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
 			"provider_type": schema.StringAttribute{
 				Computed:      true,
 				Optional:      true,
@@ -62,11 +68,13 @@ func ProviderResourceSchema() schema.Schema {
 				MarkdownDescription: "Parent identifier `realm_id`; overrides the provider default. Changing it replaces the resource.",
 				Optional:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Validators:          []validator.String{tf.ReferenceID("r", "realm", "authwise_realm.<name>.realm_id")},
 			},
 			"tenant_id": schema.StringAttribute{
 				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default. Changing it replaces the resource.",
 				Optional:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Validators:          []validator.String{tf.ReferenceID("t", "tenant", "")},
 			},
 			"trust_upstream_amr": schema.BoolAttribute{
 				Computed:      true,
@@ -87,6 +95,7 @@ func ProviderResourceSchema() schema.Schema {
 // ProviderModel is the Terraform plan/state model for Provider.
 type ProviderModel struct {
 	Name             types.String         `tfsdk:"name"`
+	ProviderId       types.String         `tfsdk:"provider_id"`
 	TenantId         types.String         `tfsdk:"tenant_id"`
 	RealmId          types.String         `tfsdk:"realm_id"`
 	Labels           types.Map            `tfsdk:"labels"`
@@ -104,6 +113,7 @@ func NewProviderModel() *ProviderModel {
 		DisplayName:      types.StringNull(),
 		Labels:           types.MapNull(types.StringType),
 		Name:             types.StringNull(),
+		ProviderId:       types.StringNull(),
 		ProviderType:     types.StringNull(),
 		RealmId:          types.StringNull(),
 		TenantId:         types.StringNull(),
@@ -273,11 +283,12 @@ func newProviderCrud(providerData any) (*tf.Crud[*v1alpha1.Provider, *ProviderMo
 				})
 			},
 		},
-		Collection: "providers",
-		Defaults:   pd.Defaults,
-		NewModel:   NewProviderModel,
-		Scope:      tf.NewScope("tenants", "realms"),
-		TypeName:   "provider",
+		Collection:  "providers",
+		Defaults:    pd.Defaults,
+		IDAttribute: "provider_id",
+		NewModel:    NewProviderModel,
+		Scope:       tf.NewScope("tenants", "realms"),
+		TypeName:    "provider",
 	}), diags
 }
 
@@ -354,6 +365,10 @@ func ProviderDataSourceSchema() schema1.Schema {
 				MarkdownDescription: "Full resource name of the object to read.",
 				Required:            true,
 			},
+			"provider_id": schema1.StringAttribute{
+				Computed:            true,
+				MarkdownDescription: "Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.",
+			},
 			"provider_type":      schema1.StringAttribute{Computed: true},
 			"realm_id":           schema1.StringAttribute{Computed: true},
 			"tenant_id":          schema1.StringAttribute{Computed: true},
@@ -397,6 +412,7 @@ func (d *providerDataSource) Read(ctx context.Context, req datasource.ReadReques
 
 // ProviderItemModel is one element of the providers data source's "providers" list.
 type ProviderItemModel struct {
+	ProviderId       types.String         `tfsdk:"provider_id"`
 	Name             types.String         `tfsdk:"name"`
 	Labels           types.Map            `tfsdk:"labels"`
 	DisplayName      types.String         `tfsdk:"display_name"`
@@ -413,6 +429,7 @@ func ProviderItemAttrTypes() map[string]attr.Type {
 		"display_name":       types.StringType,
 		"labels":             types.MapType{ElemType: types.StringType},
 		"name":               types.StringType,
+		"provider_id":        types.StringType,
 		"provider_type":      types.StringType,
 		"trust_upstream_amr": types.BoolType,
 		"upstream_acr_map":   types.MapType{ElemType: types.StringType},
@@ -447,6 +464,10 @@ func ProviderListDataSourceSchema() schema1.Schema {
 						Computed:            true,
 						MarkdownDescription: "Full resource name.",
 					},
+					"provider_id": schema1.StringAttribute{
+						Computed:            true,
+						MarkdownDescription: "Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.",
+					},
 					"provider_type":      schema1.StringAttribute{Computed: true},
 					"trust_upstream_amr": schema1.BoolAttribute{Computed: true},
 					"upstream_acr_map": schema1.MapAttribute{
@@ -458,10 +479,12 @@ func ProviderListDataSourceSchema() schema1.Schema {
 			"realm_id": schema1.StringAttribute{
 				MarkdownDescription: "Parent identifier `realm_id`; overrides the provider default.",
 				Optional:            true,
+				Validators:          []validator.String{tf.ReferenceID("r", "realm", "authwise_realm.<name>.realm_id")},
 			},
 			"tenant_id": schema1.StringAttribute{
 				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default.",
 				Optional:            true,
+				Validators:          []validator.String{tf.ReferenceID("t", "tenant", "")},
 			},
 		},
 		MarkdownDescription: "A way people sign in to a realm: username and password, a magic link, passkeys, a social or enterprise IdP, or SAML. `config` comes from the matching config data source. This data source lists every one under a parent.",
@@ -508,6 +531,11 @@ func providerItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Provider
 		diags.Append(d...)
 		item.UpstreamAcrMap = v
 	}
+	id, err := crud.IDFromName(e.Name)
+	if err != nil {
+		diags.AddError("unexpected provider name", err.Error())
+	}
+	item.ProviderId = types.StringValue(id)
 	obj, d := types.ObjectValueFrom(ctx, ProviderItemAttrTypes(), item)
 	diags.Append(d...)
 	return obj, diags

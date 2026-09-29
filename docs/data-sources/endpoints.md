@@ -31,6 +31,7 @@ Read-Only:
 - `address` (String)
 - `auth` (String)
 - `display_name` (String)
+- `endpoint_id` (String) Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.
 - `endpoint_type` (String)
 - `insecure` (Boolean)
 - `labels` (Map of String)

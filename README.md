@@ -31,14 +31,48 @@ resource "authwise_realm" "employees" {
 }
 ```
 
-## Caller-named resources
+## Ids and references
 
-Most resources get a server-assigned AWID, and `name` — the full AIP
-resource name — is computed. A few are keyed by a name the caller chooses
-instead: the access catalog's vocabulary (`authwise_access_permission`,
-`authwise_access_role`) and `authwise_domain` / `authwise_scope`. Those
-carry a required `<type>_id` attribute holding that id, and changing it
-replaces the resource:
+Every resource has two identifiers. `name` is the full resource name
+(`tenants/t-01/issuers/i-01/audiences/a-01`), the Terraform ID and the
+import ID. `<type>_id` is its last segment, the resource's own id:
+`audience_id` on `authwise_audience`, `realm_id` on `authwise_realm`,
+`client_id` on `authwise_client`. Data sources carry both.
+
+The rule for references:
+
+- **A `*_id` attribute takes another resource's `<type>_id`**, never its
+  `name`. That covers the parent attributes (`tenant_id`, `issuer_id`,
+  `realm_id`, `audience_id`, `client_id`) and the references kit resolves
+  by id (a client's `audience_id` and `appearance_profile_id`, an
+  appearance profile's `theme_id`, a binding's `condition_id`, the SAML
+  configs' `*_certificate_id`).
+- **A `*_ref = { name = … }` block and the association resources**
+  (`authwise_access_role_access_permissions`,
+  `authwise_scope_access_permissions`) **take `name`.**
+
+```hcl
+resource "authwise_client" "web" {
+  display_name = "web"
+  audience_id  = authwise_audience.api.audience_id   # not .name
+}
+```
+
+Every id starts with its type's prefix (`a-` for an audience, `r-` for a
+realm), and a reference is checked against it in plan: `audience_id =
+authwise_audience.api.name` fails there, naming the attribute to use.
+kit refuses the same mistake at apply (kit#620), and refuses an id that
+exists under another issuer or tenant. An existing
+`element(split("/", x.name), N)` still works, since it yields the id.
+The SAML certificate fields are the one exception to the check: kit also
+accepts a certificate's `name` there, so a configuration that passes one
+keeps working, but `certificate_id` is the form to write.
+
+Most resources get a server-assigned id, so `<type>_id` is computed. A few
+are keyed by a name the caller chooses instead: the access catalog's
+vocabulary (`authwise_access_permission`, `authwise_access_role`) and
+`authwise_domain` / `authwise_scope`. On those `<type>_id` is required, and
+changing it replaces the resource:
 
 ```hcl
 resource "authwise_access_permission" "tenants_get" {
@@ -49,9 +83,6 @@ resource "authwise_access_permission" "tenants_get" {
   #                     /access-permissions/guardcontrol.tenants.get
 }
 ```
-
-`name` stays the Terraform ID and the import ID; importing fills the id
-attribute from the name's last segment.
 
 ## The access surface
 
@@ -130,6 +161,22 @@ Setting a reference needs `identity.secrets.use` on the provider's
 credential. kit refuses to delete a secret while anything references it,
 so reference it by expression, as above: Terraform then destroys or
 repoints the referrer first.
+
+A client's own secret works the other way around. You don't supply it:
+kit mints it and returns it exactly once. So `authwise_client_secret` keeps
+its `secret` in state, as a sensitive attribute, which makes the state
+itself sensitive. Rotate it by changing a value in `keepers`:
+
+```hcl
+resource "authwise_client_secret" "ci" {
+  client_id = authwise_client.ci.client_id
+  keepers   = { rotation = "2026-09" }
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+```
 
 ## Authentication policy
 

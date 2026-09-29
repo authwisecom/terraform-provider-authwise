@@ -52,5 +52,6 @@ Read-Only:
 - `profile` (String)
 - `status` (String)
 - `updated_at` (String)
+- `user_id` (String) Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.
 - `website` (String)
 - `zoneinfo` (String)
