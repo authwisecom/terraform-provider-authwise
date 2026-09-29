@@ -2,9 +2,10 @@
 
 NOTES:
 
-* **kit v1.23.0.** This release is built against apis v0.12.0, the apis
-  version kit v1.23.0 serves. kit v1.22.x has no in-place upgrade to
-  v1.23.0: drop the store and let bootstrap recreate it.
+* **kit v1.23.1.** This release is built against apis v0.12.0, the apis
+  version kit v1.23.1 serves. Use v1.23.1 rather than v1.23.0, whose images
+  were published incomplete. kit v1.22.x has no in-place upgrade to
+  v1.23.x: drop the store and let bootstrap recreate it.
 * **kit#620 refuses an out-of-scope reference at apply.** A bare-id `*_id`
   field naming a row outside the writer's scope is refused on create and
   update as `InvalidArgument`: `<field>: no <noun> <id> in scope`, the same
