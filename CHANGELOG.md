@@ -9,6 +9,25 @@ NOTES:
 
 FEATURES:
 
+* **Plural data sources.** Every resource now has one, for example
+  `authwise_realms`, `authwise_providers` and `authwise_access_permissions`.
+  Each lists every object under one parent: the parent's `tenant_id` /
+  `issuer_id` / `realm_id` / `audience_id` are optional and fall back to
+  the provider defaults. The objects arrive as a list carrying the same
+  attributes as the singular data source, caller-chosen ids included, and
+  every page of the API's results is read. There is no server-side filter
+  yet; filter with a `for` expression:
+
+  ```terraform
+  data "authwise_providers" "all" {
+    realm_id = "r-01"
+  }
+
+  locals {
+    saml = [for p in data.authwise_providers.all.providers : p.name if p.provider_type == "saml"]
+  }
+  ```
+
 * **Social and enterprise sign-in (apis v0.8.0, kit#587, #20).**
   * New config data sources:
     * `authwise_provider_apple`: Sign in with Apple. The `.p8` key is an

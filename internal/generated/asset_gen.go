@@ -8,6 +8,7 @@ import (
 	v1alpha11 "git.authwise.com/authwise/apis/authwise/identity/v1alpha1"
 	v1alpha1 "git.authwise.com/authwise/apis/authwise/types/core/v1alpha1"
 	tf "github.com/activatedio/tfinfra/pkg/tf"
+	attr "github.com/hashicorp/terraform-plugin-framework/attr"
 	datasource "github.com/hashicorp/terraform-plugin-framework/datasource"
 	schema1 "github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	diag "github.com/hashicorp/terraform-plugin-framework/diag"
@@ -319,4 +320,142 @@ func (d *assetDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 		return
 	}
 	d.crud.ReadDataSource(ctx, req, resp)
+}
+
+// AssetItemModel is one element of the assets data source's "assets" list.
+type AssetItemModel struct {
+	Name        types.String `tfsdk:"name"`
+	Labels      types.Map    `tfsdk:"labels"`
+	DisplayName types.String `tfsdk:"display_name"`
+	Path        types.String `tfsdk:"path"`
+	MimeType    types.String `tfsdk:"mime_type"`
+}
+
+// AssetItemAttrTypes returns the attribute types of one assets list element.
+func AssetItemAttrTypes() map[string]attr.Type {
+	return map[string]attr.Type{
+		"display_name": types.StringType,
+		"labels":       types.MapType{ElemType: types.StringType},
+		"mime_type":    types.StringType,
+		"name":         types.StringType,
+		"path":         types.StringType,
+	}
+}
+
+// AssetsModel is the Terraform model of the assets data source.
+type AssetsModel struct {
+	TenantId types.String `tfsdk:"tenant_id"`
+	Items    types.List   `tfsdk:"assets"`
+}
+
+// AssetListDataSourceSchema returns the Terraform schema for the assets data source.
+func AssetListDataSourceSchema() schema1.Schema {
+	return schema1.Schema{
+		Attributes: map[string]schema1.Attribute{
+			"assets": schema1.ListNestedAttribute{
+				Computed:            true,
+				MarkdownDescription: "Every asset under the parent, in the order the API lists them.",
+				NestedObject: schema1.NestedAttributeObject{Attributes: map[string]schema1.Attribute{
+					"display_name": schema1.StringAttribute{Computed: true},
+					"labels": schema1.MapAttribute{
+						Computed:    true,
+						ElementType: types.StringType,
+					},
+					"mime_type": schema1.StringAttribute{Computed: true},
+					"name": schema1.StringAttribute{
+						Computed:            true,
+						MarkdownDescription: "Full resource name.",
+					},
+					"path": schema1.StringAttribute{Computed: true},
+				}},
+			},
+			"tenant_id": schema1.StringAttribute{
+				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default.",
+				Optional:            true,
+			},
+		},
+		MarkdownDescription: "A static asset the hosted pages serve, such as a logo. This data source lists every one under a parent.",
+	}
+}
+
+// assetItemFromProto converts one listed Asset into a assets list element.
+func assetItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Asset, *AssetModel], e *v1alpha1.Asset) (types.Object, diag.Diagnostics) {
+	var diags diag.Diagnostics
+	var item AssetItemModel
+	item.Name = types.StringValue(e.Name)
+	if len(e.Labels) == 0 {
+		item.Labels = types.MapNull(types.StringType)
+	} else {
+		v, d := types.MapValueFrom(ctx, types.StringType, e.Labels)
+		diags.Append(d...)
+		item.Labels = v
+	}
+	if e.DisplayName == "" {
+		item.DisplayName = types.StringNull()
+	} else {
+		item.DisplayName = types.StringValue(e.DisplayName)
+	}
+	if e.Path == "" {
+		item.Path = types.StringNull()
+	} else {
+		item.Path = types.StringValue(e.Path)
+	}
+	if e.MimeType == "" {
+		item.MimeType = types.StringNull()
+	} else {
+		item.MimeType = types.StringValue(e.MimeType)
+	}
+	obj, d := types.ObjectValueFrom(ctx, AssetItemAttrTypes(), item)
+	diags.Append(d...)
+	return obj, diags
+}
+
+// assetsDataSource is the generated plural data source for Asset (List under a parent).
+type assetsDataSource struct {
+	crud *tf.Crud[*v1alpha1.Asset, *AssetModel]
+}
+
+// NewAssetsDataSource returns the generated assets data source.
+func NewAssetsDataSource() datasource.DataSource {
+	return &assetsDataSource{}
+}
+func (d *assetsDataSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_assets"
+}
+func (d *assetsDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
+	resp.Schema = AssetListDataSourceSchema()
+}
+func (d *assetsDataSource) Configure(_ context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
+	crud, diags := newAssetCrud(req.ProviderData)
+	resp.Diagnostics.Append(diags...)
+	d.crud = crud
+}
+func (d *assetsDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
+	if d.crud == nil {
+		resp.Diagnostics.AddError("assets data source not configured", "Configure was not called with tf.ProviderData")
+		return
+	}
+	var m AssetsModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &m)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	entities, err := d.crud.ListAll(ctx, map[string]string{"tenant_id": m.TenantId.ValueString()})
+	if err != nil {
+		resp.Diagnostics.AddError("list assets failed", err.Error())
+		return
+	}
+	elems := make([]attr.Value, 0, len(entities))
+	for _, e := range entities {
+		obj, diags := assetItemFromProto(ctx, d.crud, e)
+		resp.Diagnostics.Append(diags...)
+		elems = append(elems, obj)
+	}
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	list, diags := types.ListValue(types.ObjectType{AttrTypes: AssetItemAttrTypes()}, elems)
+	resp.Diagnostics.Append(diags...)
+	m.Items = list
+	resp.Diagnostics.Append(resp.State.Set(ctx, &m)...)
 }

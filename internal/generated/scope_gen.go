@@ -8,6 +8,7 @@ import (
 	v1alpha11 "git.authwise.com/authwise/apis/authwise/identity/v1alpha1"
 	v1alpha1 "git.authwise.com/authwise/apis/authwise/types/core/v1alpha1"
 	tf "github.com/activatedio/tfinfra/pkg/tf"
+	attr "github.com/hashicorp/terraform-plugin-framework/attr"
 	datasource "github.com/hashicorp/terraform-plugin-framework/datasource"
 	schema1 "github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	diag "github.com/hashicorp/terraform-plugin-framework/diag"
@@ -305,6 +306,144 @@ func (d *scopeDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 		return
 	}
 	d.crud.ReadDataSource(ctx, req, resp)
+}
+
+// ScopeItemModel is one element of the scopes data source's "scopes" list.
+type ScopeItemModel struct {
+	ScopeId types.String `tfsdk:"scope_id"`
+	Name    types.String `tfsdk:"name"`
+	Kind    types.String `tfsdk:"kind"`
+	Auto    types.Bool   `tfsdk:"auto"`
+}
+
+// ScopeItemAttrTypes returns the attribute types of one scopes list element.
+func ScopeItemAttrTypes() map[string]attr.Type {
+	return map[string]attr.Type{
+		"auto":     types.BoolType,
+		"kind":     types.StringType,
+		"name":     types.StringType,
+		"scope_id": types.StringType,
+	}
+}
+
+// ScopesModel is the Terraform model of the scopes data source.
+type ScopesModel struct {
+	TenantId   types.String `tfsdk:"tenant_id"`
+	IssuerId   types.String `tfsdk:"issuer_id"`
+	AudienceId types.String `tfsdk:"audience_id"`
+	Items      types.List   `tfsdk:"scopes"`
+}
+
+// ScopeListDataSourceSchema returns the Terraform schema for the scopes data source.
+func ScopeListDataSourceSchema() schema1.Schema {
+	return schema1.Schema{
+		Attributes: map[string]schema1.Attribute{
+			"audience_id": schema1.StringAttribute{
+				MarkdownDescription: "Parent identifier `audience_id`; overrides the provider default.",
+				Optional:            true,
+			},
+			"issuer_id": schema1.StringAttribute{
+				MarkdownDescription: "Parent identifier `issuer_id`; overrides the provider default.",
+				Optional:            true,
+			},
+			"scopes": schema1.ListNestedAttribute{
+				Computed:            true,
+				MarkdownDescription: "Every scope under the parent, in the order the API lists them.",
+				NestedObject: schema1.NestedAttributeObject{Attributes: map[string]schema1.Attribute{
+					"auto": schema1.BoolAttribute{Computed: true},
+					"kind": schema1.StringAttribute{Computed: true},
+					"name": schema1.StringAttribute{
+						Computed:            true,
+						MarkdownDescription: "Full resource name.",
+					},
+					"scope_id": schema1.StringAttribute{
+						Computed:            true,
+						MarkdownDescription: "Caller-assigned resource id — the last segment of `name`.",
+					},
+				}},
+			},
+			"tenant_id": schema1.StringAttribute{
+				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default.",
+				Optional:            true,
+			},
+		},
+		MarkdownDescription: "An OAuth scope on an audience, and the access permissions it grants. The id is the scope's own name. This data source lists every one under a parent.",
+	}
+}
+
+// scopeItemFromProto converts one listed Scope into a scopes list element.
+func scopeItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Scope, *ScopeModel], e *v1alpha1.Scope) (types.Object, diag.Diagnostics) {
+	var diags diag.Diagnostics
+	var item ScopeItemModel
+	item.Name = types.StringValue(e.Name)
+	if e.Kind == "" {
+		item.Kind = types.StringNull()
+	} else {
+		item.Kind = types.StringValue(e.Kind)
+	}
+	item.Auto = types.BoolValue(e.Auto)
+	id, err := crud.IDFromName(e.Name)
+	if err != nil {
+		diags.AddError("unexpected scope name", err.Error())
+	}
+	item.ScopeId = types.StringValue(id)
+	obj, d := types.ObjectValueFrom(ctx, ScopeItemAttrTypes(), item)
+	diags.Append(d...)
+	return obj, diags
+}
+
+// scopesDataSource is the generated plural data source for Scope (List under a parent).
+type scopesDataSource struct {
+	crud *tf.Crud[*v1alpha1.Scope, *ScopeModel]
+}
+
+// NewScopesDataSource returns the generated scopes data source.
+func NewScopesDataSource() datasource.DataSource {
+	return &scopesDataSource{}
+}
+func (d *scopesDataSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_scopes"
+}
+func (d *scopesDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
+	resp.Schema = ScopeListDataSourceSchema()
+}
+func (d *scopesDataSource) Configure(_ context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
+	crud, diags := newScopeCrud(req.ProviderData)
+	resp.Diagnostics.Append(diags...)
+	d.crud = crud
+}
+func (d *scopesDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
+	if d.crud == nil {
+		resp.Diagnostics.AddError("scopes data source not configured", "Configure was not called with tf.ProviderData")
+		return
+	}
+	var m ScopesModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &m)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	entities, err := d.crud.ListAll(ctx, map[string]string{
+		"audience_id": m.AudienceId.ValueString(),
+		"issuer_id":   m.IssuerId.ValueString(),
+		"tenant_id":   m.TenantId.ValueString(),
+	})
+	if err != nil {
+		resp.Diagnostics.AddError("list scopes failed", err.Error())
+		return
+	}
+	elems := make([]attr.Value, 0, len(entities))
+	for _, e := range entities {
+		obj, diags := scopeItemFromProto(ctx, d.crud, e)
+		resp.Diagnostics.Append(diags...)
+		elems = append(elems, obj)
+	}
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	list, diags := types.ListValue(types.ObjectType{AttrTypes: ScopeItemAttrTypes()}, elems)
+	resp.Diagnostics.Append(diags...)
+	m.Items = list
+	resp.Diagnostics.Append(resp.State.Set(ctx, &m)...)
 }
 
 // newScopeAccessPermissionsAssociation builds the scope_access_permissions runtime from provider data; it returns nil (no error) before the provider is configured.

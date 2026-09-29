@@ -8,6 +8,7 @@ import (
 	v1alpha11 "git.authwise.com/authwise/apis/authwise/access/v1alpha1"
 	v1alpha1 "git.authwise.com/authwise/apis/authwise/types/core/v1alpha1"
 	tf "github.com/activatedio/tfinfra/pkg/tf"
+	attr "github.com/hashicorp/terraform-plugin-framework/attr"
 	datasource "github.com/hashicorp/terraform-plugin-framework/datasource"
 	schema1 "github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	diag "github.com/hashicorp/terraform-plugin-framework/diag"
@@ -308,6 +309,148 @@ func (d *accessRoleDataSource) Read(ctx context.Context, req datasource.ReadRequ
 		return
 	}
 	d.crud.ReadDataSource(ctx, req, resp)
+}
+
+// AccessRoleItemModel is one element of the access_roles data source's "access_roles" list.
+type AccessRoleItemModel struct {
+	AccessRoleId types.String `tfsdk:"access_role_id"`
+	Name         types.String `tfsdk:"name"`
+	Description  types.String `tfsdk:"description"`
+	DisplayName  types.String `tfsdk:"display_name"`
+}
+
+// AccessRoleItemAttrTypes returns the attribute types of one access_roles list element.
+func AccessRoleItemAttrTypes() map[string]attr.Type {
+	return map[string]attr.Type{
+		"access_role_id": types.StringType,
+		"description":    types.StringType,
+		"display_name":   types.StringType,
+		"name":           types.StringType,
+	}
+}
+
+// AccessRolesModel is the Terraform model of the access_roles data source.
+type AccessRolesModel struct {
+	TenantId   types.String `tfsdk:"tenant_id"`
+	IssuerId   types.String `tfsdk:"issuer_id"`
+	AudienceId types.String `tfsdk:"audience_id"`
+	Items      types.List   `tfsdk:"access_roles"`
+}
+
+// AccessRoleListDataSourceSchema returns the Terraform schema for the access_roles data source.
+func AccessRoleListDataSourceSchema() schema1.Schema {
+	return schema1.Schema{
+		Attributes: map[string]schema1.Attribute{
+			"access_roles": schema1.ListNestedAttribute{
+				Computed:            true,
+				MarkdownDescription: "Every access_role under the parent, in the order the API lists them.",
+				NestedObject: schema1.NestedAttributeObject{Attributes: map[string]schema1.Attribute{
+					"access_role_id": schema1.StringAttribute{
+						Computed:            true,
+						MarkdownDescription: "Caller-assigned resource id — the last segment of `name`.",
+					},
+					"description":  schema1.StringAttribute{Computed: true},
+					"display_name": schema1.StringAttribute{Computed: true},
+					"name": schema1.StringAttribute{
+						Computed:            true,
+						MarkdownDescription: "Full resource name.",
+					},
+				}},
+			},
+			"audience_id": schema1.StringAttribute{
+				MarkdownDescription: "Parent identifier `audience_id`; overrides the provider default.",
+				Optional:            true,
+			},
+			"issuer_id": schema1.StringAttribute{
+				MarkdownDescription: "Parent identifier `issuer_id`; overrides the provider default.",
+				Optional:            true,
+			},
+			"tenant_id": schema1.StringAttribute{
+				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default.",
+				Optional:            true,
+			},
+		},
+		MarkdownDescription: "A role in an audience's Access catalog. The id is the role's own name; its permissions are managed by `authwise_access_role_access_permissions`. This data source lists every one under a parent.",
+	}
+}
+
+// accessRoleItemFromProto converts one listed AccessRole into a access_roles list element.
+func accessRoleItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.AccessRole, *AccessRoleModel], e *v1alpha1.AccessRole) (types.Object, diag.Diagnostics) {
+	var diags diag.Diagnostics
+	var item AccessRoleItemModel
+	item.Name = types.StringValue(e.Name)
+	if e.Description == "" {
+		item.Description = types.StringNull()
+	} else {
+		item.Description = types.StringValue(e.Description)
+	}
+	if e.DisplayName == "" {
+		item.DisplayName = types.StringNull()
+	} else {
+		item.DisplayName = types.StringValue(e.DisplayName)
+	}
+	id, err := crud.IDFromName(e.Name)
+	if err != nil {
+		diags.AddError("unexpected access_role name", err.Error())
+	}
+	item.AccessRoleId = types.StringValue(id)
+	obj, d := types.ObjectValueFrom(ctx, AccessRoleItemAttrTypes(), item)
+	diags.Append(d...)
+	return obj, diags
+}
+
+// accessRolesDataSource is the generated plural data source for AccessRole (List under a parent).
+type accessRolesDataSource struct {
+	crud *tf.Crud[*v1alpha1.AccessRole, *AccessRoleModel]
+}
+
+// NewAccessRolesDataSource returns the generated access_roles data source.
+func NewAccessRolesDataSource() datasource.DataSource {
+	return &accessRolesDataSource{}
+}
+func (d *accessRolesDataSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_access_roles"
+}
+func (d *accessRolesDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
+	resp.Schema = AccessRoleListDataSourceSchema()
+}
+func (d *accessRolesDataSource) Configure(_ context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
+	crud, diags := newAccessRoleCrud(req.ProviderData)
+	resp.Diagnostics.Append(diags...)
+	d.crud = crud
+}
+func (d *accessRolesDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
+	if d.crud == nil {
+		resp.Diagnostics.AddError("access_roles data source not configured", "Configure was not called with tf.ProviderData")
+		return
+	}
+	var m AccessRolesModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &m)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	entities, err := d.crud.ListAll(ctx, map[string]string{
+		"audience_id": m.AudienceId.ValueString(),
+		"issuer_id":   m.IssuerId.ValueString(),
+		"tenant_id":   m.TenantId.ValueString(),
+	})
+	if err != nil {
+		resp.Diagnostics.AddError("list access_roles failed", err.Error())
+		return
+	}
+	elems := make([]attr.Value, 0, len(entities))
+	for _, e := range entities {
+		obj, diags := accessRoleItemFromProto(ctx, d.crud, e)
+		resp.Diagnostics.Append(diags...)
+		elems = append(elems, obj)
+	}
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	list, diags := types.ListValue(types.ObjectType{AttrTypes: AccessRoleItemAttrTypes()}, elems)
+	resp.Diagnostics.Append(diags...)
+	m.Items = list
+	resp.Diagnostics.Append(resp.State.Set(ctx, &m)...)
 }
 
 // newAccessRoleAccessPermissionsAssociation builds the access_role_access_permissions runtime from provider data; it returns nil (no error) before the provider is configured.

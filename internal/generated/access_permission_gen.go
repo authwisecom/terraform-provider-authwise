@@ -8,6 +8,7 @@ import (
 	v1alpha11 "git.authwise.com/authwise/apis/authwise/access/v1alpha1"
 	v1alpha1 "git.authwise.com/authwise/apis/authwise/types/core/v1alpha1"
 	tf "github.com/activatedio/tfinfra/pkg/tf"
+	attr "github.com/hashicorp/terraform-plugin-framework/attr"
 	datasource "github.com/hashicorp/terraform-plugin-framework/datasource"
 	schema1 "github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	diag "github.com/hashicorp/terraform-plugin-framework/diag"
@@ -325,4 +326,154 @@ func (d *accessPermissionDataSource) Read(ctx context.Context, req datasource.Re
 		return
 	}
 	d.crud.ReadDataSource(ctx, req, resp)
+}
+
+// AccessPermissionItemModel is one element of the access_permissions data source's "access_permissions" list.
+type AccessPermissionItemModel struct {
+	AccessPermissionId types.String `tfsdk:"access_permission_id"`
+	Name               types.String `tfsdk:"name"`
+	Service            types.String `tfsdk:"service"`
+	ResourceType       types.String `tfsdk:"resource_type"`
+	Description        types.String `tfsdk:"description"`
+}
+
+// AccessPermissionItemAttrTypes returns the attribute types of one access_permissions list element.
+func AccessPermissionItemAttrTypes() map[string]attr.Type {
+	return map[string]attr.Type{
+		"access_permission_id": types.StringType,
+		"description":          types.StringType,
+		"name":                 types.StringType,
+		"resource_type":        types.StringType,
+		"service":              types.StringType,
+	}
+}
+
+// AccessPermissionsModel is the Terraform model of the access_permissions data source.
+type AccessPermissionsModel struct {
+	TenantId   types.String `tfsdk:"tenant_id"`
+	IssuerId   types.String `tfsdk:"issuer_id"`
+	AudienceId types.String `tfsdk:"audience_id"`
+	Items      types.List   `tfsdk:"access_permissions"`
+}
+
+// AccessPermissionListDataSourceSchema returns the Terraform schema for the access_permissions data source.
+func AccessPermissionListDataSourceSchema() schema1.Schema {
+	return schema1.Schema{
+		Attributes: map[string]schema1.Attribute{
+			"access_permissions": schema1.ListNestedAttribute{
+				Computed:            true,
+				MarkdownDescription: "Every access_permission under the parent, in the order the API lists them.",
+				NestedObject: schema1.NestedAttributeObject{Attributes: map[string]schema1.Attribute{
+					"access_permission_id": schema1.StringAttribute{
+						Computed:            true,
+						MarkdownDescription: "Caller-assigned resource id — the last segment of `name`.",
+					},
+					"description": schema1.StringAttribute{Computed: true},
+					"name": schema1.StringAttribute{
+						Computed:            true,
+						MarkdownDescription: "Full resource name.",
+					},
+					"resource_type": schema1.StringAttribute{Computed: true},
+					"service":       schema1.StringAttribute{Computed: true},
+				}},
+			},
+			"audience_id": schema1.StringAttribute{
+				MarkdownDescription: "Parent identifier `audience_id`; overrides the provider default.",
+				Optional:            true,
+			},
+			"issuer_id": schema1.StringAttribute{
+				MarkdownDescription: "Parent identifier `issuer_id`; overrides the provider default.",
+				Optional:            true,
+			},
+			"tenant_id": schema1.StringAttribute{
+				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default.",
+				Optional:            true,
+			},
+		},
+		MarkdownDescription: "A permission in an audience's Access catalog. The id is the permission's own name, such as `guardcontrol.tenants.get`. This data source lists every one under a parent.",
+	}
+}
+
+// accessPermissionItemFromProto converts one listed AccessPermission into a access_permissions list element.
+func accessPermissionItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.AccessPermission, *AccessPermissionModel], e *v1alpha1.AccessPermission) (types.Object, diag.Diagnostics) {
+	var diags diag.Diagnostics
+	var item AccessPermissionItemModel
+	item.Name = types.StringValue(e.Name)
+	if e.Service == "" {
+		item.Service = types.StringNull()
+	} else {
+		item.Service = types.StringValue(e.Service)
+	}
+	if e.ResourceType == "" {
+		item.ResourceType = types.StringNull()
+	} else {
+		item.ResourceType = types.StringValue(e.ResourceType)
+	}
+	if e.Description == "" {
+		item.Description = types.StringNull()
+	} else {
+		item.Description = types.StringValue(e.Description)
+	}
+	id, err := crud.IDFromName(e.Name)
+	if err != nil {
+		diags.AddError("unexpected access_permission name", err.Error())
+	}
+	item.AccessPermissionId = types.StringValue(id)
+	obj, d := types.ObjectValueFrom(ctx, AccessPermissionItemAttrTypes(), item)
+	diags.Append(d...)
+	return obj, diags
+}
+
+// accessPermissionsDataSource is the generated plural data source for AccessPermission (List under a parent).
+type accessPermissionsDataSource struct {
+	crud *tf.Crud[*v1alpha1.AccessPermission, *AccessPermissionModel]
+}
+
+// NewAccessPermissionsDataSource returns the generated access_permissions data source.
+func NewAccessPermissionsDataSource() datasource.DataSource {
+	return &accessPermissionsDataSource{}
+}
+func (d *accessPermissionsDataSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_access_permissions"
+}
+func (d *accessPermissionsDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
+	resp.Schema = AccessPermissionListDataSourceSchema()
+}
+func (d *accessPermissionsDataSource) Configure(_ context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
+	crud, diags := newAccessPermissionCrud(req.ProviderData)
+	resp.Diagnostics.Append(diags...)
+	d.crud = crud
+}
+func (d *accessPermissionsDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
+	if d.crud == nil {
+		resp.Diagnostics.AddError("access_permissions data source not configured", "Configure was not called with tf.ProviderData")
+		return
+	}
+	var m AccessPermissionsModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &m)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	entities, err := d.crud.ListAll(ctx, map[string]string{
+		"audience_id": m.AudienceId.ValueString(),
+		"issuer_id":   m.IssuerId.ValueString(),
+		"tenant_id":   m.TenantId.ValueString(),
+	})
+	if err != nil {
+		resp.Diagnostics.AddError("list access_permissions failed", err.Error())
+		return
+	}
+	elems := make([]attr.Value, 0, len(entities))
+	for _, e := range entities {
+		obj, diags := accessPermissionItemFromProto(ctx, d.crud, e)
+		resp.Diagnostics.Append(diags...)
+		elems = append(elems, obj)
+	}
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	list, diags := types.ListValue(types.ObjectType{AttrTypes: AccessPermissionItemAttrTypes()}, elems)
+	resp.Diagnostics.Append(diags...)
+	m.Items = list
+	resp.Diagnostics.Append(resp.State.Set(ctx, &m)...)
 }

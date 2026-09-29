@@ -9,6 +9,7 @@ import (
 	v1alpha1 "git.authwise.com/authwise/apis/authwise/types/core/v1alpha1"
 	tf "github.com/activatedio/tfinfra/pkg/tf"
 	jsontypes "github.com/hashicorp/terraform-plugin-framework-jsontypes/jsontypes"
+	attr "github.com/hashicorp/terraform-plugin-framework/attr"
 	datasource "github.com/hashicorp/terraform-plugin-framework/datasource"
 	schema1 "github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	diag "github.com/hashicorp/terraform-plugin-framework/diag"
@@ -324,4 +325,142 @@ func (d *realmDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 		return
 	}
 	d.crud.ReadDataSource(ctx, req, resp)
+}
+
+// RealmItemModel is one element of the realms data source's "realms" list.
+type RealmItemModel struct {
+	Name        types.String         `tfsdk:"name"`
+	Labels      types.Map            `tfsdk:"labels"`
+	DisplayName types.String         `tfsdk:"display_name"`
+	Config      jsontypes.Normalized `tfsdk:"config"`
+}
+
+// RealmItemAttrTypes returns the attribute types of one realms list element.
+func RealmItemAttrTypes() map[string]attr.Type {
+	return map[string]attr.Type{
+		"config":       jsontypes.NormalizedType{},
+		"display_name": types.StringType,
+		"labels":       types.MapType{ElemType: types.StringType},
+		"name":         types.StringType,
+	}
+}
+
+// RealmsModel is the Terraform model of the realms data source.
+type RealmsModel struct {
+	TenantId types.String `tfsdk:"tenant_id"`
+	Items    types.List   `tfsdk:"realms"`
+}
+
+// RealmListDataSourceSchema returns the Terraform schema for the realms data source.
+func RealmListDataSourceSchema() schema1.Schema {
+	return schema1.Schema{
+		Attributes: map[string]schema1.Attribute{
+			"realms": schema1.ListNestedAttribute{
+				Computed:            true,
+				MarkdownDescription: "Every realm under the parent, in the order the API lists them.",
+				NestedObject: schema1.NestedAttributeObject{Attributes: map[string]schema1.Attribute{
+					"config": schema1.StringAttribute{
+						Computed:   true,
+						CustomType: jsontypes.NormalizedType{},
+					},
+					"display_name": schema1.StringAttribute{Computed: true},
+					"labels": schema1.MapAttribute{
+						Computed:    true,
+						ElementType: types.StringType,
+					},
+					"name": schema1.StringAttribute{
+						Computed:            true,
+						MarkdownDescription: "Full resource name.",
+					},
+				}},
+			},
+			"tenant_id": schema1.StringAttribute{
+				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default.",
+				Optional:            true,
+			},
+		},
+		MarkdownDescription: "A realm: a population of users with its own providers, factors and authentication policy. This data source lists every one under a parent.",
+	}
+}
+
+// realmItemFromProto converts one listed Realm into a realms list element.
+func realmItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Realm, *RealmModel], e *v1alpha1.Realm) (types.Object, diag.Diagnostics) {
+	var diags diag.Diagnostics
+	var item RealmItemModel
+	item.Name = types.StringValue(e.Name)
+	if len(e.Labels) == 0 {
+		item.Labels = types.MapNull(types.StringType)
+	} else {
+		v, d := types.MapValueFrom(ctx, types.StringType, e.Labels)
+		diags.Append(d...)
+		item.Labels = v
+	}
+	if e.DisplayName == "" {
+		item.DisplayName = types.StringNull()
+	} else {
+		item.DisplayName = types.StringValue(e.DisplayName)
+	}
+	if e.Config == nil {
+		item.Config = jsontypes.NewNormalizedNull()
+	} else {
+		b, err := protojson.Marshal(e.Config)
+		if err != nil {
+			diags.AddError("cannot encode config", err.Error())
+		} else {
+			item.Config = jsontypes.NewNormalizedValue(string(b))
+		}
+	}
+	obj, d := types.ObjectValueFrom(ctx, RealmItemAttrTypes(), item)
+	diags.Append(d...)
+	return obj, diags
+}
+
+// realmsDataSource is the generated plural data source for Realm (List under a parent).
+type realmsDataSource struct {
+	crud *tf.Crud[*v1alpha1.Realm, *RealmModel]
+}
+
+// NewRealmsDataSource returns the generated realms data source.
+func NewRealmsDataSource() datasource.DataSource {
+	return &realmsDataSource{}
+}
+func (d *realmsDataSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_realms"
+}
+func (d *realmsDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
+	resp.Schema = RealmListDataSourceSchema()
+}
+func (d *realmsDataSource) Configure(_ context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
+	crud, diags := newRealmCrud(req.ProviderData)
+	resp.Diagnostics.Append(diags...)
+	d.crud = crud
+}
+func (d *realmsDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
+	if d.crud == nil {
+		resp.Diagnostics.AddError("realms data source not configured", "Configure was not called with tf.ProviderData")
+		return
+	}
+	var m RealmsModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &m)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	entities, err := d.crud.ListAll(ctx, map[string]string{"tenant_id": m.TenantId.ValueString()})
+	if err != nil {
+		resp.Diagnostics.AddError("list realms failed", err.Error())
+		return
+	}
+	elems := make([]attr.Value, 0, len(entities))
+	for _, e := range entities {
+		obj, diags := realmItemFromProto(ctx, d.crud, e)
+		resp.Diagnostics.Append(diags...)
+		elems = append(elems, obj)
+	}
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	list, diags := types.ListValue(types.ObjectType{AttrTypes: RealmItemAttrTypes()}, elems)
+	resp.Diagnostics.Append(diags...)
+	m.Items = list
+	resp.Diagnostics.Append(resp.State.Set(ctx, &m)...)
 }

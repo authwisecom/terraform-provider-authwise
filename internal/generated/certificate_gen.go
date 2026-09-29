@@ -9,6 +9,7 @@ import (
 	v1alpha1 "git.authwise.com/authwise/apis/authwise/types/core/v1alpha1"
 	tf "github.com/activatedio/tfinfra/pkg/tf"
 	stringvalidator "github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+	attr "github.com/hashicorp/terraform-plugin-framework/attr"
 	datasource "github.com/hashicorp/terraform-plugin-framework/datasource"
 	schema1 "github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	diag "github.com/hashicorp/terraform-plugin-framework/diag"
@@ -489,4 +490,186 @@ func (d *certificateDataSource) Read(ctx context.Context, req datasource.ReadReq
 		return
 	}
 	d.crud.ReadDataSource(ctx, req, resp)
+}
+
+// CertificateItemModel is one element of the certificates data source's "certificates" list.
+type CertificateItemModel struct {
+	Name              types.String `tfsdk:"name"`
+	Labels            types.Map    `tfsdk:"labels"`
+	DisplayName       types.String `tfsdk:"display_name"`
+	KeyId             types.String `tfsdk:"key_id"`
+	Use               types.String `tfsdk:"use"`
+	Origin            types.String `tfsdk:"origin"`
+	Subject           types.String `tfsdk:"subject"`
+	NotBefore         types.String `tfsdk:"not_before"`
+	NotAfter          types.String `tfsdk:"not_after"`
+	FingerprintSha256 types.String `tfsdk:"fingerprint_sha256"`
+	CertificatePem    types.String `tfsdk:"certificate_pem"`
+	Status            types.String `tfsdk:"status"`
+	HasPrivateKey     types.Bool   `tfsdk:"has_private_key"`
+}
+
+// CertificateItemAttrTypes returns the attribute types of one certificates list element.
+func CertificateItemAttrTypes() map[string]attr.Type {
+	return map[string]attr.Type{
+		"certificate_pem":    types.StringType,
+		"display_name":       types.StringType,
+		"fingerprint_sha256": types.StringType,
+		"has_private_key":    types.BoolType,
+		"key_id":             types.StringType,
+		"labels":             types.MapType{ElemType: types.StringType},
+		"name":               types.StringType,
+		"not_after":          types.StringType,
+		"not_before":         types.StringType,
+		"origin":             types.StringType,
+		"status":             types.StringType,
+		"subject":            types.StringType,
+		"use":                types.StringType,
+	}
+}
+
+// CertificatesModel is the Terraform model of the certificates data source.
+type CertificatesModel struct {
+	TenantId types.String `tfsdk:"tenant_id"`
+	Items    types.List   `tfsdk:"certificates"`
+}
+
+// CertificateListDataSourceSchema returns the Terraform schema for the certificates data source.
+func CertificateListDataSourceSchema() schema1.Schema {
+	return schema1.Schema{
+		Attributes: map[string]schema1.Attribute{
+			"certificates": schema1.ListNestedAttribute{
+				Computed:            true,
+				MarkdownDescription: "Every certificate under the parent, in the order the API lists them.",
+				NestedObject: schema1.NestedAttributeObject{Attributes: map[string]schema1.Attribute{
+					"certificate_pem":    schema1.StringAttribute{Computed: true},
+					"display_name":       schema1.StringAttribute{Computed: true},
+					"fingerprint_sha256": schema1.StringAttribute{Computed: true},
+					"has_private_key":    schema1.BoolAttribute{Computed: true},
+					"key_id":             schema1.StringAttribute{Computed: true},
+					"labels": schema1.MapAttribute{
+						Computed:    true,
+						ElementType: types.StringType,
+					},
+					"name": schema1.StringAttribute{
+						Computed:            true,
+						MarkdownDescription: "Full resource name.",
+					},
+					"not_after":  schema1.StringAttribute{Computed: true},
+					"not_before": schema1.StringAttribute{Computed: true},
+					"origin":     schema1.StringAttribute{Computed: true},
+					"status":     schema1.StringAttribute{Computed: true},
+					"subject":    schema1.StringAttribute{Computed: true},
+					"use":        schema1.StringAttribute{Computed: true},
+				}},
+			},
+			"tenant_id": schema1.StringAttribute{
+				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default.",
+				Optional:            true,
+			},
+		},
+		MarkdownDescription: "A certificate and, when kit minted it, its private key. The trust anchor SAML connections verify signatures against, and the client certificate an endpoint presents for mTLS. This data source lists every one under a parent.",
+	}
+}
+
+// certificateItemFromProto converts one listed Certificate into a certificates list element.
+func certificateItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Certificate, *CertificateModel], e *v1alpha1.Certificate) (types.Object, diag.Diagnostics) {
+	var diags diag.Diagnostics
+	var item CertificateItemModel
+	item.Name = types.StringValue(e.Name)
+	if len(e.Labels) == 0 {
+		item.Labels = types.MapNull(types.StringType)
+	} else {
+		v, d := types.MapValueFrom(ctx, types.StringType, e.Labels)
+		diags.Append(d...)
+		item.Labels = v
+	}
+	item.DisplayName = types.StringValue(e.DisplayName)
+	if e.KeyId == "" {
+		item.KeyId = types.StringNull()
+	} else {
+		item.KeyId = types.StringValue(e.KeyId)
+	}
+	item.Use = tf.EnumValue(item.Use, int32(e.Use), e.Use.String())
+	item.Origin = tf.EnumValue(item.Origin, int32(e.Origin), e.Origin.String())
+	if e.Subject == "" {
+		item.Subject = types.StringNull()
+	} else {
+		item.Subject = types.StringValue(e.Subject)
+	}
+	if e.NotBefore == nil {
+		item.NotBefore = types.StringNull()
+	} else {
+		item.NotBefore = types.StringValue(e.NotBefore.AsTime().Format(time.RFC3339))
+	}
+	if e.NotAfter == nil {
+		item.NotAfter = types.StringNull()
+	} else {
+		item.NotAfter = types.StringValue(e.NotAfter.AsTime().Format(time.RFC3339))
+	}
+	if e.FingerprintSha256 == "" {
+		item.FingerprintSha256 = types.StringNull()
+	} else {
+		item.FingerprintSha256 = types.StringValue(e.FingerprintSha256)
+	}
+	if e.CertificatePem == "" {
+		item.CertificatePem = types.StringNull()
+	} else {
+		item.CertificatePem = types.StringValue(e.CertificatePem)
+	}
+	item.Status = tf.EnumValue(item.Status, int32(e.Status), e.Status.String())
+	item.HasPrivateKey = types.BoolValue(e.HasPrivateKey)
+	obj, d := types.ObjectValueFrom(ctx, CertificateItemAttrTypes(), item)
+	diags.Append(d...)
+	return obj, diags
+}
+
+// certificatesDataSource is the generated plural data source for Certificate (List under a parent).
+type certificatesDataSource struct {
+	crud *tf.Crud[*v1alpha1.Certificate, *CertificateModel]
+}
+
+// NewCertificatesDataSource returns the generated certificates data source.
+func NewCertificatesDataSource() datasource.DataSource {
+	return &certificatesDataSource{}
+}
+func (d *certificatesDataSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_certificates"
+}
+func (d *certificatesDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
+	resp.Schema = CertificateListDataSourceSchema()
+}
+func (d *certificatesDataSource) Configure(_ context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
+	crud, diags := newCertificateCrud(req.ProviderData)
+	resp.Diagnostics.Append(diags...)
+	d.crud = crud
+}
+func (d *certificatesDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
+	if d.crud == nil {
+		resp.Diagnostics.AddError("certificates data source not configured", "Configure was not called with tf.ProviderData")
+		return
+	}
+	var m CertificatesModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &m)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	entities, err := d.crud.ListAll(ctx, map[string]string{"tenant_id": m.TenantId.ValueString()})
+	if err != nil {
+		resp.Diagnostics.AddError("list certificates failed", err.Error())
+		return
+	}
+	elems := make([]attr.Value, 0, len(entities))
+	for _, e := range entities {
+		obj, diags := certificateItemFromProto(ctx, d.crud, e)
+		resp.Diagnostics.Append(diags...)
+		elems = append(elems, obj)
+	}
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	list, diags := types.ListValue(types.ObjectType{AttrTypes: CertificateItemAttrTypes()}, elems)
+	resp.Diagnostics.Append(diags...)
+	m.Items = list
+	resp.Diagnostics.Append(resp.State.Set(ctx, &m)...)
 }

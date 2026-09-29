@@ -6,6 +6,8 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -121,13 +123,45 @@ func (f *fakeIdentityServer) ListRealms(ctx context.Context, in *identitypb.List
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.recordAuth(ctx)
-	res := &identitypb.ListRealmsResponse{}
-	for name, r := range f.realms {
-		if strings.HasPrefix(name, in.GetParent()+"/") {
-			res.Realms = append(res.Realms, proto.Clone(r).(*corepb.Realm))
+	page, next := pageUnder(f.realms, in.GetParent()+"/realms/", in.GetPageToken())
+	return &identitypb.ListRealmsResponse{Realms: page, NextPageToken: next}, nil
+}
+
+// ListProviders pages the realm's providers two at a time.
+func (f *fakeIdentityServer) ListProviders(ctx context.Context, in *identitypb.ListProvidersRequest) (*identitypb.ListProvidersResponse, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.recordAuth(ctx)
+	page, next := pageUnder(f.providers, in.GetParent()+"/providers/", in.GetPageToken())
+	return &identitypb.ListProvidersResponse{Providers: page, NextPageToken: next}, nil
+}
+
+// fakePageSize is small on purpose: a list data source has to follow page
+// tokens to see everything.
+const fakePageSize = 2
+
+// pageUnder returns one page of the rows whose names start with prefix, in
+// name order, cloned, and the token of the next page ("" on the last).
+func pageUnder[M proto.Message](rows map[string]M, prefix, token string) ([]M, string) {
+
+	names := make([]string, 0, len(rows))
+	for name := range rows {
+		if strings.HasPrefix(name, prefix) {
+			names = append(names, name)
 		}
 	}
-	return res, nil
+	sort.Strings(names)
+
+	start, _ := strconv.Atoi(token)
+	end := min(start+fakePageSize, len(names))
+	page := make([]M, 0, fakePageSize)
+	for _, name := range names[min(start, end):end] {
+		page = append(page, proto.Clone(rows[name]).(M))
+	}
+	if end < len(names) {
+		return page, strconv.Itoa(end)
+	}
+	return page, ""
 }
 
 func (f *fakeIdentityServer) CreateRealm(ctx context.Context, in *identitypb.CreateRealmRequest) (*corepb.Realm, error) {

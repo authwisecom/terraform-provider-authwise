@@ -9,6 +9,7 @@ import (
 	v1alpha1 "git.authwise.com/authwise/apis/authwise/types/core/v1alpha1"
 	tf "github.com/activatedio/tfinfra/pkg/tf"
 	jsontypes "github.com/hashicorp/terraform-plugin-framework-jsontypes/jsontypes"
+	attr "github.com/hashicorp/terraform-plugin-framework/attr"
 	datasource "github.com/hashicorp/terraform-plugin-framework/datasource"
 	schema1 "github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	diag "github.com/hashicorp/terraform-plugin-framework/diag"
@@ -352,4 +353,158 @@ func (d *audienceDataSource) Read(ctx context.Context, req datasource.ReadReques
 		return
 	}
 	d.crud.ReadDataSource(ctx, req, resp)
+}
+
+// AudienceItemModel is one element of the audiences data source's "audiences" list.
+type AudienceItemModel struct {
+	Name                types.String         `tfsdk:"name"`
+	Labels              types.Map            `tfsdk:"labels"`
+	DisplayName         types.String         `tfsdk:"display_name"`
+	AppearanceProfileId types.String         `tfsdk:"appearance_profile_id"`
+	Config              jsontypes.Normalized `tfsdk:"config"`
+}
+
+// AudienceItemAttrTypes returns the attribute types of one audiences list element.
+func AudienceItemAttrTypes() map[string]attr.Type {
+	return map[string]attr.Type{
+		"appearance_profile_id": types.StringType,
+		"config":                jsontypes.NormalizedType{},
+		"display_name":          types.StringType,
+		"labels":                types.MapType{ElemType: types.StringType},
+		"name":                  types.StringType,
+	}
+}
+
+// AudiencesModel is the Terraform model of the audiences data source.
+type AudiencesModel struct {
+	TenantId types.String `tfsdk:"tenant_id"`
+	IssuerId types.String `tfsdk:"issuer_id"`
+	Items    types.List   `tfsdk:"audiences"`
+}
+
+// AudienceListDataSourceSchema returns the Terraform schema for the audiences data source.
+func AudienceListDataSourceSchema() schema1.Schema {
+	return schema1.Schema{
+		Attributes: map[string]schema1.Attribute{
+			"audiences": schema1.ListNestedAttribute{
+				Computed:            true,
+				MarkdownDescription: "Every audience under the parent, in the order the API lists them.",
+				NestedObject: schema1.NestedAttributeObject{Attributes: map[string]schema1.Attribute{
+					"appearance_profile_id": schema1.StringAttribute{Computed: true},
+					"config": schema1.StringAttribute{
+						Computed:   true,
+						CustomType: jsontypes.NormalizedType{},
+					},
+					"display_name": schema1.StringAttribute{Computed: true},
+					"labels": schema1.MapAttribute{
+						Computed:    true,
+						ElementType: types.StringType,
+					},
+					"name": schema1.StringAttribute{
+						Computed:            true,
+						MarkdownDescription: "Full resource name.",
+					},
+				}},
+			},
+			"issuer_id": schema1.StringAttribute{
+				MarkdownDescription: "Parent identifier `issuer_id`; overrides the provider default.",
+				Optional:            true,
+			},
+			"tenant_id": schema1.StringAttribute{
+				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default.",
+				Optional:            true,
+			},
+		},
+		MarkdownDescription: "An API an issuer mints access tokens for, and the audience its Access catalog hangs off. This data source lists every one under a parent.",
+	}
+}
+
+// audienceItemFromProto converts one listed Audience into a audiences list element.
+func audienceItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Audience, *AudienceModel], e *v1alpha1.Audience) (types.Object, diag.Diagnostics) {
+	var diags diag.Diagnostics
+	var item AudienceItemModel
+	item.Name = types.StringValue(e.Name)
+	if len(e.Labels) == 0 {
+		item.Labels = types.MapNull(types.StringType)
+	} else {
+		v, d := types.MapValueFrom(ctx, types.StringType, e.Labels)
+		diags.Append(d...)
+		item.Labels = v
+	}
+	if e.DisplayName == "" {
+		item.DisplayName = types.StringNull()
+	} else {
+		item.DisplayName = types.StringValue(e.DisplayName)
+	}
+	if e.AppearanceProfileId == "" {
+		item.AppearanceProfileId = types.StringNull()
+	} else {
+		item.AppearanceProfileId = types.StringValue(e.AppearanceProfileId)
+	}
+	if e.Config == nil {
+		item.Config = jsontypes.NewNormalizedNull()
+	} else {
+		b, err := protojson.Marshal(e.Config)
+		if err != nil {
+			diags.AddError("cannot encode config", err.Error())
+		} else {
+			item.Config = jsontypes.NewNormalizedValue(string(b))
+		}
+	}
+	obj, d := types.ObjectValueFrom(ctx, AudienceItemAttrTypes(), item)
+	diags.Append(d...)
+	return obj, diags
+}
+
+// audiencesDataSource is the generated plural data source for Audience (List under a parent).
+type audiencesDataSource struct {
+	crud *tf.Crud[*v1alpha1.Audience, *AudienceModel]
+}
+
+// NewAudiencesDataSource returns the generated audiences data source.
+func NewAudiencesDataSource() datasource.DataSource {
+	return &audiencesDataSource{}
+}
+func (d *audiencesDataSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_audiences"
+}
+func (d *audiencesDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
+	resp.Schema = AudienceListDataSourceSchema()
+}
+func (d *audiencesDataSource) Configure(_ context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
+	crud, diags := newAudienceCrud(req.ProviderData)
+	resp.Diagnostics.Append(diags...)
+	d.crud = crud
+}
+func (d *audiencesDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
+	if d.crud == nil {
+		resp.Diagnostics.AddError("audiences data source not configured", "Configure was not called with tf.ProviderData")
+		return
+	}
+	var m AudiencesModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &m)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	entities, err := d.crud.ListAll(ctx, map[string]string{
+		"issuer_id": m.IssuerId.ValueString(),
+		"tenant_id": m.TenantId.ValueString(),
+	})
+	if err != nil {
+		resp.Diagnostics.AddError("list audiences failed", err.Error())
+		return
+	}
+	elems := make([]attr.Value, 0, len(entities))
+	for _, e := range entities {
+		obj, diags := audienceItemFromProto(ctx, d.crud, e)
+		resp.Diagnostics.Append(diags...)
+		elems = append(elems, obj)
+	}
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	list, diags := types.ListValue(types.ObjectType{AttrTypes: AudienceItemAttrTypes()}, elems)
+	resp.Diagnostics.Append(diags...)
+	m.Items = list
+	resp.Diagnostics.Append(resp.State.Set(ctx, &m)...)
 }

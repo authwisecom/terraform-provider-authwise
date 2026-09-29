@@ -7,7 +7,8 @@
 // google.api.field_behavior annotations.
 //
 // Deferred entries (tracked in the GitLab plan):
-//   - Event (read-only; needs standalone data sources / DataSourceList)
+//   - Event (read-only: tfinfra's data sources, singular and plural, still
+//     require a Resource marker on the entry)
 //   - ClientSecret (write-once hash/salt; needs write-only arguments)
 //   - ProviderUsernamePassword config (repeated message field)
 //
@@ -64,8 +65,10 @@ func crud[E any](scope tf.Scope, opts ...any) gentf.Entry {
 		}
 	}
 	return gentf.Entry{
-		Type:            reflect.TypeFor[E](),
-		Implementations: append([]any{r, gentf.DataSource{}}, impls...),
+		Type: reflect.TypeFor[E](),
+		// Every resource gets its singular data source (Get by name) and its
+		// plural one (every entity under a parent, through List).
+		Implementations: append([]any{r, gentf.DataSource{}, gentf.DataSourceList{}}, impls...),
 	}
 }
 

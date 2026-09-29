@@ -9,6 +9,7 @@ import (
 	v1alpha1 "git.authwise.com/authwise/apis/authwise/types/core/v1alpha1"
 	tf "github.com/activatedio/tfinfra/pkg/tf"
 	jsontypes "github.com/hashicorp/terraform-plugin-framework-jsontypes/jsontypes"
+	attr "github.com/hashicorp/terraform-plugin-framework/attr"
 	datasource "github.com/hashicorp/terraform-plugin-framework/datasource"
 	schema1 "github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	diag "github.com/hashicorp/terraform-plugin-framework/diag"
@@ -447,4 +448,203 @@ func (d *clientDataSource) Read(ctx context.Context, req datasource.ReadRequest,
 		return
 	}
 	d.crud.ReadDataSource(ctx, req, resp)
+}
+
+// ClientItemModel is one element of the clients data source's "clients" list.
+type ClientItemModel struct {
+	Name                   types.String         `tfsdk:"name"`
+	Labels                 types.Map            `tfsdk:"labels"`
+	AudienceId             types.String         `tfsdk:"audience_id"`
+	DisplayName            types.String         `tfsdk:"display_name"`
+	GrantType              types.String         `tfsdk:"grant_type"`
+	ApplicationUrl         types.String         `tfsdk:"application_url"`
+	LoginUrl               types.String         `tfsdk:"login_url"`
+	PostLogoutRedirectUris types.List           `tfsdk:"post_logout_redirect_uris"`
+	AppearanceProfileId    types.String         `tfsdk:"appearance_profile_id"`
+	Config                 jsontypes.Normalized `tfsdk:"config"`
+}
+
+// ClientItemAttrTypes returns the attribute types of one clients list element.
+func ClientItemAttrTypes() map[string]attr.Type {
+	return map[string]attr.Type{
+		"appearance_profile_id":     types.StringType,
+		"application_url":           types.StringType,
+		"audience_id":               types.StringType,
+		"config":                    jsontypes.NormalizedType{},
+		"display_name":              types.StringType,
+		"grant_type":                types.StringType,
+		"labels":                    types.MapType{ElemType: types.StringType},
+		"login_url":                 types.StringType,
+		"name":                      types.StringType,
+		"post_logout_redirect_uris": types.ListType{ElemType: types.StringType},
+	}
+}
+
+// ClientsModel is the Terraform model of the clients data source.
+type ClientsModel struct {
+	TenantId types.String `tfsdk:"tenant_id"`
+	IssuerId types.String `tfsdk:"issuer_id"`
+	Items    types.List   `tfsdk:"clients"`
+}
+
+// ClientListDataSourceSchema returns the Terraform schema for the clients data source.
+func ClientListDataSourceSchema() schema1.Schema {
+	return schema1.Schema{
+		Attributes: map[string]schema1.Attribute{
+			"clients": schema1.ListNestedAttribute{
+				Computed:            true,
+				MarkdownDescription: "Every client under the parent, in the order the API lists them.",
+				NestedObject: schema1.NestedAttributeObject{Attributes: map[string]schema1.Attribute{
+					"appearance_profile_id": schema1.StringAttribute{Computed: true},
+					"application_url":       schema1.StringAttribute{Computed: true},
+					"audience_id":           schema1.StringAttribute{Computed: true},
+					"config": schema1.StringAttribute{
+						Computed:   true,
+						CustomType: jsontypes.NormalizedType{},
+					},
+					"display_name": schema1.StringAttribute{Computed: true},
+					"grant_type":   schema1.StringAttribute{Computed: true},
+					"labels": schema1.MapAttribute{
+						Computed:    true,
+						ElementType: types.StringType,
+					},
+					"login_url": schema1.StringAttribute{Computed: true},
+					"name": schema1.StringAttribute{
+						Computed:            true,
+						MarkdownDescription: "Full resource name.",
+					},
+					"post_logout_redirect_uris": schema1.ListAttribute{
+						Computed:    true,
+						ElementType: types.StringType,
+					},
+				}},
+			},
+			"issuer_id": schema1.StringAttribute{
+				MarkdownDescription: "Parent identifier `issuer_id`; overrides the provider default.",
+				Optional:            true,
+			},
+			"tenant_id": schema1.StringAttribute{
+				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default.",
+				Optional:            true,
+			},
+		},
+		MarkdownDescription: "An OAuth 2.0 client of an issuer: an application that signs people in or calls an API. This data source lists every one under a parent.",
+	}
+}
+
+// clientItemFromProto converts one listed Client into a clients list element.
+func clientItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Client, *ClientModel], e *v1alpha1.Client) (types.Object, diag.Diagnostics) {
+	var diags diag.Diagnostics
+	var item ClientItemModel
+	item.Name = types.StringValue(e.Name)
+	if len(e.Labels) == 0 {
+		item.Labels = types.MapNull(types.StringType)
+	} else {
+		v, d := types.MapValueFrom(ctx, types.StringType, e.Labels)
+		diags.Append(d...)
+		item.Labels = v
+	}
+	if e.AudienceId == "" {
+		item.AudienceId = types.StringNull()
+	} else {
+		item.AudienceId = types.StringValue(e.AudienceId)
+	}
+	if e.DisplayName == "" {
+		item.DisplayName = types.StringNull()
+	} else {
+		item.DisplayName = types.StringValue(e.DisplayName)
+	}
+	if e.GrantType == "" {
+		item.GrantType = types.StringNull()
+	} else {
+		item.GrantType = types.StringValue(e.GrantType)
+	}
+	if e.ApplicationUrl == "" {
+		item.ApplicationUrl = types.StringNull()
+	} else {
+		item.ApplicationUrl = types.StringValue(e.ApplicationUrl)
+	}
+	if e.LoginUrl == "" {
+		item.LoginUrl = types.StringNull()
+	} else {
+		item.LoginUrl = types.StringValue(e.LoginUrl)
+	}
+	if len(e.PostLogoutRedirectUris) == 0 {
+		item.PostLogoutRedirectUris = types.ListNull(types.StringType)
+	} else {
+		v, d := types.ListValueFrom(ctx, types.StringType, e.PostLogoutRedirectUris)
+		diags.Append(d...)
+		item.PostLogoutRedirectUris = v
+	}
+	if e.AppearanceProfileId == "" {
+		item.AppearanceProfileId = types.StringNull()
+	} else {
+		item.AppearanceProfileId = types.StringValue(e.AppearanceProfileId)
+	}
+	if e.Config == nil {
+		item.Config = jsontypes.NewNormalizedNull()
+	} else {
+		b, err := protojson.Marshal(e.Config)
+		if err != nil {
+			diags.AddError("cannot encode config", err.Error())
+		} else {
+			item.Config = jsontypes.NewNormalizedValue(string(b))
+		}
+	}
+	obj, d := types.ObjectValueFrom(ctx, ClientItemAttrTypes(), item)
+	diags.Append(d...)
+	return obj, diags
+}
+
+// clientsDataSource is the generated plural data source for Client (List under a parent).
+type clientsDataSource struct {
+	crud *tf.Crud[*v1alpha1.Client, *ClientModel]
+}
+
+// NewClientsDataSource returns the generated clients data source.
+func NewClientsDataSource() datasource.DataSource {
+	return &clientsDataSource{}
+}
+func (d *clientsDataSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_clients"
+}
+func (d *clientsDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
+	resp.Schema = ClientListDataSourceSchema()
+}
+func (d *clientsDataSource) Configure(_ context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
+	crud, diags := newClientCrud(req.ProviderData)
+	resp.Diagnostics.Append(diags...)
+	d.crud = crud
+}
+func (d *clientsDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
+	if d.crud == nil {
+		resp.Diagnostics.AddError("clients data source not configured", "Configure was not called with tf.ProviderData")
+		return
+	}
+	var m ClientsModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &m)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	entities, err := d.crud.ListAll(ctx, map[string]string{
+		"issuer_id": m.IssuerId.ValueString(),
+		"tenant_id": m.TenantId.ValueString(),
+	})
+	if err != nil {
+		resp.Diagnostics.AddError("list clients failed", err.Error())
+		return
+	}
+	elems := make([]attr.Value, 0, len(entities))
+	for _, e := range entities {
+		obj, diags := clientItemFromProto(ctx, d.crud, e)
+		resp.Diagnostics.Append(diags...)
+		elems = append(elems, obj)
+	}
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	list, diags := types.ListValue(types.ObjectType{AttrTypes: ClientItemAttrTypes()}, elems)
+	resp.Diagnostics.Append(diags...)
+	m.Items = list
+	resp.Diagnostics.Append(resp.State.Set(ctx, &m)...)
 }

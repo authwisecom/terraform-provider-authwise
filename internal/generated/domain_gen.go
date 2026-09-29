@@ -9,6 +9,7 @@ import (
 	v1alpha1 "git.authwise.com/authwise/apis/authwise/types/core/v1alpha1"
 	tf "github.com/activatedio/tfinfra/pkg/tf"
 	jsontypes "github.com/hashicorp/terraform-plugin-framework-jsontypes/jsontypes"
+	attr "github.com/hashicorp/terraform-plugin-framework/attr"
 	datasource "github.com/hashicorp/terraform-plugin-framework/datasource"
 	schema1 "github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	diag "github.com/hashicorp/terraform-plugin-framework/diag"
@@ -319,4 +320,145 @@ func (d *domainDataSource) Read(ctx context.Context, req datasource.ReadRequest,
 		return
 	}
 	d.crud.ReadDataSource(ctx, req, resp)
+}
+
+// DomainItemModel is one element of the domains data source's "domains" list.
+type DomainItemModel struct {
+	DomainId types.String         `tfsdk:"domain_id"`
+	Name     types.String         `tfsdk:"name"`
+	Labels   types.Map            `tfsdk:"labels"`
+	Config   jsontypes.Normalized `tfsdk:"config"`
+}
+
+// DomainItemAttrTypes returns the attribute types of one domains list element.
+func DomainItemAttrTypes() map[string]attr.Type {
+	return map[string]attr.Type{
+		"config":    jsontypes.NormalizedType{},
+		"domain_id": types.StringType,
+		"labels":    types.MapType{ElemType: types.StringType},
+		"name":      types.StringType,
+	}
+}
+
+// DomainsModel is the Terraform model of the domains data source.
+type DomainsModel struct {
+	TenantId types.String `tfsdk:"tenant_id"`
+	Items    types.List   `tfsdk:"domains"`
+}
+
+// DomainListDataSourceSchema returns the Terraform schema for the domains data source.
+func DomainListDataSourceSchema() schema1.Schema {
+	return schema1.Schema{
+		Attributes: map[string]schema1.Attribute{
+			"domains": schema1.ListNestedAttribute{
+				Computed:            true,
+				MarkdownDescription: "Every domain under the parent, in the order the API lists them.",
+				NestedObject: schema1.NestedAttributeObject{Attributes: map[string]schema1.Attribute{
+					"config": schema1.StringAttribute{
+						Computed:   true,
+						CustomType: jsontypes.NormalizedType{},
+					},
+					"domain_id": schema1.StringAttribute{
+						Computed:            true,
+						MarkdownDescription: "Caller-assigned resource id — the last segment of `name`.",
+					},
+					"labels": schema1.MapAttribute{
+						Computed:    true,
+						ElementType: types.StringType,
+					},
+					"name": schema1.StringAttribute{
+						Computed:            true,
+						MarkdownDescription: "Full resource name.",
+					},
+				}},
+			},
+			"tenant_id": schema1.StringAttribute{
+				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default.",
+				Optional:            true,
+			},
+		},
+		MarkdownDescription: "A domain the tenant serves logins on. The id is the domain name itself. This data source lists every one under a parent.",
+	}
+}
+
+// domainItemFromProto converts one listed Domain into a domains list element.
+func domainItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Domain, *DomainModel], e *v1alpha1.Domain) (types.Object, diag.Diagnostics) {
+	var diags diag.Diagnostics
+	var item DomainItemModel
+	item.Name = types.StringValue(e.Name)
+	if len(e.Labels) == 0 {
+		item.Labels = types.MapNull(types.StringType)
+	} else {
+		v, d := types.MapValueFrom(ctx, types.StringType, e.Labels)
+		diags.Append(d...)
+		item.Labels = v
+	}
+	if e.Config == nil {
+		item.Config = jsontypes.NewNormalizedNull()
+	} else {
+		b, err := protojson.Marshal(e.Config)
+		if err != nil {
+			diags.AddError("cannot encode config", err.Error())
+		} else {
+			item.Config = jsontypes.NewNormalizedValue(string(b))
+		}
+	}
+	id, err := crud.IDFromName(e.Name)
+	if err != nil {
+		diags.AddError("unexpected domain name", err.Error())
+	}
+	item.DomainId = types.StringValue(id)
+	obj, d := types.ObjectValueFrom(ctx, DomainItemAttrTypes(), item)
+	diags.Append(d...)
+	return obj, diags
+}
+
+// domainsDataSource is the generated plural data source for Domain (List under a parent).
+type domainsDataSource struct {
+	crud *tf.Crud[*v1alpha1.Domain, *DomainModel]
+}
+
+// NewDomainsDataSource returns the generated domains data source.
+func NewDomainsDataSource() datasource.DataSource {
+	return &domainsDataSource{}
+}
+func (d *domainsDataSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_domains"
+}
+func (d *domainsDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
+	resp.Schema = DomainListDataSourceSchema()
+}
+func (d *domainsDataSource) Configure(_ context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
+	crud, diags := newDomainCrud(req.ProviderData)
+	resp.Diagnostics.Append(diags...)
+	d.crud = crud
+}
+func (d *domainsDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
+	if d.crud == nil {
+		resp.Diagnostics.AddError("domains data source not configured", "Configure was not called with tf.ProviderData")
+		return
+	}
+	var m DomainsModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &m)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	entities, err := d.crud.ListAll(ctx, map[string]string{"tenant_id": m.TenantId.ValueString()})
+	if err != nil {
+		resp.Diagnostics.AddError("list domains failed", err.Error())
+		return
+	}
+	elems := make([]attr.Value, 0, len(entities))
+	for _, e := range entities {
+		obj, diags := domainItemFromProto(ctx, d.crud, e)
+		resp.Diagnostics.Append(diags...)
+		elems = append(elems, obj)
+	}
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	list, diags := types.ListValue(types.ObjectType{AttrTypes: DomainItemAttrTypes()}, elems)
+	resp.Diagnostics.Append(diags...)
+	m.Items = list
+	resp.Diagnostics.Append(resp.State.Set(ctx, &m)...)
 }

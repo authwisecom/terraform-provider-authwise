@@ -9,6 +9,7 @@ import (
 	v1alpha1 "git.authwise.com/authwise/apis/authwise/types/core/v1alpha1"
 	tf "github.com/activatedio/tfinfra/pkg/tf"
 	jsontypes "github.com/hashicorp/terraform-plugin-framework-jsontypes/jsontypes"
+	attr "github.com/hashicorp/terraform-plugin-framework/attr"
 	datasource "github.com/hashicorp/terraform-plugin-framework/datasource"
 	schema1 "github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	diag "github.com/hashicorp/terraform-plugin-framework/diag"
@@ -357,4 +358,158 @@ func (d *factorDataSource) Read(ctx context.Context, req datasource.ReadRequest,
 		return
 	}
 	d.crud.ReadDataSource(ctx, req, resp)
+}
+
+// FactorItemModel is one element of the factors data source's "factors" list.
+type FactorItemModel struct {
+	Name        types.String         `tfsdk:"name"`
+	Labels      types.Map            `tfsdk:"labels"`
+	DisplayName types.String         `tfsdk:"display_name"`
+	FactorType  types.String         `tfsdk:"factor_type"`
+	Config      jsontypes.Normalized `tfsdk:"config"`
+	Status      types.String         `tfsdk:"status"`
+}
+
+// FactorItemAttrTypes returns the attribute types of one factors list element.
+func FactorItemAttrTypes() map[string]attr.Type {
+	return map[string]attr.Type{
+		"config":       jsontypes.NormalizedType{},
+		"display_name": types.StringType,
+		"factor_type":  types.StringType,
+		"labels":       types.MapType{ElemType: types.StringType},
+		"name":         types.StringType,
+		"status":       types.StringType,
+	}
+}
+
+// FactorsModel is the Terraform model of the factors data source.
+type FactorsModel struct {
+	TenantId types.String `tfsdk:"tenant_id"`
+	RealmId  types.String `tfsdk:"realm_id"`
+	Items    types.List   `tfsdk:"factors"`
+}
+
+// FactorListDataSourceSchema returns the Terraform schema for the factors data source.
+func FactorListDataSourceSchema() schema1.Schema {
+	return schema1.Schema{
+		Attributes: map[string]schema1.Attribute{
+			"factors": schema1.ListNestedAttribute{
+				Computed:            true,
+				MarkdownDescription: "Every factor under the parent, in the order the API lists them.",
+				NestedObject: schema1.NestedAttributeObject{Attributes: map[string]schema1.Attribute{
+					"config": schema1.StringAttribute{
+						Computed:   true,
+						CustomType: jsontypes.NormalizedType{},
+					},
+					"display_name": schema1.StringAttribute{Computed: true},
+					"factor_type":  schema1.StringAttribute{Computed: true},
+					"labels": schema1.MapAttribute{
+						Computed:    true,
+						ElementType: types.StringType,
+					},
+					"name": schema1.StringAttribute{
+						Computed:            true,
+						MarkdownDescription: "Full resource name.",
+					},
+					"status": schema1.StringAttribute{Computed: true},
+				}},
+			},
+			"realm_id": schema1.StringAttribute{
+				MarkdownDescription: "Parent identifier `realm_id`; overrides the provider default.",
+				Optional:            true,
+			},
+			"tenant_id": schema1.StringAttribute{
+				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default.",
+				Optional:            true,
+			},
+		},
+		MarkdownDescription: "A second step a realm offers, such as TOTP, WebAuthn or Duo. `config` comes from the matching config data source; disabling keeps enrolled authenticators, destroying does not. This data source lists every one under a parent.",
+	}
+}
+
+// factorItemFromProto converts one listed Factor into a factors list element.
+func factorItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Factor, *FactorModel], e *v1alpha1.Factor) (types.Object, diag.Diagnostics) {
+	var diags diag.Diagnostics
+	var item FactorItemModel
+	item.Name = types.StringValue(e.Name)
+	if len(e.Labels) == 0 {
+		item.Labels = types.MapNull(types.StringType)
+	} else {
+		v, d := types.MapValueFrom(ctx, types.StringType, e.Labels)
+		diags.Append(d...)
+		item.Labels = v
+	}
+	item.DisplayName = types.StringValue(e.DisplayName)
+	item.FactorType = types.StringValue(e.FactorType)
+	if e.Config == nil {
+		item.Config = jsontypes.NewNormalizedNull()
+	} else {
+		b, err := protojson.Marshal(e.Config)
+		if err != nil {
+			diags.AddError("cannot encode config", err.Error())
+		} else {
+			item.Config = jsontypes.NewNormalizedValue(string(b))
+		}
+	}
+	if e.Status == "" {
+		item.Status = types.StringNull()
+	} else {
+		item.Status = types.StringValue(e.Status)
+	}
+	obj, d := types.ObjectValueFrom(ctx, FactorItemAttrTypes(), item)
+	diags.Append(d...)
+	return obj, diags
+}
+
+// factorsDataSource is the generated plural data source for Factor (List under a parent).
+type factorsDataSource struct {
+	crud *tf.Crud[*v1alpha1.Factor, *FactorModel]
+}
+
+// NewFactorsDataSource returns the generated factors data source.
+func NewFactorsDataSource() datasource.DataSource {
+	return &factorsDataSource{}
+}
+func (d *factorsDataSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_factors"
+}
+func (d *factorsDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
+	resp.Schema = FactorListDataSourceSchema()
+}
+func (d *factorsDataSource) Configure(_ context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
+	crud, diags := newFactorCrud(req.ProviderData)
+	resp.Diagnostics.Append(diags...)
+	d.crud = crud
+}
+func (d *factorsDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
+	if d.crud == nil {
+		resp.Diagnostics.AddError("factors data source not configured", "Configure was not called with tf.ProviderData")
+		return
+	}
+	var m FactorsModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &m)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	entities, err := d.crud.ListAll(ctx, map[string]string{
+		"realm_id":  m.RealmId.ValueString(),
+		"tenant_id": m.TenantId.ValueString(),
+	})
+	if err != nil {
+		resp.Diagnostics.AddError("list factors failed", err.Error())
+		return
+	}
+	elems := make([]attr.Value, 0, len(entities))
+	for _, e := range entities {
+		obj, diags := factorItemFromProto(ctx, d.crud, e)
+		resp.Diagnostics.Append(diags...)
+		elems = append(elems, obj)
+	}
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	list, diags := types.ListValue(types.ObjectType{AttrTypes: FactorItemAttrTypes()}, elems)
+	resp.Diagnostics.Append(diags...)
+	m.Items = list
+	resp.Diagnostics.Append(resp.State.Set(ctx, &m)...)
 }

@@ -9,6 +9,7 @@ import (
 	v1alpha1 "git.authwise.com/authwise/apis/authwise/types/core/v1alpha1"
 	tf "github.com/activatedio/tfinfra/pkg/tf"
 	jsontypes "github.com/hashicorp/terraform-plugin-framework-jsontypes/jsontypes"
+	attr "github.com/hashicorp/terraform-plugin-framework/attr"
 	datasource "github.com/hashicorp/terraform-plugin-framework/datasource"
 	schema1 "github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	diag "github.com/hashicorp/terraform-plugin-framework/diag"
@@ -501,4 +502,222 @@ func (d *themeDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 		return
 	}
 	d.crud.ReadDataSource(ctx, req, resp)
+}
+
+// ThemeItemModel is one element of the themes data source's "themes" list.
+type ThemeItemModel struct {
+	Name                            types.String         `tfsdk:"name"`
+	Labels                          types.Map            `tfsdk:"labels"`
+	DisplayName                     types.String         `tfsdk:"display_name"`
+	Stylesheet                      types.String         `tfsdk:"stylesheet"`
+	StylesheetAttributes            jsontypes.Normalized `tfsdk:"stylesheet_attributes"`
+	ContentSchema                   types.String         `tfsdk:"content_schema"`
+	Content                         jsontypes.Normalized `tfsdk:"content"`
+	StylesheetAttributesSchema      types.String         `tfsdk:"stylesheet_attributes_schema"`
+	PlaceholderStylesheetAttributes jsontypes.Normalized `tfsdk:"placeholder_stylesheet_attributes"`
+	PlaceholderContent              jsontypes.Normalized `tfsdk:"placeholder_content"`
+	Layout                          types.String         `tfsdk:"layout"`
+}
+
+// ThemeItemAttrTypes returns the attribute types of one themes list element.
+func ThemeItemAttrTypes() map[string]attr.Type {
+	return map[string]attr.Type{
+		"content":                           jsontypes.NormalizedType{},
+		"content_schema":                    types.StringType,
+		"display_name":                      types.StringType,
+		"labels":                            types.MapType{ElemType: types.StringType},
+		"layout":                            types.StringType,
+		"name":                              types.StringType,
+		"placeholder_content":               jsontypes.NormalizedType{},
+		"placeholder_stylesheet_attributes": jsontypes.NormalizedType{},
+		"stylesheet":                        types.StringType,
+		"stylesheet_attributes":             jsontypes.NormalizedType{},
+		"stylesheet_attributes_schema":      types.StringType,
+	}
+}
+
+// ThemesModel is the Terraform model of the themes data source.
+type ThemesModel struct {
+	TenantId types.String `tfsdk:"tenant_id"`
+	Items    types.List   `tfsdk:"themes"`
+}
+
+// ThemeListDataSourceSchema returns the Terraform schema for the themes data source.
+func ThemeListDataSourceSchema() schema1.Schema {
+	return schema1.Schema{
+		Attributes: map[string]schema1.Attribute{
+			"tenant_id": schema1.StringAttribute{
+				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default.",
+				Optional:            true,
+			},
+			"themes": schema1.ListNestedAttribute{
+				Computed:            true,
+				MarkdownDescription: "Every theme under the parent, in the order the API lists them.",
+				NestedObject: schema1.NestedAttributeObject{Attributes: map[string]schema1.Attribute{
+					"content": schema1.StringAttribute{
+						Computed:   true,
+						CustomType: jsontypes.NormalizedType{},
+					},
+					"content_schema": schema1.StringAttribute{Computed: true},
+					"display_name":   schema1.StringAttribute{Computed: true},
+					"labels": schema1.MapAttribute{
+						Computed:    true,
+						ElementType: types.StringType,
+					},
+					"layout": schema1.StringAttribute{Computed: true},
+					"name": schema1.StringAttribute{
+						Computed:            true,
+						MarkdownDescription: "Full resource name.",
+					},
+					"placeholder_content": schema1.StringAttribute{
+						Computed:   true,
+						CustomType: jsontypes.NormalizedType{},
+					},
+					"placeholder_stylesheet_attributes": schema1.StringAttribute{
+						Computed:   true,
+						CustomType: jsontypes.NormalizedType{},
+					},
+					"stylesheet": schema1.StringAttribute{Computed: true},
+					"stylesheet_attributes": schema1.StringAttribute{
+						Computed:   true,
+						CustomType: jsontypes.NormalizedType{},
+					},
+					"stylesheet_attributes_schema": schema1.StringAttribute{Computed: true},
+				}},
+			},
+		},
+		MarkdownDescription: "A tenant theme: the stylesheet and content the hosted login pages render with. This data source lists every one under a parent.",
+	}
+}
+
+// themeItemFromProto converts one listed Theme into a themes list element.
+func themeItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Theme, *ThemeModel], e *v1alpha1.Theme) (types.Object, diag.Diagnostics) {
+	var diags diag.Diagnostics
+	var item ThemeItemModel
+	item.Name = types.StringValue(e.Name)
+	if len(e.Labels) == 0 {
+		item.Labels = types.MapNull(types.StringType)
+	} else {
+		v, d := types.MapValueFrom(ctx, types.StringType, e.Labels)
+		diags.Append(d...)
+		item.Labels = v
+	}
+	if e.DisplayName == "" {
+		item.DisplayName = types.StringNull()
+	} else {
+		item.DisplayName = types.StringValue(e.DisplayName)
+	}
+	if e.Stylesheet == "" {
+		item.Stylesheet = types.StringNull()
+	} else {
+		item.Stylesheet = types.StringValue(e.Stylesheet)
+	}
+	if e.StylesheetAttributes == nil {
+		item.StylesheetAttributes = jsontypes.NewNormalizedNull()
+	} else {
+		b, err := protojson.Marshal(e.StylesheetAttributes)
+		if err != nil {
+			diags.AddError("cannot encode stylesheet_attributes", err.Error())
+		} else {
+			item.StylesheetAttributes = jsontypes.NewNormalizedValue(string(b))
+		}
+	}
+	if e.ContentSchema == "" {
+		item.ContentSchema = types.StringNull()
+	} else {
+		item.ContentSchema = types.StringValue(e.ContentSchema)
+	}
+	if e.Content == nil {
+		item.Content = jsontypes.NewNormalizedNull()
+	} else {
+		b, err := protojson.Marshal(e.Content)
+		if err != nil {
+			diags.AddError("cannot encode content", err.Error())
+		} else {
+			item.Content = jsontypes.NewNormalizedValue(string(b))
+		}
+	}
+	if e.StylesheetAttributesSchema == "" {
+		item.StylesheetAttributesSchema = types.StringNull()
+	} else {
+		item.StylesheetAttributesSchema = types.StringValue(e.StylesheetAttributesSchema)
+	}
+	if e.PlaceholderStylesheetAttributes == nil {
+		item.PlaceholderStylesheetAttributes = jsontypes.NewNormalizedNull()
+	} else {
+		b, err := protojson.Marshal(e.PlaceholderStylesheetAttributes)
+		if err != nil {
+			diags.AddError("cannot encode placeholder_stylesheet_attributes", err.Error())
+		} else {
+			item.PlaceholderStylesheetAttributes = jsontypes.NewNormalizedValue(string(b))
+		}
+	}
+	if e.PlaceholderContent == nil {
+		item.PlaceholderContent = jsontypes.NewNormalizedNull()
+	} else {
+		b, err := protojson.Marshal(e.PlaceholderContent)
+		if err != nil {
+			diags.AddError("cannot encode placeholder_content", err.Error())
+		} else {
+			item.PlaceholderContent = jsontypes.NewNormalizedValue(string(b))
+		}
+	}
+	if e.Layout == "" {
+		item.Layout = types.StringNull()
+	} else {
+		item.Layout = types.StringValue(e.Layout)
+	}
+	obj, d := types.ObjectValueFrom(ctx, ThemeItemAttrTypes(), item)
+	diags.Append(d...)
+	return obj, diags
+}
+
+// themesDataSource is the generated plural data source for Theme (List under a parent).
+type themesDataSource struct {
+	crud *tf.Crud[*v1alpha1.Theme, *ThemeModel]
+}
+
+// NewThemesDataSource returns the generated themes data source.
+func NewThemesDataSource() datasource.DataSource {
+	return &themesDataSource{}
+}
+func (d *themesDataSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_themes"
+}
+func (d *themesDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
+	resp.Schema = ThemeListDataSourceSchema()
+}
+func (d *themesDataSource) Configure(_ context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
+	crud, diags := newThemeCrud(req.ProviderData)
+	resp.Diagnostics.Append(diags...)
+	d.crud = crud
+}
+func (d *themesDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
+	if d.crud == nil {
+		resp.Diagnostics.AddError("themes data source not configured", "Configure was not called with tf.ProviderData")
+		return
+	}
+	var m ThemesModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &m)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	entities, err := d.crud.ListAll(ctx, map[string]string{"tenant_id": m.TenantId.ValueString()})
+	if err != nil {
+		resp.Diagnostics.AddError("list themes failed", err.Error())
+		return
+	}
+	elems := make([]attr.Value, 0, len(entities))
+	for _, e := range entities {
+		obj, diags := themeItemFromProto(ctx, d.crud, e)
+		resp.Diagnostics.Append(diags...)
+		elems = append(elems, obj)
+	}
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	list, diags := types.ListValue(types.ObjectType{AttrTypes: ThemeItemAttrTypes()}, elems)
+	resp.Diagnostics.Append(diags...)
+	m.Items = list
+	resp.Diagnostics.Append(resp.State.Set(ctx, &m)...)
 }

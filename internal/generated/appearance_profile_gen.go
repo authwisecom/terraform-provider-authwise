@@ -9,6 +9,7 @@ import (
 	v1alpha1 "git.authwise.com/authwise/apis/authwise/types/core/v1alpha1"
 	tf "github.com/activatedio/tfinfra/pkg/tf"
 	jsontypes "github.com/hashicorp/terraform-plugin-framework-jsontypes/jsontypes"
+	attr "github.com/hashicorp/terraform-plugin-framework/attr"
 	datasource "github.com/hashicorp/terraform-plugin-framework/datasource"
 	schema1 "github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	diag "github.com/hashicorp/terraform-plugin-framework/diag"
@@ -389,4 +390,174 @@ func (d *appearanceProfileDataSource) Read(ctx context.Context, req datasource.R
 		return
 	}
 	d.crud.ReadDataSource(ctx, req, resp)
+}
+
+// AppearanceProfileItemModel is one element of the appearance_profiles data source's "appearance_profiles" list.
+type AppearanceProfileItemModel struct {
+	Name                 types.String         `tfsdk:"name"`
+	Labels               types.Map            `tfsdk:"labels"`
+	DisplayName          types.String         `tfsdk:"display_name"`
+	ThemeId              types.String         `tfsdk:"theme_id"`
+	StylesheetAttributes jsontypes.Normalized `tfsdk:"stylesheet_attributes"`
+	Content              jsontypes.Normalized `tfsdk:"content"`
+}
+
+// AppearanceProfileItemAttrTypes returns the attribute types of one appearance_profiles list element.
+func AppearanceProfileItemAttrTypes() map[string]attr.Type {
+	return map[string]attr.Type{
+		"content":               jsontypes.NormalizedType{},
+		"display_name":          types.StringType,
+		"labels":                types.MapType{ElemType: types.StringType},
+		"name":                  types.StringType,
+		"stylesheet_attributes": jsontypes.NormalizedType{},
+		"theme_id":              types.StringType,
+	}
+}
+
+// AppearanceProfilesModel is the Terraform model of the appearance_profiles data source.
+type AppearanceProfilesModel struct {
+	TenantId types.String `tfsdk:"tenant_id"`
+	IssuerId types.String `tfsdk:"issuer_id"`
+	Items    types.List   `tfsdk:"appearance_profiles"`
+}
+
+// AppearanceProfileListDataSourceSchema returns the Terraform schema for the appearance_profiles data source.
+func AppearanceProfileListDataSourceSchema() schema1.Schema {
+	return schema1.Schema{
+		Attributes: map[string]schema1.Attribute{
+			"appearance_profiles": schema1.ListNestedAttribute{
+				Computed:            true,
+				MarkdownDescription: "Every appearance_profile under the parent, in the order the API lists them.",
+				NestedObject: schema1.NestedAttributeObject{Attributes: map[string]schema1.Attribute{
+					"content": schema1.StringAttribute{
+						Computed:   true,
+						CustomType: jsontypes.NormalizedType{},
+					},
+					"display_name": schema1.StringAttribute{Computed: true},
+					"labels": schema1.MapAttribute{
+						Computed:    true,
+						ElementType: types.StringType,
+					},
+					"name": schema1.StringAttribute{
+						Computed:            true,
+						MarkdownDescription: "Full resource name.",
+					},
+					"stylesheet_attributes": schema1.StringAttribute{
+						Computed:   true,
+						CustomType: jsontypes.NormalizedType{},
+					},
+					"theme_id": schema1.StringAttribute{Computed: true},
+				}},
+			},
+			"issuer_id": schema1.StringAttribute{
+				MarkdownDescription: "Parent identifier `issuer_id`; overrides the provider default.",
+				Optional:            true,
+			},
+			"tenant_id": schema1.StringAttribute{
+				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default.",
+				Optional:            true,
+			},
+		},
+		MarkdownDescription: "An issuer's appearance profile: the stylesheet and content its login pages use. This data source lists every one under a parent.",
+	}
+}
+
+// appearanceProfileItemFromProto converts one listed AppearanceProfile into a appearance_profiles list element.
+func appearanceProfileItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.AppearanceProfile, *AppearanceProfileModel], e *v1alpha1.AppearanceProfile) (types.Object, diag.Diagnostics) {
+	var diags diag.Diagnostics
+	var item AppearanceProfileItemModel
+	item.Name = types.StringValue(e.Name)
+	if len(e.Labels) == 0 {
+		item.Labels = types.MapNull(types.StringType)
+	} else {
+		v, d := types.MapValueFrom(ctx, types.StringType, e.Labels)
+		diags.Append(d...)
+		item.Labels = v
+	}
+	if e.DisplayName == "" {
+		item.DisplayName = types.StringNull()
+	} else {
+		item.DisplayName = types.StringValue(e.DisplayName)
+	}
+	if e.ThemeId == "" {
+		item.ThemeId = types.StringNull()
+	} else {
+		item.ThemeId = types.StringValue(e.ThemeId)
+	}
+	if e.StylesheetAttributes == nil {
+		item.StylesheetAttributes = jsontypes.NewNormalizedNull()
+	} else {
+		b, err := protojson.Marshal(e.StylesheetAttributes)
+		if err != nil {
+			diags.AddError("cannot encode stylesheet_attributes", err.Error())
+		} else {
+			item.StylesheetAttributes = jsontypes.NewNormalizedValue(string(b))
+		}
+	}
+	if e.Content == nil {
+		item.Content = jsontypes.NewNormalizedNull()
+	} else {
+		b, err := protojson.Marshal(e.Content)
+		if err != nil {
+			diags.AddError("cannot encode content", err.Error())
+		} else {
+			item.Content = jsontypes.NewNormalizedValue(string(b))
+		}
+	}
+	obj, d := types.ObjectValueFrom(ctx, AppearanceProfileItemAttrTypes(), item)
+	diags.Append(d...)
+	return obj, diags
+}
+
+// appearanceProfilesDataSource is the generated plural data source for AppearanceProfile (List under a parent).
+type appearanceProfilesDataSource struct {
+	crud *tf.Crud[*v1alpha1.AppearanceProfile, *AppearanceProfileModel]
+}
+
+// NewAppearanceProfilesDataSource returns the generated appearance_profiles data source.
+func NewAppearanceProfilesDataSource() datasource.DataSource {
+	return &appearanceProfilesDataSource{}
+}
+func (d *appearanceProfilesDataSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_appearance_profiles"
+}
+func (d *appearanceProfilesDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
+	resp.Schema = AppearanceProfileListDataSourceSchema()
+}
+func (d *appearanceProfilesDataSource) Configure(_ context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
+	crud, diags := newAppearanceProfileCrud(req.ProviderData)
+	resp.Diagnostics.Append(diags...)
+	d.crud = crud
+}
+func (d *appearanceProfilesDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
+	if d.crud == nil {
+		resp.Diagnostics.AddError("appearance_profiles data source not configured", "Configure was not called with tf.ProviderData")
+		return
+	}
+	var m AppearanceProfilesModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &m)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	entities, err := d.crud.ListAll(ctx, map[string]string{
+		"issuer_id": m.IssuerId.ValueString(),
+		"tenant_id": m.TenantId.ValueString(),
+	})
+	if err != nil {
+		resp.Diagnostics.AddError("list appearance_profiles failed", err.Error())
+		return
+	}
+	elems := make([]attr.Value, 0, len(entities))
+	for _, e := range entities {
+		obj, diags := appearanceProfileItemFromProto(ctx, d.crud, e)
+		resp.Diagnostics.Append(diags...)
+		elems = append(elems, obj)
+	}
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	list, diags := types.ListValue(types.ObjectType{AttrTypes: AppearanceProfileItemAttrTypes()}, elems)
+	resp.Diagnostics.Append(diags...)
+	m.Items = list
+	resp.Diagnostics.Append(resp.State.Set(ctx, &m)...)
 }

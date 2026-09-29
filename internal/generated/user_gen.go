@@ -9,6 +9,7 @@ import (
 	v1alpha1 "git.authwise.com/authwise/apis/authwise/types/core/v1alpha1"
 	tf "github.com/activatedio/tfinfra/pkg/tf"
 	jsontypes "github.com/hashicorp/terraform-plugin-framework-jsontypes/jsontypes"
+	attr "github.com/hashicorp/terraform-plugin-framework/attr"
 	datasource "github.com/hashicorp/terraform-plugin-framework/datasource"
 	schema1 "github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	diag "github.com/hashicorp/terraform-plugin-framework/diag"
@@ -703,4 +704,318 @@ func (d *userDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 		return
 	}
 	d.crud.ReadDataSource(ctx, req, resp)
+}
+
+// UserItemModel is one element of the users data source's "users" list.
+type UserItemModel struct {
+	Name                types.String         `tfsdk:"name"`
+	Labels              types.Map            `tfsdk:"labels"`
+	DisplayName         types.String         `tfsdk:"display_name"`
+	GivenName           types.String         `tfsdk:"given_name"`
+	FamilyName          types.String         `tfsdk:"family_name"`
+	MiddleName          types.String         `tfsdk:"middle_name"`
+	Nickname            types.String         `tfsdk:"nickname"`
+	PreferredUsername   types.String         `tfsdk:"preferred_username"`
+	Email               types.String         `tfsdk:"email"`
+	EmailVerified       types.Bool           `tfsdk:"email_verified"`
+	Gender              types.String         `tfsdk:"gender"`
+	PhoneNumber         types.String         `tfsdk:"phone_number"`
+	PhoneNumberVerified types.Bool           `tfsdk:"phone_number_verified"`
+	Profile             types.String         `tfsdk:"profile"`
+	Picture             types.String         `tfsdk:"picture"`
+	Website             types.String         `tfsdk:"website"`
+	Birthdate           types.String         `tfsdk:"birthdate"`
+	Zoneinfo            types.String         `tfsdk:"zoneinfo"`
+	Locale              types.String         `tfsdk:"locale"`
+	Metadata            jsontypes.Normalized `tfsdk:"metadata"`
+	ExtraFields         jsontypes.Normalized `tfsdk:"extra_fields"`
+	UpdatedAt           types.String         `tfsdk:"updated_at"`
+	Status              types.String         `tfsdk:"status"`
+	Origin              types.String         `tfsdk:"origin"`
+	Enrollment          types.String         `tfsdk:"enrollment"`
+}
+
+// UserItemAttrTypes returns the attribute types of one users list element.
+func UserItemAttrTypes() map[string]attr.Type {
+	return map[string]attr.Type{
+		"birthdate":             types.StringType,
+		"display_name":          types.StringType,
+		"email":                 types.StringType,
+		"email_verified":        types.BoolType,
+		"enrollment":            types.StringType,
+		"extra_fields":          jsontypes.NormalizedType{},
+		"family_name":           types.StringType,
+		"gender":                types.StringType,
+		"given_name":            types.StringType,
+		"labels":                types.MapType{ElemType: types.StringType},
+		"locale":                types.StringType,
+		"metadata":              jsontypes.NormalizedType{},
+		"middle_name":           types.StringType,
+		"name":                  types.StringType,
+		"nickname":              types.StringType,
+		"origin":                types.StringType,
+		"phone_number":          types.StringType,
+		"phone_number_verified": types.BoolType,
+		"picture":               types.StringType,
+		"preferred_username":    types.StringType,
+		"profile":               types.StringType,
+		"status":                types.StringType,
+		"updated_at":            types.StringType,
+		"website":               types.StringType,
+		"zoneinfo":              types.StringType,
+	}
+}
+
+// UsersModel is the Terraform model of the users data source.
+type UsersModel struct {
+	TenantId types.String `tfsdk:"tenant_id"`
+	RealmId  types.String `tfsdk:"realm_id"`
+	Items    types.List   `tfsdk:"users"`
+}
+
+// UserListDataSourceSchema returns the Terraform schema for the users data source.
+func UserListDataSourceSchema() schema1.Schema {
+	return schema1.Schema{
+		Attributes: map[string]schema1.Attribute{
+			"realm_id": schema1.StringAttribute{
+				MarkdownDescription: "Parent identifier `realm_id`; overrides the provider default.",
+				Optional:            true,
+			},
+			"tenant_id": schema1.StringAttribute{
+				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default.",
+				Optional:            true,
+			},
+			"users": schema1.ListNestedAttribute{
+				Computed:            true,
+				MarkdownDescription: "Every user under the parent, in the order the API lists them.",
+				NestedObject: schema1.NestedAttributeObject{Attributes: map[string]schema1.Attribute{
+					"birthdate":      schema1.StringAttribute{Computed: true},
+					"display_name":   schema1.StringAttribute{Computed: true},
+					"email":          schema1.StringAttribute{Computed: true},
+					"email_verified": schema1.BoolAttribute{Computed: true},
+					"enrollment":     schema1.StringAttribute{Computed: true},
+					"extra_fields": schema1.StringAttribute{
+						Computed:   true,
+						CustomType: jsontypes.NormalizedType{},
+					},
+					"family_name": schema1.StringAttribute{Computed: true},
+					"gender":      schema1.StringAttribute{Computed: true},
+					"given_name":  schema1.StringAttribute{Computed: true},
+					"labels": schema1.MapAttribute{
+						Computed:    true,
+						ElementType: types.StringType,
+					},
+					"locale": schema1.StringAttribute{Computed: true},
+					"metadata": schema1.StringAttribute{
+						Computed:   true,
+						CustomType: jsontypes.NormalizedType{},
+					},
+					"middle_name": schema1.StringAttribute{Computed: true},
+					"name": schema1.StringAttribute{
+						Computed:            true,
+						MarkdownDescription: "Full resource name.",
+					},
+					"nickname":              schema1.StringAttribute{Computed: true},
+					"origin":                schema1.StringAttribute{Computed: true},
+					"phone_number":          schema1.StringAttribute{Computed: true},
+					"phone_number_verified": schema1.BoolAttribute{Computed: true},
+					"picture":               schema1.StringAttribute{Computed: true},
+					"preferred_username":    schema1.StringAttribute{Computed: true},
+					"profile":               schema1.StringAttribute{Computed: true},
+					"status":                schema1.StringAttribute{Computed: true},
+					"updated_at":            schema1.StringAttribute{Computed: true},
+					"website":               schema1.StringAttribute{Computed: true},
+					"zoneinfo":              schema1.StringAttribute{Computed: true},
+				}},
+			},
+		},
+		MarkdownDescription: "A user in a realm. This data source lists every one under a parent.",
+	}
+}
+
+// userItemFromProto converts one listed User into a users list element.
+func userItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.User, *UserModel], e *v1alpha1.User) (types.Object, diag.Diagnostics) {
+	var diags diag.Diagnostics
+	var item UserItemModel
+	item.Name = types.StringValue(e.Name)
+	if len(e.Labels) == 0 {
+		item.Labels = types.MapNull(types.StringType)
+	} else {
+		v, d := types.MapValueFrom(ctx, types.StringType, e.Labels)
+		diags.Append(d...)
+		item.Labels = v
+	}
+	if e.DisplayName == "" {
+		item.DisplayName = types.StringNull()
+	} else {
+		item.DisplayName = types.StringValue(e.DisplayName)
+	}
+	if e.GivenName == "" {
+		item.GivenName = types.StringNull()
+	} else {
+		item.GivenName = types.StringValue(e.GivenName)
+	}
+	if e.FamilyName == "" {
+		item.FamilyName = types.StringNull()
+	} else {
+		item.FamilyName = types.StringValue(e.FamilyName)
+	}
+	if e.MiddleName == "" {
+		item.MiddleName = types.StringNull()
+	} else {
+		item.MiddleName = types.StringValue(e.MiddleName)
+	}
+	if e.Nickname == "" {
+		item.Nickname = types.StringNull()
+	} else {
+		item.Nickname = types.StringValue(e.Nickname)
+	}
+	if e.PreferredUsername == "" {
+		item.PreferredUsername = types.StringNull()
+	} else {
+		item.PreferredUsername = types.StringValue(e.PreferredUsername)
+	}
+	if e.Email == "" {
+		item.Email = types.StringNull()
+	} else {
+		item.Email = types.StringValue(e.Email)
+	}
+	item.EmailVerified = types.BoolValue(e.EmailVerified)
+	if e.Gender == "" {
+		item.Gender = types.StringNull()
+	} else {
+		item.Gender = types.StringValue(e.Gender)
+	}
+	if e.PhoneNumber == "" {
+		item.PhoneNumber = types.StringNull()
+	} else {
+		item.PhoneNumber = types.StringValue(e.PhoneNumber)
+	}
+	item.PhoneNumberVerified = types.BoolValue(e.PhoneNumberVerified)
+	if e.Profile == "" {
+		item.Profile = types.StringNull()
+	} else {
+		item.Profile = types.StringValue(e.Profile)
+	}
+	if e.Picture == "" {
+		item.Picture = types.StringNull()
+	} else {
+		item.Picture = types.StringValue(e.Picture)
+	}
+	if e.Website == "" {
+		item.Website = types.StringNull()
+	} else {
+		item.Website = types.StringValue(e.Website)
+	}
+	if e.Birthdate == "" {
+		item.Birthdate = types.StringNull()
+	} else {
+		item.Birthdate = types.StringValue(e.Birthdate)
+	}
+	if e.Zoneinfo == "" {
+		item.Zoneinfo = types.StringNull()
+	} else {
+		item.Zoneinfo = types.StringValue(e.Zoneinfo)
+	}
+	if e.Locale == "" {
+		item.Locale = types.StringNull()
+	} else {
+		item.Locale = types.StringValue(e.Locale)
+	}
+	if e.Metadata == nil {
+		item.Metadata = jsontypes.NewNormalizedNull()
+	} else {
+		b, err := protojson.Marshal(e.Metadata)
+		if err != nil {
+			diags.AddError("cannot encode metadata", err.Error())
+		} else {
+			item.Metadata = jsontypes.NewNormalizedValue(string(b))
+		}
+	}
+	if e.ExtraFields == nil {
+		item.ExtraFields = jsontypes.NewNormalizedNull()
+	} else {
+		b, err := protojson.Marshal(e.ExtraFields)
+		if err != nil {
+			diags.AddError("cannot encode extra_fields", err.Error())
+		} else {
+			item.ExtraFields = jsontypes.NewNormalizedValue(string(b))
+		}
+	}
+	if e.UpdatedAt == nil {
+		item.UpdatedAt = types.StringNull()
+	} else {
+		item.UpdatedAt = types.StringValue(e.UpdatedAt.AsTime().Format(time.RFC3339))
+	}
+	if e.Status == "" {
+		item.Status = types.StringNull()
+	} else {
+		item.Status = types.StringValue(e.Status)
+	}
+	if e.Origin == "" {
+		item.Origin = types.StringNull()
+	} else {
+		item.Origin = types.StringValue(e.Origin)
+	}
+	if e.Enrollment == "" {
+		item.Enrollment = types.StringNull()
+	} else {
+		item.Enrollment = types.StringValue(e.Enrollment)
+	}
+	obj, d := types.ObjectValueFrom(ctx, UserItemAttrTypes(), item)
+	diags.Append(d...)
+	return obj, diags
+}
+
+// usersDataSource is the generated plural data source for User (List under a parent).
+type usersDataSource struct {
+	crud *tf.Crud[*v1alpha1.User, *UserModel]
+}
+
+// NewUsersDataSource returns the generated users data source.
+func NewUsersDataSource() datasource.DataSource {
+	return &usersDataSource{}
+}
+func (d *usersDataSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_users"
+}
+func (d *usersDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
+	resp.Schema = UserListDataSourceSchema()
+}
+func (d *usersDataSource) Configure(_ context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
+	crud, diags := newUserCrud(req.ProviderData)
+	resp.Diagnostics.Append(diags...)
+	d.crud = crud
+}
+func (d *usersDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
+	if d.crud == nil {
+		resp.Diagnostics.AddError("users data source not configured", "Configure was not called with tf.ProviderData")
+		return
+	}
+	var m UsersModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &m)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	entities, err := d.crud.ListAll(ctx, map[string]string{
+		"realm_id":  m.RealmId.ValueString(),
+		"tenant_id": m.TenantId.ValueString(),
+	})
+	if err != nil {
+		resp.Diagnostics.AddError("list users failed", err.Error())
+		return
+	}
+	elems := make([]attr.Value, 0, len(entities))
+	for _, e := range entities {
+		obj, diags := userItemFromProto(ctx, d.crud, e)
+		resp.Diagnostics.Append(diags...)
+		elems = append(elems, obj)
+	}
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	list, diags := types.ListValue(types.ObjectType{AttrTypes: UserItemAttrTypes()}, elems)
+	resp.Diagnostics.Append(diags...)
+	m.Items = list
+	resp.Diagnostics.Append(resp.State.Set(ctx, &m)...)
 }

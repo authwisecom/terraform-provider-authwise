@@ -8,6 +8,7 @@ import (
 	v1alpha11 "git.authwise.com/authwise/apis/authwise/access/v1alpha1"
 	v1alpha1 "git.authwise.com/authwise/apis/authwise/types/core/v1alpha1"
 	tf "github.com/activatedio/tfinfra/pkg/tf"
+	attr "github.com/hashicorp/terraform-plugin-framework/attr"
 	datasource "github.com/hashicorp/terraform-plugin-framework/datasource"
 	schema1 "github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	diag "github.com/hashicorp/terraform-plugin-framework/diag"
@@ -381,4 +382,171 @@ func (d *accessBindingDataSource) Read(ctx context.Context, req datasource.ReadR
 		return
 	}
 	d.crud.ReadDataSource(ctx, req, resp)
+}
+
+// AccessBindingItemModel is one element of the access_bindings data source's "access_bindings" list.
+type AccessBindingItemModel struct {
+	Name         types.String `tfsdk:"name"`
+	SubjectType  types.String `tfsdk:"subject_type"`
+	SubjectId    types.String `tfsdk:"subject_id"`
+	RoleName     types.String `tfsdk:"role_name"`
+	ResourceType types.String `tfsdk:"resource_type"`
+	ResourceId   types.String `tfsdk:"resource_id"`
+	ConditionId  types.String `tfsdk:"condition_id"`
+	ExpiresAt    types.String `tfsdk:"expires_at"`
+	CreatedBy    types.String `tfsdk:"created_by"`
+}
+
+// AccessBindingItemAttrTypes returns the attribute types of one access_bindings list element.
+func AccessBindingItemAttrTypes() map[string]attr.Type {
+	return map[string]attr.Type{
+		"condition_id":  types.StringType,
+		"created_by":    types.StringType,
+		"expires_at":    types.StringType,
+		"name":          types.StringType,
+		"resource_id":   types.StringType,
+		"resource_type": types.StringType,
+		"role_name":     types.StringType,
+		"subject_id":    types.StringType,
+		"subject_type":  types.StringType,
+	}
+}
+
+// AccessBindingsModel is the Terraform model of the access_bindings data source.
+type AccessBindingsModel struct {
+	TenantId   types.String `tfsdk:"tenant_id"`
+	IssuerId   types.String `tfsdk:"issuer_id"`
+	AudienceId types.String `tfsdk:"audience_id"`
+	Items      types.List   `tfsdk:"access_bindings"`
+}
+
+// AccessBindingListDataSourceSchema returns the Terraform schema for the access_bindings data source.
+func AccessBindingListDataSourceSchema() schema1.Schema {
+	return schema1.Schema{
+		Attributes: map[string]schema1.Attribute{
+			"access_bindings": schema1.ListNestedAttribute{
+				Computed:            true,
+				MarkdownDescription: "Every access_binding under the parent, in the order the API lists them.",
+				NestedObject: schema1.NestedAttributeObject{Attributes: map[string]schema1.Attribute{
+					"condition_id": schema1.StringAttribute{Computed: true},
+					"created_by":   schema1.StringAttribute{Computed: true},
+					"expires_at":   schema1.StringAttribute{Computed: true},
+					"name": schema1.StringAttribute{
+						Computed:            true,
+						MarkdownDescription: "Full resource name.",
+					},
+					"resource_id":   schema1.StringAttribute{Computed: true},
+					"resource_type": schema1.StringAttribute{Computed: true},
+					"role_name":     schema1.StringAttribute{Computed: true},
+					"subject_id":    schema1.StringAttribute{Computed: true},
+					"subject_type":  schema1.StringAttribute{Computed: true},
+				}},
+			},
+			"audience_id": schema1.StringAttribute{
+				MarkdownDescription: "Parent identifier `audience_id`; overrides the provider default.",
+				Optional:            true,
+			},
+			"issuer_id": schema1.StringAttribute{
+				MarkdownDescription: "Parent identifier `issuer_id`; overrides the provider default.",
+				Optional:            true,
+			},
+			"tenant_id": schema1.StringAttribute{
+				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default.",
+				Optional:            true,
+			},
+		},
+		MarkdownDescription: "A binding that grants a subject a role in an audience's Access catalog. This data source lists every one under a parent.",
+	}
+}
+
+// accessBindingItemFromProto converts one listed AccessBinding into a access_bindings list element.
+func accessBindingItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.AccessBinding, *AccessBindingModel], e *v1alpha1.AccessBinding) (types.Object, diag.Diagnostics) {
+	var diags diag.Diagnostics
+	var item AccessBindingItemModel
+	item.Name = types.StringValue(e.Name)
+	item.SubjectType = types.StringValue(e.SubjectType)
+	item.SubjectId = types.StringValue(e.SubjectId)
+	item.RoleName = types.StringValue(e.RoleName)
+	if e.ResourceType == "" {
+		item.ResourceType = types.StringNull()
+	} else {
+		item.ResourceType = types.StringValue(e.ResourceType)
+	}
+	if e.ResourceId == "" {
+		item.ResourceId = types.StringNull()
+	} else {
+		item.ResourceId = types.StringValue(e.ResourceId)
+	}
+	if e.ConditionId == "" {
+		item.ConditionId = types.StringNull()
+	} else {
+		item.ConditionId = types.StringValue(e.ConditionId)
+	}
+	if e.ExpiresAt == nil {
+		item.ExpiresAt = types.StringNull()
+	} else {
+		item.ExpiresAt = types.StringValue(e.ExpiresAt.AsTime().Format(time.RFC3339))
+	}
+	if e.CreatedBy == "" {
+		item.CreatedBy = types.StringNull()
+	} else {
+		item.CreatedBy = types.StringValue(e.CreatedBy)
+	}
+	obj, d := types.ObjectValueFrom(ctx, AccessBindingItemAttrTypes(), item)
+	diags.Append(d...)
+	return obj, diags
+}
+
+// accessBindingsDataSource is the generated plural data source for AccessBinding (List under a parent).
+type accessBindingsDataSource struct {
+	crud *tf.Crud[*v1alpha1.AccessBinding, *AccessBindingModel]
+}
+
+// NewAccessBindingsDataSource returns the generated access_bindings data source.
+func NewAccessBindingsDataSource() datasource.DataSource {
+	return &accessBindingsDataSource{}
+}
+func (d *accessBindingsDataSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_access_bindings"
+}
+func (d *accessBindingsDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
+	resp.Schema = AccessBindingListDataSourceSchema()
+}
+func (d *accessBindingsDataSource) Configure(_ context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
+	crud, diags := newAccessBindingCrud(req.ProviderData)
+	resp.Diagnostics.Append(diags...)
+	d.crud = crud
+}
+func (d *accessBindingsDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
+	if d.crud == nil {
+		resp.Diagnostics.AddError("access_bindings data source not configured", "Configure was not called with tf.ProviderData")
+		return
+	}
+	var m AccessBindingsModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &m)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	entities, err := d.crud.ListAll(ctx, map[string]string{
+		"audience_id": m.AudienceId.ValueString(),
+		"issuer_id":   m.IssuerId.ValueString(),
+		"tenant_id":   m.TenantId.ValueString(),
+	})
+	if err != nil {
+		resp.Diagnostics.AddError("list access_bindings failed", err.Error())
+		return
+	}
+	elems := make([]attr.Value, 0, len(entities))
+	for _, e := range entities {
+		obj, diags := accessBindingItemFromProto(ctx, d.crud, e)
+		resp.Diagnostics.Append(diags...)
+		elems = append(elems, obj)
+	}
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	list, diags := types.ListValue(types.ObjectType{AttrTypes: AccessBindingItemAttrTypes()}, elems)
+	resp.Diagnostics.Append(diags...)
+	m.Items = list
+	resp.Diagnostics.Append(resp.State.Set(ctx, &m)...)
 }

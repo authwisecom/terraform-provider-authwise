@@ -9,6 +9,7 @@ import (
 	v1alpha1 "git.authwise.com/authwise/apis/authwise/types/core/v1alpha1"
 	tf "github.com/activatedio/tfinfra/pkg/tf"
 	jsontypes "github.com/hashicorp/terraform-plugin-framework-jsontypes/jsontypes"
+	attr "github.com/hashicorp/terraform-plugin-framework/attr"
 	datasource "github.com/hashicorp/terraform-plugin-framework/datasource"
 	schema1 "github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	diag "github.com/hashicorp/terraform-plugin-framework/diag"
@@ -358,4 +359,158 @@ func (d *issuerDataSource) Read(ctx context.Context, req datasource.ReadRequest,
 		return
 	}
 	d.crud.ReadDataSource(ctx, req, resp)
+}
+
+// IssuerItemModel is one element of the issuers data source's "issuers" list.
+type IssuerItemModel struct {
+	Name                types.String         `tfsdk:"name"`
+	Labels              types.Map            `tfsdk:"labels"`
+	DomainName          types.String         `tfsdk:"domain_name"`
+	Path                types.String         `tfsdk:"path"`
+	Config              jsontypes.Normalized `tfsdk:"config"`
+	AppearanceProfileId types.String         `tfsdk:"appearance_profile_id"`
+}
+
+// IssuerItemAttrTypes returns the attribute types of one issuers list element.
+func IssuerItemAttrTypes() map[string]attr.Type {
+	return map[string]attr.Type{
+		"appearance_profile_id": types.StringType,
+		"config":                jsontypes.NormalizedType{},
+		"domain_name":           types.StringType,
+		"labels":                types.MapType{ElemType: types.StringType},
+		"name":                  types.StringType,
+		"path":                  types.StringType,
+	}
+}
+
+// IssuersModel is the Terraform model of the issuers data source.
+type IssuersModel struct {
+	TenantId types.String `tfsdk:"tenant_id"`
+	Items    types.List   `tfsdk:"issuers"`
+}
+
+// IssuerListDataSourceSchema returns the Terraform schema for the issuers data source.
+func IssuerListDataSourceSchema() schema1.Schema {
+	return schema1.Schema{
+		Attributes: map[string]schema1.Attribute{
+			"issuers": schema1.ListNestedAttribute{
+				Computed:            true,
+				MarkdownDescription: "Every issuer under the parent, in the order the API lists them.",
+				NestedObject: schema1.NestedAttributeObject{Attributes: map[string]schema1.Attribute{
+					"appearance_profile_id": schema1.StringAttribute{Computed: true},
+					"config": schema1.StringAttribute{
+						Computed:   true,
+						CustomType: jsontypes.NormalizedType{},
+					},
+					"domain_name": schema1.StringAttribute{Computed: true},
+					"labels": schema1.MapAttribute{
+						Computed:    true,
+						ElementType: types.StringType,
+					},
+					"name": schema1.StringAttribute{
+						Computed:            true,
+						MarkdownDescription: "Full resource name.",
+					},
+					"path": schema1.StringAttribute{Computed: true},
+				}},
+			},
+			"tenant_id": schema1.StringAttribute{
+				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default.",
+				Optional:            true,
+			},
+		},
+		MarkdownDescription: "An OAuth 2.0 / OpenID Connect issuer: the login a set of clients shares, with its domain, token lifetimes and which realm or realms people sign in to (`config`). This data source lists every one under a parent.",
+	}
+}
+
+// issuerItemFromProto converts one listed Issuer into a issuers list element.
+func issuerItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Issuer, *IssuerModel], e *v1alpha1.Issuer) (types.Object, diag.Diagnostics) {
+	var diags diag.Diagnostics
+	var item IssuerItemModel
+	item.Name = types.StringValue(e.Name)
+	if len(e.Labels) == 0 {
+		item.Labels = types.MapNull(types.StringType)
+	} else {
+		v, d := types.MapValueFrom(ctx, types.StringType, e.Labels)
+		diags.Append(d...)
+		item.Labels = v
+	}
+	if e.DomainName == "" {
+		item.DomainName = types.StringNull()
+	} else {
+		item.DomainName = types.StringValue(e.DomainName)
+	}
+	if e.Path == "" {
+		item.Path = types.StringNull()
+	} else {
+		item.Path = types.StringValue(e.Path)
+	}
+	if e.Config == nil {
+		item.Config = jsontypes.NewNormalizedNull()
+	} else {
+		b, err := protojson.Marshal(e.Config)
+		if err != nil {
+			diags.AddError("cannot encode config", err.Error())
+		} else {
+			item.Config = jsontypes.NewNormalizedValue(string(b))
+		}
+	}
+	if e.AppearanceProfileId == "" {
+		item.AppearanceProfileId = types.StringNull()
+	} else {
+		item.AppearanceProfileId = types.StringValue(e.AppearanceProfileId)
+	}
+	obj, d := types.ObjectValueFrom(ctx, IssuerItemAttrTypes(), item)
+	diags.Append(d...)
+	return obj, diags
+}
+
+// issuersDataSource is the generated plural data source for Issuer (List under a parent).
+type issuersDataSource struct {
+	crud *tf.Crud[*v1alpha1.Issuer, *IssuerModel]
+}
+
+// NewIssuersDataSource returns the generated issuers data source.
+func NewIssuersDataSource() datasource.DataSource {
+	return &issuersDataSource{}
+}
+func (d *issuersDataSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_issuers"
+}
+func (d *issuersDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
+	resp.Schema = IssuerListDataSourceSchema()
+}
+func (d *issuersDataSource) Configure(_ context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
+	crud, diags := newIssuerCrud(req.ProviderData)
+	resp.Diagnostics.Append(diags...)
+	d.crud = crud
+}
+func (d *issuersDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
+	if d.crud == nil {
+		resp.Diagnostics.AddError("issuers data source not configured", "Configure was not called with tf.ProviderData")
+		return
+	}
+	var m IssuersModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &m)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	entities, err := d.crud.ListAll(ctx, map[string]string{"tenant_id": m.TenantId.ValueString()})
+	if err != nil {
+		resp.Diagnostics.AddError("list issuers failed", err.Error())
+		return
+	}
+	elems := make([]attr.Value, 0, len(entities))
+	for _, e := range entities {
+		obj, diags := issuerItemFromProto(ctx, d.crud, e)
+		resp.Diagnostics.Append(diags...)
+		elems = append(elems, obj)
+	}
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	list, diags := types.ListValue(types.ObjectType{AttrTypes: IssuerItemAttrTypes()}, elems)
+	resp.Diagnostics.Append(diags...)
+	m.Items = list
+	resp.Diagnostics.Append(resp.State.Set(ctx, &m)...)
 }

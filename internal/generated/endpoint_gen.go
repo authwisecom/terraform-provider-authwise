@@ -490,3 +490,199 @@ func (d *endpointDataSource) Read(ctx context.Context, req datasource.ReadReques
 	}
 	d.crud.ReadDataSource(ctx, req, resp)
 }
+
+// EndpointItemModel is one element of the endpoints data source's "endpoints" list.
+type EndpointItemModel struct {
+	Name         types.String         `tfsdk:"name"`
+	Labels       types.Map            `tfsdk:"labels"`
+	DisplayName  types.String         `tfsdk:"display_name"`
+	EndpointType types.String         `tfsdk:"endpoint_type"`
+	Address      types.String         `tfsdk:"address"`
+	Insecure     types.Bool           `tfsdk:"insecure"`
+	Auth         jsontypes.Normalized `tfsdk:"auth"`
+	Tls          types.Object         `tfsdk:"tls"`
+	Timeout      types.String         `tfsdk:"timeout"`
+}
+
+// EndpointItemAttrTypes returns the attribute types of one endpoints list element.
+func EndpointItemAttrTypes() map[string]attr.Type {
+	return map[string]attr.Type{
+		"address":       types.StringType,
+		"auth":          jsontypes.NormalizedType{},
+		"display_name":  types.StringType,
+		"endpoint_type": types.StringType,
+		"insecure":      types.BoolType,
+		"labels":        types.MapType{ElemType: types.StringType},
+		"name":          types.StringType,
+		"timeout":       types.StringType,
+		"tls":           types.ObjectType{AttrTypes: EndpointTlsAttrTypes()},
+	}
+}
+
+// EndpointsModel is the Terraform model of the endpoints data source.
+type EndpointsModel struct {
+	TenantId types.String `tfsdk:"tenant_id"`
+	Items    types.List   `tfsdk:"endpoints"`
+}
+
+// EndpointListDataSourceSchema returns the Terraform schema for the endpoints data source.
+func EndpointListDataSourceSchema() schema1.Schema {
+	return schema1.Schema{
+		Attributes: map[string]schema1.Attribute{
+			"endpoints": schema1.ListNestedAttribute{
+				Computed:            true,
+				MarkdownDescription: "Every endpoint under the parent, in the order the API lists them.",
+				NestedObject: schema1.NestedAttributeObject{Attributes: map[string]schema1.Attribute{
+					"address": schema1.StringAttribute{Computed: true},
+					"auth": schema1.StringAttribute{
+						Computed:   true,
+						CustomType: jsontypes.NormalizedType{},
+					},
+					"display_name":  schema1.StringAttribute{Computed: true},
+					"endpoint_type": schema1.StringAttribute{Computed: true},
+					"insecure":      schema1.BoolAttribute{Computed: true},
+					"labels": schema1.MapAttribute{
+						Computed:    true,
+						ElementType: types.StringType,
+					},
+					"name": schema1.StringAttribute{
+						Computed:            true,
+						MarkdownDescription: "Full resource name.",
+					},
+					"timeout": schema1.StringAttribute{Computed: true},
+					"tls": schema1.SingleNestedAttribute{
+						Attributes: map[string]schema1.Attribute{
+							"ca_pem":               schema1.StringAttribute{Computed: true},
+							"client_certificate":   schema1.StringAttribute{Computed: true},
+							"insecure_skip_verify": schema1.BoolAttribute{Computed: true},
+							"server_name":          schema1.StringAttribute{Computed: true},
+						},
+						Computed: true,
+					},
+				}},
+			},
+			"tenant_id": schema1.StringAttribute{
+				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default.",
+				Optional:            true,
+			},
+		},
+		MarkdownDescription: "A service kit calls out to: its transport and address, how kit verifies it (`tls`), how kit authenticates to it (`auth`), and the per-call deadline (`timeout`). This data source lists every one under a parent.",
+	}
+}
+
+// endpointItemFromProto converts one listed Endpoint into a endpoints list element.
+func endpointItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Endpoint, *EndpointModel], e *v1alpha1.Endpoint) (types.Object, diag.Diagnostics) {
+	var diags diag.Diagnostics
+	var item EndpointItemModel
+	item.Name = types.StringValue(e.Name)
+	if len(e.Labels) == 0 {
+		item.Labels = types.MapNull(types.StringType)
+	} else {
+		v, d := types.MapValueFrom(ctx, types.StringType, e.Labels)
+		diags.Append(d...)
+		item.Labels = v
+	}
+	if e.DisplayName == "" {
+		item.DisplayName = types.StringNull()
+	} else {
+		item.DisplayName = types.StringValue(e.DisplayName)
+	}
+	item.EndpointType = tf.EnumValue(item.EndpointType, int32(e.EndpointType), e.EndpointType.String())
+	if e.Address == "" {
+		item.Address = types.StringNull()
+	} else {
+		item.Address = types.StringValue(e.Address)
+	}
+	item.Insecure = types.BoolValue(e.Insecure)
+	if e.Auth == nil {
+		item.Auth = jsontypes.NewNormalizedNull()
+	} else {
+		b, err := protojson.Marshal(e.Auth)
+		if err != nil {
+			diags.AddError("cannot encode auth", err.Error())
+		} else {
+			item.Auth = jsontypes.NewNormalizedValue(string(b))
+		}
+	}
+	if e.Tls == nil {
+		item.Tls = types.ObjectNull(EndpointTlsAttrTypes())
+	} else {
+		var n EndpointTlsModel
+		if !item.Tls.IsNull() && !item.Tls.IsUnknown() {
+			diags.Append(item.Tls.As(ctx, &n, basetypes.ObjectAsOptions{})...)
+		}
+		if e.Tls.CaPem == "" {
+			n.CaPem = types.StringNull()
+		} else {
+			n.CaPem = types.StringValue(e.Tls.CaPem)
+		}
+		if e.Tls.ServerName == "" {
+			n.ServerName = types.StringNull()
+		} else {
+			n.ServerName = types.StringValue(e.Tls.ServerName)
+		}
+		n.InsecureSkipVerify = types.BoolValue(e.Tls.InsecureSkipVerify)
+		if e.Tls.ClientCertificate == "" {
+			n.ClientCertificate = types.StringNull()
+		} else {
+			n.ClientCertificate = types.StringValue(e.Tls.ClientCertificate)
+		}
+		obj, d := types.ObjectValueFrom(ctx, EndpointTlsAttrTypes(), n)
+		diags.Append(d...)
+		item.Tls = obj
+	}
+	item.Timeout = tf.DurationValue(item.Timeout, e.Timeout)
+	obj, d := types.ObjectValueFrom(ctx, EndpointItemAttrTypes(), item)
+	diags.Append(d...)
+	return obj, diags
+}
+
+// endpointsDataSource is the generated plural data source for Endpoint (List under a parent).
+type endpointsDataSource struct {
+	crud *tf.Crud[*v1alpha1.Endpoint, *EndpointModel]
+}
+
+// NewEndpointsDataSource returns the generated endpoints data source.
+func NewEndpointsDataSource() datasource.DataSource {
+	return &endpointsDataSource{}
+}
+func (d *endpointsDataSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_endpoints"
+}
+func (d *endpointsDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
+	resp.Schema = EndpointListDataSourceSchema()
+}
+func (d *endpointsDataSource) Configure(_ context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
+	crud, diags := newEndpointCrud(req.ProviderData)
+	resp.Diagnostics.Append(diags...)
+	d.crud = crud
+}
+func (d *endpointsDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
+	if d.crud == nil {
+		resp.Diagnostics.AddError("endpoints data source not configured", "Configure was not called with tf.ProviderData")
+		return
+	}
+	var m EndpointsModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &m)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	entities, err := d.crud.ListAll(ctx, map[string]string{"tenant_id": m.TenantId.ValueString()})
+	if err != nil {
+		resp.Diagnostics.AddError("list endpoints failed", err.Error())
+		return
+	}
+	elems := make([]attr.Value, 0, len(entities))
+	for _, e := range entities {
+		obj, diags := endpointItemFromProto(ctx, d.crud, e)
+		resp.Diagnostics.Append(diags...)
+		elems = append(elems, obj)
+	}
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	list, diags := types.ListValue(types.ObjectType{AttrTypes: EndpointItemAttrTypes()}, elems)
+	resp.Diagnostics.Append(diags...)
+	m.Items = list
+	resp.Diagnostics.Append(resp.State.Set(ctx, &m)...)
+}

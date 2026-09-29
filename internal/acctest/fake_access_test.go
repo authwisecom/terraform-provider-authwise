@@ -88,6 +88,14 @@ func (f *fakeAccessServer) CreateAccessPermission(_ context.Context, in *accessp
 	return proto.Clone(p).(*corepb.AccessPermission), nil
 }
 
+// ListAccessPermissions pages the audience's catalog two at a time.
+func (f *fakeAccessServer) ListAccessPermissions(_ context.Context, in *accesspb.ListAccessPermissionsRequest) (*accesspb.ListAccessPermissionsResponse, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	page, next := pageUnder(f.permissions, in.GetParent()+"/access-permissions/", in.GetPageToken())
+	return &accesspb.ListAccessPermissionsResponse{AccessPermissions: page, NextPageToken: next}, nil
+}
+
 func (f *fakeAccessServer) PatchAccessPermission(_ context.Context, in *accesspb.PatchAccessPermissionRequest) (*corepb.AccessPermission, error) {
 
 	f.mu.Lock()
