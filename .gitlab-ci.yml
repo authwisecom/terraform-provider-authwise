@@ -75,6 +75,40 @@ test:
     - if: '$CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/'
     - if: '$CI_COMMIT_BRANCH'
 
+# The acceptance tier: the real terraform CLI against the provider and the
+# in-memory kit stub (internal/acctest), plus every example applied
+# verbatim. Two Terraform versions: 1.11 is the floor (write-only
+# arguments, which authwise_secret's payload_wo needs) and the other is the
+# current release. hc-install (the version terraform-plugin-testing already
+# pins) runs pinned with @version, since its CLI's own dependencies are not
+# in this module's go.sum.
+acceptance:
+  stage: test
+  extends: .go-cache
+  parallel:
+    matrix:
+      - TF_VERSION: ["1.11.4", "1.15.9"]
+  script:
+    - mkdir -p .terraform-bin/${TF_VERSION}
+    - '[ -x ".terraform-bin/${TF_VERSION}/terraform" ] || go run github.com/hashicorp/hc-install/cmd/hc-install@v0.9.4 install -version "${TF_VERSION}" -path ".terraform-bin/${TF_VERSION}" terraform'
+    - export PATH="$CI_PROJECT_DIR/.terraform-bin/${TF_VERSION}:$PATH"
+    - export TF_ACC_TERRAFORM_PATH="$CI_PROJECT_DIR/.terraform-bin/${TF_VERSION}/terraform"
+    - terraform version
+    - TF_ACC=1 go test -count=1 -timeout 30m ./internal/acctest/...
+  cache:
+    - key:
+        files:
+          - go.sum
+      paths:
+        - .go
+        - .golangci-lint
+    - key: terraform-${TF_VERSION}
+      paths:
+        - .terraform-bin
+  rules:
+    - if: '$CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/'
+    - if: '$CI_COMMIT_BRANCH'
+
 lint:
   stage: lint
   extends: .go-cache
@@ -117,7 +151,7 @@ lint:
 publish-dev:
   stage: release
   extends: .go-cache
-  needs: [version, test, lint]
+  needs: [version, test, acceptance, lint]
   script:
     - !reference [.dist, script]
     - !reference [.registry-upload, script]
@@ -130,7 +164,7 @@ publish-dev:
 release:
   stage: release
   extends: .go-cache
-  needs: [version, test, lint]
+  needs: [version, test, acceptance, lint]
   script:
     - !reference [.dist, script]
     - !reference [.registry-upload, script]
