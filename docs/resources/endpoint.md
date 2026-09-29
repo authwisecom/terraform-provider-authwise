@@ -107,7 +107,7 @@ them the same way.
 
 | `endpoint_type` | `address` | plaintext |
 | --- | --- | --- |
-| `REST` (the default; leave unset) | an absolute `http(s)://` URL with no userinfo; the base a consumer appends its path to | an `http://` URL |
+| `REST` (the default) | an absolute `http(s)://` URL with no userinfo; the base a consumer appends its path to | an `http://` URL |
 | `GRPC` | `host:port` or `dns:///host:port` | `insecure = true` |
 
 `insecure` means **plaintext**: no TLS at all, not "skip verification". It
@@ -118,10 +118,6 @@ development, use `tls.insecure_skip_verify`.
 
 kit refuses a loopback, private, link-local or unique-local destination
 unless the install sets `integration.allowPrivateAddresses`.
-
-~> Leave `endpoint_type` unset for REST rather than writing `"REST"`. REST
-is the enum's zero value, which reads back as unset. Writing `"REST"`
-explicitly makes Terraform report an inconsistent result after apply.
 
 ## `auth`
 

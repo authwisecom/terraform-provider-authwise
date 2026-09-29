@@ -48,6 +48,11 @@ FEATURES:
     destroy, and a literal name string needs `depends_on`. The acceptance
     stub now enforces the same refusals and serves `:check` and
     `:referrers`.
+  * `endpoint_type = "REST"` can be written explicitly. REST is the
+    enum's zero value, and until tfinfra v0.0.13 an explicit zero read back
+    as null and failed the apply. Any enum's explicit zero now reads back as
+    written, and so does a duration's spelling inside a nested attribute
+    such as `tls`.
   * `examples/endpoints/{bearer,kit_token,mtls}` are applied by the
     acceptance suite. The example harness now copies an example's
     `file()` inputs along with its `main.tf`.

@@ -25,9 +25,10 @@ resource "authwise_secret" "risk_token" {
 resource "authwise_endpoint" "risk" {
   display_name = "Risk service"
 
-  # REST is the default transport: leave endpoint_type unset. The address is
-  # the base URL a consumer appends its path to, and its scheme says whether
-  # the connection is TLS — insecure is refused on a REST endpoint.
+  # REST is the default transport, so endpoint_type is left unset. The
+  # address is the base URL a consumer appends its path to, and its scheme
+  # says whether the connection is TLS — insecure is refused on a REST
+  # endpoint.
   address = "https://risk.example.com/v1"
 
   # Used when the caller sets no deadline of its own; 100ms to 60s, and the

@@ -227,16 +227,8 @@ func (m *CertificateModel) FromProto(ctx context.Context, e *v1alpha1.Certificat
 	} else {
 		m.KeyId = types.StringValue(e.KeyId)
 	}
-	if e.Use == 0 {
-		m.Use = types.StringNull()
-	} else {
-		m.Use = types.StringValue(e.Use.String())
-	}
-	if e.Origin == 0 {
-		m.Origin = types.StringNull()
-	} else {
-		m.Origin = types.StringValue(e.Origin.String())
-	}
+	m.Use = tf.EnumValue(m.Use, int32(e.Use), e.Use.String())
+	m.Origin = tf.EnumValue(m.Origin, int32(e.Origin), e.Origin.String())
 	if e.Subject == "" {
 		m.Subject = types.StringNull()
 	} else {
@@ -262,11 +254,7 @@ func (m *CertificateModel) FromProto(ctx context.Context, e *v1alpha1.Certificat
 	} else {
 		m.CertificatePem = types.StringValue(e.CertificatePem)
 	}
-	if e.Status == 0 {
-		m.Status = types.StringNull()
-	} else {
-		m.Status = types.StringValue(e.Status.String())
-	}
+	m.Status = tf.EnumValue(m.Status, int32(e.Status), e.Status.String())
 	m.HasPrivateKey = types.BoolValue(e.HasPrivateKey)
 	return diags
 }

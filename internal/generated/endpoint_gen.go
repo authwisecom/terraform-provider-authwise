@@ -218,11 +218,7 @@ func (m *EndpointModel) FromProto(ctx context.Context, e *v1alpha1.Endpoint) dia
 	} else {
 		m.DisplayName = types.StringValue(e.DisplayName)
 	}
-	if e.EndpointType == 0 {
-		m.EndpointType = types.StringNull()
-	} else {
-		m.EndpointType = types.StringValue(e.EndpointType.String())
-	}
+	m.EndpointType = tf.EnumValue(m.EndpointType, int32(e.EndpointType), e.EndpointType.String())
 	if e.Address == "" {
 		m.Address = types.StringNull()
 	} else {
@@ -243,6 +239,9 @@ func (m *EndpointModel) FromProto(ctx context.Context, e *v1alpha1.Endpoint) dia
 		m.Tls = types.ObjectNull(EndpointTlsAttrTypes())
 	} else {
 		var n EndpointTlsModel
+		if !m.Tls.IsNull() && !m.Tls.IsUnknown() {
+			diags.Append(m.Tls.As(ctx, &n, basetypes.ObjectAsOptions{})...)
+		}
 		if e.Tls.CaPem == "" {
 			n.CaPem = types.StringNull()
 		} else {

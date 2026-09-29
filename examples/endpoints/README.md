@@ -12,7 +12,7 @@ directory here applies on its own:
 
 ## Transport and TLS
 
-- **REST** is the default; leave `endpoint_type` unset. The `address` is an
+- **REST** is the default, so `endpoint_type` can be left unset. The `address` is an
   absolute `http(s)://` URL, and its scheme decides whether the connection
   uses TLS.
 - **gRPC** takes `host:port` or `dns:///host:port`. `insecure = true` means

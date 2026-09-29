@@ -12,8 +12,8 @@ github.com/activatedio/gen v0.2.0 h1:sPj7o6ogYaVd+g6hM16zw5whfXjgm1zdKRthGTOs8wo
 github.com/activatedio/gen v0.2.0/go.mod h1:24nhBII0r/EO8li//ksDWc5tNc1nIoHyVga4gJMxjOQ=
 github.com/activatedio/go-version v0.1.1 h1:i+w5K9QvD+A64UF0HppC64srKWJfjiMbcD0QvfkF6pM=
 github.com/activatedio/go-version v0.1.1/go.mod h1:/1Vzqb+QjBhSFZlbTstSYEE4KpMMXPnNoxMf2bOQekc=
-github.com/activatedio/tfinfra v0.0.12 h1:VB7DOvoaBCSFJrinJwlojdf21t3t4zMe8oF5qaGuW/k=
-github.com/activatedio/tfinfra v0.0.12/go.mod h1:WaZzaT3LIRKX/gbTbFFTc0aStIYgt1u4R4CGiFi1fDw=
+github.com/activatedio/tfinfra v0.0.13 h1:CygMq7cW0CDPJil4e+sqh3on+Wgi6lVFeizJVq7Cq0U=
+github.com/activatedio/tfinfra v0.0.13/go.mod h1:WaZzaT3LIRKX/gbTbFFTc0aStIYgt1u4R4CGiFi1fDw=
 github.com/agext/levenshtein v1.2.3 h1:YB2fHEn0UJagG8T1rrWknE3ZQzWM06O8AMAatNn7lmo=
 github.com/agext/levenshtein v1.2.3/go.mod h1:JEDfjyjHDjOF/1e4FlBE/PkbqA9OfWu2ki2W0IB5558=
 github.com/apparentlymart/go-textseg/v12 v12.0.0/go.mod h1:S/4uRK2UtaQttw1GenVJEynmyUenKwP++x/+DdGV/Ec=

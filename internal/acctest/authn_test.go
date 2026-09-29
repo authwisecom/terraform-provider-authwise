@@ -427,6 +427,63 @@ resource "authwise_endpoint" "ledger" {
 	})
 }
 
+// TestAccEndpoint_ExplicitREST: REST is ENDPOINT_TYPE's zero value, so it
+// is indistinguishable from unset on the wire. Written explicitly it must
+// still read back as written (tfinfra v0.0.13); left unset it stays null.
+func TestAccEndpoint_ExplicitREST(t *testing.T) {
+
+	h := newHarness(t)
+
+	endpoint := func(endpointType string) string {
+		return h.providerConfig() + `
+resource "authwise_endpoint" "rest" {
+  address = "https://risk.example.com"
+  ` + endpointType + `
+}
+`
+	}
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: protoFactories(),
+		Steps: []resource.TestStep{
+			{
+				Config: endpoint(`endpoint_type = "REST"`),
+				Check:  resource.TestCheckResourceAttr("authwise_endpoint.rest", "endpoint_type", "REST"),
+			},
+			{
+				// Switching to gRPC and back is two real updates.
+				Config: h.providerConfig() + `
+resource "authwise_endpoint" "rest" {
+  endpoint_type = "GRPC"
+  address       = "risk.example.com:443"
+}
+`,
+				Check: resource.TestCheckResourceAttr("authwise_endpoint.rest", "endpoint_type", "GRPC"),
+			},
+			{
+				Config: endpoint(`endpoint_type = "REST"`),
+				Check:  resource.TestCheckResourceAttr("authwise_endpoint.rest", "endpoint_type", "REST"),
+			},
+		},
+		CheckDestroy: noneLeft(h),
+	})
+
+	h2 := newHarness(t)
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: protoFactories(),
+		Steps: []resource.TestStep{
+			{
+				Config: h2.providerConfig() + `
+resource "authwise_endpoint" "rest" {
+  address = "https://risk.example.com"
+}
+`,
+				Check: resource.TestCheckNoResourceAttr("authwise_endpoint.rest", "endpoint_type"),
+			},
+		},
+	})
+}
+
 // TestAccEndpoint_KitRefusals pins the writes kit refuses, so the
 // documentation's claims about them stay true: insecure means plaintext and
 // exists only for gRPC, tls needs a TLS connection to describe, and the
