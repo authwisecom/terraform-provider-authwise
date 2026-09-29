@@ -3,9 +3,9 @@
 # the version is computed from annotated git tags, never stored in a file,
 # and cutting a release is nothing more than pushing an annotated vX.Y.Z tag.
 #
-# Terraform Registry publication (signing + publication mechanics) is tracked
-# separately in the release task; this pipeline verifies every push and
-# builds stamped, versioned artifacts on release tags.
+# This pipeline verifies every push and builds stamped, versioned artifacts
+# on release tags; publish-registry then signs them and ships them to the
+# Terraform Registry as a GitHub Release.
 
 variables:
   # The version computation needs full history and tags; GitLab clones
@@ -22,6 +22,7 @@ stages:
   - lint
   - prepare
   - release
+  - publish
 
 .go-cache:
   before_script:
@@ -148,7 +149,7 @@ lint:
 
 # Upload the dist tree to the GitLab generic package registry. Consumers
 # install into Terraform's implied local mirror via scripts/install.sh;
-# real Terraform Registry publication (signing etc.) stays tracked in #12.
+# the Terraform Registry copy is publish-registry below.
 .registry-upload:
   script:
     - |
@@ -185,6 +186,28 @@ release:
     name: "terraform-provider-authwise-${VERSION}"
     paths:
       - dist/
+    expire_in: never
+  rules:
+    - if: '$CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/'
+
+# Tag -> GitHub Release on authwisecom/terraform-provider-authwise, which the
+# Terraform Registry ingests by webhook. Reuses the release job's binaries;
+# scripts/registry-release.sh zips them, writes the manifest + SHA256SUMS,
+# signs, pushes the tag to GitHub and attaches everything as release assets
+# (binaries live in the release, never in git). Needs protected v* tags so the
+# protected GPG_PRIVATE_KEY (File) / GPG_PASSPHRASE / GPG_FINGERPRINT /
+# GITHUB_TOKEN variables are exposed.
+publish-registry:
+  stage: publish
+  needs: [version, release]
+  before_script:
+    - apt-get update -qq && apt-get install -y -qq jq >/dev/null
+  script:
+    - scripts/registry-release.sh
+  artifacts:
+    name: "terraform-provider-authwise-${VERSION}-registry"
+    paths:
+      - dist/registry/
     expire_in: never
   rules:
     - if: '$CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/'
