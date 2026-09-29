@@ -229,6 +229,22 @@ func main() {
 			config[corepb.ProviderFacebook]("provider_facebook"),
 			config[corepb.ProviderOkta]("provider_okta"),
 			config[corepb.ProviderAuth0]("provider_auth0"),
+			// apis v0.8.0's additions (kit#587). Apple's .p8 signing key is a
+			// Secret named by private_key_ref; OIDC discovers its endpoints
+			// unless they are pinned; OAuth has no id_token, so it reads a
+			// userinfo document through its claim map.
+			config[corepb.ProviderApple]("provider_apple"),
+			config[corepb.ProviderOidc]("provider_oidc"),
+			{
+				Type: reflect.TypeFor[corepb.ProviderOAuth](),
+				Implementations: []any{
+					gentf.ConfigDataSource{
+						TypeName:    "provider_oauth",
+						Required:    []string{"identifier_source", "claim_map"},
+						Description: "OAuth 2.0 with no id_token: explicit endpoints, a userinfo document, and a claim map over it (`userinfo.<path>` sources). X, Discord, Amazon, Twitch, Spotify and Bitbucket are recipes on this type.",
+					},
+				},
+			},
 			// SAML 2.0, both roles: ProviderSaml is kit as the SP (on a
 			// Provider), SamlRelyingPartyConfig is kit as the IdP (on a
 			// Client). Neither carries a client secret. claim_map is a

@@ -9,6 +9,23 @@ NOTES:
 
 FEATURES:
 
+* **Social and enterprise sign-in (apis v0.8.0, kit#587, #20).**
+  * New config data sources:
+    * `authwise_provider_apple`: Sign in with Apple. The `.p8` key is an
+      `authwise_secret` named by `private_key_ref`.
+    * `authwise_provider_oidc`: discovery-driven OpenID Connect from
+      `issuer`, for Okta, Auth0, Entra, Keycloak, Ping and another
+      Authwise, with `endpoints` to pin what discovery does not give.
+    * `authwise_provider_oauth`: OAuth 2.0 without an id_token. It reads a
+      userinfo document through a claim map, and both `identifier_source`
+      and `claim_map` are required.
+  * The seven reshaped data sources take the new fields; see BREAKING
+    CHANGES.
+  * `examples/social` has Google, Microsoft, GitHub, Apple, Okta (as
+    `oidc`) and Discord (as `oauth`) on one realm. Each client secret is
+    held by reference. The acceptance suite applies it and checks that no
+    secret material reaches a provider row or state.
+
 * **Identifier-first login (apis v0.11.0, #24).** Additive. The issuer's
   `multiRealmProviderSelector` is now a routing selector. The login page
   asks for an identifier, and ordered rules match it by domain or CEL
@@ -136,8 +153,7 @@ BREAKING CHANGES:
   * LinkedIn's `include_granted_scopes` is removed.
 
   The new `claim_map`, `authorization_params` and `identifier_claim`
-  attributes come with these changes. The new
-  Apple / OIDC / OAuth data sources are #20.
+  attributes come with these changes.
 * **The identity role surface is gone** (`apis` v0.6.0 removed its RPCs;
   roles and permissions live in the Access catalog now):
   `authwise_role`, `authwise_permission`, `authwise_user_roles`,

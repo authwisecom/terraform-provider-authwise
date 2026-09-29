@@ -441,3 +441,43 @@ func TestAccIdentifierFirstExample(t *testing.T) {
 		}
 	}
 }
+
+// TestAccSocialExample applies examples/social verbatim — six providers,
+// each with its secret held by reference — and asserts a re-plan is empty
+// and that no provider row carries secret material.
+func TestAccSocialExample(t *testing.T) {
+
+	if os.Getenv("TF_ACC") == "" {
+		t.Skip("acceptance test: set TF_ACC=1 to run")
+	}
+
+	h := newHarness(t)
+	r := newExampleRun(t, h, "social")
+
+	r.apply()
+	r.expectCleanPlan()
+
+	h.fake.mu.Lock()
+	defer h.fake.mu.Unlock()
+
+	types := map[string]bool{}
+	for _, p := range h.fake.providers {
+		types[p.GetProviderType()] = true
+		for _, ref := range secretRefs(p) {
+			if _, ok := h.fake.secrets[ref]; !ok {
+				t.Errorf("%s names secret %q, which does not exist", p.GetName(), ref)
+			}
+		}
+		if strings.Contains(p.GetConfig().String(), "replace-me") {
+			t.Errorf("%s carries secret material in its config", p.GetName())
+		}
+	}
+	for _, want := range []string{"google", "microsoft", "github", "apple", "oidc", "oauth"} {
+		if !types[want] {
+			t.Errorf("no %s provider on the server; have %v", want, types)
+		}
+	}
+	if len(h.fake.secrets) != 6 {
+		t.Errorf("%d secrets, want 6", len(h.fake.secrets))
+	}
+}

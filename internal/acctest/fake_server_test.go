@@ -459,14 +459,35 @@ func (f *fakeIdentityServer) GetProvider(ctx context.Context, in *identitypb.Get
 	return proto.Clone(p).(*corepb.Provider), nil
 }
 
-// admitProvider refuses the passwordless configs kit refuses: a config
-// whose type is not the provider type's, and a magic link outside its
-// bounds (a 6–8 digit code, identifiers matched on email only).
+// oauthReservedParams are the authorization parameters kit sets itself,
+// which authorization_params may not override (matched without case).
+var oauthReservedParams = map[string]bool{
+	"client_id": true, "redirect_uri": true, "response_type": true, "scope": true, "state": true,
+	"nonce": true, "code_challenge": true, "code_challenge_method": true, "access_type": true,
+}
+
+// admitProvider refuses the configs kit refuses: a config whose type is not
+// the provider type's; a magic link outside its bounds (a 6–8 digit code,
+// identifiers matched on email only); an OAuth-family config overriding a
+// parameter kit sets itself; and an oauth config without a userinfo
+// identifier_source or a claim map. kit also checks a claim map against the
+// type's protocol, which the fake does not; and it requires no client_id or
+// secret reference, so neither does the fake.
 func admitProvider(p *corepb.Provider) error {
 
 	want := map[string]proto.Message{
 		"magicLink": &corepb.ProviderMagicLink{},
 		"passkey":   &corepb.ProviderPasskey{},
+		"google":    &corepb.ProviderGoogle{},
+		"microsoft": &corepb.ProviderMicrosoft{},
+		"github":    &corepb.ProviderGitHub{},
+		"facebook":  &corepb.ProviderFacebook{},
+		"apple":     &corepb.ProviderApple{},
+		"oidc":      &corepb.ProviderOidc{},
+		"okta":      &corepb.ProviderOkta{},
+		"auth0":     &corepb.ProviderAuth0{},
+		"linkedin":  &corepb.ProviderLinkedIn{},
+		"oauth":     &corepb.ProviderOAuth{},
 	}[p.GetProviderType()]
 	if want == nil || p.GetConfig() == nil {
 		return nil
@@ -474,6 +495,23 @@ func admitProvider(p *corepb.Provider) error {
 	if err := p.GetConfig().UnmarshalTo(want); err != nil {
 		return status.Errorf(codes.InvalidArgument, "a %s provider takes a %s config: %v",
 			p.GetProviderType(), want.ProtoReflect().Descriptor().Name(), err)
+	}
+
+	if ap, ok := want.(interface{ GetAuthorizationParams() map[string]string }); ok {
+		for k := range ap.GetAuthorizationParams() {
+			if oauthReservedParams[strings.ToLower(k)] {
+				return status.Errorf(codes.InvalidArgument, "authorization_params may not set %q: kit sets it", k)
+			}
+		}
+	}
+
+	if oa, ok := want.(*corepb.ProviderOAuth); ok {
+		if !strings.HasPrefix(oa.GetIdentifierSource(), "userinfo.") || len(oa.GetIdentifierSource()) == len("userinfo.") {
+			return status.Errorf(codes.InvalidArgument, "identifier_source must be userinfo.<path>, got %q", oa.GetIdentifierSource())
+		}
+		if len(oa.GetClaimMap().GetMap()) == 0 && len(oa.GetClaimMap().GetStatic()) == 0 {
+			return status.Errorf(codes.InvalidArgument, "claim_map is required for oauth: it has no default")
+		}
 	}
 
 	if ml, ok := want.(*corepb.ProviderMagicLink); ok {
