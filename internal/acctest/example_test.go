@@ -406,3 +406,38 @@ func TestAccPasswordlessExample(t *testing.T) {
 		t.Errorf("%d factors, want the passkey realm's webauthn factor", len(h.fake.factors))
 	}
 }
+
+// TestAccIdentifierFirstExample applies examples/identifier-first verbatim
+// and asserts a re-plan is empty: the selector JSON reads back as written.
+func TestAccIdentifierFirstExample(t *testing.T) {
+
+	if os.Getenv("TF_ACC") == "" {
+		t.Skip("acceptance test: set TF_ACC=1 to run")
+	}
+
+	h := newHarness(t)
+	r := newExampleRun(t, h, "identifier-first")
+
+	r.apply()
+	r.expectCleanPlan()
+
+	h.fake.mu.Lock()
+	defer h.fake.mu.Unlock()
+
+	if len(h.fake.issuers) != 1 {
+		t.Fatalf("%d issuers, want 1", len(h.fake.issuers))
+	}
+	for _, i := range h.fake.issuers {
+		s := i.GetConfig().GetMultiRealmProviderSelector()
+		if len(s.GetRealmNames()) != 2 || len(s.GetRules()) != 1 || s.GetDefaultTarget().GetRealmName() == "" {
+			t.Errorf("selector = %v", s)
+		}
+		rule := s.GetRules()[0]
+		if _, ok := h.fake.providers[rule.GetTarget().GetProviderName()]; !ok {
+			t.Errorf("partner rule does not target the SAML provider: %v", rule)
+		}
+		if s.GetIdentifier().GetKind() != corepb.IdentifierField_KIND_UNSPECIFIED {
+			t.Errorf("kind = %v, want it left unset (read as EMAIL at login)", s.GetIdentifier().GetKind())
+		}
+	}
+}

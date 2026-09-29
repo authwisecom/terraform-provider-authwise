@@ -1,0 +1,5 @@
+Placeholder so this example validates out of the box. Replace with the
+real certificate the partner published; kit rejects a PEM it cannot parse.
+-----BEGIN CERTIFICATE-----
+placeholder
+-----END CERTIFICATE-----

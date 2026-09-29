@@ -182,6 +182,81 @@ func (f *fakeIdentityServer) DeleteRealm(ctx context.Context, in *identitypb.Del
 
 // --- Issuer (tenant-scoped; an endpoint's kit_token names one) ---
 
+// admitSelectorLocked refuses a routing selector kit could not honour
+// (apis v0.11.0), naming the field the way kit does. It covers the
+// structural rules; kit also compiles each condition and refuses a domain
+// an earlier condition-less rule already takes, which the fake does not.
+// The caller holds f.mu.
+func (f *fakeIdentityServer) admitSelectorLocked(tenant string, s *corepb.MultiRealmProviderSelector) error {
+
+	if s == nil {
+		return nil
+	}
+
+	const prefix = "config.multi_realm_provider_selector"
+	invalid := func(field, format string, args ...any) error {
+		return status.Errorf(codes.InvalidArgument, "%s%s: %s", prefix, field, fmt.Sprintf(format, args...))
+	}
+
+	served := map[string]bool{}
+	for i, r := range s.GetRealmNames() {
+		if _, ok := f.realms[r]; !ok || !strings.HasPrefix(r, tenant+"/") {
+			return invalid(fmt.Sprintf(".realm_names[%d]", i), "%q names no realm in this tenant", r)
+		}
+		served[r] = true
+	}
+
+	target := func(field string, t *corepb.RoutingTarget) error {
+		if !served[t.GetRealmName()] {
+			return invalid(field+".realm_name", "%q is not one of realm_names", t.GetRealmName())
+		}
+		if p := t.GetProviderName(); p != "" {
+			if _, ok := f.providers[p]; !ok || !strings.HasPrefix(p, t.GetRealmName()+"/providers/") {
+				return invalid(field+".provider_name", "%q names no provider in %s", p, t.GetRealmName())
+			}
+		}
+		return nil
+	}
+
+	if s.GetDefaultTarget() == nil {
+		return invalid(".default_target", "required")
+	}
+	if err := target(".default_target", s.GetDefaultTarget()); err != nil {
+		return err
+	}
+
+	username := s.GetIdentifier().GetKind() == corepb.IdentifierField_USERNAME
+	names := map[string]bool{}
+	for i, r := range s.GetRules() {
+		field := fmt.Sprintf(".rules[%d]", i)
+		switch {
+		case r.GetName() == "":
+			return invalid(field+".name", "required")
+		case names[r.GetName()]:
+			return invalid(field+".name", "%q is already the name of an earlier rule", r.GetName())
+		case len(r.GetDomains()) == 0 && r.GetCondition() == "":
+			return invalid(field, "a rule needs domains, a condition, or both")
+		case username && len(r.GetDomains()) > 0:
+			return invalid(field+".domains", "a USERNAME identifier has no domain to match")
+		}
+		names[r.GetName()] = true
+		for j, d := range r.GetDomains() {
+			host := strings.TrimPrefix(d, "*.")
+			if d != strings.ToLower(d) || host == "" || strings.ContainsAny(host, "*@/ ") || !strings.Contains(host, ".") {
+				return invalid(fmt.Sprintf("%s.domains[%d]", field, j), "%q is not a lower-case domain or *.domain", d)
+			}
+		}
+		if r.GetTarget() == nil {
+			return invalid(field+".target", "required")
+		}
+		if err := target(field+".target", r.GetTarget()); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func (f *fakeIdentityServer) GetIssuer(ctx context.Context, in *identitypb.GetIssuerRequest) (*corepb.Issuer, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -197,6 +272,9 @@ func (f *fakeIdentityServer) CreateIssuer(ctx context.Context, in *identitypb.Cr
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.recordAuth(ctx)
+	if err := f.admitSelectorLocked(in.GetParent(), in.GetIssuer().GetConfig().GetMultiRealmProviderSelector()); err != nil {
+		return nil, err
+	}
 	i := proto.Clone(in.GetIssuer()).(*corepb.Issuer)
 	i.Name = in.GetParent() + "/issuers/" + f.nextID("i")
 	f.issuers[i.GetName()] = i
@@ -219,7 +297,16 @@ func (f *fakeIdentityServer) PatchIssuer(ctx context.Context, in *identitypb.Pat
 			existing.DomainName = in.GetIssuer().GetDomainName()
 		case "path":
 			existing.Path = in.GetIssuer().GetPath()
+		case "config":
+			if err := f.admitSelectorLocked(tenantOf(in.GetName()), in.GetIssuer().GetConfig().GetMultiRealmProviderSelector()); err != nil {
+				return nil, err
+			}
+			existing.Config = in.GetIssuer().GetConfig()
 		default:
+			if strings.HasPrefix(path, "config.multiRealmProviderSelector.") || strings.HasPrefix(path, "config.multi_realm_provider_selector.") {
+				return nil, status.Errorf(codes.InvalidArgument,
+					"update_mask path %q is below config.multiRealmProviderSelector, which is written whole", path)
+			}
 			return nil, status.Errorf(codes.InvalidArgument, "unsupported update_mask path %q", path)
 		}
 	}

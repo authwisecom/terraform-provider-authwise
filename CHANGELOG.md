@@ -9,6 +9,20 @@ NOTES:
 
 FEATURES:
 
+* **Identifier-first login (apis v0.11.0, #24).** Additive. The issuer's
+  `multiRealmProviderSelector` is now a routing selector. The login page
+  asks for an identifier, and ordered rules match it by domain or CEL
+  condition and route it to a realm, optionally to one provider in it.
+  Everything else goes to a required `defaultTarget`. It is written through
+  `authwise_issuer.config` with `jsonencode`.
+  * `docs/resources/issuer.md` documents the selector, what kit refuses,
+    and how to write the JSON: lowerCamel keys, zero values left out (omit
+    `kind` for EMAIL), and the selector written whole.
+  * `examples/identifier-first` has a consumer realm as the default and a
+    partner domain routed to a SAML realm. The acceptance suite applies it.
+  * kit refuses a selector without `defaultTarget`, which is new in apis
+    v0.11.0. No such selector could have worked before.
+
 * **Passwordless primaries (kit#194, kit#195, #21).** Additive; both
   provider types are live in every shipped kit profile.
   * `authwise_provider_magic_link` builds a `magicLink` provider's config:
