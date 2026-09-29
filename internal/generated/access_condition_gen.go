@@ -59,7 +59,7 @@ func AccessConditionResourceSchema() schema.Schema {
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 		},
-		MarkdownDescription: "AccessCondition resource.",
+		MarkdownDescription: "A condition in an audience's Access catalog, which a binding can require.",
 	}
 }
 
@@ -283,7 +283,7 @@ func AccessConditionDataSourceSchema() schema1.Schema {
 			},
 			"tenant_id": schema1.StringAttribute{Computed: true},
 		},
-		MarkdownDescription: "AccessCondition data source: reads one AccessCondition by its full resource name.",
+		MarkdownDescription: "A condition in an audience's Access catalog, which a binding can require. This data source reads one by its full resource name.",
 	}
 }
 

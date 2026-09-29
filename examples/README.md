@@ -1,9 +1,27 @@
 # Examples
 
-This directory contains examples that are mostly used for documentation, but can also be run/tested manually via the Terraform CLI.
+There are two kinds of example here.
 
-The document generation tool looks for files in the following locations by default. All other *.tf files besides the ones mentioned below are ignored by the documentation tool. This is useful for creating examples that can run and/or ar testable even if some parts are not relevant for the documentation.
+**Documentation snippets.** tfplugindocs embeds these into `docs/`:
 
-* **provider/provider.tf** example file for the provider index page
-* **data-sources/`full data source name`/data-source.tf** example file for the named data source page
-* **resources/`full resource name`/resource.tf** example file for the named data source page
+- `provider/provider.tf` on the provider page;
+- `resources/<resource>/resource.tf` as a resource's Example Usage;
+- `resources/<resource>/import.sh` as its Import section.
+
+Run `make docs` after changing any of them. CI fails when `docs/` is out of
+date.
+
+**Worked configurations.** Each of these applies on its own. The
+acceptance suite (`make testacc`) applies every one listed here against an
+in-memory kit stub and requires a clean re-plan:
+
+| directory | what it shows |
+| --- | --- |
+| `authn` | factors, the realm authentication policy, a secret by reference |
+| `endpoints/{bearer,kit_token,mtls}` | outbound endpoints and their auth schemes |
+| `guard-catalog` | an Access catalog: permissions, a role, a binding, a client |
+| `identifier-first` | routing logins between realms by email domain |
+| `passwordless` | magic link and passkeys |
+| `social` | Google, Microsoft, GitHub, Apple, OIDC and OAuth sign-in |
+
+`saml` and `simple` are not applied by the suite.

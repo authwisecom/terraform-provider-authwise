@@ -1,0 +1,88 @@
+---
+page_title: "Authwise Provider"
+description: |-
+  Manage Authwise identity and access configuration: tenants' issuers, realms, providers, clients, the Access catalog, secrets and endpoints.
+---
+
+# Authwise Provider
+
+The Authwise provider manages an Authwise install's identity and access
+configuration over its published gRPC API. That covers issuers and their
+login routing, realms and the providers and factors people sign in with,
+clients and audiences, the Access catalog, and the secrets and endpoints
+these depend on.
+
+## Example Usage
+
+{{ tffile "examples/provider/provider.tf" }}
+
+## Authentication
+
+The provider authenticates with the OAuth 2.0 `client_credentials` grant:
+`token_url`, `client_id`, `client_secret` and optionally `audience`. Each
+falls back to an environment variable, so CI can configure the provider
+without any of them in the configuration:
+
+| attribute | environment variable |
+| --- | --- |
+| `endpoint` | `AUTHWISE_ENDPOINT` |
+| `token_url` | `AUTHWISE_TOKEN_URL` |
+| `client_id` | `AUTHWISE_CLIENT_ID` |
+| `client_secret` | `AUTHWISE_CLIENT_SECRET` |
+| `audience` | `AUTHWISE_AUDIENCE` |
+
+With no client credentials at all, the provider uses the local `awctl auth
+login` credential store instead, which suits interactive use.
+
+The credential's permissions bound what Terraform can do. Setting a secret
+reference, for example, needs `identity.secrets.use`.
+
+## Scope defaults
+
+Every Authwise object lives under a parent: a tenant, an issuer, a realm or
+an audience. The provider's `tenant_id`, `issuer_id`, `realm_id` and
+`audience_id` are defaults that every resource inherits. A resource's own
+attribute of the same name overrides the default, and changing it replaces
+the resource.
+
+## Resource names and import
+
+`name` on every resource is its full resource name, for example
+`tenants/t-01/realms/r-01/providers/p-01`. It is the Terraform ID and the
+import ID:
+
+```shell
+terraform import authwise_realm.employees tenants/t-01/realms/r-01
+```
+
+Most objects get an ID assigned by the server. A few take an ID you choose,
+and they carry a required `<type>_id` attribute for it:
+`authwise_access_permission`, `authwise_access_role`, `authwise_domain` and
+`authwise_scope`.
+
+## Configs built by data sources
+
+Providers, factors and clients carry a type-specific config, packed as a
+`google.protobuf.Any`. Each config type has a data source that builds it
+with typed, validated attributes and makes no API call. Reference its `any`
+output:
+
+```terraform
+data "authwise_provider_google" "this" {
+  client_id         = "123456789012-abc.apps.googleusercontent.com"
+  client_secret_ref = { name = authwise_secret.google.name }
+}
+
+resource "authwise_provider" "google" {
+  realm_id      = "r-01"
+  provider_type = "google"
+  config        = data.authwise_provider_google.this.any
+}
+```
+
+Other structured configs, such as `authwise_issuer.config`, are written as
+their protojson encoding with `jsonencode`. Keys are lowerCamel. Leave zero
+values out rather than writing them, because the server omits zero values
+when it returns them.
+
+{{ .SchemaMarkdown | trimspace }}

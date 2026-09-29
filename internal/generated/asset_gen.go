@@ -56,7 +56,7 @@ func AssetResourceSchema() schema.Schema {
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 		},
-		MarkdownDescription: "Asset resource.",
+		MarkdownDescription: "A static asset the hosted pages serve, such as a logo.",
 	}
 }
 
@@ -289,7 +289,7 @@ func AssetDataSourceSchema() schema1.Schema {
 			"path":      schema1.StringAttribute{Computed: true},
 			"tenant_id": schema1.StringAttribute{Computed: true},
 		},
-		MarkdownDescription: "Asset data source: reads one Asset by its full resource name.",
+		MarkdownDescription: "A static asset the hosted pages serve, such as a logo. This data source reads one by its full resource name.",
 	}
 }
 

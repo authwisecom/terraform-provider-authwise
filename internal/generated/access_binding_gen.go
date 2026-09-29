@@ -75,7 +75,7 @@ func AccessBindingResourceSchema() schema.Schema {
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 		},
-		MarkdownDescription: "AccessBinding resource.",
+		MarkdownDescription: "A binding that grants a subject a role in an audience's Access catalog.",
 	}
 }
 
@@ -351,7 +351,7 @@ func AccessBindingDataSourceSchema() schema1.Schema {
 			"subject_type":  schema1.StringAttribute{Computed: true},
 			"tenant_id":     schema1.StringAttribute{Computed: true},
 		},
-		MarkdownDescription: "AccessBinding data source: reads one AccessBinding by its full resource name.",
+		MarkdownDescription: "A binding that grants a subject a role in an audience's Access catalog. This data source reads one by its full resource name.",
 	}
 }
 

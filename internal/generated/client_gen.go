@@ -94,7 +94,7 @@ func ClientResourceSchema() schema.Schema {
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 		},
-		MarkdownDescription: "Client resource.",
+		MarkdownDescription: "An OAuth 2.0 client of an issuer: an application that signs people in or calls an API.",
 	}
 }
 
@@ -417,7 +417,7 @@ func ClientDataSourceSchema() schema1.Schema {
 			},
 			"tenant_id": schema1.StringAttribute{Computed: true},
 		},
-		MarkdownDescription: "Client data source: reads one Client by its full resource name.",
+		MarkdownDescription: "An OAuth 2.0 client of an issuer: an application that signs people in or calls an API. This data source reads one by its full resource name.",
 	}
 }
 

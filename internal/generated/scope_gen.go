@@ -60,7 +60,7 @@ func ScopeResourceSchema() schema.Schema {
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 		},
-		MarkdownDescription: "Scope resource.",
+		MarkdownDescription: "An OAuth scope on an audience, and the access permissions it grants. The id is the scope's own name.",
 	}
 }
 
@@ -275,7 +275,7 @@ func ScopeDataSourceSchema() schema1.Schema {
 			},
 			"tenant_id": schema1.StringAttribute{Computed: true},
 		},
-		MarkdownDescription: "Scope data source: reads one Scope by its full resource name.",
+		MarkdownDescription: "An OAuth scope on an audience, and the access permissions it grants. The id is the scope's own name. This data source reads one by its full resource name.",
 	}
 }
 

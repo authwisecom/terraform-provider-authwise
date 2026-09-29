@@ -56,7 +56,7 @@ func DomainResourceSchema() schema.Schema {
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 		},
-		MarkdownDescription: "Domain resource.",
+		MarkdownDescription: "A domain the tenant serves logins on. The id is the domain name itself.",
 	}
 }
 
@@ -289,7 +289,7 @@ func DomainDataSourceSchema() schema1.Schema {
 			},
 			"tenant_id": schema1.StringAttribute{Computed: true},
 		},
-		MarkdownDescription: "Domain data source: reads one Domain by its full resource name.",
+		MarkdownDescription: "A domain the tenant serves logins on. The id is the domain name itself. This data source reads one by its full resource name.",
 	}
 }
 

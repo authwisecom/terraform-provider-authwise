@@ -64,7 +64,7 @@ func AccessPermissionResourceSchema() schema.Schema {
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 		},
-		MarkdownDescription: "AccessPermission resource.",
+		MarkdownDescription: "A permission in an audience's Access catalog. The id is the permission's own name, such as `guardcontrol.tenants.get`.",
 	}
 }
 
@@ -295,7 +295,7 @@ func AccessPermissionDataSourceSchema() schema1.Schema {
 			"service":       schema1.StringAttribute{Computed: true},
 			"tenant_id":     schema1.StringAttribute{Computed: true},
 		},
-		MarkdownDescription: "AccessPermission data source: reads one AccessPermission by its full resource name.",
+		MarkdownDescription: "A permission in an audience's Access catalog. The id is the permission's own name, such as `guardcontrol.tenants.get`. This data source reads one by its full resource name.",
 	}
 }
 

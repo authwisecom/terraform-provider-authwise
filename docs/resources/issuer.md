@@ -1,8 +1,8 @@
 ---
-page_title: "authwise_issuer Resource - terraform-provider-authwise"
+page_title: "authwise_issuer Resource - Authwise"
 subcategory: ""
 description: |-
-  An OAuth 2.0 / OpenID Connect issuer: the login a set of clients shares, including how the login page routes people to realms.
+  An OAuth 2.0 / OpenID Connect issuer: the login a set of clients shares, with its domain, token lifetimes and which realm or realms people sign in to (config).
 ---
 
 # authwise_issuer (Resource)
@@ -141,8 +141,7 @@ refuses:
 
 ## Import
 
-Import by full resource name:
-
 ```shell
-terraform import authwise_issuer.login tenants/t-01/issuers/i-01
+# Import by full resource name.
+terraform import authwise_issuer.example tenants/t-01/issuers/i-01
 ```

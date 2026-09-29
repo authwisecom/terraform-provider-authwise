@@ -109,6 +109,19 @@ acceptance:
     - if: '$CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/'
     - if: '$CI_COMMIT_BRANCH'
 
+# docs/ is generated (tfplugindocs over the schema, templates/ and
+# examples/): a schema change without `make docs` fails here.
+docs:
+  stage: test
+  extends: .go-cache
+  script:
+    - make docs
+    - git diff --exit-code docs
+    - test -z "$(git status --porcelain docs)"
+  rules:
+    - if: '$CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/'
+    - if: '$CI_COMMIT_BRANCH'
+
 lint:
   stage: lint
   extends: .go-cache
@@ -151,7 +164,7 @@ lint:
 publish-dev:
   stage: release
   extends: .go-cache
-  needs: [version, test, acceptance, lint]
+  needs: [version, test, acceptance, docs, lint]
   script:
     - !reference [.dist, script]
     - !reference [.registry-upload, script]
@@ -164,7 +177,7 @@ publish-dev:
 release:
   stage: release
   extends: .go-cache
-  needs: [version, test, acceptance, lint]
+  needs: [version, test, acceptance, docs, lint]
   script:
     - !reference [.dist, script]
     - !reference [.registry-upload, script]

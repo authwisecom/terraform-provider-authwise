@@ -59,7 +59,7 @@ func AccessRoleResourceSchema() schema.Schema {
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 		},
-		MarkdownDescription: "AccessRole resource.",
+		MarkdownDescription: "A role in an audience's Access catalog. The id is the role's own name; its permissions are managed by `authwise_access_role_access_permissions`.",
 	}
 }
 
@@ -278,7 +278,7 @@ func AccessRoleDataSourceSchema() schema1.Schema {
 			},
 			"tenant_id": schema1.StringAttribute{Computed: true},
 		},
-		MarkdownDescription: "AccessRole data source: reads one AccessRole by its full resource name.",
+		MarkdownDescription: "A role in an audience's Access catalog. The id is the role's own name; its permissions are managed by `authwise_access_role_access_permissions`. This data source reads one by its full resource name.",
 	}
 }
 

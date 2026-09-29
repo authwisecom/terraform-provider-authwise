@@ -66,7 +66,7 @@ func IssuerResourceSchema() schema.Schema {
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 		},
-		MarkdownDescription: "Issuer resource.",
+		MarkdownDescription: "An OAuth 2.0 / OpenID Connect issuer: the login a set of clients shares, with its domain, token lifetimes and which realm or realms people sign in to (`config`).",
 	}
 }
 
@@ -328,7 +328,7 @@ func IssuerDataSourceSchema() schema1.Schema {
 			"path":      schema1.StringAttribute{Computed: true},
 			"tenant_id": schema1.StringAttribute{Computed: true},
 		},
-		MarkdownDescription: "Issuer data source: reads one Issuer by its full resource name.",
+		MarkdownDescription: "An OAuth 2.0 / OpenID Connect issuer: the login a set of clients shares, with its domain, token lifetimes and which realm or realms people sign in to (`config`). This data source reads one by its full resource name.",
 	}
 }
 

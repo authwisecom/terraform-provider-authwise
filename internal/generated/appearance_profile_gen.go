@@ -74,7 +74,7 @@ func AppearanceProfileResourceSchema() schema.Schema {
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 		},
-		MarkdownDescription: "AppearanceProfile resource.",
+		MarkdownDescription: "An issuer's appearance profile: the stylesheet and content its login pages use.",
 	}
 }
 
@@ -359,7 +359,7 @@ func AppearanceProfileDataSourceSchema() schema1.Schema {
 			"tenant_id": schema1.StringAttribute{Computed: true},
 			"theme_id":  schema1.StringAttribute{Computed: true},
 		},
-		MarkdownDescription: "AppearanceProfile data source: reads one AppearanceProfile by its full resource name.",
+		MarkdownDescription: "An issuer's appearance profile: the stylesheet and content its login pages use. This data source reads one by its full resource name.",
 	}
 }
 

@@ -114,7 +114,7 @@ func CertificateResourceSchema() schema.Schema {
 				PlanModifiers:       []planmodifier.Int64{int64planmodifier.RequiresReplace()},
 			},
 		},
-		MarkdownDescription: "Certificate resource.",
+		MarkdownDescription: "A certificate and, when kit minted it, its private key. The trust anchor SAML connections verify signatures against, and the client certificate an endpoint presents for mTLS.",
 	}
 }
 
@@ -459,7 +459,7 @@ func CertificateDataSourceSchema() schema1.Schema {
 				MarkdownDescription: "`validity_days` is input only: the API consumes it and never returns it, so this data source always reads it as null.",
 			},
 		},
-		MarkdownDescription: "Certificate data source: reads one Certificate by its full resource name.",
+		MarkdownDescription: "A certificate and, when kit minted it, its private key. The trust anchor SAML connections verify signatures against, and the client certificate an endpoint presents for mTLS. This data source reads one by its full resource name.",
 	}
 }
 

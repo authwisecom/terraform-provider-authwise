@@ -1,8 +1,8 @@
 ---
-page_title: "authwise_endpoint Resource - terraform-provider-authwise"
+page_title: "authwise_endpoint Resource - Authwise"
 subcategory: ""
 description: |-
-  A service kit calls out to: its transport and address, how kit verifies it, how kit authenticates to it, and the per-call deadline.
+  A service kit calls out to: its transport and address, how kit verifies it (tls), how kit authenticates to it (auth), and the per-call deadline (timeout).
 ---
 
 # authwise_endpoint (Resource)
@@ -207,15 +207,15 @@ with an empty body.
 
 ### Optional
 
-- `address` (String) gRPC: `host:port` or `dns:///host:port`. REST: an absolute `http(s)://` URL.
+- `address` (String)
 - `auth` (String) `auth` as the protojson encoding of EndpointAuth.
 - `display_name` (String)
-- `endpoint_type` (String) `REST` (the default) or `GRPC`.
-- `insecure` (Boolean) Plaintext, no TLS. gRPC only.
+- `endpoint_type` (String)
+- `insecure` (Boolean)
 - `labels` (Map of String)
 - `tenant_id` (String) Parent identifier `tenant_id`; overrides the provider default. Changing it replaces the resource.
 - `timeout` (String) `timeout` as a duration: `"5s"`, `"1.5s"`, `"500ms"`, `"1m30s"`.
-- `tls` (Attributes) How kit verifies the endpoint and, with a client certificate, proves itself to it. (see [below for nested schema](#nestedatt--tls))
+- `tls` (Attributes) (see [below for nested schema](#nestedatt--tls))
 
 ### Read-Only
 
@@ -226,15 +226,14 @@ with an empty body.
 
 Optional:
 
-- `ca_pem` (String) Extra trust anchors, a PEM bundle added to the system roots.
-- `client_certificate` (String) `tenants/{tenant}/certificates/{certificate}`: a certificate of this tenant holding a private key, presented for mTLS.
-- `insecure_skip_verify` (Boolean) Development only: accept any certificate the endpoint presents.
-- `server_name` (String) The name verified, and sent as SNI, when it is not the address's host.
+- `ca_pem` (String)
+- `client_certificate` (String)
+- `insecure_skip_verify` (Boolean)
+- `server_name` (String)
 
 ## Import
 
-Import by full resource name:
-
 ```shell
-terraform import authwise_endpoint.risk tenants/t-01/endpoints/e-01
+# Import by full resource name.
+terraform import authwise_endpoint.example tenants/t-01/endpoints/e-01
 ```

@@ -79,7 +79,7 @@ func ProviderResourceSchema() schema.Schema {
 				PlanModifiers: []planmodifier.Map{mapplanmodifier.UseStateForUnknown()},
 			},
 		},
-		MarkdownDescription: "Provider resource.",
+		MarkdownDescription: "A way people sign in to a realm: username and password, a magic link, passkeys, a social or enterprise IdP, or SAML. `config` comes from the matching config data source.",
 	}
 }
 
@@ -362,7 +362,7 @@ func ProviderDataSourceSchema() schema1.Schema {
 				ElementType: types.StringType,
 			},
 		},
-		MarkdownDescription: "Provider data source: reads one Provider by its full resource name.",
+		MarkdownDescription: "A way people sign in to a realm: username and password, a magic link, passkeys, a social or enterprise IdP, or SAML. `config` comes from the matching config data source. This data source reads one by its full resource name.",
 	}
 }
 

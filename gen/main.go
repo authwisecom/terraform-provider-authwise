@@ -119,6 +119,12 @@ func withInputOnly(fields ...string) func(r *gentf.Resource) {
 	return func(r *gentf.Resource) { r.InputOnly = fields }
 }
 
+// withDescription is what the resource is: its schema description, and so
+// the first thing its documentation page says.
+func withDescription(description string) func(r *gentf.Resource) {
+	return func(r *gentf.Resource) { r.Description = description }
+}
+
 // config declares a typed builder data source over a config message,
 // masking the named fields in output.
 func config[E any](typeName string, sensitive ...string) gentf.Entry {
@@ -136,14 +142,19 @@ func main() {
 		Package: "generated",
 		Entries: []gentf.Entry{
 			// Tenant-scoped.
-			crud[corepb.Domain](scopeTenant, callerNamed, withJSON("config")),
-			crud[corepb.Issuer](scopeTenant, withJSON("config")),
-			crud[corepb.Realm](scopeTenant, withJSON("config")),
-			crud[corepb.Theme](scopeTenant, withJSON(
-				"stylesheet_attributes", "content",
-				"placeholder_stylesheet_attributes", "placeholder_content",
-			)),
-			crud[corepb.Asset](scopeTenant),
+			crud[corepb.Domain](scopeTenant,
+				withDescription("A domain the tenant serves logins on. The id is the domain name itself."), callerNamed, withJSON("config")),
+			crud[corepb.Issuer](scopeTenant,
+				withDescription("An OAuth 2.0 / OpenID Connect issuer: the login a set of clients shares, with its domain, token lifetimes and which realm or realms people sign in to (`config`)."), withJSON("config")),
+			crud[corepb.Realm](scopeTenant,
+				withDescription("A realm: a population of users with its own providers, factors and authentication policy."), withJSON("config")),
+			crud[corepb.Theme](scopeTenant,
+				withDescription("A tenant theme: the stylesheet and content the hosted login pages render with."), withJSON(
+					"stylesheet_attributes", "content",
+					"placeholder_stylesheet_attributes", "placeholder_content",
+				)),
+			crud[corepb.Asset](scopeTenant,
+				withDescription("A static asset the hosted pages serve, such as a logo.")),
 			// auth is a oneof of messages that each hold a SecretRef, which
 			// is deeper than a typed nested attribute goes; it takes the JSON
 			// lane, and a reference inside jsonencode still orders the
@@ -151,12 +162,14 @@ func main() {
 			// singular message and takes the typed nested lane; timeout is
 			// the provider's first Duration, a string ("5s", "500ms") that
 			// keeps the spelling written (kit#603, apis v0.9.0).
-			crud[corepb.Endpoint](scopeTenant, withJSON("auth")),
+			crud[corepb.Endpoint](scopeTenant,
+				withDescription("A service kit calls out to: its transport and address, how kit verifies it (`tls`), how kit authenticates to it (`auth`), and the per-call deadline (`timeout`)."), withJSON("auth")),
 			// The SAML trust anchors (kit#487). certificate_pem is the
 			// public certificate of any row, minted or imported, and is
 			// read-only; importing a partner's PEM is a separate input-only
 			// field on create, not an RPC of its own.
 			crud[corepb.Certificate](scopeTenant,
+				withDescription("A certificate and, when kit minted it, its private key. The trust anchor SAML connections verify signatures against, and the client certificate an endpoint presents for mTLS."),
 				withRequired("display_name", "use"),
 				withComputed("key_id", "origin", "subject", "not_before", "not_after",
 					"fingerprint_sha256", "certificate_pem", "has_private_key"),
@@ -167,6 +180,7 @@ func main() {
 
 			// Realm-scoped.
 			crud[corepb.User](scopeRealm,
+				withDescription("A user in a realm."),
 				withJSON("metadata", "extra_fields"),
 				// origin is write-once and enrollment is derived and never
 				// stored (kit#304, kit#324): kit refuses a differing value on
@@ -175,38 +189,48 @@ func main() {
 				// already covers its ""-means-unchanged semantics.
 				withComputed("updated_at", "origin", "enrollment"),
 			),
-			crud[corepb.Provider](scopeRealm, withJSON("config")),
+			crud[corepb.Provider](scopeRealm,
+				withDescription("A way people sign in to a realm: username and password, a magic link, passkeys, a social or enterprise IdP, or SAML. `config` comes from the matching config data source."), withJSON("config")),
 			// A second step the realm offers (kit#544). config is the
 			// per-type Any; the factor_* config data sources below build it.
 			crud[corepb.Factor](scopeRealm,
+				withDescription("A second step a realm offers, such as TOTP, WebAuthn or Duo. `config` comes from the matching config data source; disabling keeps enrolled authenticators, destroying does not."),
 				withRequired("display_name", "factor_type"),
 				withImmutable("factor_type"),
 				withJSON("config")),
 
 			// Issuer-scoped.
-			crud[corepb.Client](scopeIssuer, withJSON("config")),
-			crud[corepb.Audience](scopeIssuer, withJSON("config")),
+			crud[corepb.Client](scopeIssuer,
+				withDescription("An OAuth 2.0 client of an issuer: an application that signs people in or calls an API."), withJSON("config")),
+			crud[corepb.Audience](scopeIssuer,
+				withDescription("An API an issuer mints access tokens for, and the audience its Access catalog hangs off."), withJSON("config")),
 			crud[corepb.AppearanceProfile](scopeIssuer,
+				withDescription("An issuer's appearance profile: the stylesheet and content its login pages use."),
 				withCollection("appearance-profiles"),
 				withJSON("stylesheet_attributes", "content")),
 
 			// Audience-scoped. The identity Role and Permission surface is
 			// gone (apis v0.6.0): roles and permissions live in the Access
 			// catalog, and a scope grants access permissions.
-			crud[corepb.Scope](scopeAudience, callerNamed, associate[corepb.AccessPermission]()),
+			crud[corepb.Scope](scopeAudience,
+				withDescription("An OAuth scope on an audience, and the access permissions it grants. The id is the scope's own name."), callerNamed, associate[corepb.AccessPermission]()),
 
 			// Access service (audience-scoped). AccessPermission and
 			// AccessRole are name-keyed in kit — the catalog's vocabulary is
 			// the deployer's to choose ("guardcontrol.tenants.get") — while
 			// AccessCondition and AccessBinding are AWID-keyed.
-			crud[corepb.AccessPermission](scopeAudience, access, callerNamed,
+			crud[corepb.AccessPermission](scopeAudience,
+				withDescription("A permission in an audience's Access catalog. The id is the permission's own name, such as `guardcontrol.tenants.get`."), access, callerNamed,
 				withCollection("access-permissions")),
-			crud[corepb.AccessRole](scopeAudience, access, callerNamed,
+			crud[corepb.AccessRole](scopeAudience,
+				withDescription("A role in an audience's Access catalog. The id is the role's own name; its permissions are managed by `authwise_access_role_access_permissions`."), access, callerNamed,
 				withCollection("access-roles"),
 				associate[corepb.AccessPermission]()),
-			crud[corepb.AccessCondition](scopeAudience, access,
+			crud[corepb.AccessCondition](scopeAudience,
+				withDescription("A condition in an audience's Access catalog, which a binding can require."), access,
 				withCollection("access-conditions")),
-			crud[corepb.AccessBinding](scopeAudience, access,
+			crud[corepb.AccessBinding](scopeAudience,
+				withDescription("A binding that grants a subject a role in an audience's Access catalog."), access,
 				withCollection("access-bindings"),
 				withRequired("subject_type", "subject_id", "role_name"),
 				withComputed("created_by")),

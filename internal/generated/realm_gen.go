@@ -56,7 +56,7 @@ func RealmResourceSchema() schema.Schema {
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 		},
-		MarkdownDescription: "Realm resource.",
+		MarkdownDescription: "A realm: a population of users with its own providers, factors and authentication policy.",
 	}
 }
 
@@ -294,7 +294,7 @@ func RealmDataSourceSchema() schema1.Schema {
 			},
 			"tenant_id": schema1.StringAttribute{Computed: true},
 		},
-		MarkdownDescription: "Realm data source: reads one Realm by its full resource name.",
+		MarkdownDescription: "A realm: a population of users with its own providers, factors and authentication policy. This data source reads one by its full resource name.",
 	}
 }
 

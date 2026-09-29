@@ -107,7 +107,7 @@ func EndpointResourceSchema() schema.Schema {
 				PlanModifiers: []planmodifier.Object{objectplanmodifier.UseStateForUnknown()},
 			},
 		},
-		MarkdownDescription: "Endpoint resource.",
+		MarkdownDescription: "A service kit calls out to: its transport and address, how kit verifies it (`tls`), how kit authenticates to it (`auth`), and the per-call deadline (`timeout`).",
 	}
 }
 
@@ -459,7 +459,7 @@ func EndpointDataSourceSchema() schema1.Schema {
 				Computed: true,
 			},
 		},
-		MarkdownDescription: "Endpoint data source: reads one Endpoint by its full resource name.",
+		MarkdownDescription: "A service kit calls out to: its transport and address, how kit verifies it (`tls`), how kit authenticates to it (`auth`), and the per-call deadline (`timeout`). This data source reads one by its full resource name.",
 	}
 }
 

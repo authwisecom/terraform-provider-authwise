@@ -98,7 +98,7 @@ func ThemeResourceSchema() schema.Schema {
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 		},
-		MarkdownDescription: "Theme resource.",
+		MarkdownDescription: "A tenant theme: the stylesheet and content the hosted login pages render with.",
 	}
 }
 
@@ -471,7 +471,7 @@ func ThemeDataSourceSchema() schema1.Schema {
 			"stylesheet_attributes_schema": schema1.StringAttribute{Computed: true},
 			"tenant_id":                    schema1.StringAttribute{Computed: true},
 		},
-		MarkdownDescription: "Theme data source: reads one Theme by its full resource name.",
+		MarkdownDescription: "A tenant theme: the stylesheet and content the hosted login pages render with. This data source reads one by its full resource name.",
 	}
 }
 

@@ -8,7 +8,7 @@ VERSION ?= $(shell go tool go-version)
 
 default: testacc
 
-.PHONY: version bump build generate test testacc
+.PHONY: version bump build generate docs test testacc
 
 version:
 	@go tool go-version
@@ -30,6 +30,12 @@ build:
 # Regenerate the provider surface from the spec table.
 generate:
 	cd gen && go run .
+
+# Regenerate docs/ from the provider schema, templates/ and examples/. CI
+# fails when the committed docs differ from what this produces.
+docs:
+	go tool tfplugindocs generate --provider-name authwise --rendered-provider-name Authwise
+	go tool tfplugindocs validate --provider-name authwise
 
 test:
 	go test -cover ./...

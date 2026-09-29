@@ -170,7 +170,7 @@ func UserResourceSchema() schema.Schema {
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 		},
-		MarkdownDescription: "User resource.",
+		MarkdownDescription: "A user in a realm.",
 	}
 }
 
@@ -673,7 +673,7 @@ func UserDataSourceSchema() schema1.Schema {
 			"website":               schema1.StringAttribute{Computed: true},
 			"zoneinfo":              schema1.StringAttribute{Computed: true},
 		},
-		MarkdownDescription: "User data source: reads one User by its full resource name.",
+		MarkdownDescription: "A user in a realm. This data source reads one by its full resource name.",
 	}
 }
 

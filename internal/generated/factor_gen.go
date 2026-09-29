@@ -67,7 +67,7 @@ func FactorResourceSchema() schema.Schema {
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 		},
-		MarkdownDescription: "Factor resource.",
+		MarkdownDescription: "A second step a realm offers, such as TOTP, WebAuthn or Duo. `config` comes from the matching config data source; disabling keeps enrolled authenticators, destroying does not.",
 	}
 }
 
@@ -327,7 +327,7 @@ func FactorDataSourceSchema() schema1.Schema {
 			"status":    schema1.StringAttribute{Computed: true},
 			"tenant_id": schema1.StringAttribute{Computed: true},
 		},
-		MarkdownDescription: "Factor data source: reads one Factor by its full resource name.",
+		MarkdownDescription: "A second step a realm offers, such as TOTP, WebAuthn or Duo. `config` comes from the matching config data source; disabling keeps enrolled authenticators, destroying does not. This data source reads one by its full resource name.",
 	}
 }
 
