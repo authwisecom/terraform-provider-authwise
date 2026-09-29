@@ -181,6 +181,15 @@ Two lanes, the same bearer credentials as awctl:
 block supply AIP parent segments so per-resource attributes can be
 omitted; per-resource values always override.
 
+## Tenants are not managed here
+
+The provider works inside an existing tenant and never creates one. There
+is no `authwise_tenant` resource. Tenants are provisioned out of band,
+through the operator-facing tenancy admin API, which is not part of the
+published contract. A configuration names its tenant with the provider's
+`tenant_id`, or a resource's own. This was decided on 2026-08-15 (#11). A
+read-only tenant data source can be added if a concrete need appears.
+
 ## Development
 
 Most of the provider surface generates from `gen/main.go` — the declarative

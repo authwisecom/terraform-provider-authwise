@@ -35,17 +35,22 @@ var certNotBefore = time.Date(2026, 9, 14, 0, 0, 0, 0, time.UTC)
 type fakeIdentityServer struct {
 	identitypb.UnimplementedAuthwiseIdentityServiceServer
 
-	mu        sync.Mutex
-	realms    map[string]*corepb.Realm
-	issuers   map[string]*corepb.Issuer
-	audiences map[string]*corepb.Audience
-	clients   map[string]*corepb.Client
-	providers map[string]*corepb.Provider
-	certs     map[string]*corepb.Certificate
-	endpoints map[string]*corepb.Endpoint
-	factors   map[string]*corepb.Factor
-	secrets   map[string]*corepb.Secret
-	seq       int
+	mu       sync.Mutex
+	realms   map[string]*corepb.Realm
+	issuers  map[string]*corepb.Issuer
+	domains  map[string]*corepb.Domain
+	scopes   map[string]*corepb.Scope
+	profiles map[string]*corepb.AppearanceProfile
+	// scopePerms holds each scope's access-permission set, by name.
+	scopePerms map[string]map[string]bool
+	audiences  map[string]*corepb.Audience
+	clients    map[string]*corepb.Client
+	providers  map[string]*corepb.Provider
+	certs      map[string]*corepb.Certificate
+	endpoints  map[string]*corepb.Endpoint
+	factors    map[string]*corepb.Factor
+	secrets    map[string]*corepb.Secret
+	seq        int
 
 	// material holds each secret's versions as sent, oldest first. The
 	// stored Secret has no field for it, exactly as kit's does not, so this
@@ -68,17 +73,21 @@ type fakeIdentityServer struct {
 
 func newFakeIdentityServer() *fakeIdentityServer {
 	return &fakeIdentityServer{
-		realms:    map[string]*corepb.Realm{},
-		issuers:   map[string]*corepb.Issuer{},
-		audiences: map[string]*corepb.Audience{},
-		clients:   map[string]*corepb.Client{},
-		providers: map[string]*corepb.Provider{},
-		certs:     map[string]*corepb.Certificate{},
-		endpoints: map[string]*corepb.Endpoint{},
-		factors:   map[string]*corepb.Factor{},
-		secrets:   map[string]*corepb.Secret{},
-		material:  map[string][]string{},
-		pinned:    map[string]bool{},
+		realms:     map[string]*corepb.Realm{},
+		issuers:    map[string]*corepb.Issuer{},
+		domains:    map[string]*corepb.Domain{},
+		scopes:     map[string]*corepb.Scope{},
+		profiles:   map[string]*corepb.AppearanceProfile{},
+		scopePerms: map[string]map[string]bool{},
+		audiences:  map[string]*corepb.Audience{},
+		clients:    map[string]*corepb.Client{},
+		providers:  map[string]*corepb.Provider{},
+		certs:      map[string]*corepb.Certificate{},
+		endpoints:  map[string]*corepb.Endpoint{},
+		factors:    map[string]*corepb.Factor{},
+		secrets:    map[string]*corepb.Secret{},
+		material:   map[string][]string{},
+		pinned:     map[string]bool{},
 	}
 }
 
