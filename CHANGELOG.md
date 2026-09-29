@@ -137,6 +137,12 @@ FEATURES:
 
 BREAKING CHANGES:
 
+* **Access bindings are unique per grant (kit#616).** Against a kit with
+  kit#616, two `authwise_access_binding` resources that declare the same
+  grant fail on apply with `ALREADY_EXISTS`, even if they differ only in
+  `expires_at`. A grant is its audience, subject, role, resource and
+  condition. Changing `expires_at` alone updates the binding in place, so
+  extending a grant never collides with itself.
 * **The social provider configs take `apis` v0.8.0's shapes**, which the
   bump to v0.9.0 brings in. No kit install could hold a working row of
   these types, so what breaks is configuration, not stored data:

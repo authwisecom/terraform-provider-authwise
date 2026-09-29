@@ -3,9 +3,12 @@ package acctest_test
 import (
 	"fmt"
 	"regexp"
+	"sort"
 	"testing"
+	"time"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/plancheck"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
 )
 
@@ -208,6 +211,151 @@ resource "authwise_access_permission" "second" {
 			{
 				Config:      config,
 				ExpectError: regexp.MustCompile(`already exists`),
+			},
+		},
+	})
+}
+
+// bindingConfig renders a role and the given bindings (HCL bodies keyed by
+// resource name).
+func bindingConfig(h *harness, bindings map[string]string) string {
+	out := h.providerConfig() + `
+resource "authwise_access_role" "admin" {
+  access_role_id = "guardcontrol.admin"
+}
+`
+	names := make([]string, 0, len(bindings))
+	for k := range bindings {
+		names = append(names, k)
+	}
+	sort.Strings(names)
+	for _, k := range names {
+		out += fmt.Sprintf("\nresource \"authwise_access_binding\" %q {\n  role_name = authwise_access_role.admin.access_role_id\n%s\n}\n", k, bindings[k])
+	}
+	return out
+}
+
+// TestAccAccessBinding_ExpiryUpdatesInPlace: kit#616 makes a binding's
+// identity everything but expires_at, so a new expiry must be a PATCH of
+// the same row. A replace would create the new row before the old one is
+// gone and collide with it.
+func TestAccAccessBinding_ExpiryUpdatesInPlace(t *testing.T) {
+
+	h := newHarness(t)
+
+	binding := func(expires string) string {
+		return bindingConfig(h, map[string]string{"alice": `
+  subject_type = "user"
+  subject_id   = "u-01"
+  expires_at   = "` + expires + `"`})
+	}
+
+	var first string
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: protoFactories(),
+		Steps: []resource.TestStep{
+			{
+				Config: binding("2026-12-31T00:00:00Z"),
+				Check: func(s *terraform.State) error {
+					first = s.RootModule().Resources["authwise_access_binding.alice"].Primary.Attributes["name"]
+					return nil
+				},
+			},
+			{
+				Config: binding("2027-06-30T00:00:00Z"),
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{
+						plancheck.ExpectResourceAction("authwise_access_binding.alice", plancheck.ResourceActionUpdate),
+					},
+				},
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("authwise_access_binding.alice", "expires_at", "2027-06-30T00:00:00Z"),
+					checkServer(func() error {
+						h.access.mu.Lock()
+						defer h.access.mu.Unlock()
+						b, ok := h.access.bindings[first]
+						if len(h.access.bindings) != 1 || !ok {
+							return fmt.Errorf("want the one original binding %s, have %d", first, len(h.access.bindings))
+						}
+						if got := b.GetExpiresAt().AsTime().Format(time.RFC3339); got != "2027-06-30T00:00:00Z" {
+							return fmt.Errorf("expires_at = %s", got)
+						}
+						return nil
+					}),
+				),
+			},
+		},
+	})
+}
+
+// TestAccAccessBinding_DuplicateGrant: two resources declaring the same
+// grant — here differing only in expiry, which is not part of a grant's
+// identity — fail on apply with kit's ALREADY_EXISTS, and only one row
+// exists.
+func TestAccAccessBinding_DuplicateGrant(t *testing.T) {
+
+	h := newHarness(t)
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: protoFactories(),
+		Steps: []resource.TestStep{
+			{
+				Config: bindingConfig(h, map[string]string{
+					"one": `
+  subject_type = "user"
+  subject_id   = "u-01"`,
+					"two": `
+  subject_type = "user"
+  subject_id   = "u-01"
+  expires_at   = "2027-01-01T00:00:00Z"`,
+				}),
+				ExpectError: regexp.MustCompile(`(?s)already\s+grants\s+this`),
+			},
+		},
+	})
+}
+
+// TestAccAccessBinding_UpdateOntoExistingGrant: changing one binding into
+// another's grant is refused too, and the refused row keeps its grant.
+func TestAccAccessBinding_UpdateOntoExistingGrant(t *testing.T) {
+
+	h := newHarness(t)
+
+	subjects := func(bob string) string {
+		return bindingConfig(h, map[string]string{
+			"alice": `
+  subject_type = "user"
+  subject_id   = "u-01"`,
+			"bob": `
+  subject_type = "user"
+  subject_id   = "` + bob + `"`,
+		})
+	}
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: protoFactories(),
+		Steps: []resource.TestStep{
+			{Config: subjects("u-02")},
+			{
+				Config:      subjects("u-01"),
+				ExpectError: regexp.MustCompile(`(?s)already\s+grants\s+this`),
+			},
+			{
+				// Back to distinct grants: bob still holds u-02 on the server.
+				Config: subjects("u-02"),
+				Check: checkServer(func() error {
+					h.access.mu.Lock()
+					defer h.access.mu.Unlock()
+					seen := map[string]bool{}
+					for _, b := range h.access.bindings {
+						seen[b.GetSubjectId()] = true
+					}
+					if len(h.access.bindings) != 2 || !seen["u-01"] || !seen["u-02"] {
+						return fmt.Errorf("bindings = %v", h.access.bindings)
+					}
+					return nil
+				}),
 			},
 		},
 	})

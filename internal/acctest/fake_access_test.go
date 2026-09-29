@@ -277,12 +277,38 @@ func (f *fakeAccessServer) GetAccessBinding(_ context.Context, in *accesspb.GetA
 	return proto.Clone(b).(*corepb.AccessBinding), nil
 }
 
+// grantKey is a binding's identity since kit#616: audience, subject, role,
+// resource and condition. expires_at is deliberately not part of it — the
+// same grant with a different expiry is the same grant.
+func grantKey(audience string, b *corepb.AccessBinding) string {
+	return strings.Join([]string{audience, b.GetSubjectType(), b.GetSubjectId(), b.GetRoleName(),
+		b.GetResourceType(), b.GetResourceId(), b.GetConditionId()}, "\x00")
+}
+
+// grantHolderLocked returns the name of another binding in the audience
+// holding the same grant, or "". The caller holds f.mu.
+func (f *fakeAccessServer) grantHolderLocked(audience, self string, b *corepb.AccessBinding) string {
+	key := grantKey(audience, b)
+	for name, other := range f.bindings {
+		if name != self && strings.HasPrefix(name, audience+"/access-bindings/") && grantKey(audience, other) == key {
+			return name
+		}
+	}
+	return ""
+}
+
 // CreateAccessBinding stores the row as given: kit accepts a role_name that
 // resolves to nothing, which is exactly why the provider checks it first.
+// It refuses a grant the audience already holds (kit#616), whatever the
+// expiry.
 func (f *fakeAccessServer) CreateAccessBinding(_ context.Context, in *accesspb.CreateAccessBindingRequest) (*corepb.AccessBinding, error) {
 
 	f.mu.Lock()
 	defer f.mu.Unlock()
+
+	if holder := f.grantHolderLocked(in.GetParent(), "", in.GetAccessBinding()); holder != "" {
+		return nil, status.Errorf(codes.AlreadyExists, "access binding %s already grants this", holder)
+	}
 
 	b := proto.Clone(in.GetAccessBinding()).(*corepb.AccessBinding)
 	b.Name = in.GetParent() + "/access-bindings/" + f.nextID("axb")
@@ -297,11 +323,14 @@ func (f *fakeAccessServer) PatchAccessBinding(_ context.Context, in *accesspb.Pa
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
-	existing, ok := f.bindings[in.GetName()]
+	stored, ok := f.bindings[in.GetName()]
 	if !ok {
 		return nil, status.Errorf(codes.NotFound, "access binding %q not found", in.GetName())
 	}
 
+	// The patch is applied to a copy and checked before it is stored, so a
+	// refused update leaves the row as it was.
+	existing := proto.Clone(stored).(*corepb.AccessBinding)
 	for _, path := range in.GetUpdateMask().GetPaths() {
 		switch path {
 		case "subject_type":
@@ -322,6 +351,12 @@ func (f *fakeAccessServer) PatchAccessBinding(_ context.Context, in *accesspb.Pa
 			return nil, status.Errorf(codes.InvalidArgument, "unsupported update_mask path %q", path)
 		}
 	}
+
+	audience, _, _ := strings.Cut(in.GetName(), "/access-bindings/")
+	if holder := f.grantHolderLocked(audience, in.GetName(), existing); holder != "" {
+		return nil, status.Errorf(codes.AlreadyExists, "access binding %s already grants this", holder)
+	}
+	f.bindings[in.GetName()] = existing
 
 	return proto.Clone(existing).(*corepb.AccessBinding), nil
 }
