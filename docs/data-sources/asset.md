@@ -3,12 +3,12 @@
 page_title: "authwise_asset Data Source - Authwise"
 subcategory: ""
 description: |-
-  A static asset the hosted pages serve, such as a logo. This data source reads one by its full resource name.
+  A static asset the hosted pages serve, such as a logo. This is the asset's metadata; upload the file itself with authwise_asset_content. This data source reads one by its full resource name.
 ---
 
 # authwise_asset (Data Source)
 
-A static asset the hosted pages serve, such as a logo. This data source reads one by its full resource name.
+A static asset the hosted pages serve, such as a logo. This is the asset's metadata; upload the file itself with `authwise_asset_content`. This data source reads one by its full resource name.
 
 
 

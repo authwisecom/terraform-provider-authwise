@@ -216,7 +216,7 @@ func main() {
 					"placeholder_stylesheet_attributes", "placeholder_content",
 				)),
 			crud[corepb.Asset](scopeTenant,
-				withDescription("A static asset the hosted pages serve, such as a logo.")),
+				withDescription("A static asset the hosted pages serve, such as a logo. This is the asset's metadata; upload the file itself with `authwise_asset_content`.")),
 			// auth is a oneof of messages that each hold a SecretRef, which
 			// is deeper than a typed nested attribute goes; it takes the JSON
 			// lane, and a reference inside jsonencode still orders the

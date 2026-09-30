@@ -53,9 +53,9 @@ func TestProviderSurface(t *testing.T) {
 	}
 	// 19 generated entity resources (client_secret, minted, came with
 	// kit#617), 2 association resources (scope_access_permissions,
-	// access_role_access_permissions), and the hand-written secret and
-	// realm_authentication_policy.
-	assert.Len(t, resourceTypes, 23)
+	// access_role_access_permissions), and the hand-written secret,
+	// realm_authentication_policy and asset_content.
+	assert.Len(t, resourceTypes, 24)
 	for _, want := range []string{
 		"authwise_client_secret",
 		"authwise_access_permission",
@@ -67,6 +67,7 @@ func TestProviderSurface(t *testing.T) {
 		"authwise_factor",
 		"authwise_secret",
 		"authwise_realm_authentication_policy",
+		"authwise_asset_content",
 	} {
 		assert.True(t, resourceTypes[want], "missing resource %s", want)
 	}

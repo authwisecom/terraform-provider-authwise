@@ -58,7 +58,14 @@ type fakeIdentityServer struct {
 	endpoints map[string]*corepb.Endpoint
 	factors   map[string]*corepb.Factor
 	secrets   map[string]*corepb.Secret
+	assets    map[string]*corepb.Asset
 	seq       int
+
+	// blobs holds each asset's content as uploaded, apart from the row,
+	// the way kit keeps it in a bucket. uploads counts completed
+	// UploadAsset streams.
+	blobs   map[string][]byte
+	uploads int
 
 	// material holds each secret's versions as sent, oldest first. The
 	// stored Secret has no field for it, exactly as kit's does not, so this
@@ -95,6 +102,8 @@ func newFakeIdentityServer() *fakeIdentityServer {
 		endpoints:     map[string]*corepb.Endpoint{},
 		factors:       map[string]*corepb.Factor{},
 		secrets:       map[string]*corepb.Secret{},
+		assets:        map[string]*corepb.Asset{},
+		blobs:         map[string][]byte{},
 		material:      map[string][]string{},
 		pinned:        map[string]bool{},
 	}

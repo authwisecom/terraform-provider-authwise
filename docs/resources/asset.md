@@ -3,12 +3,12 @@
 page_title: "authwise_asset Resource - Authwise"
 subcategory: ""
 description: |-
-  A static asset the hosted pages serve, such as a logo.
+  A static asset the hosted pages serve, such as a logo. This is the asset's metadata; upload the file itself with authwise_asset_content.
 ---
 
 # authwise_asset (Resource)
 
-A static asset the hosted pages serve, such as a logo.
+A static asset the hosted pages serve, such as a logo. This is the asset's metadata; upload the file itself with `authwise_asset_content`.
 
 
 

@@ -1,3 +1,18 @@
+## 0.3.0 (Unreleased)
+
+FEATURES:
+
+* **New resource `authwise_asset_content` (#28).** The file behind an
+  `authwise_asset`. `authwise_asset` manages only the asset's metadata, and
+  until now the provider had no way to upload the bytes the hosted pages
+  serve at its `path`. Set `source` (a local file) or `content_base64`.
+  `content_sha256` tracks the content: editing the file plans an in-place
+  update that uploads it again, and a file changed on the server shows as
+  drift. Destroying it warns and leaves the file stored, because kit's
+  `RemoveAsset` is not implemented yet (kit#54). Destroying the
+  `authwise_asset` stops the file being served, but kit still leaves it
+  stored.
+
 ## 0.2.0 (September 29, 2026)
 
 NOTES:

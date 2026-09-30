@@ -64,7 +64,7 @@ func AssetResourceSchema() schema.Schema {
 				Validators:          []validator.String{tf.ReferenceID("t", "tenant", "")},
 			},
 		},
-		MarkdownDescription: "A static asset the hosted pages serve, such as a logo.",
+		MarkdownDescription: "A static asset the hosted pages serve, such as a logo. This is the asset's metadata; upload the file itself with `authwise_asset_content`.",
 	}
 }
 
@@ -304,7 +304,7 @@ func AssetDataSourceSchema() schema1.Schema {
 			"path":      schema1.StringAttribute{Computed: true},
 			"tenant_id": schema1.StringAttribute{Computed: true},
 		},
-		MarkdownDescription: "A static asset the hosted pages serve, such as a logo. This data source reads one by its full resource name.",
+		MarkdownDescription: "A static asset the hosted pages serve, such as a logo. This is the asset's metadata; upload the file itself with `authwise_asset_content`. This data source reads one by its full resource name.",
 	}
 }
 
@@ -395,7 +395,7 @@ func AssetListDataSourceSchema() schema1.Schema {
 				Validators:          []validator.String{tf.ReferenceID("t", "tenant", "")},
 			},
 		},
-		MarkdownDescription: "A static asset the hosted pages serve, such as a logo. This data source lists every one under a parent.",
+		MarkdownDescription: "A static asset the hosted pages serve, such as a logo. This is the asset's metadata; upload the file itself with `authwise_asset_content`. This data source lists every one under a parent.",
 	}
 }
 
