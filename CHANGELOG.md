@@ -1,3 +1,21 @@
+## 0.4.0 (September 30, 2026)
+
+NOTES:
+
+* **apis v0.13.0.** This release is built against apis v0.13.0 (from kit
+  6f63ec1e). `link_by_verified_email` needs a kit release that carries
+  kit#633.
+
+FEATURES:
+
+* **`authwise_provider` gains `link_by_verified_email` (#29, kit#633).**
+  It is an optional bool and defaults to false. It lets a person who signs
+  in through this upstream with a verified email link to the account that
+  already holds that email, once they confirm with the account's password.
+  kit refuses it on a type with no upstream: `usernamePassword`,
+  `magicLink`, `smsCode`, `passkey` and `dummy`. The `authwise_provider` and
+  `authwise_providers` data sources read it.
+
 ## 0.3.0 (September 30, 2026)
 
 NOTES:

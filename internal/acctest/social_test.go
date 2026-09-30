@@ -217,6 +217,63 @@ data "authwise_provider_oauth" "c" {
 // TestAccSocialProvider_Refusals pins kit's write-time rules for the OAuth
 // family: authorization_params cannot override a parameter kit sets, and an
 // oauth provider's identifier must come from the userinfo document.
+// TestAccProvider_LinkByVerifiedEmail is the per-provider opt-in to the
+// login-time link by verified email (kit#633, apis v0.13.0): set on create,
+// cleared in place, and reaching kit's row each time.
+func TestAccProvider_LinkByVerifiedEmail(t *testing.T) {
+
+	h := newHarness(t)
+
+	config := func(link bool) string {
+		return h.providerConfig() + realmForFactors + fmt.Sprintf(`
+data "authwise_provider_google" "this" {
+  client_id = "123.apps.googleusercontent.com"
+}
+
+resource "authwise_provider" "google" {
+  realm_id               = local.realm_id
+  provider_type          = "google"
+  config                 = data.authwise_provider_google.this.any
+  link_by_verified_email = %t
+}
+`, link)
+	}
+
+	serverHas := func(want bool) resource.TestCheckFunc {
+		return checkServer(func() error {
+			h.fake.mu.Lock()
+			defer h.fake.mu.Unlock()
+			for _, p := range h.fake.providers {
+				if p.GetLinkByVerifiedEmail() != want {
+					return fmt.Errorf("link_by_verified_email = %t on the row, want %t", p.GetLinkByVerifiedEmail(), want)
+				}
+			}
+			return nil
+		})
+	}
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: protoFactories(),
+		Steps: []resource.TestStep{
+			{
+				Config: config(true),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("authwise_provider.google", "link_by_verified_email", "true"),
+					serverHas(true),
+				),
+			},
+			{
+				Config: config(false),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("authwise_provider.google", "link_by_verified_email", "false"),
+					serverHas(false),
+				),
+			},
+		},
+		CheckDestroy: noneLeft(h),
+	})
+}
+
 func TestAccSocialProvider_Refusals(t *testing.T) {
 
 	type s struct {
@@ -265,6 +322,18 @@ resource "authwise_provider" "p" {
   config        = data.authwise_provider_github.c.any
 }`,
 			want: regexp.MustCompile(`(?s)a google provider takes a\s+ProviderGoogle config`),
+		},
+		"link_by_verified_email on a type with no upstream": {
+			config: `
+data "authwise_provider_magic_link" "c" {}
+
+resource "authwise_provider" "p" {
+  realm_id               = "r-1"
+  provider_type          = "magicLink"
+  config                 = data.authwise_provider_magic_link.c.any
+  link_by_verified_email = true
+}`,
+			want: regexp.MustCompile(`(?s)link_by_verified_email is for a\s+federated\s+provider; magicLink is not one`),
 		},
 	}
 

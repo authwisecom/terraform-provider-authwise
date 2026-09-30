@@ -41,6 +41,7 @@ resource "authwise_provider" "google" {
 - `config` (String) `config` as protojson-encoded google.protobuf.Any (JSON object with `@type`); reference a generated config data source's `any` output for the type-safe form.
 - `display_name` (String)
 - `labels` (Map of String)
+- `link_by_verified_email` (Boolean)
 - `provider_type` (String)
 - `realm_id` (String) Parent identifier `realm_id`; overrides the provider default. Changing it replaces the resource.
 - `tenant_id` (String) Parent identifier `tenant_id`; overrides the provider default. Changing it replaces the resource.

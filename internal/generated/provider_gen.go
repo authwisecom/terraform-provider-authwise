@@ -49,6 +49,11 @@ func ProviderResourceSchema() schema.Schema {
 				Optional:      true,
 				PlanModifiers: []planmodifier.Map{mapplanmodifier.UseStateForUnknown()},
 			},
+			"link_by_verified_email": schema.BoolAttribute{
+				Computed:      true,
+				Optional:      true,
+				PlanModifiers: []planmodifier.Bool{boolplanmodifier.UseStateForUnknown()},
+			},
 			"name": schema.StringAttribute{
 				Computed:            true,
 				MarkdownDescription: "Full resource name; serves as the Terraform ID.",
@@ -94,31 +99,33 @@ func ProviderResourceSchema() schema.Schema {
 
 // ProviderModel is the Terraform plan/state model for Provider.
 type ProviderModel struct {
-	Name             types.String         `tfsdk:"name"`
-	ProviderId       types.String         `tfsdk:"provider_id"`
-	TenantId         types.String         `tfsdk:"tenant_id"`
-	RealmId          types.String         `tfsdk:"realm_id"`
-	Labels           types.Map            `tfsdk:"labels"`
-	DisplayName      types.String         `tfsdk:"display_name"`
-	ProviderType     types.String         `tfsdk:"provider_type"`
-	Config           jsontypes.Normalized `tfsdk:"config"`
-	TrustUpstreamAmr types.Bool           `tfsdk:"trust_upstream_amr"`
-	UpstreamAcrMap   types.Map            `tfsdk:"upstream_acr_map"`
+	Name                types.String         `tfsdk:"name"`
+	ProviderId          types.String         `tfsdk:"provider_id"`
+	TenantId            types.String         `tfsdk:"tenant_id"`
+	RealmId             types.String         `tfsdk:"realm_id"`
+	Labels              types.Map            `tfsdk:"labels"`
+	DisplayName         types.String         `tfsdk:"display_name"`
+	ProviderType        types.String         `tfsdk:"provider_type"`
+	Config              jsontypes.Normalized `tfsdk:"config"`
+	TrustUpstreamAmr    types.Bool           `tfsdk:"trust_upstream_amr"`
+	UpstreamAcrMap      types.Map            `tfsdk:"upstream_acr_map"`
+	LinkByVerifiedEmail types.Bool           `tfsdk:"link_by_verified_email"`
 }
 
 // NewProviderModel returns a model with every attribute set to its typed null; collection types cannot be zero-valued.
 func NewProviderModel() *ProviderModel {
 	return &ProviderModel{
-		Config:           jsontypes.NewNormalizedNull(),
-		DisplayName:      types.StringNull(),
-		Labels:           types.MapNull(types.StringType),
-		Name:             types.StringNull(),
-		ProviderId:       types.StringNull(),
-		ProviderType:     types.StringNull(),
-		RealmId:          types.StringNull(),
-		TenantId:         types.StringNull(),
-		TrustUpstreamAmr: types.BoolNull(),
-		UpstreamAcrMap:   types.MapNull(types.StringType),
+		Config:              jsontypes.NewNormalizedNull(),
+		DisplayName:         types.StringNull(),
+		Labels:              types.MapNull(types.StringType),
+		LinkByVerifiedEmail: types.BoolNull(),
+		Name:                types.StringNull(),
+		ProviderId:          types.StringNull(),
+		ProviderType:        types.StringNull(),
+		RealmId:             types.StringNull(),
+		TenantId:            types.StringNull(),
+		TrustUpstreamAmr:    types.BoolNull(),
+		UpstreamAcrMap:      types.MapNull(types.StringType),
 	}
 }
 
@@ -144,6 +151,7 @@ func (m *ProviderModel) ToProto(ctx context.Context) (*v1alpha1.Provider, diag.D
 	if !m.UpstreamAcrMap.IsNull() && !m.UpstreamAcrMap.IsUnknown() {
 		diags.Append(m.UpstreamAcrMap.ElementsAs(ctx, &out.UpstreamAcrMap, false)...)
 	}
+	out.LinkByVerifiedEmail = m.LinkByVerifiedEmail.ValueBool()
 	return out, diags
 }
 
@@ -186,6 +194,7 @@ func (m *ProviderModel) FromProto(ctx context.Context, e *v1alpha1.Provider) dia
 		diags.Append(d...)
 		m.UpstreamAcrMap = v
 	}
+	m.LinkByVerifiedEmail = types.BoolValue(e.LinkByVerifiedEmail)
 	return diags
 }
 
@@ -224,6 +233,9 @@ func (m *ProviderModel) UpdateMask(ctx context.Context, prior *ProviderModel) []
 	}
 	if !m.UpstreamAcrMap.Equal(prior.UpstreamAcrMap) {
 		paths = append(paths, "upstream_acr_map")
+	}
+	if !m.LinkByVerifiedEmail.Equal(prior.LinkByVerifiedEmail) {
+		paths = append(paths, "link_by_verified_email")
 	}
 	return paths
 }
@@ -361,6 +373,7 @@ func ProviderDataSourceSchema() schema1.Schema {
 				Computed:    true,
 				ElementType: types.StringType,
 			},
+			"link_by_verified_email": schema1.BoolAttribute{Computed: true},
 			"name": schema1.StringAttribute{
 				MarkdownDescription: "Full resource name of the object to read.",
 				Required:            true,
@@ -412,27 +425,29 @@ func (d *providerDataSource) Read(ctx context.Context, req datasource.ReadReques
 
 // ProviderItemModel is one element of the providers data source's "providers" list.
 type ProviderItemModel struct {
-	ProviderId       types.String         `tfsdk:"provider_id"`
-	Name             types.String         `tfsdk:"name"`
-	Labels           types.Map            `tfsdk:"labels"`
-	DisplayName      types.String         `tfsdk:"display_name"`
-	ProviderType     types.String         `tfsdk:"provider_type"`
-	Config           jsontypes.Normalized `tfsdk:"config"`
-	TrustUpstreamAmr types.Bool           `tfsdk:"trust_upstream_amr"`
-	UpstreamAcrMap   types.Map            `tfsdk:"upstream_acr_map"`
+	ProviderId          types.String         `tfsdk:"provider_id"`
+	Name                types.String         `tfsdk:"name"`
+	Labels              types.Map            `tfsdk:"labels"`
+	DisplayName         types.String         `tfsdk:"display_name"`
+	ProviderType        types.String         `tfsdk:"provider_type"`
+	Config              jsontypes.Normalized `tfsdk:"config"`
+	TrustUpstreamAmr    types.Bool           `tfsdk:"trust_upstream_amr"`
+	UpstreamAcrMap      types.Map            `tfsdk:"upstream_acr_map"`
+	LinkByVerifiedEmail types.Bool           `tfsdk:"link_by_verified_email"`
 }
 
 // ProviderItemAttrTypes returns the attribute types of one providers list element.
 func ProviderItemAttrTypes() map[string]attr.Type {
 	return map[string]attr.Type{
-		"config":             jsontypes.NormalizedType{},
-		"display_name":       types.StringType,
-		"labels":             types.MapType{ElemType: types.StringType},
-		"name":               types.StringType,
-		"provider_id":        types.StringType,
-		"provider_type":      types.StringType,
-		"trust_upstream_amr": types.BoolType,
-		"upstream_acr_map":   types.MapType{ElemType: types.StringType},
+		"config":                 jsontypes.NormalizedType{},
+		"display_name":           types.StringType,
+		"labels":                 types.MapType{ElemType: types.StringType},
+		"link_by_verified_email": types.BoolType,
+		"name":                   types.StringType,
+		"provider_id":            types.StringType,
+		"provider_type":          types.StringType,
+		"trust_upstream_amr":     types.BoolType,
+		"upstream_acr_map":       types.MapType{ElemType: types.StringType},
 	}
 }
 
@@ -460,6 +475,7 @@ func ProviderListDataSourceSchema() schema1.Schema {
 						Computed:    true,
 						ElementType: types.StringType,
 					},
+					"link_by_verified_email": schema1.BoolAttribute{Computed: true},
 					"name": schema1.StringAttribute{
 						Computed:            true,
 						MarkdownDescription: "Full resource name.",
@@ -531,6 +547,7 @@ func providerItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Provider
 		diags.Append(d...)
 		item.UpstreamAcrMap = v
 	}
+	item.LinkByVerifiedEmail = types.BoolValue(e.LinkByVerifiedEmail)
 	id, err := crud.IDFromName(e.Name)
 	if err != nil {
 		diags.AddError("unexpected provider name", err.Error())

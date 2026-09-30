@@ -32,6 +32,7 @@ Read-Only:
 - `config` (String)
 - `display_name` (String)
 - `labels` (Map of String)
+- `link_by_verified_email` (Boolean)
 - `name` (String) Full resource name.
 - `provider_id` (String) Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.
 - `provider_type` (String)
