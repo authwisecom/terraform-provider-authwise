@@ -8,10 +8,9 @@ FEATURES:
   serve at its `path`. Set `source` (a local file) or `content_base64`.
   `content_sha256` tracks the content: editing the file plans an in-place
   update that uploads it again, and a file changed on the server shows as
-  drift. Destroying it warns and leaves the file stored, because kit's
-  `RemoveAsset` is not implemented yet (kit#54). Destroying the
-  `authwise_asset` stops the file being served, but kit still leaves it
-  stored.
+  drift. Destroying it removes the file and leaves the asset, through
+  `RemoveAsset`. That needs a kit release carrying kit#54: kit v1.23.1 and
+  earlier fail every `RemoveAsset`, so destroying the resource fails there.
 
 ## 0.2.0 (September 29, 2026)
 

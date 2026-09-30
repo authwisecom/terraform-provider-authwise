@@ -5,7 +5,7 @@ subcategory: ""
 description: |-
   The file behind an authwise_asset: the bytes the hosted pages serve at the asset's path.
   authwise_asset manages only the asset's metadata. kit stores the file separately, through its upload and download calls, and this resource manages that part. Set exactly one of source, a local file, or content_base64. Changes are tracked by content_sha256: editing the file plans an in-place update that uploads it again, and a file changed outside Terraform shows as drift.
-  Destroy. kit does not implement removing an asset's file yet (kit#54). Until it does, destroying this resource warns and leaves the file in place. Destroying the authwise_asset stops the file being served, since kit serves it through the asset, but kit still leaves it stored.
+  Destroying it removes the file and leaves the asset. Destroying the authwise_asset removes both.
 ---
 
 # authwise_asset_content (Resource)
@@ -14,7 +14,7 @@ The file behind an `authwise_asset`: the bytes the hosted pages serve at the ass
 
 `authwise_asset` manages only the asset's metadata. kit stores the file separately, through its upload and download calls, and this resource manages that part. Set exactly one of `source`, a local file, or `content_base64`. Changes are tracked by `content_sha256`: editing the file plans an in-place update that uploads it again, and a file changed outside Terraform shows as drift.
 
-**Destroy.** kit does not implement removing an asset's file yet (kit#54). Until it does, destroying this resource warns and leaves the file in place. Destroying the `authwise_asset` stops the file being served, since kit serves it through the asset, but kit still leaves it stored.
+Destroying it removes the file and leaves the asset. Destroying the `authwise_asset` removes both.
 
 ## Example Usage
 

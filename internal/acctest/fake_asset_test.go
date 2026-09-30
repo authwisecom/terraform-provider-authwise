@@ -16,8 +16,8 @@ import (
 // Asset, the row and its blob. kit keeps the two apart: the row goes
 // through the CRUD RPCs, the bytes through the UploadAsset client stream
 // and the DownloadAsset server stream, each chunk naming the asset.
-// RemoveAsset fails the way kit's does while its Remove is unimplemented
-// (kit#54): the panic, recovered into an error.
+// RemoveAsset deletes the file and keeps the row (kit#54); a file that is
+// already gone is success.
 
 func (f *fakeIdentityServer) GetAsset(ctx context.Context, in *identitypb.GetAssetRequest) (*corepb.Asset, error) {
 	f.mu.Lock()
@@ -134,11 +134,15 @@ func (f *fakeIdentityServer) DownloadAsset(in *identitypb.DownloadAssetRequest, 
 	return nil
 }
 
-func (f *fakeIdentityServer) RemoveAsset(ctx context.Context, _ *identitypb.RemoveAssetRequest) (*emptypb.Empty, error) {
+func (f *fakeIdentityServer) RemoveAsset(ctx context.Context, in *identitypb.RemoveAssetRequest) (*emptypb.Empty, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.recordAuth(ctx)
-	return nil, status.Error(codes.Unknown, "panic occurred: implement me")
+	if _, ok := f.assets[in.GetName()]; !ok {
+		return nil, status.Errorf(codes.NotFound, "asset %q not found", in.GetName())
+	}
+	delete(f.blobs, in.GetName())
+	return &emptypb.Empty{}, nil
 }
 
 // blob returns an asset's stored content, and whether it has any.

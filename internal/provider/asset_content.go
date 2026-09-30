@@ -80,8 +80,7 @@ func (r *assetContentResource) Schema(_ context.Context, _ resource.SchemaReques
 			"`authwise_asset` manages only the asset's metadata. kit stores the file separately, through its upload and download calls, and this resource manages that part. " +
 			"Set exactly one of `source`, a local file, or `content_base64`. Changes are tracked by `content_sha256`: editing the file plans an in-place update that uploads it again, " +
 			"and a file changed outside Terraform shows as drift.\n\n" +
-			"**Destroy.** kit does not implement removing an asset's file yet (kit#54). Until it does, destroying this resource warns and leaves the file in place. " +
-			"Destroying the `authwise_asset` stops the file being served, since kit serves it through the asset, but kit still leaves it stored.",
+			"Destroying it removes the file and leaves the asset. Destroying the `authwise_asset` removes both.",
 		Attributes: map[string]schema.Attribute{
 			"tenant_id": schema.StringAttribute{
 				Optional:            true,
@@ -232,9 +231,8 @@ func (r *assetContentResource) Read(ctx context.Context, req resource.ReadReques
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
-// Delete asks kit to remove the file. kit's RemoveAsset is not implemented
-// yet (kit#54), and failing every destroy until it is would be worse than
-// leaving the file behind, so any failure other than NotFound is a warning.
+// Delete removes the file and leaves the asset row. A file or asset that is
+// already gone is success.
 func (r *assetContentResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 
 	if !r.configured(&resp.Diagnostics) {
@@ -255,9 +253,7 @@ func (r *assetContentResource) Delete(ctx context.Context, req resource.DeleteRe
 
 	_, err = r.client.RemoveAsset(ctx, &identitypb.RemoveAssetRequest{Name: name})
 	if err != nil && !aip.IsNotFound(err) {
-		resp.Diagnostics.AddWarning("the asset content was not removed",
-			fmt.Sprintf("kit could not remove the content of %s (%s), so the file is still stored. "+
-				"The resource is removed from state anyway. Destroying the authwise_asset stops the file being served.", name, err))
+		resp.Diagnostics.AddError("removing the asset content failed", err.Error())
 	}
 }
 

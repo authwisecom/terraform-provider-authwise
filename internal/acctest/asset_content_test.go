@@ -2,7 +2,8 @@
 // through kit's UploadAsset stream. The steps walk what the hash has to
 // catch: a first upload big enough to take several chunks, the same file
 // path with new bytes, a change made on the server behind Terraform's back,
-// and a switch from a file to inline content.
+// and a switch from a file to inline content. Destroying the content alone
+// removes the file and keeps the asset.
 package acctest_test
 
 import (
@@ -15,6 +16,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"testing"
+
+	identitypb "git.authwise.com/authwise/apis/authwise/identity/v1alpha1"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/plancheck"
@@ -146,6 +149,18 @@ resource "authwise_asset_content" "logo" {
 				ImportStateVerify:                    true,
 				ImportStateVerifyIdentifierAttribute: "asset_id",
 				ImportStateVerifyIgnore:              []string{"content_base64"},
+			},
+			{
+				Config: h.providerConfig() + asset,
+				Check: checkServer(func() error {
+					if _, ok := h.fake.blob(assetName); ok {
+						return fmt.Errorf("asset %s still has content after destroy", assetName)
+					}
+					if _, err := h.fake.GetAsset(t.Context(), &identitypb.GetAssetRequest{Name: assetName}); err != nil {
+						return fmt.Errorf("the asset went with its content: %w", err)
+					}
+					return nil
+				}),
 			},
 		},
 	})
