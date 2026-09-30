@@ -82,7 +82,7 @@ func (r *assetContentResource) Schema(_ context.Context, _ resource.SchemaReques
 			"and a file changed outside Terraform shows as drift.\n\n" +
 			"Destroying it removes the file and leaves the asset. Destroying the `authwise_asset` removes both.",
 		Attributes: map[string]schema.Attribute{
-			"tenant_id": schema.StringAttribute{
+			tenantIDAttribute: schema.StringAttribute{
 				Optional:            true,
 				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default. Changing it replaces the resource.",
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
@@ -271,8 +271,8 @@ func (r *assetContentResource) ImportState(ctx context.Context, req resource.Imp
 		return
 	}
 
-	if t := ids["tenant_id"]; t != r.defaults["tenant_id"] {
-		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("tenant_id"), t)...)
+	if t := ids[tenantIDAttribute]; t != r.defaults[tenantIDAttribute] {
+		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root(tenantIDAttribute), t)...)
 	}
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("asset_id"), id)...)
 }
@@ -280,9 +280,9 @@ func (r *assetContentResource) ImportState(ctx context.Context, req resource.Imp
 // assetName composes the asset's full name from its id and tenant, falling
 // back to the provider's tenant default.
 func (r *assetContentResource) assetName(m assetContentModel) (string, error) {
-	ids := map[string]string{"tenant_id": r.defaults["tenant_id"]}
+	ids := map[string]string{tenantIDAttribute: r.defaults[tenantIDAttribute]}
 	if v := m.TenantID.ValueString(); v != "" {
-		ids["tenant_id"] = v
+		ids[tenantIDAttribute] = v
 	}
 	name, err := assetScope.ComposeName(assetCollection, ids, m.AssetID.ValueString())
 	if err != nil {

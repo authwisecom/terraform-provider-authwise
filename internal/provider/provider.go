@@ -28,6 +28,10 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
+// tenantIDAttribute is the tenant scope attribute: the provider default and
+// the per-resource override the hand-written resources compose names from.
+const tenantIDAttribute = "tenant_id"
+
 var _ provider.Provider = &AuthwiseProvider{}
 
 // AuthwiseProvider manages Authwise identity objects over the published

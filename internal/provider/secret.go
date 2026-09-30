@@ -107,7 +107,7 @@ func (r *secretResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 				MarkdownDescription: "Full resource name (`tenants/{t}/secrets/{s}`); serves as the Terraform ID, and is what references take.",
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
-			"tenant_id": schema.StringAttribute{
+			tenantIDAttribute: schema.StringAttribute{
 				Optional:            true,
 				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default. Changing it replaces the resource.",
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
@@ -222,9 +222,9 @@ func (r *secretResource) Create(ctx context.Context, req resource.CreateRequest,
 		return
 	}
 
-	ids := map[string]string{"tenant_id": r.defaults["tenant_id"]}
+	ids := map[string]string{tenantIDAttribute: r.defaults[tenantIDAttribute]}
 	if v := plan.TenantID.ValueString(); v != "" {
-		ids["tenant_id"] = v
+		ids[tenantIDAttribute] = v
 	}
 	parent, err := secretScope.ComposeParent(ids)
 	if err != nil {
