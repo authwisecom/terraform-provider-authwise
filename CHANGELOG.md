@@ -1,4 +1,13 @@
-## 0.3.0 (Unreleased)
+## 0.3.0 (September 30, 2026)
+
+NOTES:
+
+* **kit v1.24.0.** This release pairs with kit v1.24.0 and is built against
+  apis v0.12.0, the version 0.2.0 used. kit v1.24.0 is the first release
+  that deletes an asset's file (kit#54). Its object-storage installs also
+  need platform v1.13.0, or platform-hosted v0.9.0 on hosted installs.
+  Against an older kit or platform, uploads and refreshes work, but
+  destroying an `authwise_asset_content` fails.
 
 FEATURES:
 
@@ -8,9 +17,7 @@ FEATURES:
   serve at its `path`. Set `source` (a local file) or `content_base64`.
   `content_sha256` tracks the content: editing the file plans an in-place
   update that uploads it again, and a file changed on the server shows as
-  drift. Destroying it removes the file and leaves the asset, through
-  `RemoveAsset`. That needs a kit release carrying kit#54: kit v1.23.1 and
-  earlier fail every `RemoveAsset`, so destroying the resource fails there.
+  drift. Destroying it removes the file and leaves the asset.
 
 ## 0.2.0 (September 29, 2026)
 
