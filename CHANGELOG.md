@@ -2,9 +2,9 @@
 
 NOTES:
 
-* **apis v0.13.0.** This release is built against apis v0.13.0 (from kit
-  6f63ec1e). `link_by_verified_email` needs a kit release that carries
-  kit#633.
+* **kit v1.25.0.** This release pairs with kit v1.25.0 and is built
+  against apis v0.13.0. kit v1.25.0 is the first release that carries
+  kit#633, which `link_by_verified_email` needs.
 
 FEATURES:
 
