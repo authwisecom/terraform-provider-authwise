@@ -59,7 +59,11 @@ type fakeIdentityServer struct {
 	factors   map[string]*corepb.Factor
 	secrets   map[string]*corepb.Secret
 	assets    map[string]*corepb.Asset
-	seq       int
+	users     map[string]*corepb.User
+	// contact is each user's derived address, apart from the row: kit
+	// fills email from the account's proven identifiers on every read.
+	contact map[string]string
+	seq     int
 
 	// blobs holds each asset's content as uploaded, apart from the row,
 	// the way kit keeps it in a bucket. uploads counts completed
@@ -103,6 +107,8 @@ func newFakeIdentityServer() *fakeIdentityServer {
 		factors:       map[string]*corepb.Factor{},
 		secrets:       map[string]*corepb.Secret{},
 		assets:        map[string]*corepb.Asset{},
+		users:         map[string]*corepb.User{},
+		contact:       map[string]string{},
 		blobs:         map[string][]byte{},
 		material:      map[string][]string{},
 		pinned:        map[string]bool{},

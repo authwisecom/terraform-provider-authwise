@@ -19,8 +19,6 @@ A user in a realm.
 
 - `birthdate` (String)
 - `display_name` (String)
-- `email` (String)
-- `email_verified` (Boolean)
 - `extra_fields` (String) `extra_fields` as a JSON object.
 - `family_name` (String)
 - `gender` (String)
@@ -30,8 +28,6 @@ A user in a realm.
 - `metadata` (String) `metadata` as a JSON object.
 - `middle_name` (String)
 - `nickname` (String)
-- `phone_number` (String)
-- `phone_number_verified` (Boolean)
 - `picture` (String)
 - `preferred_username` (String)
 - `profile` (String)
@@ -43,9 +39,14 @@ A user in a realm.
 
 ### Read-Only
 
+- `credentials_changed_at` (String) `credentials_changed_at` as an RFC 3339 timestamp.
+- `email` (String)
+- `email_verified` (Boolean)
 - `enrollment` (String)
 - `name` (String) Full resource name; serves as the Terraform ID.
 - `origin` (String)
+- `phone_number` (String)
+- `phone_number_verified` (Boolean)
 - `updated_at` (String) `updated_at` as an RFC 3339 timestamp.
 - `user_id` (String) Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.
 

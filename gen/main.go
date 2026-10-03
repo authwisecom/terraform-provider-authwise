@@ -249,7 +249,13 @@ func main() {
 				// update rather than ignoring it, so neither may be written.
 				// status stays writable — the default Optional+Computed shape
 				// already covers its ""-means-unchanged semantics.
-				withComputed("updated_at", "origin", "enrollment"),
+				// The address and phone fields are output only (kit#662,
+				// kit#666): kit refuses them on create, update and patch
+				// whatever the value. An address now comes from an
+				// invitation (InviteUser). credentials_changed_at is kit's.
+				withComputed("updated_at", "origin", "enrollment",
+					"email", "email_verified", "phone_number", "phone_number_verified",
+					"credentials_changed_at"),
 			),
 			crud[corepb.Provider](scopeRealm,
 				withDescription("A way people sign in to a realm: username and password, a magic link, passkeys, a social or enterprise IdP, or SAML. `config` comes from the matching config data source."), withJSON("config")),

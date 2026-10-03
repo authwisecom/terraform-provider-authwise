@@ -30,6 +30,7 @@ A user in a realm. This data source lists every one under a parent.
 Read-Only:
 
 - `birthdate` (String)
+- `credentials_changed_at` (String)
 - `display_name` (String)
 - `email` (String)
 - `email_verified` (Boolean)

@@ -1,3 +1,27 @@
+## Unreleased
+
+NOTES:
+
+* **Pairs with kit v1.30.0 (pending).** Built against apis v0.15.0 for now;
+  apis v0.16.0 (kit v1.30.0) is not yet published. Do not release this ahead
+  of kit v1.30.0.
+
+BREAKING CHANGES:
+
+* **`authwise_user`: `email`, `email_verified`, `phone_number` and
+  `phone_number_verified` are read-only (kit#662, kit#666).** kit derives
+  them from the account's proven identifiers and refuses them on every user
+  write, whatever the value. A configuration that sets one now fails at
+  plan. Remove them, and give a user an address through an invitation
+  (`InviteUser`). The provider no longer sends them on create or update, so
+  updating a user who has an address works.
+
+FEATURES:
+
+* **`authwise_user` gains `credentials_changed_at` (apis v0.15.0).** It is
+  read-only, and the `authwise_user` and `authwise_users` data sources read
+  it too.
+
 ## 0.4.0 (September 30, 2026)
 
 NOTES:

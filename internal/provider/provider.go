@@ -217,7 +217,7 @@ func (p *AuthwiseProvider) Configure(ctx context.Context, req provider.Configure
 
 	providerData := &tfruntime.ProviderData{
 		Clients: map[string]any{
-			"identity": identitypb.NewAuthwiseIdentityServiceClient(conn),
+			"identity": userContactClient{identitypb.NewAuthwiseIdentityServiceClient(conn)},
 			"access":   accesspb.NewAuthwiseAccessServiceClient(conn),
 		},
 		Defaults: defaults,

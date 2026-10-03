@@ -22,6 +22,7 @@ A user in a realm. This data source reads one by its full resource name.
 ### Read-Only
 
 - `birthdate` (String)
+- `credentials_changed_at` (String)
 - `display_name` (String)
 - `email` (String)
 - `email_verified` (Boolean)

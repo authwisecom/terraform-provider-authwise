@@ -38,6 +38,11 @@ func UserResourceSchema() schema.Schema {
 				Optional:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
+			"credentials_changed_at": schema.StringAttribute{
+				Computed:            true,
+				MarkdownDescription: "`credentials_changed_at` as an RFC 3339 timestamp.",
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
 			"display_name": schema.StringAttribute{
 				Computed:      true,
 				Optional:      true,
@@ -45,12 +50,10 @@ func UserResourceSchema() schema.Schema {
 			},
 			"email": schema.StringAttribute{
 				Computed:      true,
-				Optional:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"email_verified": schema.BoolAttribute{
 				Computed:      true,
-				Optional:      true,
 				PlanModifiers: []planmodifier.Bool{boolplanmodifier.UseStateForUnknown()},
 			},
 			"enrollment": schema.StringAttribute{
@@ -118,12 +121,10 @@ func UserResourceSchema() schema.Schema {
 			},
 			"phone_number": schema.StringAttribute{
 				Computed:      true,
-				Optional:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"phone_number_verified": schema.BoolAttribute{
 				Computed:      true,
-				Optional:      true,
 				PlanModifiers: []planmodifier.Bool{boolplanmodifier.UseStateForUnknown()},
 			},
 			"picture": schema.StringAttribute{
@@ -185,67 +186,69 @@ func UserResourceSchema() schema.Schema {
 
 // UserModel is the Terraform plan/state model for User.
 type UserModel struct {
-	Name                types.String         `tfsdk:"name"`
-	UserId              types.String         `tfsdk:"user_id"`
-	TenantId            types.String         `tfsdk:"tenant_id"`
-	RealmId             types.String         `tfsdk:"realm_id"`
-	Labels              types.Map            `tfsdk:"labels"`
-	DisplayName         types.String         `tfsdk:"display_name"`
-	GivenName           types.String         `tfsdk:"given_name"`
-	FamilyName          types.String         `tfsdk:"family_name"`
-	MiddleName          types.String         `tfsdk:"middle_name"`
-	Nickname            types.String         `tfsdk:"nickname"`
-	PreferredUsername   types.String         `tfsdk:"preferred_username"`
-	Email               types.String         `tfsdk:"email"`
-	EmailVerified       types.Bool           `tfsdk:"email_verified"`
-	Gender              types.String         `tfsdk:"gender"`
-	PhoneNumber         types.String         `tfsdk:"phone_number"`
-	PhoneNumberVerified types.Bool           `tfsdk:"phone_number_verified"`
-	Profile             types.String         `tfsdk:"profile"`
-	Picture             types.String         `tfsdk:"picture"`
-	Website             types.String         `tfsdk:"website"`
-	Birthdate           types.String         `tfsdk:"birthdate"`
-	Zoneinfo            types.String         `tfsdk:"zoneinfo"`
-	Locale              types.String         `tfsdk:"locale"`
-	Metadata            jsontypes.Normalized `tfsdk:"metadata"`
-	ExtraFields         jsontypes.Normalized `tfsdk:"extra_fields"`
-	UpdatedAt           types.String         `tfsdk:"updated_at"`
-	Status              types.String         `tfsdk:"status"`
-	Origin              types.String         `tfsdk:"origin"`
-	Enrollment          types.String         `tfsdk:"enrollment"`
+	Name                 types.String         `tfsdk:"name"`
+	UserId               types.String         `tfsdk:"user_id"`
+	TenantId             types.String         `tfsdk:"tenant_id"`
+	RealmId              types.String         `tfsdk:"realm_id"`
+	Labels               types.Map            `tfsdk:"labels"`
+	DisplayName          types.String         `tfsdk:"display_name"`
+	GivenName            types.String         `tfsdk:"given_name"`
+	FamilyName           types.String         `tfsdk:"family_name"`
+	MiddleName           types.String         `tfsdk:"middle_name"`
+	Nickname             types.String         `tfsdk:"nickname"`
+	PreferredUsername    types.String         `tfsdk:"preferred_username"`
+	Email                types.String         `tfsdk:"email"`
+	EmailVerified        types.Bool           `tfsdk:"email_verified"`
+	Gender               types.String         `tfsdk:"gender"`
+	PhoneNumber          types.String         `tfsdk:"phone_number"`
+	PhoneNumberVerified  types.Bool           `tfsdk:"phone_number_verified"`
+	Profile              types.String         `tfsdk:"profile"`
+	Picture              types.String         `tfsdk:"picture"`
+	Website              types.String         `tfsdk:"website"`
+	Birthdate            types.String         `tfsdk:"birthdate"`
+	Zoneinfo             types.String         `tfsdk:"zoneinfo"`
+	Locale               types.String         `tfsdk:"locale"`
+	Metadata             jsontypes.Normalized `tfsdk:"metadata"`
+	ExtraFields          jsontypes.Normalized `tfsdk:"extra_fields"`
+	UpdatedAt            types.String         `tfsdk:"updated_at"`
+	Status               types.String         `tfsdk:"status"`
+	Origin               types.String         `tfsdk:"origin"`
+	Enrollment           types.String         `tfsdk:"enrollment"`
+	CredentialsChangedAt types.String         `tfsdk:"credentials_changed_at"`
 }
 
 // NewUserModel returns a model with every attribute set to its typed null; collection types cannot be zero-valued.
 func NewUserModel() *UserModel {
 	return &UserModel{
-		Birthdate:           types.StringNull(),
-		DisplayName:         types.StringNull(),
-		Email:               types.StringNull(),
-		EmailVerified:       types.BoolNull(),
-		Enrollment:          types.StringNull(),
-		ExtraFields:         jsontypes.NewNormalizedNull(),
-		FamilyName:          types.StringNull(),
-		Gender:              types.StringNull(),
-		GivenName:           types.StringNull(),
-		Labels:              types.MapNull(types.StringType),
-		Locale:              types.StringNull(),
-		Metadata:            jsontypes.NewNormalizedNull(),
-		MiddleName:          types.StringNull(),
-		Name:                types.StringNull(),
-		Nickname:            types.StringNull(),
-		Origin:              types.StringNull(),
-		PhoneNumber:         types.StringNull(),
-		PhoneNumberVerified: types.BoolNull(),
-		Picture:             types.StringNull(),
-		PreferredUsername:   types.StringNull(),
-		Profile:             types.StringNull(),
-		RealmId:             types.StringNull(),
-		Status:              types.StringNull(),
-		TenantId:            types.StringNull(),
-		UpdatedAt:           types.StringNull(),
-		UserId:              types.StringNull(),
-		Website:             types.StringNull(),
-		Zoneinfo:            types.StringNull(),
+		Birthdate:            types.StringNull(),
+		CredentialsChangedAt: types.StringNull(),
+		DisplayName:          types.StringNull(),
+		Email:                types.StringNull(),
+		EmailVerified:        types.BoolNull(),
+		Enrollment:           types.StringNull(),
+		ExtraFields:          jsontypes.NewNormalizedNull(),
+		FamilyName:           types.StringNull(),
+		Gender:               types.StringNull(),
+		GivenName:            types.StringNull(),
+		Labels:               types.MapNull(types.StringType),
+		Locale:               types.StringNull(),
+		Metadata:             jsontypes.NewNormalizedNull(),
+		MiddleName:           types.StringNull(),
+		Name:                 types.StringNull(),
+		Nickname:             types.StringNull(),
+		Origin:               types.StringNull(),
+		PhoneNumber:          types.StringNull(),
+		PhoneNumberVerified:  types.BoolNull(),
+		Picture:              types.StringNull(),
+		PreferredUsername:    types.StringNull(),
+		Profile:              types.StringNull(),
+		RealmId:              types.StringNull(),
+		Status:               types.StringNull(),
+		TenantId:             types.StringNull(),
+		UpdatedAt:            types.StringNull(),
+		UserId:               types.StringNull(),
+		Website:              types.StringNull(),
+		Zoneinfo:             types.StringNull(),
 	}
 }
 
@@ -301,6 +304,14 @@ func (m *UserModel) ToProto(ctx context.Context) (*v1alpha1.User, diag.Diagnosti
 	out.Status = m.Status.ValueString()
 	out.Origin = m.Origin.ValueString()
 	out.Enrollment = m.Enrollment.ValueString()
+	if !m.CredentialsChangedAt.IsNull() && !m.CredentialsChangedAt.IsUnknown() {
+		t, err := time.Parse(time.RFC3339, m.CredentialsChangedAt.ValueString())
+		if err != nil {
+			diags.AddAttributeError(path.Root("credentials_changed_at"), "invalid RFC 3339 timestamp", err.Error())
+		} else {
+			out.CredentialsChangedAt = timestamppb.New(t)
+		}
+	}
 	return out, diags
 }
 
@@ -432,6 +443,11 @@ func (m *UserModel) FromProto(ctx context.Context, e *v1alpha1.User) diag.Diagno
 	} else {
 		m.Enrollment = types.StringValue(e.Enrollment)
 	}
+	if e.CredentialsChangedAt == nil {
+		m.CredentialsChangedAt = types.StringNull()
+	} else {
+		m.CredentialsChangedAt = types.StringValue(e.CredentialsChangedAt.AsTime().Format(time.RFC3339))
+	}
 	return diags
 }
 
@@ -472,20 +488,8 @@ func (m *UserModel) UpdateMask(ctx context.Context, prior *UserModel) []string {
 	if !m.PreferredUsername.Equal(prior.PreferredUsername) {
 		paths = append(paths, "preferred_username")
 	}
-	if !m.Email.Equal(prior.Email) {
-		paths = append(paths, "email")
-	}
-	if !m.EmailVerified.Equal(prior.EmailVerified) {
-		paths = append(paths, "email_verified")
-	}
 	if !m.Gender.Equal(prior.Gender) {
 		paths = append(paths, "gender")
-	}
-	if !m.PhoneNumber.Equal(prior.PhoneNumber) {
-		paths = append(paths, "phone_number")
-	}
-	if !m.PhoneNumberVerified.Equal(prior.PhoneNumberVerified) {
-		paths = append(paths, "phone_number_verified")
 	}
 	if !m.Profile.Equal(prior.Profile) {
 		paths = append(paths, "profile")
@@ -645,11 +649,12 @@ func (r *userResource) ImportState(ctx context.Context, req resource.ImportState
 func UserDataSourceSchema() schema1.Schema {
 	return schema1.Schema{
 		Attributes: map[string]schema1.Attribute{
-			"birthdate":      schema1.StringAttribute{Computed: true},
-			"display_name":   schema1.StringAttribute{Computed: true},
-			"email":          schema1.StringAttribute{Computed: true},
-			"email_verified": schema1.BoolAttribute{Computed: true},
-			"enrollment":     schema1.StringAttribute{Computed: true},
+			"birthdate":              schema1.StringAttribute{Computed: true},
+			"credentials_changed_at": schema1.StringAttribute{Computed: true},
+			"display_name":           schema1.StringAttribute{Computed: true},
+			"email":                  schema1.StringAttribute{Computed: true},
+			"email_verified":         schema1.BoolAttribute{Computed: true},
+			"enrollment":             schema1.StringAttribute{Computed: true},
 			"extra_fields": schema1.StringAttribute{
 				Computed:   true,
 				CustomType: jsontypes.NormalizedType{},
@@ -723,63 +728,65 @@ func (d *userDataSource) Read(ctx context.Context, req datasource.ReadRequest, r
 
 // UserItemModel is one element of the users data source's "users" list.
 type UserItemModel struct {
-	UserId              types.String         `tfsdk:"user_id"`
-	Name                types.String         `tfsdk:"name"`
-	Labels              types.Map            `tfsdk:"labels"`
-	DisplayName         types.String         `tfsdk:"display_name"`
-	GivenName           types.String         `tfsdk:"given_name"`
-	FamilyName          types.String         `tfsdk:"family_name"`
-	MiddleName          types.String         `tfsdk:"middle_name"`
-	Nickname            types.String         `tfsdk:"nickname"`
-	PreferredUsername   types.String         `tfsdk:"preferred_username"`
-	Email               types.String         `tfsdk:"email"`
-	EmailVerified       types.Bool           `tfsdk:"email_verified"`
-	Gender              types.String         `tfsdk:"gender"`
-	PhoneNumber         types.String         `tfsdk:"phone_number"`
-	PhoneNumberVerified types.Bool           `tfsdk:"phone_number_verified"`
-	Profile             types.String         `tfsdk:"profile"`
-	Picture             types.String         `tfsdk:"picture"`
-	Website             types.String         `tfsdk:"website"`
-	Birthdate           types.String         `tfsdk:"birthdate"`
-	Zoneinfo            types.String         `tfsdk:"zoneinfo"`
-	Locale              types.String         `tfsdk:"locale"`
-	Metadata            jsontypes.Normalized `tfsdk:"metadata"`
-	ExtraFields         jsontypes.Normalized `tfsdk:"extra_fields"`
-	UpdatedAt           types.String         `tfsdk:"updated_at"`
-	Status              types.String         `tfsdk:"status"`
-	Origin              types.String         `tfsdk:"origin"`
-	Enrollment          types.String         `tfsdk:"enrollment"`
+	UserId               types.String         `tfsdk:"user_id"`
+	Name                 types.String         `tfsdk:"name"`
+	Labels               types.Map            `tfsdk:"labels"`
+	DisplayName          types.String         `tfsdk:"display_name"`
+	GivenName            types.String         `tfsdk:"given_name"`
+	FamilyName           types.String         `tfsdk:"family_name"`
+	MiddleName           types.String         `tfsdk:"middle_name"`
+	Nickname             types.String         `tfsdk:"nickname"`
+	PreferredUsername    types.String         `tfsdk:"preferred_username"`
+	Email                types.String         `tfsdk:"email"`
+	EmailVerified        types.Bool           `tfsdk:"email_verified"`
+	Gender               types.String         `tfsdk:"gender"`
+	PhoneNumber          types.String         `tfsdk:"phone_number"`
+	PhoneNumberVerified  types.Bool           `tfsdk:"phone_number_verified"`
+	Profile              types.String         `tfsdk:"profile"`
+	Picture              types.String         `tfsdk:"picture"`
+	Website              types.String         `tfsdk:"website"`
+	Birthdate            types.String         `tfsdk:"birthdate"`
+	Zoneinfo             types.String         `tfsdk:"zoneinfo"`
+	Locale               types.String         `tfsdk:"locale"`
+	Metadata             jsontypes.Normalized `tfsdk:"metadata"`
+	ExtraFields          jsontypes.Normalized `tfsdk:"extra_fields"`
+	UpdatedAt            types.String         `tfsdk:"updated_at"`
+	Status               types.String         `tfsdk:"status"`
+	Origin               types.String         `tfsdk:"origin"`
+	Enrollment           types.String         `tfsdk:"enrollment"`
+	CredentialsChangedAt types.String         `tfsdk:"credentials_changed_at"`
 }
 
 // UserItemAttrTypes returns the attribute types of one users list element.
 func UserItemAttrTypes() map[string]attr.Type {
 	return map[string]attr.Type{
-		"birthdate":             types.StringType,
-		"display_name":          types.StringType,
-		"email":                 types.StringType,
-		"email_verified":        types.BoolType,
-		"enrollment":            types.StringType,
-		"extra_fields":          jsontypes.NormalizedType{},
-		"family_name":           types.StringType,
-		"gender":                types.StringType,
-		"given_name":            types.StringType,
-		"labels":                types.MapType{ElemType: types.StringType},
-		"locale":                types.StringType,
-		"metadata":              jsontypes.NormalizedType{},
-		"middle_name":           types.StringType,
-		"name":                  types.StringType,
-		"nickname":              types.StringType,
-		"origin":                types.StringType,
-		"phone_number":          types.StringType,
-		"phone_number_verified": types.BoolType,
-		"picture":               types.StringType,
-		"preferred_username":    types.StringType,
-		"profile":               types.StringType,
-		"status":                types.StringType,
-		"updated_at":            types.StringType,
-		"user_id":               types.StringType,
-		"website":               types.StringType,
-		"zoneinfo":              types.StringType,
+		"birthdate":              types.StringType,
+		"credentials_changed_at": types.StringType,
+		"display_name":           types.StringType,
+		"email":                  types.StringType,
+		"email_verified":         types.BoolType,
+		"enrollment":             types.StringType,
+		"extra_fields":           jsontypes.NormalizedType{},
+		"family_name":            types.StringType,
+		"gender":                 types.StringType,
+		"given_name":             types.StringType,
+		"labels":                 types.MapType{ElemType: types.StringType},
+		"locale":                 types.StringType,
+		"metadata":               jsontypes.NormalizedType{},
+		"middle_name":            types.StringType,
+		"name":                   types.StringType,
+		"nickname":               types.StringType,
+		"origin":                 types.StringType,
+		"phone_number":           types.StringType,
+		"phone_number_verified":  types.BoolType,
+		"picture":                types.StringType,
+		"preferred_username":     types.StringType,
+		"profile":                types.StringType,
+		"status":                 types.StringType,
+		"updated_at":             types.StringType,
+		"user_id":                types.StringType,
+		"website":                types.StringType,
+		"zoneinfo":               types.StringType,
 	}
 }
 
@@ -808,11 +815,12 @@ func UserListDataSourceSchema() schema1.Schema {
 				Computed:            true,
 				MarkdownDescription: "Every user under the parent, in the order the API lists them.",
 				NestedObject: schema1.NestedAttributeObject{Attributes: map[string]schema1.Attribute{
-					"birthdate":      schema1.StringAttribute{Computed: true},
-					"display_name":   schema1.StringAttribute{Computed: true},
-					"email":          schema1.StringAttribute{Computed: true},
-					"email_verified": schema1.BoolAttribute{Computed: true},
-					"enrollment":     schema1.StringAttribute{Computed: true},
+					"birthdate":              schema1.StringAttribute{Computed: true},
+					"credentials_changed_at": schema1.StringAttribute{Computed: true},
+					"display_name":           schema1.StringAttribute{Computed: true},
+					"email":                  schema1.StringAttribute{Computed: true},
+					"email_verified":         schema1.BoolAttribute{Computed: true},
+					"enrollment":             schema1.StringAttribute{Computed: true},
 					"extra_fields": schema1.StringAttribute{
 						Computed:   true,
 						CustomType: jsontypes.NormalizedType{},
@@ -984,6 +992,11 @@ func userItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.User, *UserM
 		item.Enrollment = types.StringNull()
 	} else {
 		item.Enrollment = types.StringValue(e.Enrollment)
+	}
+	if e.CredentialsChangedAt == nil {
+		item.CredentialsChangedAt = types.StringNull()
+	} else {
+		item.CredentialsChangedAt = types.StringValue(e.CredentialsChangedAt.AsTime().Format(time.RFC3339))
 	}
 	id, err := crud.IDFromName(e.Name)
 	if err != nil {
