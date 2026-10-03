@@ -562,8 +562,8 @@ var notFederated = map[string]bool{
 // the provider type's; a magic link outside its bounds (a 6–8 digit code,
 // identifiers matched on email only); an OAuth-family config overriding a
 // parameter kit sets itself; and an oauth config without a userinfo
-// identifier_source or a claim map; and link_by_verified_email on a type
-// with no upstream (kit#633). kit also checks a claim map against the
+// identifier_source or a claim map; and link_by_verified_email (kit#633) or
+// trust_upstream_email_verified (kit#663) on a type with no upstream. kit also checks a claim map against the
 // type's protocol, which the fake does not; and it requires no client_id or
 // secret reference, so neither does the fake.
 func admitProvider(p *corepb.Provider) error {
@@ -571,6 +571,10 @@ func admitProvider(p *corepb.Provider) error {
 	if p.GetLinkByVerifiedEmail() && notFederated[p.GetProviderType()] {
 		return status.Errorf(codes.InvalidArgument,
 			"link_by_verified_email is for a federated provider; %s is not one", p.GetProviderType())
+	}
+	if p.GetTrustUpstreamEmailVerified() && notFederated[p.GetProviderType()] {
+		return status.Errorf(codes.InvalidArgument,
+			"trust_upstream_email_verified is for a federated provider; %s is not one", p.GetProviderType())
 	}
 
 	want := map[string]proto.Message{
@@ -663,6 +667,8 @@ func (f *fakeIdentityServer) PatchProvider(ctx context.Context, in *identitypb.P
 			existing.Labels = in.GetProvider().GetLabels()
 		case "link_by_verified_email":
 			existing.LinkByVerifiedEmail = in.GetProvider().GetLinkByVerifiedEmail()
+		case "trust_upstream_email_verified":
+			existing.TrustUpstreamEmailVerified = in.GetProvider().GetTrustUpstreamEmailVerified()
 		default:
 			return nil, status.Errorf(codes.InvalidArgument, "unsupported update_mask path %q", path)
 		}

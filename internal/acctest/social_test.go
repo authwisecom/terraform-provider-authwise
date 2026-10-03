@@ -274,6 +274,64 @@ resource "authwise_provider" "google" {
 	})
 }
 
+// TestAccProvider_TrustUpstreamEmailVerified is the per-provider opt-in to
+// counting the upstream's verified address as kit's own proof (kit#663,
+// apis v0.16.0): set on create, cleared in place, and reaching kit's row
+// each time.
+func TestAccProvider_TrustUpstreamEmailVerified(t *testing.T) {
+
+	h := newHarness(t)
+
+	config := func(trust bool) string {
+		return h.providerConfig() + realmForFactors + fmt.Sprintf(`
+data "authwise_provider_google" "this" {
+  client_id = "123.apps.googleusercontent.com"
+}
+
+resource "authwise_provider" "google" {
+  realm_id                      = local.realm_id
+  provider_type                 = "google"
+  config                        = data.authwise_provider_google.this.any
+  trust_upstream_email_verified = %t
+}
+`, trust)
+	}
+
+	serverHas := func(want bool) resource.TestCheckFunc {
+		return checkServer(func() error {
+			h.fake.mu.Lock()
+			defer h.fake.mu.Unlock()
+			for _, p := range h.fake.providers {
+				if p.GetTrustUpstreamEmailVerified() != want {
+					return fmt.Errorf("trust_upstream_email_verified = %t on the row, want %t", p.GetTrustUpstreamEmailVerified(), want)
+				}
+			}
+			return nil
+		})
+	}
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: protoFactories(),
+		Steps: []resource.TestStep{
+			{
+				Config: config(true),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("authwise_provider.google", "trust_upstream_email_verified", "true"),
+					serverHas(true),
+				),
+			},
+			{
+				Config: config(false),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("authwise_provider.google", "trust_upstream_email_verified", "false"),
+					serverHas(false),
+				),
+			},
+		},
+		CheckDestroy: noneLeft(h),
+	})
+}
+
 func TestAccSocialProvider_Refusals(t *testing.T) {
 
 	type s struct {
@@ -334,6 +392,18 @@ resource "authwise_provider" "p" {
   link_by_verified_email = true
 }`,
 			want: regexp.MustCompile(`(?s)link_by_verified_email is for a\s+federated\s+provider; magicLink is not one`),
+		},
+		"trust_upstream_email_verified on a type with no upstream": {
+			config: `
+data "authwise_provider_magic_link" "c" {}
+
+resource "authwise_provider" "p" {
+  realm_id                      = "r-1"
+  provider_type                 = "magicLink"
+  config                        = data.authwise_provider_magic_link.c.any
+  trust_upstream_email_verified = true
+}`,
+			want: regexp.MustCompile(`(?s)trust_upstream_email_verified is for\s+a\s+federated\s+provider; magicLink is not\s+one`),
 		},
 	}
 

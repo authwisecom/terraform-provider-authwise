@@ -2,9 +2,9 @@
 
 NOTES:
 
-* **Pairs with kit v1.30.0 (pending).** Built against apis v0.15.0 for now;
-  apis v0.16.0 (kit v1.30.0) is not yet published. Do not release this ahead
-  of kit v1.30.0.
+* **kit v1.30.0.** This release pairs with kit v1.30.0 and is built against
+  apis v0.16.0. Against an older kit, `trust_upstream_email_verified` is
+  unknown and a user's address is no longer settable here.
 
 BREAKING CHANGES:
 
@@ -18,6 +18,12 @@ BREAKING CHANGES:
 
 FEATURES:
 
+* **`authwise_provider` gains `trust_upstream_email_verified` (kit#663).**
+  It is an optional bool and defaults to false. It makes kit count the
+  upstream's verified email as its own proof of the address. kit refuses
+  it on a type with no upstream: `usernamePassword`, `magicLink`,
+  `smsCode`, `passkey` and `dummy`. The `authwise_provider` and
+  `authwise_providers` data sources read it.
 * **`authwise_user` gains `credentials_changed_at` (apis v0.15.0).** It is
   read-only, and the `authwise_user` and `authwise_users` data sources read
   it too.

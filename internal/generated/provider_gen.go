@@ -86,6 +86,11 @@ func ProviderResourceSchema() schema.Schema {
 				Optional:      true,
 				PlanModifiers: []planmodifier.Bool{boolplanmodifier.UseStateForUnknown()},
 			},
+			"trust_upstream_email_verified": schema.BoolAttribute{
+				Computed:      true,
+				Optional:      true,
+				PlanModifiers: []planmodifier.Bool{boolplanmodifier.UseStateForUnknown()},
+			},
 			"upstream_acr_map": schema.MapAttribute{
 				Computed:      true,
 				ElementType:   types.StringType,
@@ -99,33 +104,35 @@ func ProviderResourceSchema() schema.Schema {
 
 // ProviderModel is the Terraform plan/state model for Provider.
 type ProviderModel struct {
-	Name                types.String         `tfsdk:"name"`
-	ProviderId          types.String         `tfsdk:"provider_id"`
-	TenantId            types.String         `tfsdk:"tenant_id"`
-	RealmId             types.String         `tfsdk:"realm_id"`
-	Labels              types.Map            `tfsdk:"labels"`
-	DisplayName         types.String         `tfsdk:"display_name"`
-	ProviderType        types.String         `tfsdk:"provider_type"`
-	Config              jsontypes.Normalized `tfsdk:"config"`
-	TrustUpstreamAmr    types.Bool           `tfsdk:"trust_upstream_amr"`
-	UpstreamAcrMap      types.Map            `tfsdk:"upstream_acr_map"`
-	LinkByVerifiedEmail types.Bool           `tfsdk:"link_by_verified_email"`
+	Name                       types.String         `tfsdk:"name"`
+	ProviderId                 types.String         `tfsdk:"provider_id"`
+	TenantId                   types.String         `tfsdk:"tenant_id"`
+	RealmId                    types.String         `tfsdk:"realm_id"`
+	Labels                     types.Map            `tfsdk:"labels"`
+	DisplayName                types.String         `tfsdk:"display_name"`
+	ProviderType               types.String         `tfsdk:"provider_type"`
+	Config                     jsontypes.Normalized `tfsdk:"config"`
+	TrustUpstreamAmr           types.Bool           `tfsdk:"trust_upstream_amr"`
+	UpstreamAcrMap             types.Map            `tfsdk:"upstream_acr_map"`
+	LinkByVerifiedEmail        types.Bool           `tfsdk:"link_by_verified_email"`
+	TrustUpstreamEmailVerified types.Bool           `tfsdk:"trust_upstream_email_verified"`
 }
 
 // NewProviderModel returns a model with every attribute set to its typed null; collection types cannot be zero-valued.
 func NewProviderModel() *ProviderModel {
 	return &ProviderModel{
-		Config:              jsontypes.NewNormalizedNull(),
-		DisplayName:         types.StringNull(),
-		Labels:              types.MapNull(types.StringType),
-		LinkByVerifiedEmail: types.BoolNull(),
-		Name:                types.StringNull(),
-		ProviderId:          types.StringNull(),
-		ProviderType:        types.StringNull(),
-		RealmId:             types.StringNull(),
-		TenantId:            types.StringNull(),
-		TrustUpstreamAmr:    types.BoolNull(),
-		UpstreamAcrMap:      types.MapNull(types.StringType),
+		Config:                     jsontypes.NewNormalizedNull(),
+		DisplayName:                types.StringNull(),
+		Labels:                     types.MapNull(types.StringType),
+		LinkByVerifiedEmail:        types.BoolNull(),
+		Name:                       types.StringNull(),
+		ProviderId:                 types.StringNull(),
+		ProviderType:               types.StringNull(),
+		RealmId:                    types.StringNull(),
+		TenantId:                   types.StringNull(),
+		TrustUpstreamAmr:           types.BoolNull(),
+		TrustUpstreamEmailVerified: types.BoolNull(),
+		UpstreamAcrMap:             types.MapNull(types.StringType),
 	}
 }
 
@@ -152,6 +159,7 @@ func (m *ProviderModel) ToProto(ctx context.Context) (*v1alpha1.Provider, diag.D
 		diags.Append(m.UpstreamAcrMap.ElementsAs(ctx, &out.UpstreamAcrMap, false)...)
 	}
 	out.LinkByVerifiedEmail = m.LinkByVerifiedEmail.ValueBool()
+	out.TrustUpstreamEmailVerified = m.TrustUpstreamEmailVerified.ValueBool()
 	return out, diags
 }
 
@@ -195,6 +203,7 @@ func (m *ProviderModel) FromProto(ctx context.Context, e *v1alpha1.Provider) dia
 		m.UpstreamAcrMap = v
 	}
 	m.LinkByVerifiedEmail = types.BoolValue(e.LinkByVerifiedEmail)
+	m.TrustUpstreamEmailVerified = types.BoolValue(e.TrustUpstreamEmailVerified)
 	return diags
 }
 
@@ -236,6 +245,9 @@ func (m *ProviderModel) UpdateMask(ctx context.Context, prior *ProviderModel) []
 	}
 	if !m.LinkByVerifiedEmail.Equal(prior.LinkByVerifiedEmail) {
 		paths = append(paths, "link_by_verified_email")
+	}
+	if !m.TrustUpstreamEmailVerified.Equal(prior.TrustUpstreamEmailVerified) {
+		paths = append(paths, "trust_upstream_email_verified")
 	}
 	return paths
 }
@@ -382,10 +394,11 @@ func ProviderDataSourceSchema() schema1.Schema {
 				Computed:            true,
 				MarkdownDescription: "Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.",
 			},
-			"provider_type":      schema1.StringAttribute{Computed: true},
-			"realm_id":           schema1.StringAttribute{Computed: true},
-			"tenant_id":          schema1.StringAttribute{Computed: true},
-			"trust_upstream_amr": schema1.BoolAttribute{Computed: true},
+			"provider_type":                 schema1.StringAttribute{Computed: true},
+			"realm_id":                      schema1.StringAttribute{Computed: true},
+			"tenant_id":                     schema1.StringAttribute{Computed: true},
+			"trust_upstream_amr":            schema1.BoolAttribute{Computed: true},
+			"trust_upstream_email_verified": schema1.BoolAttribute{Computed: true},
 			"upstream_acr_map": schema1.MapAttribute{
 				Computed:    true,
 				ElementType: types.StringType,
@@ -425,29 +438,31 @@ func (d *providerDataSource) Read(ctx context.Context, req datasource.ReadReques
 
 // ProviderItemModel is one element of the providers data source's "providers" list.
 type ProviderItemModel struct {
-	ProviderId          types.String         `tfsdk:"provider_id"`
-	Name                types.String         `tfsdk:"name"`
-	Labels              types.Map            `tfsdk:"labels"`
-	DisplayName         types.String         `tfsdk:"display_name"`
-	ProviderType        types.String         `tfsdk:"provider_type"`
-	Config              jsontypes.Normalized `tfsdk:"config"`
-	TrustUpstreamAmr    types.Bool           `tfsdk:"trust_upstream_amr"`
-	UpstreamAcrMap      types.Map            `tfsdk:"upstream_acr_map"`
-	LinkByVerifiedEmail types.Bool           `tfsdk:"link_by_verified_email"`
+	ProviderId                 types.String         `tfsdk:"provider_id"`
+	Name                       types.String         `tfsdk:"name"`
+	Labels                     types.Map            `tfsdk:"labels"`
+	DisplayName                types.String         `tfsdk:"display_name"`
+	ProviderType               types.String         `tfsdk:"provider_type"`
+	Config                     jsontypes.Normalized `tfsdk:"config"`
+	TrustUpstreamAmr           types.Bool           `tfsdk:"trust_upstream_amr"`
+	UpstreamAcrMap             types.Map            `tfsdk:"upstream_acr_map"`
+	LinkByVerifiedEmail        types.Bool           `tfsdk:"link_by_verified_email"`
+	TrustUpstreamEmailVerified types.Bool           `tfsdk:"trust_upstream_email_verified"`
 }
 
 // ProviderItemAttrTypes returns the attribute types of one providers list element.
 func ProviderItemAttrTypes() map[string]attr.Type {
 	return map[string]attr.Type{
-		"config":                 jsontypes.NormalizedType{},
-		"display_name":           types.StringType,
-		"labels":                 types.MapType{ElemType: types.StringType},
-		"link_by_verified_email": types.BoolType,
-		"name":                   types.StringType,
-		"provider_id":            types.StringType,
-		"provider_type":          types.StringType,
-		"trust_upstream_amr":     types.BoolType,
-		"upstream_acr_map":       types.MapType{ElemType: types.StringType},
+		"config":                        jsontypes.NormalizedType{},
+		"display_name":                  types.StringType,
+		"labels":                        types.MapType{ElemType: types.StringType},
+		"link_by_verified_email":        types.BoolType,
+		"name":                          types.StringType,
+		"provider_id":                   types.StringType,
+		"provider_type":                 types.StringType,
+		"trust_upstream_amr":            types.BoolType,
+		"trust_upstream_email_verified": types.BoolType,
+		"upstream_acr_map":              types.MapType{ElemType: types.StringType},
 	}
 }
 
@@ -484,8 +499,9 @@ func ProviderListDataSourceSchema() schema1.Schema {
 						Computed:            true,
 						MarkdownDescription: "Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.",
 					},
-					"provider_type":      schema1.StringAttribute{Computed: true},
-					"trust_upstream_amr": schema1.BoolAttribute{Computed: true},
+					"provider_type":                 schema1.StringAttribute{Computed: true},
+					"trust_upstream_amr":            schema1.BoolAttribute{Computed: true},
+					"trust_upstream_email_verified": schema1.BoolAttribute{Computed: true},
 					"upstream_acr_map": schema1.MapAttribute{
 						Computed:    true,
 						ElementType: types.StringType,
@@ -548,6 +564,7 @@ func providerItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Provider
 		item.UpstreamAcrMap = v
 	}
 	item.LinkByVerifiedEmail = types.BoolValue(e.LinkByVerifiedEmail)
+	item.TrustUpstreamEmailVerified = types.BoolValue(e.TrustUpstreamEmailVerified)
 	id, err := crud.IDFromName(e.Name)
 	if err != nil {
 		diags.AddError("unexpected provider name", err.Error())

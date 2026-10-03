@@ -30,4 +30,5 @@ A way people sign in to a realm: username and password, a magic link, passkeys, 
 - `realm_id` (String)
 - `tenant_id` (String)
 - `trust_upstream_amr` (Boolean)
+- `trust_upstream_email_verified` (Boolean)
 - `upstream_acr_map` (Map of String)
