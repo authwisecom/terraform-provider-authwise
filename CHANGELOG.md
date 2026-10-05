@@ -1,4 +1,4 @@
-## Unreleased
+## 0.5.0 (October 4, 2026)
 
 NOTES:
 
