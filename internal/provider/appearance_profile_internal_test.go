@@ -52,6 +52,9 @@ func (s *stubIdentity) DeleteAppearanceProfile(_ context.Context, _ *identitypb.
 	return &emptypb.Empty{}, nil
 }
 
+// displayName is the profile field the patch cases change beside the flag.
+const displayName = "display_name"
+
 const profileName = "tenants/t-1/issuers/i-1/appearance-profiles/ap-1"
 
 func stubbed(s *stubIdentity, wait time.Duration) appearanceDefaultClient {
@@ -73,10 +76,10 @@ func TestAppearanceDefault_PatchNeverWritesTheFlag(t *testing.T) {
 	}
 
 	cases := map[string]c{
-		"stale true echoed, flag not masked": {mask: []string{"display_name"}, isDefault: true, wantPatched: []string{"display_name"}},
-		"true with another field":            {mask: []string{"display_name", "is_default"}, isDefault: true, wantPatched: []string{"display_name"}, wantDefaults: 1},
-		"true alone":                         {mask: []string{"is_default"}, isDefault: true, wantGet: true, wantDefaults: 1},
-		"unknown planned, sent as false":     {mask: []string{"display_name", "is_default"}, wantPatched: []string{"display_name"}},
+		"stale true echoed, flag not masked": {mask: []string{displayName}, isDefault: true, wantPatched: []string{displayName}},
+		"true with another field":            {mask: []string{displayName, isDefaultAttr}, isDefault: true, wantPatched: []string{displayName}, wantDefaults: 1},
+		"true alone":                         {mask: []string{isDefaultAttr}, isDefault: true, wantGet: true, wantDefaults: 1},
+		"unknown planned, sent as false":     {mask: []string{displayName, isDefaultAttr}, wantPatched: []string{displayName}},
 	}
 
 	for k, v := range cases {
