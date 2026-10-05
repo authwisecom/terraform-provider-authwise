@@ -3,12 +3,12 @@
 page_title: "authwise_appearance_profiles Data Source - Authwise"
 subcategory: ""
 description: |-
-  An issuer's appearance profile: the stylesheet and content its login pages use. This data source lists every one under a parent.
+  An issuer's appearance profile: the stylesheet and content its login pages use. The issuer's default profile (is_default) is the issuer's appearance; a client's or audience's appearance_profile_id overrides it. This data source lists every one under a parent.
 ---
 
 # authwise_appearance_profiles (Data Source)
 
-An issuer's appearance profile: the stylesheet and content its login pages use. This data source lists every one under a parent.
+An issuer's appearance profile: the stylesheet and content its login pages use. The issuer's default profile (`is_default`) is the issuer's appearance; a client's or audience's `appearance_profile_id` overrides it. This data source lists every one under a parent.
 
 
 
@@ -32,6 +32,7 @@ Read-Only:
 - `appearance_profile_id` (String) Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.
 - `content` (String)
 - `display_name` (String)
+- `is_default` (Boolean)
 - `labels` (Map of String)
 - `name` (String) Full resource name.
 - `stylesheet_attributes` (String)

@@ -16,6 +16,7 @@ import (
 	path "github.com/hashicorp/terraform-plugin-framework/path"
 	resource "github.com/hashicorp/terraform-plugin-framework/resource"
 	schema "github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	boolplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	mapplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
 	planmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	stringplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
@@ -46,6 +47,11 @@ func AppearanceProfileResourceSchema() schema.Schema {
 				Computed:      true,
 				Optional:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
+			"is_default": schema.BoolAttribute{
+				Computed:      true,
+				Optional:      true,
+				PlanModifiers: []planmodifier.Bool{boolplanmodifier.UseStateForUnknown()},
 			},
 			"issuer_id": schema.StringAttribute{
 				MarkdownDescription: "Parent identifier `issuer_id`; overrides the provider default. Changing it replaces the resource.",
@@ -84,7 +90,7 @@ func AppearanceProfileResourceSchema() schema.Schema {
 				Validators:    []validator.String{tf.ReferenceID("th", "theme", "authwise_theme.<name>.theme_id")},
 			},
 		},
-		MarkdownDescription: "An issuer's appearance profile: the stylesheet and content its login pages use.",
+		MarkdownDescription: "An issuer's appearance profile: the stylesheet and content its login pages use. The issuer's default profile (`is_default`) is the issuer's appearance; a client's or audience's `appearance_profile_id` overrides it.",
 	}
 }
 
@@ -99,6 +105,7 @@ type AppearanceProfileModel struct {
 	ThemeId              types.String         `tfsdk:"theme_id"`
 	StylesheetAttributes jsontypes.Normalized `tfsdk:"stylesheet_attributes"`
 	Content              jsontypes.Normalized `tfsdk:"content"`
+	IsDefault            types.Bool           `tfsdk:"is_default"`
 }
 
 // NewAppearanceProfileModel returns a model with every attribute set to its typed null; collection types cannot be zero-valued.
@@ -107,6 +114,7 @@ func NewAppearanceProfileModel() *AppearanceProfileModel {
 		AppearanceProfileId:  types.StringNull(),
 		Content:              jsontypes.NewNormalizedNull(),
 		DisplayName:          types.StringNull(),
+		IsDefault:            types.BoolNull(),
 		IssuerId:             types.StringNull(),
 		Labels:               types.MapNull(types.StringType),
 		Name:                 types.StringNull(),
@@ -142,6 +150,7 @@ func (m *AppearanceProfileModel) ToProto(ctx context.Context) (*v1alpha1.Appeara
 			out.Content = v
 		}
 	}
+	out.IsDefault = m.IsDefault.ValueBool()
 	return out, diags
 }
 
@@ -186,6 +195,7 @@ func (m *AppearanceProfileModel) FromProto(ctx context.Context, e *v1alpha1.Appe
 			m.Content = jsontypes.NewNormalizedValue(string(b))
 		}
 	}
+	m.IsDefault = types.BoolValue(e.IsDefault)
 	return diags
 }
 
@@ -223,6 +233,9 @@ func (m *AppearanceProfileModel) UpdateMask(ctx context.Context, prior *Appearan
 		if eq, _ := m.Content.StringSemanticEquals(ctx, prior.Content); !eq {
 			paths = append(paths, "content")
 		}
+	}
+	if !m.IsDefault.Equal(prior.IsDefault) {
+		paths = append(paths, "is_default")
 	}
 	return paths
 }
@@ -360,6 +373,7 @@ func AppearanceProfileDataSourceSchema() schema1.Schema {
 				CustomType: jsontypes.NormalizedType{},
 			},
 			"display_name": schema1.StringAttribute{Computed: true},
+			"is_default":   schema1.BoolAttribute{Computed: true},
 			"issuer_id":    schema1.StringAttribute{Computed: true},
 			"labels": schema1.MapAttribute{
 				Computed:    true,
@@ -376,7 +390,7 @@ func AppearanceProfileDataSourceSchema() schema1.Schema {
 			"tenant_id": schema1.StringAttribute{Computed: true},
 			"theme_id":  schema1.StringAttribute{Computed: true},
 		},
-		MarkdownDescription: "An issuer's appearance profile: the stylesheet and content its login pages use. This data source reads one by its full resource name.",
+		MarkdownDescription: "An issuer's appearance profile: the stylesheet and content its login pages use. The issuer's default profile (`is_default`) is the issuer's appearance; a client's or audience's `appearance_profile_id` overrides it. This data source reads one by its full resource name.",
 	}
 }
 
@@ -417,6 +431,7 @@ type AppearanceProfileItemModel struct {
 	ThemeId              types.String         `tfsdk:"theme_id"`
 	StylesheetAttributes jsontypes.Normalized `tfsdk:"stylesheet_attributes"`
 	Content              jsontypes.Normalized `tfsdk:"content"`
+	IsDefault            types.Bool           `tfsdk:"is_default"`
 }
 
 // AppearanceProfileItemAttrTypes returns the attribute types of one appearance_profiles list element.
@@ -425,6 +440,7 @@ func AppearanceProfileItemAttrTypes() map[string]attr.Type {
 		"appearance_profile_id": types.StringType,
 		"content":               jsontypes.NormalizedType{},
 		"display_name":          types.StringType,
+		"is_default":            types.BoolType,
 		"labels":                types.MapType{ElemType: types.StringType},
 		"name":                  types.StringType,
 		"stylesheet_attributes": jsontypes.NormalizedType{},
@@ -456,6 +472,7 @@ func AppearanceProfileListDataSourceSchema() schema1.Schema {
 						CustomType: jsontypes.NormalizedType{},
 					},
 					"display_name": schema1.StringAttribute{Computed: true},
+					"is_default":   schema1.BoolAttribute{Computed: true},
 					"labels": schema1.MapAttribute{
 						Computed:    true,
 						ElementType: types.StringType,
@@ -482,7 +499,7 @@ func AppearanceProfileListDataSourceSchema() schema1.Schema {
 				Validators:          []validator.String{tf.ReferenceID("t", "tenant", "")},
 			},
 		},
-		MarkdownDescription: "An issuer's appearance profile: the stylesheet and content its login pages use. This data source lists every one under a parent.",
+		MarkdownDescription: "An issuer's appearance profile: the stylesheet and content its login pages use. The issuer's default profile (`is_default`) is the issuer's appearance; a client's or audience's `appearance_profile_id` overrides it. This data source lists every one under a parent.",
 	}
 }
 
@@ -528,6 +545,7 @@ func appearanceProfileItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1
 			item.Content = jsontypes.NewNormalizedValue(string(b))
 		}
 	}
+	item.IsDefault = types.BoolValue(e.IsDefault)
 	id, err := crud.IDFromName(e.Name)
 	if err != nil {
 		diags.AddError("unexpected appearance_profile name", err.Error())

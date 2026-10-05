@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"regexp"
 	"sort"
+	"strings"
 
 	identitypb "git.authwise.com/authwise/apis/authwise/identity/v1alpha1"
 	corepb "git.authwise.com/authwise/apis/authwise/types/core/v1alpha1"
@@ -220,6 +221,28 @@ func (f *fakeIdentityServer) scopePermissionsLocked(scope string) []string {
 }
 
 // --- AppearanceProfile (issuer-scoped, collection "appearance-profiles") ---
+//
+// kit holds exactly one default per issuer once it has a profile (kit#680):
+// the first profile created is the default whatever is_default says; a write
+// that would make a second default, or a mask that clears the default's
+// flag, is FAILED_PRECONDITION; the default cannot be deleted while others
+// remain; and MakeDefaultAppearanceProfile moves it.
+
+// issuerOfProfile is the issuer a profile's name sits under.
+func issuerOfProfile(name string) string {
+	issuer, _, _ := strings.Cut(name, "/appearance-profiles/")
+	return issuer
+}
+
+// defaultProfileLocked is the issuer's default profile, or nil.
+func (f *fakeIdentityServer) defaultProfileLocked(issuer string) *corepb.AppearanceProfile {
+	for name, p := range f.profiles {
+		if issuerOfProfile(name) == issuer && p.GetIsDefault() {
+			return p
+		}
+	}
+	return nil
+}
 
 func (f *fakeIdentityServer) GetAppearanceProfile(ctx context.Context, in *identitypb.GetAppearanceProfileRequest) (*corepb.AppearanceProfile, error) {
 	f.mu.Lock()
@@ -240,6 +263,11 @@ func (f *fakeIdentityServer) CreateAppearanceProfile(ctx context.Context, in *id
 		return nil, err
 	}
 	p := proto.Clone(in.GetAppearanceProfile()).(*corepb.AppearanceProfile)
+	current := f.defaultProfileLocked(in.GetParent())
+	if p.GetIsDefault() && current != nil {
+		return nil, status.Errorf(codes.FailedPrecondition, "the issuer's default is %s; make this the default with :makeDefault", current.GetName())
+	}
+	p.IsDefault = current == nil
 	p.Name = in.GetParent() + "/appearance-profiles/" + f.nextID("ap")
 	f.profiles[p.GetName()] = p
 	return proto.Clone(p).(*corepb.AppearanceProfile), nil
@@ -265,6 +293,10 @@ func (f *fakeIdentityServer) PatchAppearanceProfile(ctx context.Context, in *ide
 			existing.StylesheetAttributes = in.GetAppearanceProfile().GetStylesheetAttributes()
 		case "content":
 			existing.Content = in.GetAppearanceProfile().GetContent()
+		case "is_default":
+			if in.GetAppearanceProfile().GetIsDefault() != existing.GetIsDefault() {
+				return nil, status.Errorf(codes.FailedPrecondition, "is_default moves only through :makeDefault")
+			}
 		default:
 			return nil, status.Errorf(codes.InvalidArgument, "unsupported update_mask path %q", path)
 		}
@@ -272,12 +304,40 @@ func (f *fakeIdentityServer) PatchAppearanceProfile(ctx context.Context, in *ide
 	return proto.Clone(existing).(*corepb.AppearanceProfile), nil
 }
 
+func (f *fakeIdentityServer) MakeDefaultAppearanceProfile(ctx context.Context, in *identitypb.MakeDefaultAppearanceProfileRequest) (*identitypb.MakeDefaultAppearanceProfileResponse, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.recordAuth(ctx)
+	f.makeDefaults++
+	p, ok := f.profiles[in.GetName()]
+	if !ok {
+		return nil, status.Errorf(codes.NotFound, "appearance profile %q not found", in.GetName())
+	}
+	out := &identitypb.MakeDefaultAppearanceProfileResponse{}
+	if previous := f.defaultProfileLocked(issuerOfProfile(in.GetName())); previous != nil && previous != p {
+		previous.IsDefault = false
+		out.Previous = proto.Clone(previous).(*corepb.AppearanceProfile)
+	}
+	p.IsDefault = true
+	out.Default = proto.Clone(p).(*corepb.AppearanceProfile)
+	return out, nil
+}
+
 func (f *fakeIdentityServer) DeleteAppearanceProfile(ctx context.Context, in *identitypb.DeleteAppearanceProfileRequest) (*emptypb.Empty, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.recordAuth(ctx)
-	if _, ok := f.profiles[in.GetName()]; !ok {
+	p, ok := f.profiles[in.GetName()]
+	if !ok {
 		return nil, status.Errorf(codes.NotFound, "appearance profile %q not found", in.GetName())
+	}
+	if p.GetIsDefault() {
+		issuer := issuerOfProfile(in.GetName())
+		for name := range f.profiles {
+			if name != in.GetName() && issuerOfProfile(name) == issuer {
+				return nil, status.Errorf(codes.FailedPrecondition, "%s is the issuer's default and the issuer has other profiles", in.GetName())
+			}
+		}
 	}
 	delete(f.profiles, in.GetName())
 	return &emptypb.Empty{}, nil

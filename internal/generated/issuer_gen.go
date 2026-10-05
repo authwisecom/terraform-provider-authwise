@@ -29,12 +29,6 @@ import (
 func IssuerResourceSchema() schema.Schema {
 	return schema.Schema{
 		Attributes: map[string]schema.Attribute{
-			"appearance_profile_id": schema.StringAttribute{
-				Computed:      true,
-				Optional:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
-				Validators:    []validator.String{tf.ReferenceID("ap", "appearance_profile", "authwise_appearance_profile.<name>.appearance_profile_id")},
-			},
 			"config": schema.StringAttribute{
 				Computed:            true,
 				CustomType:          jsontypes.NormalizedType{},
@@ -75,33 +69,31 @@ func IssuerResourceSchema() schema.Schema {
 				Validators:          []validator.String{tf.ReferenceID("t", "tenant", "")},
 			},
 		},
-		MarkdownDescription: "An OAuth 2.0 / OpenID Connect issuer: the login a set of clients shares, with its domain, token lifetimes and which realm or realms people sign in to (`config`).",
+		MarkdownDescription: "An OAuth 2.0 / OpenID Connect issuer: the login a set of clients shares, with its domain, token lifetimes and which realm or realms people sign in to (`config`). Its appearance is whichever of its profiles is the default (`authwise_appearance_profile.is_default`).",
 	}
 }
 
 // IssuerModel is the Terraform plan/state model for Issuer.
 type IssuerModel struct {
-	Name                types.String         `tfsdk:"name"`
-	IssuerId            types.String         `tfsdk:"issuer_id"`
-	TenantId            types.String         `tfsdk:"tenant_id"`
-	Labels              types.Map            `tfsdk:"labels"`
-	DomainName          types.String         `tfsdk:"domain_name"`
-	Path                types.String         `tfsdk:"path"`
-	Config              jsontypes.Normalized `tfsdk:"config"`
-	AppearanceProfileId types.String         `tfsdk:"appearance_profile_id"`
+	Name       types.String         `tfsdk:"name"`
+	IssuerId   types.String         `tfsdk:"issuer_id"`
+	TenantId   types.String         `tfsdk:"tenant_id"`
+	Labels     types.Map            `tfsdk:"labels"`
+	DomainName types.String         `tfsdk:"domain_name"`
+	Path       types.String         `tfsdk:"path"`
+	Config     jsontypes.Normalized `tfsdk:"config"`
 }
 
 // NewIssuerModel returns a model with every attribute set to its typed null; collection types cannot be zero-valued.
 func NewIssuerModel() *IssuerModel {
 	return &IssuerModel{
-		AppearanceProfileId: types.StringNull(),
-		Config:              jsontypes.NewNormalizedNull(),
-		DomainName:          types.StringNull(),
-		IssuerId:            types.StringNull(),
-		Labels:              types.MapNull(types.StringType),
-		Name:                types.StringNull(),
-		Path:                types.StringNull(),
-		TenantId:            types.StringNull(),
+		Config:     jsontypes.NewNormalizedNull(),
+		DomainName: types.StringNull(),
+		IssuerId:   types.StringNull(),
+		Labels:     types.MapNull(types.StringType),
+		Name:       types.StringNull(),
+		Path:       types.StringNull(),
+		TenantId:   types.StringNull(),
 	}
 }
 
@@ -123,7 +115,6 @@ func (m *IssuerModel) ToProto(ctx context.Context) (*v1alpha1.Issuer, diag.Diagn
 			out.Config = v
 		}
 	}
-	out.AppearanceProfileId = m.AppearanceProfileId.ValueString()
 	return out, diags
 }
 
@@ -158,11 +149,6 @@ func (m *IssuerModel) FromProto(ctx context.Context, e *v1alpha1.Issuer) diag.Di
 			m.Config = jsontypes.NewNormalizedValue(string(b))
 		}
 	}
-	if e.AppearanceProfileId == "" {
-		m.AppearanceProfileId = types.StringNull()
-	} else {
-		m.AppearanceProfileId = types.StringValue(e.AppearanceProfileId)
-	}
 	return diags
 }
 
@@ -192,9 +178,6 @@ func (m *IssuerModel) UpdateMask(ctx context.Context, prior *IssuerModel) []stri
 		if eq, _ := m.Config.StringSemanticEquals(ctx, prior.Config); !eq {
 			paths = append(paths, "config")
 		}
-	}
-	if !m.AppearanceProfileId.Equal(prior.AppearanceProfileId) {
-		paths = append(paths, "appearance_profile_id")
 	}
 	return paths
 }
@@ -323,7 +306,6 @@ func (r *issuerResource) ImportState(ctx context.Context, req resource.ImportSta
 func IssuerDataSourceSchema() schema1.Schema {
 	return schema1.Schema{
 		Attributes: map[string]schema1.Attribute{
-			"appearance_profile_id": schema1.StringAttribute{Computed: true},
 			"config": schema1.StringAttribute{
 				Computed:   true,
 				CustomType: jsontypes.NormalizedType{},
@@ -344,7 +326,7 @@ func IssuerDataSourceSchema() schema1.Schema {
 			"path":      schema1.StringAttribute{Computed: true},
 			"tenant_id": schema1.StringAttribute{Computed: true},
 		},
-		MarkdownDescription: "An OAuth 2.0 / OpenID Connect issuer: the login a set of clients shares, with its domain, token lifetimes and which realm or realms people sign in to (`config`). This data source reads one by its full resource name.",
+		MarkdownDescription: "An OAuth 2.0 / OpenID Connect issuer: the login a set of clients shares, with its domain, token lifetimes and which realm or realms people sign in to (`config`). Its appearance is whichever of its profiles is the default (`authwise_appearance_profile.is_default`). This data source reads one by its full resource name.",
 	}
 }
 
@@ -378,25 +360,23 @@ func (d *issuerDataSource) Read(ctx context.Context, req datasource.ReadRequest,
 
 // IssuerItemModel is one element of the issuers data source's "issuers" list.
 type IssuerItemModel struct {
-	IssuerId            types.String         `tfsdk:"issuer_id"`
-	Name                types.String         `tfsdk:"name"`
-	Labels              types.Map            `tfsdk:"labels"`
-	DomainName          types.String         `tfsdk:"domain_name"`
-	Path                types.String         `tfsdk:"path"`
-	Config              jsontypes.Normalized `tfsdk:"config"`
-	AppearanceProfileId types.String         `tfsdk:"appearance_profile_id"`
+	IssuerId   types.String         `tfsdk:"issuer_id"`
+	Name       types.String         `tfsdk:"name"`
+	Labels     types.Map            `tfsdk:"labels"`
+	DomainName types.String         `tfsdk:"domain_name"`
+	Path       types.String         `tfsdk:"path"`
+	Config     jsontypes.Normalized `tfsdk:"config"`
 }
 
 // IssuerItemAttrTypes returns the attribute types of one issuers list element.
 func IssuerItemAttrTypes() map[string]attr.Type {
 	return map[string]attr.Type{
-		"appearance_profile_id": types.StringType,
-		"config":                jsontypes.NormalizedType{},
-		"domain_name":           types.StringType,
-		"issuer_id":             types.StringType,
-		"labels":                types.MapType{ElemType: types.StringType},
-		"name":                  types.StringType,
-		"path":                  types.StringType,
+		"config":      jsontypes.NormalizedType{},
+		"domain_name": types.StringType,
+		"issuer_id":   types.StringType,
+		"labels":      types.MapType{ElemType: types.StringType},
+		"name":        types.StringType,
+		"path":        types.StringType,
 	}
 }
 
@@ -414,7 +394,6 @@ func IssuerListDataSourceSchema() schema1.Schema {
 				Computed:            true,
 				MarkdownDescription: "Every issuer under the parent, in the order the API lists them.",
 				NestedObject: schema1.NestedAttributeObject{Attributes: map[string]schema1.Attribute{
-					"appearance_profile_id": schema1.StringAttribute{Computed: true},
 					"config": schema1.StringAttribute{
 						Computed:   true,
 						CustomType: jsontypes.NormalizedType{},
@@ -441,7 +420,7 @@ func IssuerListDataSourceSchema() schema1.Schema {
 				Validators:          []validator.String{tf.ReferenceID("t", "tenant", "")},
 			},
 		},
-		MarkdownDescription: "An OAuth 2.0 / OpenID Connect issuer: the login a set of clients shares, with its domain, token lifetimes and which realm or realms people sign in to (`config`). This data source lists every one under a parent.",
+		MarkdownDescription: "An OAuth 2.0 / OpenID Connect issuer: the login a set of clients shares, with its domain, token lifetimes and which realm or realms people sign in to (`config`). Its appearance is whichever of its profiles is the default (`authwise_appearance_profile.is_default`). This data source lists every one under a parent.",
 	}
 }
 
@@ -476,11 +455,6 @@ func issuerItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Issuer, *I
 		} else {
 			item.Config = jsontypes.NewNormalizedValue(string(b))
 		}
-	}
-	if e.AppearanceProfileId == "" {
-		item.AppearanceProfileId = types.StringNull()
-	} else {
-		item.AppearanceProfileId = types.StringValue(e.AppearanceProfileId)
 	}
 	id, err := crud.IDFromName(e.Name)
 	if err != nil {

@@ -2,9 +2,10 @@
 
 NOTES:
 
-* **kit v1.30.0.** This release pairs with kit v1.30.0 and is built against
-  apis v0.16.0. Against an older kit, `trust_upstream_email_verified` is
-  unknown and a user's address is no longer settable here.
+* **kit v1.32.0.** This release pairs with kit v1.32.0 and is built against
+  apis v0.18.0. It needs kit v1.32.0: against an older kit, `is_default`
+  and an issuer's appearance do not work, and `trust_upstream_email_verified`
+  needs kit v1.30.0.
 
 BREAKING CHANGES:
 
@@ -15,8 +16,33 @@ BREAKING CHANGES:
   plan. Remove them, and give a user an address through an invitation
   (`InviteUser`). The provider no longer sends them on create or update, so
   updating a user who has an address works.
+* **`authwise_issuer.appearance_profile_id` is removed (kit#680).** An
+  issuer's appearance is now whichever of its appearance profiles is the
+  default. To migrate, delete `appearance_profile_id` from the issuer and
+  set `is_default = true` on the profile it named. A client's or audience's
+  `appearance_profile_id` is unchanged and still overrides the issuer's
+  default.
 
 FEATURES:
+
+* **`authwise_appearance_profile` gains `is_default` (kit#680).** An issuer
+  with any profiles always has exactly one default, and kit keeps it that
+  way:
+  * Its first profile becomes the default without asking, and reads back
+    `true`.
+  * Set `is_default = true` on the one profile that should be the default,
+    and leave it out on the others. `is_default = false` is refused at plan,
+    because kit cannot honour it.
+  * To move the default, set it on the new profile and remove it from the
+    old one, in one apply. The provider moves it with kit's `:makeDefault`
+    rather than writing the flag, which kit refuses.
+  * kit refuses to delete the default while the issuer has other profiles.
+    When they are all destroyed together, the provider retries the
+    default's delete for up to a minute while the others go. It fails after
+    that if the others remain, for example if the default is the only one
+    removed from configuration, or if the default depends on another
+    profile, which Terraform then destroys later. With `-parallelism=1`, a
+    full destroy can also time out if Terraform deletes the default first.
 
 * **`authwise_provider` gains `trust_upstream_email_verified` (kit#663).**
   It is an optional bool and defaults to false. It makes kit count the

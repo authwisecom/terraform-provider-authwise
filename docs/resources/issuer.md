@@ -2,7 +2,7 @@
 page_title: "authwise_issuer Resource - Authwise"
 subcategory: ""
 description: |-
-  An OAuth 2.0 / OpenID Connect issuer: the login a set of clients shares, with its domain, token lifetimes and which realm or realms people sign in to (config).
+  An OAuth 2.0 / OpenID Connect issuer: the login a set of clients shares, with its domain, token lifetimes and which realm or realms people sign in to (config). Its appearance is whichever of its profiles is the default (authwise_appearance_profile.is_default).
 ---
 
 # authwise_issuer (Resource)
@@ -128,7 +128,6 @@ refuses:
 
 ### Optional
 
-- `appearance_profile_id` (String)
 - `config` (String) `config` as the protojson encoding of IssuerConfig.
 - `domain_name` (String)
 - `labels` (Map of String)

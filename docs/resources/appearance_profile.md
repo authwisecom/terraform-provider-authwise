@@ -3,12 +3,12 @@
 page_title: "authwise_appearance_profile Resource - Authwise"
 subcategory: ""
 description: |-
-  An issuer's appearance profile: the stylesheet and content its login pages use.
+  An issuer's appearance profile: the stylesheet and content its login pages use. The issuer's default profile (is_default) is the issuer's appearance; a client's or audience's appearance_profile_id overrides it.
 ---
 
 # authwise_appearance_profile (Resource)
 
-An issuer's appearance profile: the stylesheet and content its login pages use.
+An issuer's appearance profile: the stylesheet and content its login pages use. The issuer's default profile (`is_default`) is the issuer's appearance; a client's or audience's `appearance_profile_id` overrides it.
 
 
 
@@ -19,6 +19,7 @@ An issuer's appearance profile: the stylesheet and content its login pages use.
 
 - `content` (String) `content` as a JSON object.
 - `display_name` (String)
+- `is_default` (Boolean) Whether this profile is its issuer's default, and so the issuer's appearance. Set it to `true` on the one profile that should be the default, and leave it out on the others. The issuer's first profile becomes the default whatever this says. To move the default, set it on the new profile and remove it from the old one.
 - `issuer_id` (String) Parent identifier `issuer_id`; overrides the provider default. Changing it replaces the resource.
 - `labels` (Map of String)
 - `stylesheet_attributes` (String) `stylesheet_attributes` as a JSON object.

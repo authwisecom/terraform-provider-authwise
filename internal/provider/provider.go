@@ -217,7 +217,7 @@ func (p *AuthwiseProvider) Configure(ctx context.Context, req provider.Configure
 
 	providerData := &tfruntime.ProviderData{
 		Clients: map[string]any{
-			"identity": userContactClient{identitypb.NewAuthwiseIdentityServiceClient(conn)},
+			"identity": userContactClient{newAppearanceDefaultClient(identitypb.NewAuthwiseIdentityServiceClient(conn))},
 			"access":   accesspb.NewAuthwiseAccessServiceClient(conn),
 		},
 		Defaults: defaults,
@@ -232,9 +232,10 @@ func (p *AuthwiseProvider) Configure(ctx context.Context, req provider.Configure
 // not express, plus the resources whose shapes are beyond it.
 func (p *AuthwiseProvider) Resources(ctx context.Context) []func() resource.Resource {
 	return append(substitute(ctx, generated.Resources(), map[string]func() resource.Resource{
-		accessBindingTypeName: newAccessBindingResource,
-		realmTypeName:         newRealmResource,
-		factorTypeName:        newFactorResource,
+		accessBindingTypeName:     newAccessBindingResource,
+		realmTypeName:             newRealmResource,
+		factorTypeName:            newFactorResource,
+		appearanceProfileTypeName: newAppearanceProfileResource,
 	}),
 		newSecretResource,
 		newRealmAuthenticationPolicyResource,

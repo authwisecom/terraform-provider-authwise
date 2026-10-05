@@ -206,8 +206,7 @@ func main() {
 			crud[corepb.Domain](scopeTenant,
 				withDescription("A domain the tenant serves logins on. The id is the domain name itself."), callerNamed, withJSON("config")),
 			crud[corepb.Issuer](scopeTenant,
-				withDescription("An OAuth 2.0 / OpenID Connect issuer: the login a set of clients shares, with its domain, token lifetimes and which realm or realms people sign in to (`config`)."), withJSON("config"),
-				withReferences(map[string]gentf.Reference{"appearance_profile_id": refAppearanceProfile})),
+				withDescription("An OAuth 2.0 / OpenID Connect issuer: the login a set of clients shares, with its domain, token lifetimes and which realm or realms people sign in to (`config`). Its appearance is whichever of its profiles is the default (`authwise_appearance_profile.is_default`)."), withJSON("config")),
 			crud[corepb.Realm](scopeTenant,
 				withDescription("A realm: a population of users with its own providers, factors and authentication policy."), withJSON("config")),
 			crud[corepb.Theme](scopeTenant,
@@ -276,7 +275,11 @@ func main() {
 				withDescription("An API an issuer mints access tokens for, and the audience its Access catalog hangs off."), withJSON("config"),
 				withReferences(map[string]gentf.Reference{"appearance_profile_id": refAppearanceProfile})),
 			crud[corepb.AppearanceProfile](scopeIssuer,
-				withDescription("An issuer's appearance profile: the stylesheet and content its login pages use."),
+				// is_default is the issuer's appearance (kit#680, apis v0.18.0).
+				// kit holds exactly one default per issuer and moves it only
+				// through MakeDefaultAppearanceProfile; the wrapper in
+				// internal/provider routes the flag there.
+				withDescription("An issuer's appearance profile: the stylesheet and content its login pages use. The issuer's default profile (`is_default`) is the issuer's appearance; a client's or audience's `appearance_profile_id` overrides it."),
 				withCollection("appearance-profiles"),
 				withJSON("stylesheet_attributes", "content"),
 				withReferences(map[string]gentf.Reference{"theme_id": refTheme})),

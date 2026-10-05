@@ -52,14 +52,16 @@ type fakeIdentityServer struct {
 	clientSecrets map[string]*corepb.ClientSecret
 	// mints counts MintClientSecret calls, so a test can tell a
 	// replacement from an in-place update.
-	mints     int
-	providers map[string]*corepb.Provider
-	certs     map[string]*corepb.Certificate
-	endpoints map[string]*corepb.Endpoint
-	factors   map[string]*corepb.Factor
-	secrets   map[string]*corepb.Secret
-	assets    map[string]*corepb.Asset
-	users     map[string]*corepb.User
+	mints int
+	// makeDefaults counts MakeDefaultAppearanceProfile calls.
+	makeDefaults int
+	providers    map[string]*corepb.Provider
+	certs        map[string]*corepb.Certificate
+	endpoints    map[string]*corepb.Endpoint
+	factors      map[string]*corepb.Factor
+	secrets      map[string]*corepb.Secret
+	assets       map[string]*corepb.Asset
+	users        map[string]*corepb.User
 	// contact is each user's derived address, apart from the row: kit
 	// fills email from the account's proven identifiers on every read.
 	contact map[string]string
