@@ -1,3 +1,34 @@
+## Unreleased
+
+NOTES:
+
+* **kit v1.36.0.** This release pairs with kit v1.36.0 and is built against
+  apis v0.20.0. Nothing in the provider's own schema changes: every
+  addition below goes in `authwise_realm`'s JSON `config`. Against an older
+  kit, recovery needs v1.34.0, and bot protection and the SMS policy need
+  v1.36.0.
+* **The Omni rename (kit#223) changes nothing here.** apis renames
+  `CLASSIFICATION_CUSTOMER` to `CLASSIFICATION_OMNI`, but classification is
+  a tenant field and the provider has no tenant resource or data source.
+
+FEATURES:
+
+* **`authwise_realm` config accepts `recovery` (apis v0.19.0).**
+  Self-service password reset: `selfServiceReset`, `resetTtl` (5 minutes to
+  24 hours, written in seconds such as `"1800s"`; omit it for kit's one-hour
+  default) and `supportContact`.
+* **`authwise_realm` config accepts `botProtection` and `sms` (apis
+  v0.20.0).** `botProtection` takes `mode` (`OFF` or `ALWAYS`), `provider`
+  (`TURNSTILE`, `HCAPTCHA` or `ENDPOINT`), `siteKey`, `secretRef`
+  (`{ name = authwise_secret.x.name }`, which also orders the realm after
+  the secret), `endpointName`, `failMode`, `timeout` and
+  `refuseDisposableSignup`. `sms` takes `allowedRegions`, `deniedRegions`
+  and `sendsPerPrefixPerHour`. kit refuses `ADAPTIVE`, `ALWAYS` with no
+  provider, a vendor provider without both keys, and a region that is not
+  ISO 3166-1 alpha-2. As with the rest of the JSON config, leave zero values
+  such as `failMode = "CLOSED"` out: kit omits them on read, and an explicit
+  one plans a diff on every run.
+
 ## 0.5.0 (October 4, 2026)
 
 NOTES:

@@ -192,6 +192,9 @@ func (f *fakeIdentityServer) CreateRealm(ctx context.Context, in *identitypb.Cre
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.recordAuth(ctx)
+	if err := f.admitRealmConfigLocked(in.GetRealm()); err != nil {
+		return nil, err
+	}
 	r := proto.Clone(in.GetRealm()).(*corepb.Realm)
 	r.Name = in.GetParent() + "/realms/" + f.nextID("r")
 	f.realms[r.GetName()] = r
@@ -211,6 +214,9 @@ func (f *fakeIdentityServer) PatchRealm(ctx context.Context, in *identitypb.Patc
 		case "display_name":
 			existing.DisplayName = in.GetRealm().GetDisplayName()
 		case "config":
+			if err := f.admitRealmConfigLocked(in.GetRealm()); err != nil {
+				return nil, err
+			}
 			existing.Config = in.GetRealm().GetConfig()
 		case "config.authentication":
 			// kit merges a nested path on its own and refuses one whose
