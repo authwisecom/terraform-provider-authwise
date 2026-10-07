@@ -17,7 +17,7 @@ A client's secret, for authenticating it to the token endpoint. kit mints it and
 # once; Terraform keeps it in state and hands it on from there.
 resource "authwise_client" "ci" {
   display_name = "CI"
-  grant_type   = "client_credentials"
+  grant_types  = ["client_credentials"]
 }
 
 resource "authwise_client_secret" "ci" {

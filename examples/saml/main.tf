@@ -187,7 +187,7 @@ data "authwise_saml_relying_party_config" "app" {
 resource "authwise_client" "partner_app" {
   display_name = "Partner Co app (SAML)"
   audience_id  = "a-01"
-  grant_type   = "authorization_code"
+  grant_types  = ["saml_idp"]
   config       = data.authwise_saml_relying_party_config.app.any
 }
 

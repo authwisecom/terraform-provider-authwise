@@ -479,6 +479,9 @@ func (f *fakeIdentityServer) CreateClient(ctx context.Context, in *identitypb.Cr
 	if err := f.admitAudience(in.GetParent(), c.GetAudienceId()); err != nil {
 		return nil, err
 	}
+	if err := admitClient(c); err != nil {
+		return nil, err
+	}
 	c.Name = in.GetParent() + "/clients/" + f.nextID("c")
 	f.clients[c.GetName()] = c
 	return proto.Clone(c).(*corepb.Client), nil
@@ -502,10 +505,11 @@ func (f *fakeIdentityServer) PatchClient(ctx context.Context, in *identitypb.Pat
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.recordAuth(ctx)
-	existing, ok := f.clients[in.GetName()]
+	stored, ok := f.clients[in.GetName()]
 	if !ok {
 		return nil, status.Errorf(codes.NotFound, "client %q not found", in.GetName())
 	}
+	existing := proto.Clone(stored).(*corepb.Client)
 	for _, path := range in.GetUpdateMask().GetPaths() {
 		switch path {
 		case "display_name":
@@ -516,8 +520,16 @@ func (f *fakeIdentityServer) PatchClient(ctx context.Context, in *identitypb.Pat
 				return nil, err
 			}
 			existing.AudienceId = in.GetClient().GetAudienceId()
-		case "grant_type":
-			existing.GrantType = in.GetClient().GetGrantType()
+		case "grant_types":
+			existing.GrantTypes = in.GetClient().GetGrantTypes()
+		case "kind":
+			existing.Kind = in.GetClient().GetKind()
+		case "token_endpoint_auth_method":
+			existing.TokenEndpointAuthMethod = in.GetClient().GetTokenEndpointAuthMethod()
+		case "status":
+			existing.Status = in.GetClient().GetStatus()
+		case "expires_at":
+			existing.ExpiresAt = in.GetClient().GetExpiresAt()
 		case "config":
 			existing.Config = in.GetClient().GetConfig()
 		case "labels":
@@ -526,6 +538,10 @@ func (f *fakeIdentityServer) PatchClient(ctx context.Context, in *identitypb.Pat
 			return nil, status.Errorf(codes.InvalidArgument, "unsupported update_mask path %q", path)
 		}
 	}
+	if err := admitClient(existing); err != nil {
+		return nil, err
+	}
+	f.clients[in.GetName()] = existing
 	return proto.Clone(existing).(*corepb.Client), nil
 }
 

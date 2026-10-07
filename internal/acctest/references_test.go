@@ -46,7 +46,7 @@ resource "authwise_audience" "api" {
 
 resource "authwise_client" "web" {
   display_name = "web"
-  grant_type   = "client_credentials"
+  grant_types  = ["client_credentials"]
   audience_id  = %s
 }
 
@@ -109,7 +109,7 @@ resource "authwise_audience" "api" {
 resource "authwise_client" "elsewhere" {
   issuer_id    = "i-2"
   display_name = "elsewhere"
-  grant_type   = "client_credentials"
+  grant_types  = ["client_credentials"]
   audience_id  = authwise_audience.api.audience_id
 }
 `,

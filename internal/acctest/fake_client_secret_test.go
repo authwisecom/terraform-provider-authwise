@@ -36,8 +36,14 @@ func (f *fakeIdentityServer) MintClientSecret(ctx context.Context, in *identityp
 	if err := checkParent("client secret", clientParent, in.GetParent()); err != nil {
 		return nil, err
 	}
-	if _, ok := f.clients[in.GetParent()]; !ok {
+	c, ok := f.clients[in.GetParent()]
+	if !ok {
 		return nil, status.Errorf(codes.NotFound, "client %q not found", in.GetParent())
+	}
+	if c.GetTokenEndpointAuthMethod() == authMethodNone {
+		return nil, status.Errorf(codes.InvalidArgument,
+			"client %s is public (token_endpoint_auth_method none) and holds no secret; "+
+				"set token_endpoint_auth_method to client_secret_basic or client_secret_post first", in.GetParent())
 	}
 	if err := checkExpiry(in.GetExpiresAt()); err != nil {
 		return nil, err

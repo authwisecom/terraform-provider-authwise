@@ -26,7 +26,7 @@ data "authwise_interactive_client_config" "console" {
 resource "authwise_client" "console" {
   display_name = "Console"
   audience_id  = authwise_audience.api.audience_id
-  grant_type   = "authorization_code"
+  grant_types  = ["authorization_code", "refresh_token"]
   config       = data.authwise_interactive_client_config.console.any
 }
 ```
@@ -41,12 +41,16 @@ resource "authwise_client" "console" {
 - `audience_id` (String)
 - `config` (String) `config` as protojson-encoded google.protobuf.Any (JSON object with `@type`); reference a generated config data source's `any` output for the type-safe form.
 - `display_name` (String)
-- `grant_type` (String)
+- `expires_at` (String) `expires_at` as an RFC 3339 timestamp.
+- `grant_types` (List of String)
 - `issuer_id` (String) Parent identifier `issuer_id`; overrides the provider default. Changing it replaces the resource.
+- `kind` (String)
 - `labels` (Map of String)
 - `login_url` (String)
 - `post_logout_redirect_uris` (List of String)
+- `status` (String)
 - `tenant_id` (String) Parent identifier `tenant_id`; overrides the provider default. Changing it replaces the resource.
+- `token_endpoint_auth_method` (String)
 
 ### Read-Only
 

@@ -35,8 +35,12 @@ Read-Only:
 - `client_id` (String) Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.
 - `config` (String)
 - `display_name` (String)
-- `grant_type` (String)
+- `expires_at` (String)
+- `grant_types` (List of String)
+- `kind` (String)
 - `labels` (Map of String)
 - `login_url` (String)
 - `name` (String) Full resource name.
 - `post_logout_redirect_uris` (List of String)
+- `status` (String)
+- `token_endpoint_auth_method` (String)

@@ -24,7 +24,7 @@ func TestAccClientSecret_MintKeepRotate(t *testing.T) {
 		return h.providerConfig() + fmt.Sprintf(`
 resource "authwise_client" "ci" {
   display_name = "CI"
-  grant_type   = "client_credentials"
+  grant_types  = ["client_credentials"]
 }
 
 resource "authwise_client_secret" "ci" {
@@ -157,7 +157,7 @@ func TestAccClientSecret_PastExpiryRefused(t *testing.T) {
 				Config: h.providerConfig() + `
 resource "authwise_client" "ci" {
   display_name = "CI"
-  grant_type   = "client_credentials"
+  grant_types  = ["client_credentials"]
 }
 
 resource "authwise_client_secret" "ci" {

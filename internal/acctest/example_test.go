@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -245,8 +246,11 @@ func TestAccGuardCatalogExample(t *testing.T) {
 		if c.GetAudienceId() != audienceID {
 			t.Errorf("client audience_id = %q, want the created audience %q", c.GetAudienceId(), audienceID)
 		}
-		if c.GetGrantType() != "authorization_code" {
-			t.Errorf("client grant_type = %q", c.GetGrantType())
+		if got := c.GetGrantTypes(); !slices.Equal(got, []string{"authorization_code", "refresh_token"}) {
+			t.Errorf("client grant_types = %v", got)
+		}
+		if c.GetKind() != corepb.ClientKind_CLIENT_KIND_APPLICATION || c.GetTokenEndpointAuthMethod() != "none" {
+			t.Errorf("client kind = %s, token_endpoint_auth_method = %q; want a public application", c.GetKind(), c.GetTokenEndpointAuthMethod())
 		}
 		if !strings.Contains(string(c.GetConfig().GetValue()), "guard-admin.example.com/") {
 			t.Errorf("client config does not carry the redirect URI: %s", c.GetConfig())

@@ -360,7 +360,7 @@ resource "authwise_audience" "app" {
 resource "authwise_client" "app" {
   display_name = "SAML app"
   audience_id  = authwise_audience.app.audience_id
-  grant_type   = "authorization_code"
+  grant_types  = ["saml_idp"]
   config       = data.authwise_saml_relying_party_config.app.any
 }
 `

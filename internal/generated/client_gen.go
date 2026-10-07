@@ -9,6 +9,7 @@ import (
 	v1alpha1 "git.authwise.com/authwise/apis/authwise/types/core/v1alpha1"
 	tf "github.com/activatedio/tfinfra/pkg/tf"
 	jsontypes "github.com/hashicorp/terraform-plugin-framework-jsontypes/jsontypes"
+	stringvalidator "github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	attr "github.com/hashicorp/terraform-plugin-framework/attr"
 	datasource "github.com/hashicorp/terraform-plugin-framework/datasource"
 	schema1 "github.com/hashicorp/terraform-plugin-framework/datasource/schema"
@@ -25,6 +26,8 @@ import (
 	protojson "google.golang.org/protobuf/encoding/protojson"
 	anypb "google.golang.org/protobuf/types/known/anypb"
 	fieldmaskpb "google.golang.org/protobuf/types/known/fieldmaskpb"
+	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
+	"time"
 )
 
 // ClientResourceSchema returns the Terraform schema for the Client resource.
@@ -65,16 +68,29 @@ func ClientResourceSchema() schema.Schema {
 				Optional:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
-			"grant_type": schema.StringAttribute{
+			"expires_at": schema.StringAttribute{
+				Computed:            true,
+				MarkdownDescription: "`expires_at` as an RFC 3339 timestamp.",
+				Optional:            true,
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
+			"grant_types": schema.ListAttribute{
 				Computed:      true,
+				ElementType:   types.StringType,
 				Optional:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+				PlanModifiers: []planmodifier.List{listplanmodifier.UseStateForUnknown()},
 			},
 			"issuer_id": schema.StringAttribute{
 				MarkdownDescription: "Parent identifier `issuer_id`; overrides the provider default. Changing it replaces the resource.",
 				Optional:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 				Validators:          []validator.String{tf.ReferenceID("i", "issuer", "authwise_issuer.<name>.issuer_id")},
+			},
+			"kind": schema.StringAttribute{
+				Computed:      true,
+				Optional:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+				Validators:    []validator.String{stringvalidator.OneOf("CLIENT_KIND_UNSPECIFIED", "CLIENT_KIND_APPLICATION", "CLIENT_KIND_SERVICE", "CLIENT_KIND_AGENT")},
 			},
 			"labels": schema.MapAttribute{
 				Computed:      true,
@@ -98,11 +114,22 @@ func ClientResourceSchema() schema.Schema {
 				Optional:      true,
 				PlanModifiers: []planmodifier.List{listplanmodifier.UseStateForUnknown()},
 			},
+			"status": schema.StringAttribute{
+				Computed:      true,
+				Optional:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+				Validators:    []validator.String{stringvalidator.OneOf("CLIENT_STATUS_UNSPECIFIED", "CLIENT_STATUS_ACTIVE", "CLIENT_STATUS_DISABLED", "CLIENT_STATUS_QUARANTINED")},
+			},
 			"tenant_id": schema.StringAttribute{
 				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default. Changing it replaces the resource.",
 				Optional:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 				Validators:          []validator.String{tf.ReferenceID("t", "tenant", "")},
+			},
+			"token_endpoint_auth_method": schema.StringAttribute{
+				Computed:      true,
+				Optional:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 		},
 		MarkdownDescription: "An OAuth 2.0 client of an issuer: an application that signs people in or calls an API.",
@@ -111,37 +138,45 @@ func ClientResourceSchema() schema.Schema {
 
 // ClientModel is the Terraform plan/state model for Client.
 type ClientModel struct {
-	Name                   types.String         `tfsdk:"name"`
-	ClientId               types.String         `tfsdk:"client_id"`
-	TenantId               types.String         `tfsdk:"tenant_id"`
-	IssuerId               types.String         `tfsdk:"issuer_id"`
-	Labels                 types.Map            `tfsdk:"labels"`
-	AudienceId             types.String         `tfsdk:"audience_id"`
-	DisplayName            types.String         `tfsdk:"display_name"`
-	GrantType              types.String         `tfsdk:"grant_type"`
-	ApplicationUrl         types.String         `tfsdk:"application_url"`
-	LoginUrl               types.String         `tfsdk:"login_url"`
-	PostLogoutRedirectUris types.List           `tfsdk:"post_logout_redirect_uris"`
-	AppearanceProfileId    types.String         `tfsdk:"appearance_profile_id"`
-	Config                 jsontypes.Normalized `tfsdk:"config"`
+	Name                    types.String         `tfsdk:"name"`
+	ClientId                types.String         `tfsdk:"client_id"`
+	TenantId                types.String         `tfsdk:"tenant_id"`
+	IssuerId                types.String         `tfsdk:"issuer_id"`
+	Labels                  types.Map            `tfsdk:"labels"`
+	AudienceId              types.String         `tfsdk:"audience_id"`
+	DisplayName             types.String         `tfsdk:"display_name"`
+	ApplicationUrl          types.String         `tfsdk:"application_url"`
+	LoginUrl                types.String         `tfsdk:"login_url"`
+	PostLogoutRedirectUris  types.List           `tfsdk:"post_logout_redirect_uris"`
+	AppearanceProfileId     types.String         `tfsdk:"appearance_profile_id"`
+	Config                  jsontypes.Normalized `tfsdk:"config"`
+	GrantTypes              types.List           `tfsdk:"grant_types"`
+	Kind                    types.String         `tfsdk:"kind"`
+	TokenEndpointAuthMethod types.String         `tfsdk:"token_endpoint_auth_method"`
+	Status                  types.String         `tfsdk:"status"`
+	ExpiresAt               types.String         `tfsdk:"expires_at"`
 }
 
 // NewClientModel returns a model with every attribute set to its typed null; collection types cannot be zero-valued.
 func NewClientModel() *ClientModel {
 	return &ClientModel{
-		AppearanceProfileId:    types.StringNull(),
-		ApplicationUrl:         types.StringNull(),
-		AudienceId:             types.StringNull(),
-		ClientId:               types.StringNull(),
-		Config:                 jsontypes.NewNormalizedNull(),
-		DisplayName:            types.StringNull(),
-		GrantType:              types.StringNull(),
-		IssuerId:               types.StringNull(),
-		Labels:                 types.MapNull(types.StringType),
-		LoginUrl:               types.StringNull(),
-		Name:                   types.StringNull(),
-		PostLogoutRedirectUris: types.ListNull(types.StringType),
-		TenantId:               types.StringNull(),
+		AppearanceProfileId:     types.StringNull(),
+		ApplicationUrl:          types.StringNull(),
+		AudienceId:              types.StringNull(),
+		ClientId:                types.StringNull(),
+		Config:                  jsontypes.NewNormalizedNull(),
+		DisplayName:             types.StringNull(),
+		ExpiresAt:               types.StringNull(),
+		GrantTypes:              types.ListNull(types.StringType),
+		IssuerId:                types.StringNull(),
+		Kind:                    types.StringNull(),
+		Labels:                  types.MapNull(types.StringType),
+		LoginUrl:                types.StringNull(),
+		Name:                    types.StringNull(),
+		PostLogoutRedirectUris:  types.ListNull(types.StringType),
+		Status:                  types.StringNull(),
+		TenantId:                types.StringNull(),
+		TokenEndpointAuthMethod: types.StringNull(),
 	}
 }
 
@@ -155,7 +190,6 @@ func (m *ClientModel) ToProto(ctx context.Context) (*v1alpha1.Client, diag.Diagn
 	}
 	out.AudienceId = m.AudienceId.ValueString()
 	out.DisplayName = m.DisplayName.ValueString()
-	out.GrantType = m.GrantType.ValueString()
 	out.ApplicationUrl = m.ApplicationUrl.ValueString()
 	out.LoginUrl = m.LoginUrl.ValueString()
 	if !m.PostLogoutRedirectUris.IsNull() && !m.PostLogoutRedirectUris.IsUnknown() {
@@ -168,6 +202,24 @@ func (m *ClientModel) ToProto(ctx context.Context) (*v1alpha1.Client, diag.Diagn
 			diags.AddAttributeError(path.Root("config"), "invalid google.protobuf.Any JSON", err.Error())
 		} else {
 			out.Config = v
+		}
+	}
+	if !m.GrantTypes.IsNull() && !m.GrantTypes.IsUnknown() {
+		diags.Append(m.GrantTypes.ElementsAs(ctx, &out.GrantTypes, false)...)
+	}
+	if !m.Kind.IsNull() && !m.Kind.IsUnknown() {
+		out.Kind = v1alpha1.ClientKind(v1alpha1.ClientKind_value[m.Kind.ValueString()])
+	}
+	out.TokenEndpointAuthMethod = m.TokenEndpointAuthMethod.ValueString()
+	if !m.Status.IsNull() && !m.Status.IsUnknown() {
+		out.Status = v1alpha1.ClientStatus(v1alpha1.ClientStatus_value[m.Status.ValueString()])
+	}
+	if !m.ExpiresAt.IsNull() && !m.ExpiresAt.IsUnknown() {
+		t, err := time.Parse(time.RFC3339, m.ExpiresAt.ValueString())
+		if err != nil {
+			diags.AddAttributeError(path.Root("expires_at"), "invalid RFC 3339 timestamp", err.Error())
+		} else {
+			out.ExpiresAt = timestamppb.New(t)
 		}
 	}
 	return out, diags
@@ -193,11 +245,6 @@ func (m *ClientModel) FromProto(ctx context.Context, e *v1alpha1.Client) diag.Di
 		m.DisplayName = types.StringNull()
 	} else {
 		m.DisplayName = types.StringValue(e.DisplayName)
-	}
-	if e.GrantType == "" {
-		m.GrantType = types.StringNull()
-	} else {
-		m.GrantType = types.StringValue(e.GrantType)
 	}
 	if e.ApplicationUrl == "" {
 		m.ApplicationUrl = types.StringNull()
@@ -231,6 +278,25 @@ func (m *ClientModel) FromProto(ctx context.Context, e *v1alpha1.Client) diag.Di
 			m.Config = jsontypes.NewNormalizedValue(string(b))
 		}
 	}
+	if len(e.GrantTypes) == 0 {
+		m.GrantTypes = types.ListNull(types.StringType)
+	} else {
+		v, d := types.ListValueFrom(ctx, types.StringType, e.GrantTypes)
+		diags.Append(d...)
+		m.GrantTypes = v
+	}
+	m.Kind = tf.EnumValue(m.Kind, int32(e.Kind), e.Kind.String())
+	if e.TokenEndpointAuthMethod == "" {
+		m.TokenEndpointAuthMethod = types.StringNull()
+	} else {
+		m.TokenEndpointAuthMethod = types.StringValue(e.TokenEndpointAuthMethod)
+	}
+	m.Status = tf.EnumValue(m.Status, int32(e.Status), e.Status.String())
+	if e.ExpiresAt == nil {
+		m.ExpiresAt = types.StringNull()
+	} else {
+		m.ExpiresAt = types.StringValue(e.ExpiresAt.AsTime().Format(time.RFC3339))
+	}
 	return diags
 }
 
@@ -259,9 +325,6 @@ func (m *ClientModel) UpdateMask(ctx context.Context, prior *ClientModel) []stri
 	if !m.DisplayName.Equal(prior.DisplayName) {
 		paths = append(paths, "display_name")
 	}
-	if !m.GrantType.Equal(prior.GrantType) {
-		paths = append(paths, "grant_type")
-	}
 	if !m.ApplicationUrl.Equal(prior.ApplicationUrl) {
 		paths = append(paths, "application_url")
 	}
@@ -278,6 +341,21 @@ func (m *ClientModel) UpdateMask(ctx context.Context, prior *ClientModel) []stri
 		if eq, _ := m.Config.StringSemanticEquals(ctx, prior.Config); !eq {
 			paths = append(paths, "config")
 		}
+	}
+	if !m.GrantTypes.Equal(prior.GrantTypes) {
+		paths = append(paths, "grant_types")
+	}
+	if !m.Kind.Equal(prior.Kind) {
+		paths = append(paths, "kind")
+	}
+	if !m.TokenEndpointAuthMethod.Equal(prior.TokenEndpointAuthMethod) {
+		paths = append(paths, "token_endpoint_auth_method")
+	}
+	if !m.Status.Equal(prior.Status) {
+		paths = append(paths, "status")
+	}
+	if !m.ExpiresAt.Equal(prior.ExpiresAt) {
+		paths = append(paths, "expires_at")
 	}
 	return paths
 }
@@ -418,8 +496,13 @@ func ClientDataSourceSchema() schema1.Schema {
 				CustomType: jsontypes.NormalizedType{},
 			},
 			"display_name": schema1.StringAttribute{Computed: true},
-			"grant_type":   schema1.StringAttribute{Computed: true},
-			"issuer_id":    schema1.StringAttribute{Computed: true},
+			"expires_at":   schema1.StringAttribute{Computed: true},
+			"grant_types": schema1.ListAttribute{
+				Computed:    true,
+				ElementType: types.StringType,
+			},
+			"issuer_id": schema1.StringAttribute{Computed: true},
+			"kind":      schema1.StringAttribute{Computed: true},
 			"labels": schema1.MapAttribute{
 				Computed:    true,
 				ElementType: types.StringType,
@@ -433,7 +516,9 @@ func ClientDataSourceSchema() schema1.Schema {
 				Computed:    true,
 				ElementType: types.StringType,
 			},
-			"tenant_id": schema1.StringAttribute{Computed: true},
+			"status":                     schema1.StringAttribute{Computed: true},
+			"tenant_id":                  schema1.StringAttribute{Computed: true},
+			"token_endpoint_auth_method": schema1.StringAttribute{Computed: true},
 		},
 		MarkdownDescription: "An OAuth 2.0 client of an issuer: an application that signs people in or calls an API. This data source reads one by its full resource name.",
 	}
@@ -469,33 +554,41 @@ func (d *clientDataSource) Read(ctx context.Context, req datasource.ReadRequest,
 
 // ClientItemModel is one element of the clients data source's "clients" list.
 type ClientItemModel struct {
-	ClientId               types.String         `tfsdk:"client_id"`
-	Name                   types.String         `tfsdk:"name"`
-	Labels                 types.Map            `tfsdk:"labels"`
-	AudienceId             types.String         `tfsdk:"audience_id"`
-	DisplayName            types.String         `tfsdk:"display_name"`
-	GrantType              types.String         `tfsdk:"grant_type"`
-	ApplicationUrl         types.String         `tfsdk:"application_url"`
-	LoginUrl               types.String         `tfsdk:"login_url"`
-	PostLogoutRedirectUris types.List           `tfsdk:"post_logout_redirect_uris"`
-	AppearanceProfileId    types.String         `tfsdk:"appearance_profile_id"`
-	Config                 jsontypes.Normalized `tfsdk:"config"`
+	ClientId                types.String         `tfsdk:"client_id"`
+	Name                    types.String         `tfsdk:"name"`
+	Labels                  types.Map            `tfsdk:"labels"`
+	AudienceId              types.String         `tfsdk:"audience_id"`
+	DisplayName             types.String         `tfsdk:"display_name"`
+	ApplicationUrl          types.String         `tfsdk:"application_url"`
+	LoginUrl                types.String         `tfsdk:"login_url"`
+	PostLogoutRedirectUris  types.List           `tfsdk:"post_logout_redirect_uris"`
+	AppearanceProfileId     types.String         `tfsdk:"appearance_profile_id"`
+	Config                  jsontypes.Normalized `tfsdk:"config"`
+	GrantTypes              types.List           `tfsdk:"grant_types"`
+	Kind                    types.String         `tfsdk:"kind"`
+	TokenEndpointAuthMethod types.String         `tfsdk:"token_endpoint_auth_method"`
+	Status                  types.String         `tfsdk:"status"`
+	ExpiresAt               types.String         `tfsdk:"expires_at"`
 }
 
 // ClientItemAttrTypes returns the attribute types of one clients list element.
 func ClientItemAttrTypes() map[string]attr.Type {
 	return map[string]attr.Type{
-		"appearance_profile_id":     types.StringType,
-		"application_url":           types.StringType,
-		"audience_id":               types.StringType,
-		"client_id":                 types.StringType,
-		"config":                    jsontypes.NormalizedType{},
-		"display_name":              types.StringType,
-		"grant_type":                types.StringType,
-		"labels":                    types.MapType{ElemType: types.StringType},
-		"login_url":                 types.StringType,
-		"name":                      types.StringType,
-		"post_logout_redirect_uris": types.ListType{ElemType: types.StringType},
+		"appearance_profile_id":      types.StringType,
+		"application_url":            types.StringType,
+		"audience_id":                types.StringType,
+		"client_id":                  types.StringType,
+		"config":                     jsontypes.NormalizedType{},
+		"display_name":               types.StringType,
+		"expires_at":                 types.StringType,
+		"grant_types":                types.ListType{ElemType: types.StringType},
+		"kind":                       types.StringType,
+		"labels":                     types.MapType{ElemType: types.StringType},
+		"login_url":                  types.StringType,
+		"name":                       types.StringType,
+		"post_logout_redirect_uris":  types.ListType{ElemType: types.StringType},
+		"status":                     types.StringType,
+		"token_endpoint_auth_method": types.StringType,
 	}
 }
 
@@ -526,7 +619,12 @@ func ClientListDataSourceSchema() schema1.Schema {
 						CustomType: jsontypes.NormalizedType{},
 					},
 					"display_name": schema1.StringAttribute{Computed: true},
-					"grant_type":   schema1.StringAttribute{Computed: true},
+					"expires_at":   schema1.StringAttribute{Computed: true},
+					"grant_types": schema1.ListAttribute{
+						Computed:    true,
+						ElementType: types.StringType,
+					},
+					"kind": schema1.StringAttribute{Computed: true},
 					"labels": schema1.MapAttribute{
 						Computed:    true,
 						ElementType: types.StringType,
@@ -540,6 +638,8 @@ func ClientListDataSourceSchema() schema1.Schema {
 						Computed:    true,
 						ElementType: types.StringType,
 					},
+					"status":                     schema1.StringAttribute{Computed: true},
+					"token_endpoint_auth_method": schema1.StringAttribute{Computed: true},
 				}},
 			},
 			"issuer_id": schema1.StringAttribute{
@@ -579,11 +679,6 @@ func clientItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Client, *C
 	} else {
 		item.DisplayName = types.StringValue(e.DisplayName)
 	}
-	if e.GrantType == "" {
-		item.GrantType = types.StringNull()
-	} else {
-		item.GrantType = types.StringValue(e.GrantType)
-	}
 	if e.ApplicationUrl == "" {
 		item.ApplicationUrl = types.StringNull()
 	} else {
@@ -615,6 +710,25 @@ func clientItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Client, *C
 		} else {
 			item.Config = jsontypes.NewNormalizedValue(string(b))
 		}
+	}
+	if len(e.GrantTypes) == 0 {
+		item.GrantTypes = types.ListNull(types.StringType)
+	} else {
+		v, d := types.ListValueFrom(ctx, types.StringType, e.GrantTypes)
+		diags.Append(d...)
+		item.GrantTypes = v
+	}
+	item.Kind = tf.EnumValue(item.Kind, int32(e.Kind), e.Kind.String())
+	if e.TokenEndpointAuthMethod == "" {
+		item.TokenEndpointAuthMethod = types.StringNull()
+	} else {
+		item.TokenEndpointAuthMethod = types.StringValue(e.TokenEndpointAuthMethod)
+	}
+	item.Status = tf.EnumValue(item.Status, int32(e.Status), e.Status.String())
+	if e.ExpiresAt == nil {
+		item.ExpiresAt = types.StringNull()
+	} else {
+		item.ExpiresAt = types.StringValue(e.ExpiresAt.AsTime().Format(time.RFC3339))
 	}
 	id, err := crud.IDFromName(e.Name)
 	if err != nil {

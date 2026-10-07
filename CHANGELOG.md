@@ -2,17 +2,59 @@
 
 NOTES:
 
-* **kit v1.36.0.** This release pairs with kit v1.36.0 and is built against
-  apis v0.20.0. Nothing in the provider's own schema changes: every
-  addition below goes in `authwise_realm`'s JSON `config`. Against an older
-  kit, recovery needs v1.34.0, and bot protection and the SMS policy need
-  v1.36.0.
+* **kit v1.38.0.** This release pairs with kit v1.38.0 and is built against
+  apis v0.21.0. It needs kit v1.38.0: an older kit still expects the single
+  `grant_type`, and the client fields below do not exist there. Within that,
+  recovery came in kit v1.34.0 and bot protection and the SMS policy in
+  v1.36.0. kit v1.38.0 is a reset release for clients (see its CHANGELOG),
+  so clients are recreated rather than migrated in place.
 * **The Omni rename (kit#223) changes nothing here.** apis renames
   `CLASSIFICATION_CUSTOMER` to `CLASSIFICATION_OMNI`, but classification is
   a tenant field and the provider has no tenant resource or data source.
 
+BREAKING CHANGES:
+
+* **`authwise_client.grant_type` is replaced by `grant_types` (apis
+  v0.21.0, kit#404).** The same goes for the `authwise_client` and
+  `authwise_clients` data sources. `grant_types` is a list of RFC 7591
+  values:
+  * `["authorization_code", "refresh_token"]` for an application that
+    refreshes. A kit v1.38.0 server issues a refresh token only to a client
+    that lists `refresh_token`, so `"authorization_code"` alone no longer
+    implies it.
+  * `["client_credentials"]` for a service.
+  * `["saml_idp"]` for a SAML relying party. These were
+    `grant_type = "authorization_code"` before, as in `examples/saml`.
+
+  A configuration that sets `grant_type` fails at plan. Rewrite it, as the
+  examples now do.
+* **A public client holds no secret.** An application's
+  `token_endpoint_auth_method` defaults to `none`, and kit refuses an
+  `authwise_client_secret` for a `none` client. An application that holds
+  a secret must set `token_endpoint_auth_method` to `client_secret_basic`
+  or `client_secret_post`. A service defaults to `client_secret_basic`, so
+  a `client_credentials` client with a secret needs no change beyond
+  `grant_types`.
+
 FEATURES:
 
+* **`authwise_client` says what a client may do (apis v0.21.0, kit#404).**
+  New optional, computed attributes, also on both client data sources:
+  * `kind`: `CLIENT_KIND_APPLICATION`, `CLIENT_KIND_SERVICE` or
+    `CLIENT_KIND_AGENT`. kit derives it from `grant_types` when omitted:
+    `client_credentials` alone is a service, anything else an application.
+  * `token_endpoint_auth_method`: `client_secret_basic`,
+    `client_secret_post` or `none`. kit derives it from `kind` when omitted.
+    `private_key_jwt` is refused until kit#411.
+  * `status`: `CLIENT_STATUS_ACTIVE` (the default), `CLIENT_STATUS_DISABLED`
+    or `CLIENT_STATUS_QUARANTINED`. A client that is not active is refused
+    at the token endpoint, and its tokens introspect inactive.
+  * `expires_at`: an RFC 3339 timestamp. Once it is reached, the client is
+    refused as if disabled.
+
+  What kit derives lands in state and is kept, so a later change to
+  `grant_types` does not re-derive `kind` or the method. If you move a
+  client between an application and a service, set them explicitly.
 * **`authwise_realm` config accepts `recovery` (apis v0.19.0).**
   Self-service password reset: `selfServiceReset`, `resetTtl` (5 minutes to
   24 hours, written in seconds such as `"1800s"`; omit it for kit's one-hour

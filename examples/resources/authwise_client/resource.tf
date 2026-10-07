@@ -11,6 +11,6 @@ data "authwise_interactive_client_config" "console" {
 resource "authwise_client" "console" {
   display_name = "Console"
   audience_id  = authwise_audience.api.audience_id
-  grant_type   = "authorization_code"
+  grant_types  = ["authorization_code", "refresh_token"]
   config       = data.authwise_interactive_client_config.console.any
 }
