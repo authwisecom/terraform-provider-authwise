@@ -268,7 +268,8 @@ func TestAccGuardCatalogExample(t *testing.T) {
 
 // TestAccGuardExample applies examples/guard and examples/guard-catalog as
 // one configuration (#32): kit's catalog, role, binding and console client
-// beside a Guard tenant, network, relay, two resources and an invite.
+// beside a Guard tenant, network, relay, two resources, a gateway node
+// serving one of them, and an invite.
 func TestAccGuardExample(t *testing.T) {
 
 	if os.Getenv("TF_ACC") == "" {
@@ -284,13 +285,21 @@ func TestAccGuardExample(t *testing.T) {
 	if url := strings.TrimSpace(r.run("output", "-raw", "invite_url")); !strings.HasPrefix(url, "https://join.example.com/i/gi_") {
 		t.Errorf("invite_url = %q", url)
 	}
+	if code := strings.TrimSpace(r.run("output", "-raw", "gateway_auth_code")); !strings.HasPrefix(code, "ga_") {
+		t.Errorf("gateway_auth_code = %q", code)
+	}
 
 	h.guard.mu.Lock()
 	defer h.guard.mu.Unlock()
 	if len(h.guard.tenants) != 1 || len(h.guard.networks) != 1 || len(h.guard.relays) != 1 ||
-		len(h.guard.resources) != 2 || len(h.guard.invites) != 1 {
-		t.Errorf("guard-control holds %d tenants, %d networks, %d relays, %d resources, %d invites; want 1, 1, 1, 2, 1",
-			len(h.guard.tenants), len(h.guard.networks), len(h.guard.relays), len(h.guard.resources), len(h.guard.invites))
+		len(h.guard.resources) != 2 || len(h.guard.invites) != 1 || len(h.guard.nodes) != 1 {
+		t.Errorf("guard-control holds %d tenants, %d networks, %d relays, %d resources, %d invites, %d nodes; want 1, 1, 1, 2, 1, 1",
+			len(h.guard.tenants), len(h.guard.networks), len(h.guard.relays), len(h.guard.resources), len(h.guard.invites), len(h.guard.nodes))
+	}
+	for _, r := range h.guard.resources {
+		if r.GetKind() == "subnet" && len(r.GetServingNodeIds()) != 1 {
+			t.Errorf("the office LAN is served by %v, want the gateway", r.GetServingNodeIds())
+		}
 	}
 	for _, i := range h.guard.invites {
 		if len(i.GetGrants()) != 2 {

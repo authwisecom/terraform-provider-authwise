@@ -24,9 +24,11 @@ import (
 // with a cidr in the mesh range, relays, resources and the nodes serving
 // them, and invites whose code is returned once. The rules are
 // guard-control's tenant_registration.go, creator.go and validations.go.
-// Nodes are seeded by tests: enrolment is not the provider's.
+// People's nodes are seeded by tests, as enrolment would make them; a
+// server's node is created through CreateNode.
 type fakeGuardServer struct {
 	guardpb.UnimplementedGuardControlServiceServer
+	guardpb.UnimplementedGuardNodeServiceServer
 
 	mu        sync.Mutex
 	tenants   map[string]*guardpb.Tenant
@@ -38,7 +40,9 @@ type fakeGuardServer struct {
 	// codes are the invites' codes, apart from the row, the way
 	// guard-control keeps only a hash: a read never returns one.
 	codes map[string]string
-	seq   int
+	// grants are each node's, by node name: resource and node names.
+	grants map[string][]string
+	seq    int
 	// auths records the authorization header of every call, to show the
 	// provider's bearer reaches guard-control too.
 	auths []string
@@ -53,6 +57,7 @@ func newFakeGuardServer() *fakeGuardServer {
 		invites:   map[string]*guardpb.Invite{},
 		nodes:     map[string]*guardpb.Node{},
 		codes:     map[string]string{},
+		grants:    map[string][]string{},
 	}
 }
 
@@ -76,7 +81,11 @@ func (f *fakeGuardServer) seedNode(network, id string) string {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	name := network + "/nodes/" + id
-	f.nodes[name] = &guardpb.Node{Name: name, DisplayName: id, State: "ACTIVE"}
+	address, err := f.allocateLocked(network)
+	if err != nil {
+		panic(err)
+	}
+	f.nodes[name] = &guardpb.Node{Name: name, DisplayName: id, State: "ACTIVE", Address: address, OwnerId: "u-" + id}
 	return name
 }
 

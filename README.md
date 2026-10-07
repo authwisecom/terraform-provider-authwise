@@ -109,16 +109,20 @@ Two things worth knowing:
 The `authwise_guard_*` resources manage Guard, the mesh VPN, over
 guard-control's API rather than kit's (#32): `authwise_guard_tenant`,
 `authwise_guard_network`, `authwise_guard_relay`, `authwise_guard_resource`
-with `authwise_guard_resource_nodes`, and `authwise_guard_invite`, each with
+with `authwise_guard_resource_nodes`, `authwise_guard_node` with
+`authwise_guard_node_grants`, and `authwise_guard_invite`, each entity with
 its singular and plural data sources. Set `guard_endpoint` (or
 `AUTHWISE_GUARD_ENDPOINT`) to guard-control's gRPC address; the same bearer
 goes to both services, and without it a Guard resource fails at plan.
 
-`examples/guard` is a network from the tenant down to an invite, applied by
-the acceptance suite together with `examples/guard-catalog`. Nodes and
-Guard's users are not terraform's: they join by enrolment. That matters on
-destroy, since guard-control refuses to delete a network that still has
-nodes or to unregister a tenant with networks or users.
+`examples/guard` is a network from the tenant down to a gateway server and
+an invite, applied by the acceptance suite together with
+`examples/guard-catalog`. A server's node is declared and enrols itself with
+its one-time `auth_code`; the key and endpoint enrolment writes read back
+without a diff. People's nodes and Guard's users are not terraform's: they
+join by invite. That matters on destroy, since guard-control refuses to
+delete a network that still has nodes or to unregister a tenant with
+networks or users.
 
 ## Associations
 

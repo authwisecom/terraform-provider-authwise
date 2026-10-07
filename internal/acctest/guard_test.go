@@ -331,6 +331,26 @@ resource "authwise_guard_invite" "x" {
 }`,
 			want: regexp.MustCompile(`(?s)at\s+most\s+30\s+days\s+ahead`),
 		},
+		"node granted itself": {
+			config: `
+resource "authwise_guard_node" "x" {
+  network_id = authwise_guard_network.office.guard_network_id
+}
+
+resource "authwise_guard_node_grants" "x" {
+  guard_node = authwise_guard_node.x.name
+  grants     = [authwise_guard_node.x.name]
+}`,
+			want: regexp.MustCompile(`(?s)cannot\s+be\s+granted\s+itself`),
+		},
+		"node address outside the network": {
+			config: `
+resource "authwise_guard_node" "x" {
+  network_id = authwise_guard_network.office.guard_network_id
+  address    = "10.1.2.3"
+}`,
+			want: regexp.MustCompile(`(?s)not\s+inside\s+the\s+network's\s+cidr`),
+		},
 		"tenant that is not a kit AWID": {
 			config: `
 resource "authwise_guard_tenant" "x" {
@@ -392,5 +412,42 @@ resource "authwise_guard_tenant" "acme" {
 			PlanOnly:    true,
 			ExpectError: regexp.MustCompile(`(?s)guard_endpoint\s+is\s+not\s+configured`),
 		}},
+	})
+}
+
+// Renaming a network whose cidr was left out changes it in place: the
+// allocated cidr is not a change.
+func TestAccGuard_NetworkRenameKeepsCIDR(t *testing.T) {
+
+	h := newHarness(t)
+
+	config := func(name string) string {
+		return h.providerConfig() + fmt.Sprintf(`
+resource "authwise_guard_tenant" "acme" {
+  guard_tenant_id = "t-1"
+  display_name    = "Acme"
+}
+
+resource "authwise_guard_network" "office" {
+  tenant_id    = authwise_guard_tenant.acme.guard_tenant_id
+  display_name = %q
+}
+`, name)
+	}
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: protoFactories(),
+		Steps: []resource.TestStep{
+			{Config: config("Office")},
+			{
+				Config: config("HQ"),
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{
+						plancheck.ExpectResourceAction(guardNetworkAddr, plancheck.ResourceActionUpdate),
+					},
+				},
+				Check: resource.TestCheckResourceAttr(guardNetworkAddr, "cidr", "100.64.0.0/10"),
+			},
+		},
 	})
 }

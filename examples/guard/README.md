@@ -1,8 +1,9 @@
 # A Guard network
 
 A Guard tenant, a network in it, a relay, the two things on the far side of
-the network people reach (an office subnet and an internal application),
-and an invite that admits one person with both granted.
+the network people reach (an office subnet and an internal application), a
+gateway server that routes to the subnet, and an invite that admits one
+person with both granted.
 
 Guard is managed by the same provider as the identity objects, through a
 second endpoint: `guard_endpoint` (or `AUTHWISE_GUARD_ENDPOINT`) is
@@ -20,14 +21,15 @@ suite applies the two.
 # main.tf, then:
 terraform init
 terraform apply
-terraform output -raw invite_url   # send it to the person you invited
+terraform output -raw invite_url          # send it to the person you invited
+terraform output -raw gateway_auth_code   # enrol the gateway with it
 ```
 
 ## What terraform does not own
 
-- **Nodes.** A node joins by enrolment: a person following an invite, or a
-  server with an auth code. Once nodes exist, name the ones serving a
-  resource with `authwise_guard_resource_nodes`.
+- **People's nodes.** A person's node joins by following an invite. A
+  server's node is declared (`authwise_guard_node`) and enrols with its
+  auth code; what it may reach is `authwise_guard_node_grants`.
 - **People.** Guard's users mirror the people who joined.
 
 Both matter on destroy: guard-control refuses to delete a network that still

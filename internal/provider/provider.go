@@ -237,6 +237,7 @@ func (p *AuthwiseProvider) Configure(ctx context.Context, req provider.Configure
 			"access":   accesspb.NewAuthwiseAccessServiceClient(conn),
 
 			guardClientKey:     guardpb.NewGuardControlServiceClient(guardConn),
+			guardNodeClientKey: guardpb.NewGuardNodeServiceClient(guardConn),
 			guardConfiguredKey: guardConfigured,
 		},
 		Defaults: defaults,
@@ -250,18 +251,20 @@ func (p *AuthwiseProvider) Configure(ctx context.Context, req provider.Configure
 // substituting the hand-written wrappers that add behavior the generator does
 // not express, plus the resources whose shapes are beyond it.
 func (p *AuthwiseProvider) Resources(ctx context.Context) []func() resource.Resource {
-	return append(guardWrap(ctx, substitute(ctx, generated.Resources(), map[string]func() resource.Resource{
+	return guardWrap(ctx, append(substitute(ctx, generated.Resources(), map[string]func() resource.Resource{
 		accessBindingTypeName:     newAccessBindingResource,
 		realmTypeName:             newRealmResource,
 		factorTypeName:            newFactorResource,
 		appearanceProfileTypeName: newAppearanceProfileResource,
 		guardTenantTypeName:       newGuardTenantResource,
 		guardInviteTypeName:       newGuardInviteResource,
-	})),
+		guardNodeTypeName:         newGuardNodeResource,
+	}),
 		newSecretResource,
 		newRealmAuthenticationPolicyResource,
 		newAssetContentResource,
-	)
+		newGuardNodeGrantsResource,
+	))
 }
 
 // substitute replaces generated constructors with wrappers, matched on the

@@ -374,6 +374,22 @@ func main() {
 				withRequired("kind", "address"), withImmutable("kind"),
 				withComputed("serving_node_ids"), withJSON("config"),
 				gentf.Associate{Target: reflect.TypeFor[guardpb.Node](), Attribute: "nodes", TypeName: "guard_resource_nodes"}),
+			// A node terraform declares is a pre-registered server (#32 stage
+			// 2). Created without a public_key it is PENDING, and the create
+			// response alone carries its auth code, which the wrapper in
+			// internal/provider keeps. Enrolment then sets public_key and
+			// endpoint, so both are optional and computed: what the device
+			// wrote reads back without a diff. The address is allocated
+			// when left out and never changes. :issueAuthCode and :revoke
+			// are not modelled, and a person's node (owner_id set) is never
+			// terraform's.
+			crud[guardpb.Node](scopeGuardNetwork,
+				withDescription("A server's node in a Guard network, registered ahead of time. Created without a `public_key`, it is `PENDING` and its one-time `auth_code` enrols the server; created with one, it is `ACTIVE` at once. The auth code is shown once, so it is kept in state: treat the state as sensitive. People's nodes join by invite and are not managed here."),
+				guard("node"), guardList("nodes"),
+				withImmutable("address"),
+				withComputed("allowed_ips", "owner_id", "state", "roles", "auth_code", "auth_code_expires_at"),
+				withSensitive("auth_code"),
+				withJSON("config")),
 			// An invite is create-only: guard-control has no update. Its code
 			// and url are shown once, in the create response; the wrapper in
 			// internal/provider keeps them in state.

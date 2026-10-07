@@ -1,4 +1,5 @@
-# A Guard network, from the tenant down to the first invite.
+# A Guard network, from the tenant down to a gateway server and the first
+# invite.
 
 locals {
   # The kit tenant to register with Guard: Guard's tenants are kit's.
@@ -47,7 +48,21 @@ resource "authwise_guard_resource" "wiki" {
   address      = "wiki.internal.example.com"
 }
 
-# 5. An invite for one person: the node they join with is granted both.
+# 5. The gateway: a server in the office that routes to the LAN. It is
+#    registered here and enrols itself with the auth code, which writes its
+#    key and endpoint; those read back without a diff.
+resource "authwise_guard_node" "gateway" {
+  tenant_id    = authwise_guard_tenant.this.guard_tenant_id
+  network_id   = authwise_guard_network.office.guard_network_id
+  display_name = "office-gateway"
+}
+
+resource "authwise_guard_resource_nodes" "office_lan" {
+  guard_resource = authwise_guard_resource.office_lan.name
+  nodes          = [authwise_guard_node.gateway.name]
+}
+
+# 6. An invite for one person: the node they join with is granted both.
 resource "authwise_guard_invite" "dana" {
   tenant_id    = authwise_guard_tenant.this.guard_tenant_id
   network_id   = authwise_guard_network.office.guard_network_id
@@ -61,5 +76,11 @@ resource "authwise_guard_invite" "dana" {
 output "invite_url" {
   description = "The join link carrying the invite's code. Shown once by guard-control; kept in state."
   value       = authwise_guard_invite.dana.url
+  sensitive   = true
+}
+
+output "gateway_auth_code" {
+  description = "Enrols the gateway: run the agent on it with this code. Shown once by guard-control; kept in state."
+  value       = authwise_guard_node.gateway.auth_code
   sensitive   = true
 }

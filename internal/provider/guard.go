@@ -7,9 +7,11 @@ import (
 	guardpb "git.authwise.com/authwise/apis/authwise/guardcontrol/v1alpha1"
 	"git.authwise.com/authwise/terraform-provider-authwise/internal/generated"
 	tfruntime "github.com/activatedio/tfinfra/pkg/tf"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -264,51 +266,50 @@ func (r *guardTenantResource) ImportState(ctx context.Context, req resource.Impo
 	}
 }
 
-// guardInviteTypeName is the Terraform type the invite wrapper substitutes
-// for.
-const guardInviteTypeName = "authwise_guard_invite"
-
-// inviteOnce are the invite attributes guard-control returns only in the
-// create response.
-var inviteOnce = []string{"code", "url"}
-
-// guardInviteResource is the generated invite with its code and url kept
-// across reads: no read returns them, so a refresh would otherwise null
-// them. An imported invite has neither.
-type guardInviteResource struct {
-	inner resource.Resource
-}
+// The Guard types whose create response alone carries a value: an invite's
+// code and join link, and a node's auth code.
+const (
+	guardInviteTypeName = "authwise_guard_invite"
+	guardNodeTypeName   = "authwise_guard_node"
+)
 
 func newGuardInviteResource() resource.Resource {
-	return &guardInviteResource{inner: generated.NewInviteResource()}
+	return &keepOnceResource{inner: generated.NewInviteResource(), attrs: []string{"code", "url"}}
 }
 
-func (r *guardInviteResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
+func newGuardNodeResource() resource.Resource {
+	return &keepOnceResource{inner: generated.NewNodeResource(), attrs: []string{"auth_code"}}
+}
+
+// keepOnceResource carries attrs across reads: guard-control returns them
+// in the create response and never again, so a refresh would otherwise
+// null them. An imported resource has none of them.
+type keepOnceResource struct {
+	inner resource.Resource
+	attrs []string
+}
+
+func (r *keepOnceResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	r.inner.Metadata(ctx, req, resp)
 }
 
-func (r *guardInviteResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
+func (r *keepOnceResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	r.inner.Schema(ctx, req, resp)
 }
 
-func (r *guardInviteResource) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
+func (r *keepOnceResource) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
 	if inner, ok := r.inner.(resource.ResourceWithConfigure); ok {
 		inner.Configure(ctx, req, resp)
 	}
 }
 
-func (r *guardInviteResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+func (r *keepOnceResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	r.inner.Create(ctx, req, resp)
 }
 
-func (r *guardInviteResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+func (r *keepOnceResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 
-	prior := map[string]types.String{}
-	for _, attr := range inviteOnce {
-		var v types.String
-		resp.Diagnostics.Append(req.State.GetAttribute(ctx, path.Root(attr), &v)...)
-		prior[attr] = v
-	}
+	prior := r.kept(ctx, req.State, &resp.Diagnostics)
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -318,20 +319,46 @@ func (r *guardInviteResource) Read(ctx context.Context, req resource.ReadRequest
 		return
 	}
 
+	r.restore(ctx, prior, &resp.State, &resp.Diagnostics)
+}
+
+// Update keeps them too: the update response does not carry them either.
+func (r *keepOnceResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+
+	prior := r.kept(ctx, req.State, &resp.Diagnostics)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	r.inner.Update(ctx, req, resp)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	r.restore(ctx, prior, &resp.State, &resp.Diagnostics)
+}
+
+func (r *keepOnceResource) kept(ctx context.Context, state tfsdk.State, diags *diag.Diagnostics) map[string]types.String {
+	prior := map[string]types.String{}
+	for _, attr := range r.attrs {
+		var v types.String
+		diags.Append(state.GetAttribute(ctx, path.Root(attr), &v)...)
+		prior[attr] = v
+	}
+	return prior
+}
+
+func (r *keepOnceResource) restore(ctx context.Context, prior map[string]types.String, state *tfsdk.State, diags *diag.Diagnostics) {
 	for attr, v := range prior {
-		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root(attr), v)...)
+		diags.Append(state.SetAttribute(ctx, path.Root(attr), v)...)
 	}
 }
 
-func (r *guardInviteResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	r.inner.Update(ctx, req, resp)
-}
-
-func (r *guardInviteResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+func (r *keepOnceResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	r.inner.Delete(ctx, req, resp)
 }
 
-func (r *guardInviteResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+func (r *keepOnceResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	if inner, ok := r.inner.(resource.ResourceWithImportState); ok {
 		inner.ImportState(ctx, req, resp)
 	}

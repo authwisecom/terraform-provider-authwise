@@ -24,9 +24,19 @@ FEATURES:
   * `authwise_guard_relay`: `url`, `ca_cert_pem`, `region` and `priority`.
   * `authwise_guard_resource`: a `subnet`, `host` or `application` and its
     `address`. `serving_node_ids` is read-only. The serving nodes are an
-    authoritative set in `authwise_guard_resource_nodes`, named by their
-    full names, since nodes join by enrolment rather than through
-    terraform.
+    authoritative set of node names in `authwise_guard_resource_nodes`.
+  * `authwise_guard_node`: a server's node, registered ahead of time.
+    Without a `public_key` it is `PENDING`, and its one-time `auth_code`
+    (sensitive, kept in state like an invite's code) enrols the server.
+    With one it is `ACTIVE` at once. `address` is allocated when left out
+    and changing it replaces the node. Enrolment writes `public_key` and
+    `endpoint`, which read back without a diff. `state`, `roles`,
+    `allowed_ips`, `owner_id` and `auth_code_expires_at` are read-only.
+    `:issueAuthCode` and `:revoke` are not modelled. People's nodes join by
+    invite and are not terraform's.
+  * `authwise_guard_node_grants`: what a node may reach, the resources and
+    nodes of its network, as an authoritative set. A grant an invite gave
+    the node is removed unless listed.
   * `authwise_guard_invite` is create-only: changing anything replaces it.
     `code` and `url` are shown once and kept in state, sensitive. A spent or
     expired invite reads back without a diff. Replace it
@@ -39,8 +49,9 @@ FEATURES:
   resource fails at plan and a Guard data source at read. On Guard
   resources, `network_id` is required: there is no provider default for
   it. A Guard tenant's id attribute is `guard_tenant_id`, and a network's
-  `guard_network_id`. Nodes (stage 2 of #32) are not managed yet.
-* **`examples/guard`** builds a network from the tenant down to an invite.
+  `guard_network_id`.
+* **`examples/guard`** builds a network from the tenant down to a gateway
+  server serving the office subnet, and an invite.
   The acceptance suite applies it in one configuration with
   `examples/guard-catalog`.
 
