@@ -1,7 +1,7 @@
 ---
 page_title: "Authwise Provider"
 description: |-
-  Manage Authwise identity and access configuration: tenants' issuers, realms, providers, clients, the Access catalog, secrets and endpoints.
+  Manage Authwise identity and access configuration: tenants' issuers, realms, providers, clients, the Access catalog, secrets and endpoints; and Guard networks.
 ---
 
 # Authwise Provider
@@ -10,7 +10,20 @@ The Authwise provider manages an Authwise install's identity and access
 configuration over its published gRPC API. That covers issuers and their
 login routing, realms and the providers and factors people sign in with,
 clients and audiences, the Access catalog, and the secrets and endpoints
-these depend on.
+these depend on. It also manages Guard, Authwise's mesh VPN: tenants,
+networks, relays, resources and invites, over guard-control's API.
+
+The resources and data sources are grouped by what they manage:
+
+* **Identity**: tenants' issuers, realms, clients, audiences, scopes, users,
+  secrets, certificates, endpoints and appearance.
+* **Sign-in providers**: `authwise_provider` and the data sources that build
+  each provider type's config.
+* **Factors**: `authwise_factor` and the data sources that build each factor
+  type's config.
+* **Access**: an audience's Access catalog of permissions, roles, conditions
+  and bindings.
+* **Guard**: the `authwise_guard_*` resources.
 
 ## Example Usage
 
@@ -51,12 +64,22 @@ without any of them in the configuration:
 | `client_id` | `AUTHWISE_CLIENT_ID` |
 | `client_secret` | `AUTHWISE_CLIENT_SECRET` |
 | `audience` | `AUTHWISE_AUDIENCE` |
+| `guard_endpoint` | `AUTHWISE_GUARD_ENDPOINT` |
 
 With no client credentials at all, the provider uses the local `awctl auth
 login` credential store instead, which suits interactive use.
 
 The credential's permissions bound what Terraform can do. Setting a secret
 reference, for example, needs `identity.secrets.use`.
+
+## Guard
+
+The Guard resources talk to guard-control rather than kit. Set
+`guard_endpoint` to its gRPC address; the provider sends it the same bearer
+it sends `endpoint`, so the credential needs Guard's permissions too
+(`guardcontrol.*`, which the guard-catalog example creates). Without
+`guard_endpoint`, a Guard resource fails at plan. Guard's tenants are kit's:
+`authwise_guard_tenant` registers one by its kit AWID.
 
 ## Scope defaults
 
@@ -116,6 +139,7 @@ when it returns them.
 - `client_id` (String) OAuth2 client ID for the client_credentials grant. Falls back to `AUTHWISE_CLIENT_ID`.
 - `client_secret` (String, Sensitive) OAuth2 client secret. Falls back to `AUTHWISE_CLIENT_SECRET`.
 - `endpoint` (String) gRPC API endpoint, e.g. `api.example.authwise.io:443`. Falls back to `AUTHWISE_ENDPOINT`.
+- `guard_endpoint` (String) guard-control's gRPC endpoint, e.g. `guard.example.authwise.io:443`, for the `authwise_guard_*` resources and data sources. Falls back to `AUTHWISE_GUARD_ENDPOINT`. It takes the same credentials as `endpoint`. Unset, a Guard resource fails at plan.
 - `insecure` (Boolean) Use plaintext gRPC (development only).
 - `issuer_id` (String) Default issuer identifier; per-resource `issuer_id` attributes override it.
 - `realm_id` (String) Default realm identifier; per-resource `realm_id` attributes override it.

@@ -13,7 +13,7 @@
 # that release (kit#312) and would report other audiences' edges as drift.
 
 locals {
-  # Generated from guard-control's proto. Do not hand-maintain a copy —
+  # Generated from guard-control v0.8.1's proto. Do not hand-maintain a copy —
   # regenerate from the version you deploy, and apply the new version's
   # entries BEFORE rolling it out:
   #
@@ -23,22 +23,28 @@ locals {
   # permission nobody created denies that method for everyone, with a healthy
   # install and nothing in any log explaining it.
   guardcontrol_permissions = [
-    "guardcontrol.clients.associateResources",
-    "guardcontrol.clients.create",
-    "guardcontrol.clients.delete",
-    "guardcontrol.clients.get",
-    "guardcontrol.clients.list",
-    "guardcontrol.clients.update",
+    "guardcontrol.invites.create",
+    "guardcontrol.invites.delete",
+    "guardcontrol.invites.get",
+    "guardcontrol.invites.list",
     "guardcontrol.networks.create",
     "guardcontrol.networks.delete",
+    "guardcontrol.networks.enrol",
     "guardcontrol.networks.get",
     "guardcontrol.networks.list",
     "guardcontrol.networks.update",
+    "guardcontrol.nodes.associateGrants",
     "guardcontrol.nodes.create",
     "guardcontrol.nodes.delete",
     "guardcontrol.nodes.get",
+    "guardcontrol.nodes.issueAuthCode",
     "guardcontrol.nodes.list",
     "guardcontrol.nodes.update",
+    "guardcontrol.relays.create",
+    "guardcontrol.relays.delete",
+    "guardcontrol.relays.get",
+    "guardcontrol.relays.list",
+    "guardcontrol.relays.update",
     "guardcontrol.resources.associateNodes",
     "guardcontrol.resources.create",
     "guardcontrol.resources.delete",

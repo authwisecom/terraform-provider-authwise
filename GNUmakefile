@@ -31,10 +31,12 @@ build:
 generate:
 	cd gen && go run .
 
-# Regenerate docs/ from the provider schema, templates/ and examples/. CI
-# fails when the committed docs differ from what this produces.
+# Regenerate docs/ from the provider schema, templates/ and examples/, then
+# fill each page's Registry subcategory (#31). CI fails when the committed
+# docs differ from what this produces.
 docs:
 	go tool tfplugindocs generate --provider-name authwise --rendered-provider-name Authwise
+	go run ./internal/docsubcategory
 	go tool tfplugindocs validate --provider-name authwise
 
 test:

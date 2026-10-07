@@ -104,6 +104,22 @@ Two things worth knowing:
   The provider resolves the role in the binding's own audience first and
   fails the apply instead.
 
+## Guard
+
+The `authwise_guard_*` resources manage Guard, the mesh VPN, over
+guard-control's API rather than kit's (#32): `authwise_guard_tenant`,
+`authwise_guard_network`, `authwise_guard_relay`, `authwise_guard_resource`
+with `authwise_guard_resource_nodes`, and `authwise_guard_invite`, each with
+its singular and plural data sources. Set `guard_endpoint` (or
+`AUTHWISE_GUARD_ENDPOINT`) to guard-control's gRPC address; the same bearer
+goes to both services, and without it a Guard resource fails at plan.
+
+`examples/guard` is a network from the tenant down to an invite, applied by
+the acceptance suite together with `examples/guard-catalog`. Nodes and
+Guard's users are not terraform's: they join by enrolment. That matters on
+destroy, since guard-control refuses to delete a network that still has
+nodes or to unregister a tenant with networks or users.
+
 ## Associations
 
 Edges are managed as **authoritative set resources**
@@ -230,7 +246,9 @@ omitted; per-resource values always override.
 
 ## Tenants are not managed here
 
-The provider works inside an existing tenant and never creates one. There
+The provider works inside an existing tenant and never creates one.
+(`authwise_guard_tenant` does not either: it registers an existing kit
+tenant with Guard.) There
 is no `authwise_tenant` resource. Tenants are provisioned out of band,
 through the operator-facing tenancy admin API, which is not part of the
 published contract. A configuration names its tenant with the provider's

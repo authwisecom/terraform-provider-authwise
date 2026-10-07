@@ -1,6 +1,6 @@
 ---
 page_title: "authwise_issuer Resource - Authwise"
-subcategory: ""
+subcategory: "Identity"
 description: |-
   An OAuth 2.0 / OpenID Connect issuer: the login a set of clients shares, with its domain, token lifetimes and which realm or realms people sign in to (config). Its appearance is whichever of its profiles is the default (authwise_appearance_profile.is_default).
 ---

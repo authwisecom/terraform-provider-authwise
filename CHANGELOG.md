@@ -1,3 +1,57 @@
+## Unreleased
+
+NOTES:
+
+* **apis v0.22.0, guard-control v0.8.1.** Built against apis v0.22.0, which
+  adds Guard's admin API and changes nothing else; kit v1.38.0 is still the
+  kit release this pairs with. The Guard resources need guard-control
+  v0.8.1.
+* **The Registry groups the pages (#31).** Every resource and data source
+  page now carries one of five subcategories: Identity, Sign-in providers,
+  Factors, Access and Guard. `make docs` fills them in after tfplugindocs,
+  from `provider.Subcategory`, and a unit test fails when a registered type
+  has none.
+
+FEATURES:
+
+* **Guard (#32).** The provider manages Guard, the mesh VPN, over
+  guard-control's API:
+  * `authwise_guard_tenant` registers a kit tenant with Guard, by its AWID
+    (`guard_tenant_id`). Destroying it unregisters the tenant, which
+    guard-control refuses while the tenant has networks or users.
+  * `authwise_guard_network`: a mesh in the tenant. Leave `cidr` out for the
+    whole of 100.64.0.0/10. Changing it replaces the network.
+  * `authwise_guard_relay`: `url`, `ca_cert_pem`, `region` and `priority`.
+  * `authwise_guard_resource`: a `subnet`, `host` or `application` and its
+    `address`. `serving_node_ids` is read-only. The serving nodes are an
+    authoritative set in `authwise_guard_resource_nodes`, named by their
+    full names, since nodes join by enrolment rather than through
+    terraform.
+  * `authwise_guard_invite` is create-only: changing anything replaces it.
+    `code` and `url` are shown once and kept in state, sensitive. A spent or
+    expired invite reads back without a diff. Replace it
+    (`-replace=authwise_guard_invite.x`) to issue another. An imported
+    invite has neither.
+
+  Each has a singular and a plural data source. The provider's new
+  `guard_endpoint` (or `AUTHWISE_GUARD_ENDPOINT`) is guard-control's gRPC
+  address. The same bearer goes to it as to `endpoint`. Unset, a Guard
+  resource fails at plan and a Guard data source at read. On Guard
+  resources, `network_id` is required: there is no provider default for
+  it. A Guard tenant's id attribute is `guard_tenant_id`, and a network's
+  `guard_network_id`. Nodes (stage 2 of #32) are not managed yet.
+* **`examples/guard`** builds a network from the tenant down to an invite.
+  The acceptance suite applies it in one configuration with
+  `examples/guard-catalog`.
+
+FIXES:
+
+* **`examples/guard-catalog` carries guard-control v0.8.1's 37
+  permissions.** It had 31 from an older release: the six `clients.*`
+  permissions that no longer exist, and none for relays, invites,
+  `networks.enrol`, `nodes.associateGrants` or `nodes.issueAuthCode`. A
+  role built from it could not manage relays or invites.
+
 ## 0.6.0 (October 7, 2026)
 
 NOTES:

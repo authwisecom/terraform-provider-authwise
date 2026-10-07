@@ -14,6 +14,7 @@ import (
 	"time"
 
 	accesspb "git.authwise.com/authwise/apis/authwise/access/v1alpha1"
+	guardpb "git.authwise.com/authwise/apis/authwise/guardcontrol/v1alpha1"
 	identitypb "git.authwise.com/authwise/apis/authwise/identity/v1alpha1"
 	corepb "git.authwise.com/authwise/apis/authwise/types/core/v1alpha1"
 	"google.golang.org/grpc"
@@ -118,11 +119,19 @@ func newFakeIdentityServer() *fakeIdentityServer {
 }
 
 func (f *fakeIdentityServer) recordAuth(ctx context.Context) {
+	if v := authorizationOf(ctx); v != "" {
+		f.lastAuthorization = v
+	}
+}
+
+// authorizationOf is the authorization header a call carried, or "".
+func authorizationOf(ctx context.Context) string {
 	if md, ok := metadata.FromIncomingContext(ctx); ok {
 		if v := md.Get("authorization"); len(v) > 0 {
-			f.lastAuthorization = v[0]
+			return v[0]
 		}
 	}
+	return ""
 }
 
 func (f *fakeIdentityServer) nextID(prefix string) string {
@@ -838,9 +847,12 @@ func (f *fakeIdentityServer) DeleteCertificate(ctx context.Context, in *identity
 // harness boots the fake gRPC server plus a fake OAuth token endpoint and
 // renders the provider block pointing at them.
 type harness struct {
-	fake        *fakeIdentityServer
-	access      *fakeAccessServer
-	grpcAddr    string
+	fake     *fakeIdentityServer
+	access   *fakeAccessServer
+	grpcAddr string
+	// guard is guard-control, on its own listener as in a deployment.
+	guard       *fakeGuardServer
+	guardAddr   string
 	tokenServer *httptest.Server
 	tokenCalls  int
 }
@@ -849,7 +861,7 @@ func newHarness(t *testing.T) *harness {
 
 	t.Helper()
 
-	h := &harness{fake: newFakeIdentityServer(), access: newFakeAccessServer()}
+	h := &harness{fake: newFakeIdentityServer(), access: newFakeAccessServer(), guard: newFakeGuardServer()}
 
 	lis, err := new(net.ListenConfig).Listen(t.Context(), "tcp", "127.0.0.1:0")
 	if err != nil {
@@ -862,6 +874,16 @@ func newHarness(t *testing.T) *harness {
 	accesspb.RegisterAuthwiseAccessServiceServer(s, h.access)
 	go func() { _ = s.Serve(lis) }()
 	t.Cleanup(s.Stop)
+
+	guardLis, err := new(net.ListenConfig).Listen(t.Context(), "tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	h.guardAddr = guardLis.Addr().String()
+	gs := grpc.NewServer()
+	guardpb.RegisterGuardControlServiceServer(gs, h.guard)
+	go func() { _ = gs.Serve(guardLis) }()
+	t.Cleanup(gs.Stop)
 
 	h.tokenServer = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		h.tokenCalls++
@@ -882,8 +904,9 @@ func newHarness(t *testing.T) *harness {
 func (h *harness) providerConfig() string {
 	return fmt.Sprintf(`
 provider "authwise" {
-  endpoint      = %q
-  insecure      = true
+  endpoint       = %q
+  guard_endpoint = %q
+  insecure       = true
   token_url     = %q
   client_id     = "acc-client"
   client_secret = "acc-secret"
@@ -893,5 +916,5 @@ provider "authwise" {
   issuer_id   = "i-1"
   audience_id = "a-1"
 }
-`, h.grpcAddr, h.tokenServer.URL+"/oauth/token")
+`, h.grpcAddr, h.guardAddr, h.tokenServer.URL+"/oauth/token")
 }

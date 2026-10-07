@@ -32,7 +32,9 @@ type exampleRun struct {
 	applied bool
 }
 
-func newExampleRun(t *testing.T, h *harness, example string) *exampleRun {
+// Each of beside's examples is copied in too, its files prefixed with its
+// directory name: examples meant to be applied as one configuration.
+func newExampleRun(t *testing.T, h *harness, example string, beside ...string) *exampleRun {
 
 	t.Helper()
 
@@ -73,21 +75,27 @@ provider_installation {
 		t.Fatal(err)
 	}
 
-	src := filepath.Join("../../examples", example)
-	entries, err := os.ReadDir(src)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, e := range entries {
-		if e.IsDir() || e.Name() == "provider.tf" || e.Name() == "README.md" {
-			continue
+	for i, dir := range append([]string{example}, beside...) {
+		prefix := ""
+		if i > 0 {
+			prefix = dir + "-"
 		}
-		body, err := os.ReadFile(filepath.Join(src, e.Name()))
+		src := filepath.Join("../../examples", dir)
+		entries, err := os.ReadDir(src)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := os.WriteFile(filepath.Join(work, e.Name()), body, 0o600); err != nil {
-			t.Fatal(err)
+		for _, e := range entries {
+			if e.IsDir() || e.Name() == "provider.tf" || e.Name() == "README.md" {
+				continue
+			}
+			body, err := os.ReadFile(filepath.Join(src, e.Name()))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(work, prefix+e.Name()), body, 0o600); err != nil {
+				t.Fatal(err)
+			}
 		}
 	}
 
@@ -189,7 +197,7 @@ func asExitError(err error, target **exec.ExitError) bool {
 }
 
 // TestAccGuardCatalogExample applies examples/guard-catalog verbatim: the
-// whole guard prerequisite — 31 permissions, the role, the authoritative
+// whole guard prerequisite — 37 permissions (guard-control v0.8.1), the role, the authoritative
 // association, the root-anchored binding, and the console audience and
 // client — then asserts a re-plan is empty.
 func TestAccGuardCatalogExample(t *testing.T) {
@@ -208,16 +216,16 @@ func TestAccGuardCatalogExample(t *testing.T) {
 	permissions, bindings := len(h.access.permissions), len(h.access.bindings)
 	h.access.mu.Unlock()
 
-	if permissions != 31 {
-		t.Errorf("%d access permissions on the server, want 31", permissions)
+	if permissions != 37 {
+		t.Errorf("%d access permissions on the server, want 37", permissions)
 	}
 	if bindings != 1 {
 		t.Errorf("%d access bindings, want 1", bindings)
 	}
 
 	members := h.access.rolePermissions(accessPrefix + "/access-roles/guardcontrol.admin")
-	if len(members) != 31 {
-		t.Errorf("the role carries %d permissions, want 31", len(members))
+	if len(members) != 37 {
+		t.Errorf("the role carries %d permissions, want 37", len(members))
 	}
 
 	b := h.access.onlyBinding()
@@ -255,6 +263,42 @@ func TestAccGuardCatalogExample(t *testing.T) {
 		if !strings.Contains(string(c.GetConfig().GetValue()), "guard-admin.example.com/") {
 			t.Errorf("client config does not carry the redirect URI: %s", c.GetConfig())
 		}
+	}
+}
+
+// TestAccGuardExample applies examples/guard and examples/guard-catalog as
+// one configuration (#32): kit's catalog, role, binding and console client
+// beside a Guard tenant, network, relay, two resources and an invite.
+func TestAccGuardExample(t *testing.T) {
+
+	if os.Getenv("TF_ACC") == "" {
+		t.Skip("acceptance test: set TF_ACC=1 to run")
+	}
+
+	h := newHarness(t)
+	r := newExampleRun(t, h, "guard", "guard-catalog")
+
+	r.apply()
+	r.expectCleanPlan()
+
+	if url := strings.TrimSpace(r.run("output", "-raw", "invite_url")); !strings.HasPrefix(url, "https://join.example.com/i/gi_") {
+		t.Errorf("invite_url = %q", url)
+	}
+
+	h.guard.mu.Lock()
+	defer h.guard.mu.Unlock()
+	if len(h.guard.tenants) != 1 || len(h.guard.networks) != 1 || len(h.guard.relays) != 1 ||
+		len(h.guard.resources) != 2 || len(h.guard.invites) != 1 {
+		t.Errorf("guard-control holds %d tenants, %d networks, %d relays, %d resources, %d invites; want 1, 1, 1, 2, 1",
+			len(h.guard.tenants), len(h.guard.networks), len(h.guard.relays), len(h.guard.resources), len(h.guard.invites))
+	}
+	for _, i := range h.guard.invites {
+		if len(i.GetGrants()) != 2 {
+			t.Errorf("invite grants = %v, want both resources", i.GetGrants())
+		}
+	}
+	if len(h.access.permissions) != 37 {
+		t.Errorf("%d access permissions beside the network, want 37", len(h.access.permissions))
 	}
 }
 

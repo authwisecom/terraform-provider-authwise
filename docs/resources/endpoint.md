@@ -1,6 +1,6 @@
 ---
 page_title: "authwise_endpoint Resource - Authwise"
-subcategory: ""
+subcategory: "Identity"
 description: |-
   A service kit calls out to: its transport and address, how kit verifies it (tls), how kit authenticates to it (auth), and the per-call deadline (timeout).
 ---

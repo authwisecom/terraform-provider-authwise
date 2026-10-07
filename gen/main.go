@@ -24,6 +24,7 @@ import (
 	"reflect"
 
 	accesspb "git.authwise.com/authwise/apis/authwise/access/v1alpha1"
+	guardpb "git.authwise.com/authwise/apis/authwise/guardcontrol/v1alpha1"
 	identitypb "git.authwise.com/authwise/apis/authwise/identity/v1alpha1"
 	corepb "git.authwise.com/authwise/apis/authwise/types/core/v1alpha1"
 	gentf "github.com/activatedio/tfinfra/genlib/tf"
@@ -37,6 +38,9 @@ var (
 	scopeRealm    = tf.NewScope("tenants", "realms")
 	scopeAudience = tf.NewScope("tenants", "issuers", "audiences")
 	scopeClient   = tf.NewScope("tenants", "issuers", "clients")
+
+	// Guard's (guard-control): its tenants are kit's, by the same AWID.
+	scopeGuardNetwork = tf.NewScope("tenants", "networks")
 )
 
 // References: the bare-AWID fields and what they hold, from kit's
@@ -65,12 +69,14 @@ var (
 		"realm_id":    {Target: "realm", Prefix: "r"},
 		"audience_id": refAudience,
 		"client_id":   {Target: "client", Prefix: "c"},
+		"network_id":  {Target: "guard_network", Prefix: "n"},
 	}
 )
 
 var (
 	identityClient = reflect.TypeFor[identitypb.AuthwiseIdentityServiceClient]()
 	accessClient   = reflect.TypeFor[accesspb.AuthwiseAccessServiceClient]()
+	guardClient    = reflect.TypeFor[guardpb.GuardControlServiceClient]()
 )
 
 // resource builds the standard identity resource marker.
@@ -84,11 +90,14 @@ func resource(scope tf.Scope) gentf.Resource {
 
 func crud[E any](scope tf.Scope, opts ...any) gentf.Entry {
 	r := resource(scope)
+	list := gentf.DataSourceList{}
 	impls := []any{}
 	for _, o := range opts {
 		switch v := o.(type) {
 		case func(r *gentf.Resource):
 			v(&r)
+		case gentf.DataSourceList:
+			list = v
 		default:
 			impls = append(impls, o)
 		}
@@ -97,7 +106,7 @@ func crud[E any](scope tf.Scope, opts ...any) gentf.Entry {
 		Type: reflect.TypeFor[E](),
 		// Every resource gets its singular data source (Get by name) and its
 		// plural one (every entity under a parent, through List).
-		Implementations: append([]any{r, gentf.DataSource{}, gentf.DataSourceList{}}, impls...),
+		Implementations: append([]any{r, gentf.DataSource{}, list}, impls...),
 	}
 }
 
@@ -112,6 +121,28 @@ func associate[T any]() gentf.Associate {
 func access(r *gentf.Resource) {
 	r.ClientType = accessClient
 	r.Client = "access"
+}
+
+// guard retargets an entry at guard-control and names it authwise_guard_<typeName>:
+// Guard's entity names (Tenant, Resource, User) would otherwise collide with
+// kit's, and its pages group under Guard by the prefix.
+func guard(typeName string) func(r *gentf.Resource) {
+	return func(r *gentf.Resource) {
+		r.ClientType = guardClient
+		r.Client = "guard"
+		r.TypeName = "guard_" + typeName
+	}
+}
+
+// withOps narrows the operations the API exposes.
+func withOps(ops gentf.Ops) func(r *gentf.Resource) {
+	return func(r *gentf.Resource) { r.Ops = ops }
+}
+
+// guardList is the plural data source of a Guard entry, prefixed like its
+// resource.
+func guardList(typeName string) gentf.DataSourceList {
+	return gentf.DataSourceList{TypeName: "guard_" + typeName}
 }
 
 // callerNamed marks the entities kit keys by a name the caller supplies
@@ -134,6 +165,10 @@ func withRequired(fields ...string) func(r *gentf.Resource) {
 
 func withJSON(fields ...string) func(r *gentf.Resource) {
 	return func(r *gentf.Resource) { r.JSON = fields }
+}
+
+func withSensitive(fields ...string) func(r *gentf.Resource) {
+	return func(r *gentf.Resource) { r.Sensitive = fields }
 }
 
 func withComputed(fields ...string) func(r *gentf.Resource) {
@@ -310,6 +345,46 @@ func main() {
 				withRequired("subject_type", "subject_id", "role_name"),
 				withComputed("created_by"),
 				withReferences(map[string]gentf.Reference{"condition_id": refAccessCondition})),
+
+			// Guard (guard-control, apis v0.22.0, #32). The tenant is kit's
+			// tenant registered with Guard: RegisterTenant / UnregisterTenant
+			// stand in for create and delete, which the wrapper in
+			// internal/provider supplies.
+			crud[guardpb.Tenant](tf.NewScope(),
+				withDescription("A kit tenant registered with Guard. Nothing else in Guard exists until this does; destroying it unregisters the tenant."),
+				guard("tenant"), guardList("tenants"), callerNamed,
+				withOps(gentf.OpGet|gentf.OpList|gentf.OpPatch),
+				withRequired("display_name"), withComputed("status"), withJSON("config")),
+			// cidr cannot change once the network has a node; replacing the
+			// network is the only way to move it.
+			crud[guardpb.Network](scopeTenant,
+				withDescription("A Guard network: a WireGuard mesh in a tenant. `cidr` is its address space inside 100.64.0.0/10, the whole of it when unset; changing it replaces the network."),
+				guard("network"), guardList("networks"),
+				withImmutable("cidr"), withJSON("config")),
+			crud[guardpb.Relay](scopeGuardNetwork,
+				withDescription("A relay a Guard network's nodes connect through when no direct path exists. guard-control serves a network's relays to its nodes, lowest `priority` first."),
+				guard("relay"), guardList("relays"),
+				withRequired("url"), withJSON("config")),
+			// serving_node_ids is applied on create and otherwise only
+			// echoed; authwise_guard_resource_nodes owns the set, so here it
+			// is read-only.
+			crud[guardpb.Resource](scopeGuardNetwork,
+				withDescription("A routed target in a Guard network that is not a node: a subnet, a host or an application. The nodes that serve it are managed by `authwise_guard_resource_nodes`."),
+				guard("resource"), guardList("resources"),
+				withRequired("kind", "address"), withImmutable("kind"),
+				withComputed("serving_node_ids"), withJSON("config"),
+				gentf.Associate{Target: reflect.TypeFor[guardpb.Node](), Attribute: "nodes", TypeName: "guard_resource_nodes"}),
+			// An invite is create-only: guard-control has no update. Its code
+			// and url are shown once, in the create response; the wrapper in
+			// internal/provider keeps them in state.
+			crud[guardpb.Invite](scopeGuardNetwork,
+				withDescription("An invite that admits people to a Guard network, with the grants every node it creates receives. Its `code` and `url` are shown once, so they are kept in state: treat the state as sensitive. A spent or expired invite stays in state; replace it to issue a new one."),
+				guard("invite"), guardList("invites"),
+				withOps(gentf.OpGet|gentf.OpList|gentf.OpCreate|gentf.OpDelete),
+				withComputed("uses", "created_by", "state", "code", "url"),
+				withSensitive("code", "url"),
+				withImmutable("labels", "display_name", "expires_at", "max_uses", "grants", "config"),
+				withJSON("config")),
 
 			// Config builder data sources for Any-packed configs
 			// (Provider.config, Client.config).

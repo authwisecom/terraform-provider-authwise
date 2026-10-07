@@ -13,6 +13,7 @@ import (
 	supportcreds "git.authwise.com/authwise/api-client-support/credentials"
 	"git.authwise.com/authwise/api-client-support/credentials/bearer"
 	accesspb "git.authwise.com/authwise/apis/authwise/access/v1alpha1"
+	guardpb "git.authwise.com/authwise/apis/authwise/guardcontrol/v1alpha1"
 	identitypb "git.authwise.com/authwise/apis/authwise/identity/v1alpha1"
 	"git.authwise.com/authwise/terraform-provider-authwise/internal/generated"
 	tfruntime "github.com/activatedio/tfinfra/pkg/tf"
@@ -46,12 +47,13 @@ type AuthwiseProvider struct {
 }
 
 type authwiseProviderModel struct {
-	Endpoint     types.String `tfsdk:"endpoint"`
-	TokenURL     types.String `tfsdk:"token_url"`
-	ClientID     types.String `tfsdk:"client_id"`
-	ClientSecret types.String `tfsdk:"client_secret"`
-	Audience     types.String `tfsdk:"audience"`
-	Insecure     types.Bool   `tfsdk:"insecure"`
+	Endpoint      types.String `tfsdk:"endpoint"`
+	GuardEndpoint types.String `tfsdk:"guard_endpoint"`
+	TokenURL      types.String `tfsdk:"token_url"`
+	ClientID      types.String `tfsdk:"client_id"`
+	ClientSecret  types.String `tfsdk:"client_secret"`
+	Audience      types.String `tfsdk:"audience"`
+	Insecure      types.Bool   `tfsdk:"insecure"`
 
 	// Scope identifier defaults; per-resource attributes override them.
 	TenantID   types.String `tfsdk:"tenant_id"`
@@ -84,6 +86,10 @@ func (p *AuthwiseProvider) Schema(_ context.Context, _ provider.SchemaRequest, r
 			"endpoint": schema.StringAttribute{
 				Optional:            true,
 				MarkdownDescription: "gRPC API endpoint, e.g. `api.example.authwise.io:443`. Falls back to `AUTHWISE_ENDPOINT`.",
+			},
+			"guard_endpoint": schema.StringAttribute{
+				Optional:            true,
+				MarkdownDescription: "guard-control's gRPC endpoint, e.g. `guard.example.authwise.io:443`, for the `authwise_guard_*` resources and data sources. Falls back to `AUTHWISE_GUARD_ENDPOINT`. It takes the same credentials as `endpoint`. Unset, a Guard resource fails at plan.",
 			},
 			"token_url": schema.StringAttribute{
 				Optional:            true,
@@ -191,15 +197,25 @@ func (p *AuthwiseProvider) Configure(ctx context.Context, req provider.Configure
 		transport = insecure.NewCredentials()
 	}
 
-	conn, err := grpc.NewClient(endpoint,
-		grpc.WithTransportCredentials(transport),
-		grpc.WithChainUnaryInterceptor(
-			authwise.NewBearerCredentialsInterceptor(bearerService),
-			warningInterceptor,
-		),
-	)
+	dial := func(target string) (*grpc.ClientConn, error) {
+		return grpc.NewClient(target,
+			grpc.WithTransportCredentials(transport),
+			grpc.WithChainUnaryInterceptor(
+				authwise.NewBearerCredentialsInterceptor(bearerService),
+				warningInterceptor,
+			),
+		)
+	}
+
+	conn, err := dial(endpoint)
 	if err != nil {
 		resp.Diagnostics.AddError("cannot create gRPC client", err.Error())
+		return
+	}
+
+	guardConn, guardConfigured, err := guardConnFor(config, dial)
+	if err != nil {
+		resp.Diagnostics.AddAttributeError(path.Root("guard_endpoint"), "cannot create guard-control gRPC client", err.Error())
 		return
 	}
 
@@ -219,6 +235,9 @@ func (p *AuthwiseProvider) Configure(ctx context.Context, req provider.Configure
 		Clients: map[string]any{
 			"identity": userContactClient{newAppearanceDefaultClient(identitypb.NewAuthwiseIdentityServiceClient(conn))},
 			"access":   accesspb.NewAuthwiseAccessServiceClient(conn),
+
+			guardClientKey:     guardpb.NewGuardControlServiceClient(guardConn),
+			guardConfiguredKey: guardConfigured,
 		},
 		Defaults: defaults,
 	}
@@ -231,12 +250,14 @@ func (p *AuthwiseProvider) Configure(ctx context.Context, req provider.Configure
 // substituting the hand-written wrappers that add behavior the generator does
 // not express, plus the resources whose shapes are beyond it.
 func (p *AuthwiseProvider) Resources(ctx context.Context) []func() resource.Resource {
-	return append(substitute(ctx, generated.Resources(), map[string]func() resource.Resource{
+	return append(guardWrap(ctx, substitute(ctx, generated.Resources(), map[string]func() resource.Resource{
 		accessBindingTypeName:     newAccessBindingResource,
 		realmTypeName:             newRealmResource,
 		factorTypeName:            newFactorResource,
 		appearanceProfileTypeName: newAppearanceProfileResource,
-	}),
+		guardTenantTypeName:       newGuardTenantResource,
+		guardInviteTypeName:       newGuardInviteResource,
+	})),
 		newSecretResource,
 		newRealmAuthenticationPolicyResource,
 		newAssetContentResource,

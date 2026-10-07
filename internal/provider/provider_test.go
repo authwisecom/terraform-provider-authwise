@@ -54,9 +54,16 @@ func TestProviderSurface(t *testing.T) {
 	// 19 generated entity resources (client_secret, minted, came with
 	// kit#617), 2 association resources (scope_access_permissions,
 	// access_role_access_permissions), and the hand-written secret,
-	// realm_authentication_policy and asset_content.
-	assert.Len(t, resourceTypes, 24)
+	// realm_authentication_policy and asset_content. Guard (#32) adds five
+	// entity resources and the guard_resource_nodes association.
+	assert.Len(t, resourceTypes, 30)
 	for _, want := range []string{
+		"authwise_guard_tenant",
+		"authwise_guard_network",
+		"authwise_guard_relay",
+		"authwise_guard_resource",
+		"authwise_guard_resource_nodes",
+		"authwise_guard_invite",
 		"authwise_client_secret",
 		"authwise_access_permission",
 		"authwise_access_role",
@@ -95,8 +102,12 @@ func TestProviderSurface(t *testing.T) {
 	// (provider_dropbox went with apis v0.8.0; provider_magic_link and
 	// provider_passkey came with #21; provider_apple, provider_oidc and
 	// provider_oauth with #20), and the hand-written secret and
-	// realm_authentication_context_schema.
-	assert.Len(t, dataSourceTypes, 59)
+	// realm_authentication_context_schema. Guard (#32) adds a singular and
+	// a plural data source for each of its five entities.
+	assert.Len(t, dataSourceTypes, 69)
+	for _, want := range []string{"authwise_guard_tenant", "authwise_guard_tenants", "authwise_guard_invites"} {
+		assert.True(t, dataSourceTypes[want], "missing data source %s", want)
+	}
 	assert.False(t, dataSourceTypes["authwise_client_secret"], "a minted resource has no singular data source")
 	for _, want := range []string{
 		"authwise_client_secrets",
