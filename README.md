@@ -87,8 +87,9 @@ resource "authwise_access_permission" "tenants_get" {
 ## The access surface
 
 `authwise_access_permission`, `authwise_access_role`,
-`authwise_access_role_access_permissions`, `authwise_access_condition` and
-`authwise_access_binding` manage an audience's authorization catalog.
+`authwise_access_role_access_permissions`, `authwise_access_condition`,
+`authwise_access_resource_type` and `authwise_access_binding` manage an
+audience's authorization catalog.
 `examples/guard-catalog` is a complete worked example — guard-control's
 prerequisite catalog, applied by the acceptance suite on every run.
 
@@ -121,8 +122,12 @@ an invite, applied by the acceptance suite together with
 its one-time `auth_code`; the key and endpoint enrolment writes read back
 without a diff. People's nodes and Guard's users are not terraform's: they
 join by invite. That matters on destroy, since guard-control refuses to
-delete a network that still has nodes or to unregister a tenant with
-networks or users.
+delete a network that still has nodes or a Guard tenant with networks or
+users.
+
+A Guard tenant is Guard's own (`gt-…`), created under a parent Authwise
+tenant with a users link (#35, guard-control v0.12.0). The other Guard
+resources take its id as a required `tenant_id`.
 
 ## Associations
 

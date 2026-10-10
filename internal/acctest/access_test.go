@@ -360,3 +360,68 @@ func TestAccAccessBinding_UpdateOntoExistingGrant(t *testing.T) {
 		},
 	})
 }
+
+// A declared resource type is caller-named, changes in place, imports by
+// name, and is refused under one of kit's own type names.
+func TestAccAccessResourceType_Lifecycle(t *testing.T) {
+
+	h := newHarness(t)
+
+	const addr = "authwise_access_resource_type.network"
+
+	config := func(description string) string {
+		return h.providerConfig() + fmt.Sprintf(`
+resource "authwise_access_resource_type" "tenant" {
+  access_resource_type_id = "guardcontrol.tenant"
+  parent_type             = "tenant"
+  expansion_mode          = "PUSH"
+}
+
+resource "authwise_access_resource_type" "network" {
+  access_resource_type_id = "guardcontrol.network"
+  parent_type             = authwise_access_resource_type.tenant.access_resource_type_id
+  expansion_mode          = "PUSH"
+  description             = %q
+}
+`, description)
+	}
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: protoFactories(),
+		Steps: []resource.TestStep{
+			{
+				Config: config("A Guard network"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr(addr, "name", accessPrefix+"/access-resource-types/guardcontrol.network"),
+					resource.TestCheckResourceAttr(addr, "parent_type", "guardcontrol.tenant"),
+					resource.TestCheckResourceAttr(addr, "expansion_mode", "PUSH"),
+				),
+			},
+			{
+				Config: config("A Guard network, administered through its Guard tenant"),
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{
+						plancheck.ExpectResourceAction(addr, plancheck.ResourceActionUpdate),
+					},
+				},
+				Check: resource.TestCheckResourceAttr(addr, "description", "A Guard network, administered through its Guard tenant"),
+			},
+			{
+				ResourceName:                         addr,
+				ImportState:                          true,
+				ImportStateVerify:                    true,
+				ImportStateVerifyIdentifierAttribute: "name",
+				ImportStateVerifyIgnore:              []string{"tenant_id", "issuer_id", "audience_id"},
+				ImportStateIdFunc:                    importByName(addr),
+			},
+			{
+				Config: config("A Guard network, administered through its Guard tenant") + `
+resource "authwise_access_resource_type" "reserved" {
+  access_resource_type_id = "realm"
+}
+`,
+				ExpectError: regexp.MustCompile(`(?s)reserved`),
+			},
+		},
+	})
+}

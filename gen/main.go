@@ -336,6 +336,12 @@ func main() {
 				withDescription("A role in an audience's Access catalog. The id is the role's own name; its permissions are managed by `authwise_access_role_access_permissions`."), access, callerNamed,
 				withCollection("access-roles"),
 				associate[corepb.AccessPermission]()),
+			// A declared resource type (kit#25): a type of the deployer's
+			// own, and where its parent edge comes from. Name-keyed, like a
+			// permission. Every field may change in place.
+			crud[corepb.AccessResourceType](scopeAudience,
+				withDescription("A resource type declared in an audience's Access catalog, such as `guardcontrol.tenant`: its `parent_type` and where the parent edge comes from (`expansion_mode`: `NONE`, `PUSH`, `PULL` or `PATH`). A binding anchored at a parent reaches the resources linked under it. The id is the type's own name."), access, callerNamed,
+				withCollection("access-resource-types")),
 			crud[corepb.AccessCondition](scopeAudience,
 				withDescription("A condition in an audience's Access catalog, which a binding can require."), access,
 				withCollection("access-conditions")),

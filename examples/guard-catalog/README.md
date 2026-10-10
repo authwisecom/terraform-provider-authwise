@@ -1,9 +1,10 @@
 # guard-control's authorization catalog
 
 The terraform path for the prerequisite guard-control needs on an Authwise
-install: the `guardcontrol.*` permission vocabulary, the `guardcontrol.admin`
-role carrying it, a binding to your first admin, and the console's audience
-and OIDC client.
+install: the `guardcontrol.*` permission vocabulary, the declared types
+`guardcontrol.tenant` and `guardcontrol.network`, the `guardcontrol.admin`
+role carrying the permissions and kit's link permissions, a binding to your
+first admin, and the console's audience and OIDC client.
 
 This is the same set of entries as guard-control's `docs/AUTHORIZATION.md`
 Path A (static overlay, first install only) and Path B (awctl runbook, live
@@ -22,10 +23,18 @@ The `console_client_id` output is what guard-admin is configured with
 
 ## Requirements
 
-**kit >= 1.10.0.** The role's permission set is refreshed through
-`ListAccessPermissionsByAccessRole`, which was not audience-scoped before
-that release (kit#312); against an older install, a refresh answers with
-other audiences' edges and terraform will either invent drift or hide it.
+**kit >= 1.40.0** and **guard-control v0.12.0.** guard-control links each
+Guard tenant under its parent Authwise tenant, and each network under its
+Guard tenant, at central with the caller's own bearer. kit admits those
+link writes at the link's parent from v1.40.0 (ESTATE_TENANCY.md E21), and
+writes declared types to a database install from the same release
+(kit#738). Against an older kit, every Guard tenant create is refused at the
+link. The role's three `access.resourceLinks.*` permissions are kit's own:
+the example reads them from the catalog and fails the plan if they are
+missing.
+
+kit's `authwise-guard` preset (kit#727) seeds these entries itself. Apply
+this example on any other install.
 
 ## Upgrading guard-control
 
@@ -34,7 +43,8 @@ Regenerate it from the version you are deploying and **apply before rolling
 out**:
 
 ```sh
-guard-control authz-permissions
+guard-control authz-permissions          # guard-control's own: 41 at v0.12.0
+guard-control authz-permissions --role   # what the role carries: those and kit's 3
 ```
 
 Creating a permission nothing yet requires is harmless. Deploying a binary

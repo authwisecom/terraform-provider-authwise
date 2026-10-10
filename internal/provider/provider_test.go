@@ -56,8 +56,9 @@ func TestProviderSurface(t *testing.T) {
 	// access_role_access_permissions), and the hand-written secret,
 	// realm_authentication_policy and asset_content. Guard (#32) adds five
 	// entity resources and the guard_resource_nodes association; stage 2
-	// the node and the hand-written guard_node_grants.
-	assert.Len(t, resourceTypes, 32)
+	// the node and the hand-written guard_node_grants. access_resource_type
+	// came with the guard-control v0.12.0 catalog.
+	assert.Len(t, resourceTypes, 33)
 	for _, want := range []string{
 		"authwise_guard_tenant",
 		"authwise_guard_network",
@@ -72,6 +73,7 @@ func TestProviderSurface(t *testing.T) {
 		"authwise_access_role",
 		"authwise_access_role_access_permissions",
 		"authwise_access_condition",
+		"authwise_access_resource_type",
 		"authwise_access_binding",
 		"authwise_certificate",
 		"authwise_factor",
@@ -106,8 +108,9 @@ func TestProviderSurface(t *testing.T) {
 	// provider_passkey came with #21; provider_apple, provider_oidc and
 	// provider_oauth with #20), and the hand-written secret and
 	// realm_authentication_context_schema. Guard (#32) adds a singular and
-	// a plural data source for each of its six entities.
-	assert.Len(t, dataSourceTypes, 71)
+	// a plural data source for each of its six entities, and
+	// access_resource_type a pair of its own.
+	assert.Len(t, dataSourceTypes, 73)
 	for _, want := range []string{"authwise_guard_tenant", "authwise_guard_tenants", "authwise_guard_invites"} {
 		assert.True(t, dataSourceTypes[want], "missing data source %s", want)
 	}

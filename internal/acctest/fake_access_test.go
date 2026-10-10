@@ -3,6 +3,7 @@ package acctest_test
 import (
 	"context"
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -27,6 +28,7 @@ type fakeAccessServer struct {
 
 	mu          sync.Mutex
 	permissions map[string]*corepb.AccessPermission
+	types       map[string]*corepb.AccessResourceType
 	roles       map[string]*corepb.AccessRole
 	rolePerms   map[string]map[string]bool
 	bindings    map[string]*corepb.AccessBinding
@@ -36,6 +38,7 @@ type fakeAccessServer struct {
 func newFakeAccessServer() *fakeAccessServer {
 	return &fakeAccessServer{
 		permissions: map[string]*corepb.AccessPermission{},
+		types:       map[string]*corepb.AccessResourceType{},
 		roles:       map[string]*corepb.AccessRole{},
 		rolePerms:   map[string]map[string]bool{},
 		bindings:    map[string]*corepb.AccessBinding{},
@@ -130,6 +133,130 @@ func (f *fakeAccessServer) DeleteAccessPermission(_ context.Context, in *accessp
 	}
 	delete(f.permissions, in.GetName())
 	return &emptypb.Empty{}, nil
+}
+
+// --- AccessResourceType (caller-named) ---
+
+// kit's own entity types: a declaration may not take one of their names
+// (kit#559), nor hang off one kit cannot walk.
+var (
+	builtInResourceTypes   = []string{"tenant", "issuer", "realm", "audience"}
+	unwalkableParentTypes  = []string{"issuer", "realm", "audience"}
+	resourceTypeExpansions = []string{"", "NONE", "PUSH", "PULL", "PATH"}
+)
+
+func checkResourceType(id string, t *corepb.AccessResourceType) error {
+	if slices.Contains(builtInResourceTypes, id) {
+		return status.Errorf(codes.PermissionDenied, "resource type %q names a level of kit's own entity tree and is reserved", id)
+	}
+	if slices.Contains(unwalkableParentTypes, t.GetParentType()) {
+		return status.Errorf(codes.InvalidArgument, "resource type %q cannot be parented on %q: kit cannot walk it", id, t.GetParentType())
+	}
+	if !slices.Contains(resourceTypeExpansions, t.GetExpansionMode()) {
+		return status.Errorf(codes.InvalidArgument, "expansion_mode %q is not NONE, PUSH, PULL or PATH", t.GetExpansionMode())
+	}
+	if m := t.GetExpansionMode(); m != "" && m != "NONE" && t.GetParentType() == "" {
+		return status.Errorf(codes.InvalidArgument, "expansion_mode %s needs a parent_type", m)
+	}
+	return nil
+}
+
+func (f *fakeAccessServer) GetAccessResourceType(_ context.Context, in *accesspb.GetAccessResourceTypeRequest) (*corepb.AccessResourceType, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	t, ok := f.types[in.GetName()]
+	if !ok {
+		return nil, status.Errorf(codes.NotFound, "access resource type %q not found", in.GetName())
+	}
+	return proto.Clone(t).(*corepb.AccessResourceType), nil
+}
+
+func (f *fakeAccessServer) CreateAccessResourceType(_ context.Context, in *accesspb.CreateAccessResourceTypeRequest) (*corepb.AccessResourceType, error) {
+
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	id := in.GetAccessResourceType().GetName()
+	name, err := callerName(in.GetParent(), "access-resource-types", id)
+	if err != nil {
+		return nil, err
+	}
+	if err := checkResourceType(id, in.GetAccessResourceType()); err != nil {
+		return nil, err
+	}
+	if _, exists := f.types[name]; exists {
+		return nil, status.Errorf(codes.AlreadyExists, "access resource type %q already exists", name)
+	}
+
+	t := proto.Clone(in.GetAccessResourceType()).(*corepb.AccessResourceType)
+	t.Name = name
+	f.types[name] = t
+
+	return proto.Clone(t).(*corepb.AccessResourceType), nil
+}
+
+func (f *fakeAccessServer) ListAccessResourceTypes(_ context.Context, in *accesspb.ListAccessResourceTypesRequest) (*accesspb.ListAccessResourceTypesResponse, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	page, next := pageUnder(f.types, in.GetParent()+"/access-resource-types/", in.GetPageToken())
+	return &accesspb.ListAccessResourceTypesResponse{AccessResourceTypes: page, NextPageToken: next}, nil
+}
+
+func (f *fakeAccessServer) PatchAccessResourceType(_ context.Context, in *accesspb.PatchAccessResourceTypeRequest) (*corepb.AccessResourceType, error) {
+
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	existing, ok := f.types[in.GetName()]
+	if !ok {
+		return nil, status.Errorf(codes.NotFound, "access resource type %q not found", in.GetName())
+	}
+
+	next := proto.Clone(existing).(*corepb.AccessResourceType)
+	src := in.GetAccessResourceType()
+	for _, path := range in.GetUpdateMask().GetPaths() {
+		switch path {
+		case "description":
+			next.Description = src.GetDescription()
+		case "parent_type":
+			next.ParentType = src.GetParentType()
+		case "expansion_mode":
+			next.ExpansionMode = src.GetExpansionMode()
+		case "endpoint_name":
+			next.EndpointName = src.GetEndpointName()
+		case "materialize_lookup_resources":
+			next.MaterializeLookupResources = src.GetMaterializeLookupResources()
+		default:
+			return nil, status.Errorf(codes.InvalidArgument, "unsupported update_mask path %q", path)
+		}
+	}
+	if err := checkResourceType(in.GetName()[strings.LastIndex(in.GetName(), "/")+1:], next); err != nil {
+		return nil, err
+	}
+	f.types[in.GetName()] = next
+
+	return proto.Clone(next).(*corepb.AccessResourceType), nil
+}
+
+func (f *fakeAccessServer) DeleteAccessResourceType(_ context.Context, in *accesspb.DeleteAccessResourceTypeRequest) (*emptypb.Empty, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if _, ok := f.types[in.GetName()]; !ok {
+		return nil, status.Errorf(codes.NotFound, "access resource type %q not found", in.GetName())
+	}
+	delete(f.types, in.GetName())
+	return &emptypb.Empty{}, nil
+}
+
+// seedPermissions adds permissions under the audience as kit's own seed
+// declares them: they exist before terraform runs, and it only reads them.
+func (f *fakeAccessServer) seedPermissions(audience, service string, ids ...string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for _, id := range ids {
+		name := audience + "/access-permissions/" + id
+		f.permissions[name] = &corepb.AccessPermission{Name: name, Service: service}
+	}
 }
 
 // --- AccessRole (caller-named) ---
