@@ -1,4 +1,11 @@
-## Unreleased
+## 0.8.0 (October 9, 2026)
+
+NOTES:
+
+* **apis v0.24.0, guard-control v0.12.0.** Built against apis v0.24.0. kit's
+  surfaces the provider uses are unchanged, so kit v1.38.0 is still the kit
+  release this pairs with. The Guard resources need guard-control v0.12.0,
+  and do not work against earlier versions.
 
 BREAKING CHANGES:
 
