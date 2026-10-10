@@ -1,15 +1,10 @@
-## Unreleased
-
-FEATURES:
-
-* **`authwise_access_resource_type`**, with its singular and plural data
-  sources: a resource type declared in an audience's Access catalog, with
-  its `parent_type` and `expansion_mode` (`NONE`, `PUSH`, `PULL` or
-  `PATH`). It is keyed by its name, like a permission, and every other field
-  changes in place.
+## 0.9.0 (October 9, 2026)
 
 NOTES:
 
+* **apis v0.24.0, guard-control v0.12.0, kit v1.38.0.** No dependency
+  changes since 0.8.0. The provider still pairs with kit v1.38.0; the
+  guard-catalog example below needs kit v1.40.0.
 * **`examples/guard-catalog` is guard-control v0.12.0's.** Its 41
   permissions are regenerated from that version's `authz-permissions`:
   `tenants.register` and `tenants.unregister` are gone, `tenants.create`,
@@ -20,6 +15,14 @@ NOTES:
   `access.resourceLinks.create`, `.delete` and `.list`, which are read from
   the catalog rather than created. The example needs kit v1.40.0 (E21,
   kit#738).
+
+FEATURES:
+
+* **`authwise_access_resource_type`**, with its singular and plural data
+  sources: a resource type declared in an audience's Access catalog, with
+  its `parent_type` and `expansion_mode` (`NONE`, `PUSH`, `PULL` or
+  `PATH`). It is keyed by its name, like a permission, and every other field
+  changes in place.
 
 ## 0.8.0 (October 9, 2026)
 
