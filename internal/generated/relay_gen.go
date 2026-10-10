@@ -24,6 +24,8 @@ import (
 	protojson "google.golang.org/protobuf/encoding/protojson"
 	fieldmaskpb "google.golang.org/protobuf/types/known/fieldmaskpb"
 	structpb "google.golang.org/protobuf/types/known/structpb"
+	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
+	"time"
 )
 
 // RelayResourceSchema returns the Terraform schema for the Relay resource.
@@ -57,6 +59,11 @@ func RelayResourceSchema() schema.Schema {
 				ElementType:   types.StringType,
 				Optional:      true,
 				PlanModifiers: []planmodifier.Map{mapplanmodifier.UseStateForUnknown()},
+			},
+			"last_seen_at": schema.StringAttribute{
+				Computed:            true,
+				MarkdownDescription: "`last_seen_at` as an RFC 3339 timestamp.",
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"name": schema.StringAttribute{
 				Computed:            true,
@@ -104,6 +111,7 @@ type RelayModel struct {
 	Region       types.String         `tfsdk:"region"`
 	Priority     types.Int64          `tfsdk:"priority"`
 	Config       jsontypes.Normalized `tfsdk:"config"`
+	LastSeenAt   types.String         `tfsdk:"last_seen_at"`
 }
 
 // NewRelayModel returns a model with every attribute set to its typed null; collection types cannot be zero-valued.
@@ -114,6 +122,7 @@ func NewRelayModel() *RelayModel {
 		DisplayName:  types.StringNull(),
 		GuardRelayId: types.StringNull(),
 		Labels:       types.MapNull(types.StringType),
+		LastSeenAt:   types.StringNull(),
 		Name:         types.StringNull(),
 		NetworkId:    types.StringNull(),
 		Priority:     types.Int64Null(),
@@ -142,6 +151,14 @@ func (m *RelayModel) ToProto(ctx context.Context) (*v1alpha1.Relay, diag.Diagnos
 			diags.AddAttributeError(path.Root("config"), "invalid JSON object", err.Error())
 		} else {
 			out.Config = v
+		}
+	}
+	if !m.LastSeenAt.IsNull() && !m.LastSeenAt.IsUnknown() {
+		t, err := time.Parse(time.RFC3339, m.LastSeenAt.ValueString())
+		if err != nil {
+			diags.AddAttributeError(path.Root("last_seen_at"), "invalid RFC 3339 timestamp", err.Error())
+		} else {
+			out.LastSeenAt = timestamppb.New(t)
 		}
 	}
 	return out, diags
@@ -184,6 +201,11 @@ func (m *RelayModel) FromProto(ctx context.Context, e *v1alpha1.Relay) diag.Diag
 		} else {
 			m.Config = jsontypes.NewNormalizedValue(string(b))
 		}
+	}
+	if e.LastSeenAt == nil {
+		m.LastSeenAt = types.StringNull()
+	} else {
+		m.LastSeenAt = types.StringValue(e.LastSeenAt.AsTime().Format(time.RFC3339))
 	}
 	return diags
 }
@@ -368,6 +390,7 @@ func RelayDataSourceSchema() schema1.Schema {
 				Computed:    true,
 				ElementType: types.StringType,
 			},
+			"last_seen_at": schema1.StringAttribute{Computed: true},
 			"name": schema1.StringAttribute{
 				MarkdownDescription: "Full resource name of the object to read.",
 				Required:            true,
@@ -421,6 +444,7 @@ type RelayItemModel struct {
 	Region       types.String         `tfsdk:"region"`
 	Priority     types.Int64          `tfsdk:"priority"`
 	Config       jsontypes.Normalized `tfsdk:"config"`
+	LastSeenAt   types.String         `tfsdk:"last_seen_at"`
 }
 
 // RelayItemAttrTypes returns the attribute types of one guard_relays list element.
@@ -431,6 +455,7 @@ func RelayItemAttrTypes() map[string]attr.Type {
 		"display_name":   types.StringType,
 		"guard_relay_id": types.StringType,
 		"labels":         types.MapType{ElemType: types.StringType},
+		"last_seen_at":   types.StringType,
 		"name":           types.StringType,
 		"priority":       types.Int64Type,
 		"region":         types.StringType,
@@ -467,6 +492,7 @@ func RelayListDataSourceSchema() schema1.Schema {
 						Computed:    true,
 						ElementType: types.StringType,
 					},
+					"last_seen_at": schema1.StringAttribute{Computed: true},
 					"name": schema1.StringAttribute{
 						Computed:            true,
 						MarkdownDescription: "Full resource name.",
@@ -529,6 +555,11 @@ func relayItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Relay, *Rel
 		} else {
 			item.Config = jsontypes.NewNormalizedValue(string(b))
 		}
+	}
+	if e.LastSeenAt == nil {
+		item.LastSeenAt = types.StringNull()
+	} else {
+		item.LastSeenAt = types.StringValue(e.LastSeenAt.AsTime().Format(time.RFC3339))
 	}
 	id, err := crud.IDFromName(e.Name)
 	if err != nil {

@@ -32,13 +32,13 @@ resource "authwise_guard_resource" "office_lan" {
 - `address` (String)
 - `kind` (String)
 - `network_id` (String) The network's id, `authwise_guard_network.<name>.guard_network_id`. Changing it replaces the resource.
+- `tenant_id` (String) The Guard tenant's id, `authwise_guard_tenant.<name>.guard_tenant_id` (`gt-…`); the provider's `tenant_id` is not used. Changing it replaces the resource.
 
 ### Optional
 
 - `config` (String) `config` as a JSON object.
 - `display_name` (String)
 - `labels` (Map of String)
-- `tenant_id` (String) Parent identifier `tenant_id`; overrides the provider default. Changing it replaces the resource.
 
 ### Read-Only
 

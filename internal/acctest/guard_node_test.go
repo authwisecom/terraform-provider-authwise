@@ -23,11 +23,7 @@ const (
 // "db", and, with extra, more.
 func (h *harness) guardNodeConfig(dbName, extra string) string {
 	return h.providerConfig() + fmt.Sprintf(`
-resource "authwise_guard_tenant" "acme" {
-  guard_tenant_id = "t-1"
-  display_name    = "Acme"
-}
-
+`+guardTenantHCL+`
 resource "authwise_guard_network" "office" {
   tenant_id    = authwise_guard_tenant.acme.guard_tenant_id
   display_name = "Office"
@@ -35,6 +31,7 @@ resource "authwise_guard_network" "office" {
 }
 
 resource "authwise_guard_resource" "wiki" {
+  tenant_id    = authwise_guard_tenant.acme.guard_tenant_id
   network_id   = authwise_guard_network.office.guard_network_id
   display_name = "wiki"
   kind         = "host"
@@ -42,6 +39,7 @@ resource "authwise_guard_resource" "wiki" {
 }
 
 resource "authwise_guard_node" "db" {
+  tenant_id    = authwise_guard_tenant.acme.guard_tenant_id
   network_id   = authwise_guard_network.office.guard_network_id
   display_name = %q
 }
@@ -57,6 +55,7 @@ func TestAccGuardNode_RegisterEnrolGrant(t *testing.T) {
 	web := func(address string) string {
 		return fmt.Sprintf(`
 resource "authwise_guard_node" "web" {
+  tenant_id    = authwise_guard_tenant.acme.guard_tenant_id
   network_id   = authwise_guard_network.office.guard_network_id
   display_name = "web"
   public_key   = "d2ViLXB1YmxpYy1rZXk="
@@ -191,7 +190,7 @@ resource "authwise_guard_node_grants" "web" {
 				ImportState:                          true,
 				ImportStateVerify:                    true,
 				ImportStateVerifyIdentifierAttribute: "name",
-				ImportStateVerifyIgnore:              []string{"auth_code", "network_id"},
+				ImportStateVerifyIgnore:              []string{"auth_code", "tenant_id", "network_id"},
 				ImportStateIdFunc:                    importByName(guardDBAddr),
 			},
 			{

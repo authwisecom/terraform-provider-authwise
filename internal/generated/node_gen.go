@@ -80,6 +80,11 @@ func NodeResourceSchema() schema.Schema {
 				Optional:      true,
 				PlanModifiers: []planmodifier.Map{mapplanmodifier.UseStateForUnknown()},
 			},
+			"last_seen_at": schema.StringAttribute{
+				Computed:            true,
+				MarkdownDescription: "`last_seen_at` as an RFC 3339 timestamp.",
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
 			"name": schema.StringAttribute{
 				Computed:            true,
 				MarkdownDescription: "Full resource name; serves as the Terraform ID.",
@@ -138,6 +143,7 @@ type NodeModel struct {
 	Roles             types.List           `tfsdk:"roles"`
 	AuthCode          types.String         `tfsdk:"auth_code"`
 	AuthCodeExpiresAt types.String         `tfsdk:"auth_code_expires_at"`
+	LastSeenAt        types.String         `tfsdk:"last_seen_at"`
 }
 
 // NewNodeModel returns a model with every attribute set to its typed null; collection types cannot be zero-valued.
@@ -152,6 +158,7 @@ func NewNodeModel() *NodeModel {
 		Endpoint:          types.StringNull(),
 		GuardNodeId:       types.StringNull(),
 		Labels:            types.MapNull(types.StringType),
+		LastSeenAt:        types.StringNull(),
 		Name:              types.StringNull(),
 		NetworkId:         types.StringNull(),
 		OwnerId:           types.StringNull(),
@@ -197,6 +204,14 @@ func (m *NodeModel) ToProto(ctx context.Context) (*v1alpha1.Node, diag.Diagnosti
 			diags.AddAttributeError(path.Root("auth_code_expires_at"), "invalid RFC 3339 timestamp", err.Error())
 		} else {
 			out.AuthCodeExpiresAt = timestamppb.New(t)
+		}
+	}
+	if !m.LastSeenAt.IsNull() && !m.LastSeenAt.IsUnknown() {
+		t, err := time.Parse(time.RFC3339, m.LastSeenAt.ValueString())
+		if err != nil {
+			diags.AddAttributeError(path.Root("last_seen_at"), "invalid RFC 3339 timestamp", err.Error())
+		} else {
+			out.LastSeenAt = timestamppb.New(t)
 		}
 	}
 	return out, diags
@@ -276,6 +291,11 @@ func (m *NodeModel) FromProto(ctx context.Context, e *v1alpha1.Node) diag.Diagno
 		m.AuthCodeExpiresAt = types.StringNull()
 	} else {
 		m.AuthCodeExpiresAt = types.StringValue(e.AuthCodeExpiresAt.AsTime().Format(time.RFC3339))
+	}
+	if e.LastSeenAt == nil {
+		m.LastSeenAt = types.StringNull()
+	} else {
+		m.LastSeenAt = types.StringValue(e.LastSeenAt.AsTime().Format(time.RFC3339))
 	}
 	return diags
 }
@@ -467,6 +487,7 @@ func NodeDataSourceSchema() schema1.Schema {
 				Computed:    true,
 				ElementType: types.StringType,
 			},
+			"last_seen_at": schema1.StringAttribute{Computed: true},
 			"name": schema1.StringAttribute{
 				MarkdownDescription: "Full resource name of the object to read.",
 				Required:            true,
@@ -529,6 +550,7 @@ type NodeItemModel struct {
 	Roles             types.List           `tfsdk:"roles"`
 	AuthCode          types.String         `tfsdk:"auth_code"`
 	AuthCodeExpiresAt types.String         `tfsdk:"auth_code_expires_at"`
+	LastSeenAt        types.String         `tfsdk:"last_seen_at"`
 }
 
 // NodeItemAttrTypes returns the attribute types of one guard_nodes list element.
@@ -543,6 +565,7 @@ func NodeItemAttrTypes() map[string]attr.Type {
 		"endpoint":             types.StringType,
 		"guard_node_id":        types.StringType,
 		"labels":               types.MapType{ElemType: types.StringType},
+		"last_seen_at":         types.StringType,
 		"name":                 types.StringType,
 		"owner_id":             types.StringType,
 		"public_key":           types.StringType,
@@ -590,6 +613,7 @@ func NodeListDataSourceSchema() schema1.Schema {
 						Computed:    true,
 						ElementType: types.StringType,
 					},
+					"last_seen_at": schema1.StringAttribute{Computed: true},
 					"name": schema1.StringAttribute{
 						Computed:            true,
 						MarkdownDescription: "Full resource name.",
@@ -693,6 +717,11 @@ func nodeItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Node, *NodeM
 		item.AuthCodeExpiresAt = types.StringNull()
 	} else {
 		item.AuthCodeExpiresAt = types.StringValue(e.AuthCodeExpiresAt.AsTime().Format(time.RFC3339))
+	}
+	if e.LastSeenAt == nil {
+		item.LastSeenAt = types.StringNull()
+	} else {
+		item.LastSeenAt = types.StringValue(e.LastSeenAt.AsTime().Format(time.RFC3339))
 	}
 	id, err := crud.IDFromName(e.Name)
 	if err != nil {

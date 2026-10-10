@@ -34,6 +34,7 @@ output "gateway_auth_code" {
 ### Required
 
 - `network_id` (String) The network's id, `authwise_guard_network.<name>.guard_network_id`. Changing it replaces the resource.
+- `tenant_id` (String) The Guard tenant's id, `authwise_guard_tenant.<name>.guard_tenant_id` (`gt-…`); the provider's `tenant_id` is not used. Changing it replaces the resource.
 
 ### Optional
 
@@ -43,7 +44,6 @@ output "gateway_auth_code" {
 - `endpoint` (String)
 - `labels` (Map of String)
 - `public_key` (String)
-- `tenant_id` (String) Parent identifier `tenant_id`; overrides the provider default. Changing it replaces the resource.
 
 ### Read-Only
 
@@ -51,6 +51,7 @@ output "gateway_auth_code" {
 - `auth_code` (String, Sensitive)
 - `auth_code_expires_at` (String) `auth_code_expires_at` as an RFC 3339 timestamp.
 - `guard_node_id` (String) Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.
+- `last_seen_at` (String) `last_seen_at` as an RFC 3339 timestamp.
 - `name` (String) Full resource name; serves as the Terraform ID.
 - `owner_id` (String)
 - `roles` (List of String)

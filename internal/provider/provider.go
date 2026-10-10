@@ -236,9 +236,10 @@ func (p *AuthwiseProvider) Configure(ctx context.Context, req provider.Configure
 			"identity": userContactClient{newAppearanceDefaultClient(identitypb.NewAuthwiseIdentityServiceClient(conn))},
 			"access":   accesspb.NewAuthwiseAccessServiceClient(conn),
 
-			guardClientKey:     guardpb.NewGuardControlServiceClient(guardConn),
-			guardNodeClientKey: guardpb.NewGuardNodeServiceClient(guardConn),
-			guardConfiguredKey: guardConfigured,
+			guardClientKey:            guardpb.NewGuardControlServiceClient(guardConn),
+			guardTenantAdminClientKey: guardpb.NewGuardTenantAdminServiceClient(guardConn),
+			guardNodeClientKey:        guardpb.NewGuardNodeServiceClient(guardConn),
+			guardConfiguredKey:        guardConfigured,
 		},
 		Defaults: defaults,
 	}
@@ -295,6 +296,6 @@ func newFactorResource() resource.Resource {
 
 // DataSources implements provider.Provider with the generated constructors
 // plus the hand-written ones.
-func (p *AuthwiseProvider) DataSources(_ context.Context) []func() datasource.DataSource {
-	return append(generated.DataSources(), newSecretDataSource, newRealmAuthenticationContextSchemaDataSource)
+func (p *AuthwiseProvider) DataSources(ctx context.Context) []func() datasource.DataSource {
+	return guardDataSourceWrap(ctx, append(generated.DataSources(), newSecretDataSource, newRealmAuthenticationContextSchemaDataSource))
 }

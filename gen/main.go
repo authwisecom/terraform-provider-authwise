@@ -39,7 +39,7 @@ var (
 	scopeAudience = tf.NewScope("tenants", "issuers", "audiences")
 	scopeClient   = tf.NewScope("tenants", "issuers", "clients")
 
-	// Guard's (guard-control): its tenants are kit's, by the same AWID.
+	// Guard's (guard-control): its tenants are its own (`gt-…`, #35).
 	scopeGuardNetwork = tf.NewScope("tenants", "networks")
 )
 
@@ -346,15 +346,20 @@ func main() {
 				withComputed("created_by"),
 				withReferences(map[string]gentf.Reference{"condition_id": refAccessCondition})),
 
-			// Guard (guard-control, apis v0.22.0, #32). The tenant is kit's
-			// tenant registered with Guard: RegisterTenant / UnregisterTenant
-			// stand in for create and delete, which the wrapper in
-			// internal/provider supplies.
+			// Guard (guard-control, #32). Since apis v0.24.0 (#35) a Guard
+			// tenant is Guard's own (`gt-…`), created under a parent kit
+			// tenant with a users link through GuardTenantAdminService, which
+			// the wrapper in internal/provider supplies for create and
+			// delete. The parent and the link are set at create only: the
+			// admin API shows them and never changes them.
 			crud[guardpb.Tenant](tf.NewScope(),
-				withDescription("A kit tenant registered with Guard. Nothing else in Guard exists until this does; destroying it unregisters the tenant."),
-				guard("tenant"), guardList("tenants"), callerNamed,
+				withDescription("A Guard tenant, under a parent Authwise tenant. Nothing else in Guard exists until this does. `users` is where the tenant's people sign in and are decided; it and `parent_tenant_id` cannot change in place. Destroying it deletes the tenant, which guard-control refuses while it still has networks or users."),
+				guard("tenant"), guardList("tenants"),
 				withOps(gentf.OpGet|gentf.OpList|gentf.OpPatch),
-				withRequired("display_name"), withComputed("status"), withJSON("config")),
+				withRequired("display_name", "parent_tenant_id", "users"),
+				withImmutable("parent_tenant_id", "users"),
+				withComputed("status", "created_by"), withJSON("config"),
+				withReferences(map[string]gentf.Reference{"parent_tenant_id": scopeReferences["tenant_id"]})),
 			// cidr cannot change once the network has a node; replacing the
 			// network is the only way to move it.
 			crud[guardpb.Network](scopeTenant,
@@ -364,7 +369,7 @@ func main() {
 			crud[guardpb.Relay](scopeGuardNetwork,
 				withDescription("A relay a Guard network's nodes connect through when no direct path exists. guard-control serves a network's relays to its nodes, lowest `priority` first."),
 				guard("relay"), guardList("relays"),
-				withRequired("url"), withJSON("config")),
+				withRequired("url"), withComputed("last_seen_at"), withJSON("config")),
 			// serving_node_ids is applied on create and otherwise only
 			// echoed; authwise_guard_resource_nodes owns the set, so here it
 			// is read-only.
@@ -387,7 +392,7 @@ func main() {
 				withDescription("A server's node in a Guard network, registered ahead of time. Created without a `public_key`, it is `PENDING` and its one-time `auth_code` enrols the server; created with one, it is `ACTIVE` at once. The auth code is shown once, so it is kept in state: treat the state as sensitive. People's nodes join by invite and are not managed here."),
 				guard("node"), guardList("nodes"),
 				withImmutable("address"),
-				withComputed("allowed_ips", "owner_id", "state", "roles", "auth_code", "auth_code_expires_at"),
+				withComputed("allowed_ips", "owner_id", "state", "roles", "auth_code", "auth_code_expires_at", "last_seen_at"),
 				withSensitive("auth_code"),
 				withJSON("config")),
 			// An invite is create-only: guard-control has no update. Its code

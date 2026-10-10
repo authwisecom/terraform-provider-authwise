@@ -30,6 +30,7 @@ resource "authwise_guard_relay" "us_west" {
 ### Required
 
 - `network_id` (String) The network's id, `authwise_guard_network.<name>.guard_network_id`. Changing it replaces the resource.
+- `tenant_id` (String) The Guard tenant's id, `authwise_guard_tenant.<name>.guard_tenant_id` (`gt-…`); the provider's `tenant_id` is not used. Changing it replaces the resource.
 - `url` (String)
 
 ### Optional
@@ -40,11 +41,11 @@ resource "authwise_guard_relay" "us_west" {
 - `labels` (Map of String)
 - `priority` (Number)
 - `region` (String)
-- `tenant_id` (String) Parent identifier `tenant_id`; overrides the provider default. Changing it replaces the resource.
 
 ### Read-Only
 
 - `guard_relay_id` (String) Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.
+- `last_seen_at` (String) `last_seen_at` as an RFC 3339 timestamp.
 - `name` (String) Full resource name; serves as the Terraform ID.
 
 ## Import

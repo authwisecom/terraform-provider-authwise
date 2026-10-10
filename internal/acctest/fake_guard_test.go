@@ -19,15 +19,17 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-// fakeGuardServer is guard-control v0.8.1's admin API (apis v0.22.0) as the
-// Guard resources use it: tenants registered rather than created, networks
+// fakeGuardServer is guard-control v0.12.0's admin API (apis v0.24.0) as the
+// Guard resources use it: Guard tenants created under a kit tenant through
+// GuardTenantAdminService (#35), networks
 // with a cidr in the mesh range, relays, resources and the nodes serving
 // them, and invites whose code is returned once. The rules are
-// guard-control's tenant_registration.go, creator.go and validations.go.
+// guard-control's creator.go and validations.go.
 // People's nodes are seeded by tests, as enrolment would make them; a
 // server's node is created through CreateNode.
 type fakeGuardServer struct {
 	guardpb.UnimplementedGuardControlServiceServer
+	guardpb.UnimplementedGuardTenantAdminServiceServer
 	guardpb.UnimplementedGuardNodeServiceServer
 
 	mu        sync.Mutex
@@ -128,22 +130,33 @@ func (f *fakeGuardServer) hasNodes(network string) bool {
 
 // --- Tenant ---
 
-func (f *fakeGuardServer) RegisterTenant(ctx context.Context, in *guardpb.RegisterTenantRequest) (*guardpb.Tenant, error) {
+// CreateTenant is GuardTenantAdminService's: a Guard tenant of its own
+// (`gt-…`) under a kit tenant, with the users link its people sign in
+// through. The creator is the caller.
+func (f *fakeGuardServer) CreateTenant(ctx context.Context, in *guardpb.CreateTenantRequest) (*guardpb.Tenant, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.record(ctx)
-	if !strings.HasPrefix(in.GetTenantId(), "t-") {
-		return nil, status.Error(codes.InvalidArgument, "tenant_id must be the identity install's tenant AWID (t-...)")
+	if !strings.HasPrefix(in.GetParentTenantId(), "t-") {
+		return nil, status.Error(codes.InvalidArgument, "parent_tenant_id must be an Authwise tenant (t-...)")
 	}
-	if in.GetDisplayName() == "" {
-		return nil, status.Error(codes.InvalidArgument, "display_name is required")
+	if in.GetTenant().GetDisplayName() == "" {
+		return nil, status.Error(codes.InvalidArgument, "tenant.display_name is required")
 	}
-	name := "tenants/" + in.GetTenantId()
-	if t, ok := f.tenants[name]; ok {
-		return proto.Clone(t).(*guardpb.Tenant), nil
+	u := in.GetUsers()
+	if u.GetIssuer() == "" || u.GetAudience() == "" || u.GetAccessEndpoint() == "" {
+		return nil, status.Error(codes.InvalidArgument, "users needs issuer, audience and access_endpoint")
 	}
-	t := &guardpb.Tenant{Name: name, DisplayName: in.GetDisplayName(), Status: "ACTIVE"}
-	f.tenants[name] = t
+	t := &guardpb.Tenant{
+		Name:           "tenants/" + f.nextID("gt"),
+		DisplayName:    in.GetTenant().GetDisplayName(),
+		Labels:         in.GetTenant().GetLabels(),
+		Status:         "ACTIVE",
+		ParentTenantId: in.GetParentTenantId(),
+		Users:          proto.Clone(u).(*guardpb.TenantUsersLink),
+		CreatedBy:      "acc-client",
+	}
+	f.tenants[t.GetName()] = t
 	return proto.Clone(t).(*guardpb.Tenant), nil
 }
 
@@ -177,6 +190,11 @@ func (f *fakeGuardServer) PatchTenant(ctx context.Context, in *guardpb.PatchTena
 	if !ok {
 		return nil, status.Errorf(codes.NotFound, "tenant %q not found", in.GetName())
 	}
+	for _, p := range in.GetUpdateMask().GetPaths() {
+		if p == "parent_tenant_id" || p == "users" || p == "created_by" {
+			return nil, status.Errorf(codes.InvalidArgument, "%s is output-only", p)
+		}
+	}
 	next := proto.Clone(t).(*guardpb.Tenant)
 	if err := applyMask(next, in.GetTenant(), in.GetUpdateMask().GetPaths()); err != nil {
 		return nil, err
@@ -185,12 +203,12 @@ func (f *fakeGuardServer) PatchTenant(ctx context.Context, in *guardpb.PatchTena
 	return proto.Clone(next).(*guardpb.Tenant), nil
 }
 
-func (f *fakeGuardServer) UnregisterTenant(ctx context.Context, in *guardpb.UnregisterTenantRequest) (*emptypb.Empty, error) {
+func (f *fakeGuardServer) DeleteTenant(ctx context.Context, in *guardpb.DeleteTenantRequest) (*emptypb.Empty, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.record(ctx)
 	if _, ok := f.tenants[in.GetName()]; !ok {
-		return nil, status.Errorf(codes.NotFound, "tenant %s is not registered", in.GetName())
+		return nil, status.Errorf(codes.NotFound, "tenant %s not found", in.GetName())
 	}
 	n := 0
 	for name := range f.networks {
@@ -224,7 +242,7 @@ func (f *fakeGuardServer) CreateNetwork(ctx context.Context, in *guardpb.CreateN
 	defer f.mu.Unlock()
 	f.record(ctx)
 	if _, ok := f.tenants[in.GetParent()]; !ok {
-		return nil, status.Errorf(codes.NotFound, "tenant %q is not registered with Guard", in.GetParent())
+		return nil, status.Errorf(codes.NotFound, "tenant %q not found", in.GetParent())
 	}
 	n := proto.Clone(in.GetNetwork()).(*guardpb.Network)
 	if err := checkNetworkCIDR(n.GetCidr()); err != nil {

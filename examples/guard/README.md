@@ -17,8 +17,8 @@ this `main.tf` under another name), which is how the provider's acceptance
 suite applies the two.
 
 ```sh
-# Edit provider.tf (endpoints, scope AWIDs) and the locals at the top of
-# main.tf, then:
+# Edit provider.tf (endpoints, scope AWIDs), the locals at the top of
+# main.tf and the tenant's users link, then:
 terraform init
 terraform apply
 terraform output -raw invite_url          # send it to the person you invited
@@ -33,7 +33,7 @@ terraform output -raw gateway_auth_code   # enrol the gateway with it
 - **People.** Guard's users mirror the people who joined.
 
 Both matter on destroy: guard-control refuses to delete a network that still
-has nodes, and to unregister a tenant that still has networks or users.
+has nodes, and to delete a tenant that still has networks or users.
 
 ## Invites
 

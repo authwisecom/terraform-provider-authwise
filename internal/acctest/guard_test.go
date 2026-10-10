@@ -1,5 +1,5 @@
-// Guard (guard-control, apis v0.22.0, #32): a tenant registered with
-// Guard, a network in it, a relay, a resource and the nodes serving it, and
+// Guard (guard-control, #32): a Guard tenant under a kit tenant (#35), a
+// network in it, a relay, a resource and the nodes serving it, and
 // an invite whose code is shown once. guard-control is its own endpoint,
 // reached with the same bearer as kit.
 package acctest_test
@@ -10,10 +10,25 @@ import (
 	"strings"
 	"testing"
 
+	guardpb "git.authwise.com/authwise/apis/authwise/guardcontrol/v1alpha1"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/plancheck"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
 )
+
+// guardTenantHCL is the Guard tenant every test's network is in: a tenant
+// of Guard's own under the kit tenant t-1.
+const guardTenantHCL = `
+resource "authwise_guard_tenant" "acme" {
+  parent_tenant_id = "t-1"
+  display_name     = "Acme"
+  users = {
+    issuer          = "https://id.example.com/t-1"
+    audience        = "a-guard"
+    access_endpoint = "access.example.com:443"
+  }
+}
+`
 
 const (
 	guardTenantAddr   = "authwise_guard_tenant.acme"
@@ -28,17 +43,14 @@ const (
 // and an invite granting it; extra is appended.
 func (h *harness) guardConfig(priority int, extra string) string {
 	return h.providerConfig() + fmt.Sprintf(`
-resource "authwise_guard_tenant" "acme" {
-  guard_tenant_id = "t-1"
-  display_name    = "Acme"
-}
-
+`+guardTenantHCL+`
 resource "authwise_guard_network" "office" {
   tenant_id    = authwise_guard_tenant.acme.guard_tenant_id
   display_name = "Office"
 }
 
 resource "authwise_guard_relay" "west" {
+  tenant_id    = authwise_guard_tenant.acme.guard_tenant_id
   network_id   = authwise_guard_network.office.guard_network_id
   display_name = "us-west"
   url          = "wss://relay.example.com:8443/v1/transport"
@@ -47,6 +59,7 @@ resource "authwise_guard_relay" "west" {
 }
 
 resource "authwise_guard_resource" "wiki" {
+  tenant_id    = authwise_guard_tenant.acme.guard_tenant_id
   network_id   = authwise_guard_network.office.guard_network_id
   display_name = "wiki"
   kind         = "host"
@@ -54,6 +67,7 @@ resource "authwise_guard_resource" "wiki" {
 }
 
 resource "authwise_guard_invite" "dana" {
+  tenant_id    = authwise_guard_tenant.acme.guard_tenant_id
   network_id   = authwise_guard_network.office.guard_network_id
   display_name = "for Dana"
   grants       = [authwise_guard_resource.wiki.name]
@@ -98,9 +112,13 @@ resource "authwise_guard_resource_nodes" "wiki" {
 			{
 				Config: h.guardConfig(10, ""),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr(guardTenantAddr, "name", "tenants/t-1"),
+					resource.TestMatchResourceAttr(guardTenantAddr, "guard_tenant_id", regexp.MustCompile(`^gt-[0-9]+$`)),
+					resource.TestCheckResourceAttrPair(guardTenantAddr, "guard_tenant_id", guardNetworkAddr, "tenant_id"),
+					resource.TestCheckResourceAttr(guardTenantAddr, "parent_tenant_id", "t-1"),
+					resource.TestCheckResourceAttr(guardTenantAddr, "users.audience", "a-guard"),
+					resource.TestCheckResourceAttr(guardTenantAddr, "created_by", "acc-client"),
 					resource.TestCheckResourceAttr(guardTenantAddr, "status", "ACTIVE"),
-					resource.TestMatchResourceAttr(guardNetworkAddr, "name", regexp.MustCompile(`^tenants/t-1/networks/n-[0-9]+$`)),
+					resource.TestMatchResourceAttr(guardNetworkAddr, "name", regexp.MustCompile(`^tenants/gt-[0-9]+/networks/n-[0-9]+$`)),
 					resource.TestMatchResourceAttr(guardNetworkAddr, "guard_network_id", regexp.MustCompile(`^n-[0-9]+$`)),
 					// Unset, the cidr is the whole mesh range.
 					resource.TestCheckResourceAttr(guardNetworkAddr, "cidr", "100.64.0.0/10"),
@@ -141,8 +159,8 @@ resource "authwise_guard_resource_nodes" "wiki" {
 					h.guard.seedNode(network(), "nd-2")
 				},
 				Config: h.guardConfig(20, nodes(
-					"tenants/t-1/networks/${authwise_guard_network.office.guard_network_id}/nodes/nd-1",
-					"tenants/t-1/networks/${authwise_guard_network.office.guard_network_id}/nodes/nd-2")),
+					"${authwise_guard_network.office.name}/nodes/nd-1",
+					"${authwise_guard_network.office.name}/nodes/nd-2")),
 				ConfigPlanChecks: resource.ConfigPlanChecks{
 					PreApply: []plancheck.PlanCheck{
 						plancheck.ExpectResourceAction(guardRelayAddr, plancheck.ResourceActionUpdate),
@@ -159,7 +177,7 @@ resource "authwise_guard_resource_nodes" "wiki" {
 				// One node stops serving it. The resource's own echo of the
 				// set is read-only, so it follows without a diff.
 				Config: h.guardConfig(20, nodes(
-					"tenants/t-1/networks/${authwise_guard_network.office.guard_network_id}/nodes/nd-2")),
+					"${authwise_guard_network.office.name}/nodes/nd-2")),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(guardNodesAddr, "nodes.#", "1"),
 					func(*terraform.State) error {
@@ -184,7 +202,7 @@ resource "authwise_guard_resource_nodes" "wiki" {
 					h.guard.spend(name)
 				},
 				Config: h.guardConfig(20, nodes(
-					"tenants/t-1/networks/${authwise_guard_network.office.guard_network_id}/nodes/nd-2")),
+					"${authwise_guard_network.office.name}/nodes/nd-2")),
 				ConfigPlanChecks: resource.ConfigPlanChecks{
 					PreApply: []plancheck.PlanCheck{plancheck.ExpectEmptyPlan()},
 				},
@@ -214,7 +232,7 @@ resource "authwise_guard_resource_nodes" "wiki" {
 				ImportState:                          true,
 				ImportStateVerify:                    true,
 				ImportStateVerifyIdentifierAttribute: "name",
-				ImportStateVerifyIgnore:              []string{"network_id"},
+				ImportStateVerifyIgnore:              []string{"tenant_id", "network_id"},
 				ImportStateIdFunc:                    importByName(guardRelayAddr),
 			},
 			{
@@ -222,7 +240,7 @@ resource "authwise_guard_resource_nodes" "wiki" {
 				ImportState:                          true,
 				ImportStateVerify:                    true,
 				ImportStateVerifyIdentifierAttribute: "name",
-				ImportStateVerifyIgnore:              []string{"network_id"},
+				ImportStateVerifyIgnore:              []string{"tenant_id", "network_id"},
 				ImportStateIdFunc:                    importByName(guardResourceAddr),
 			},
 			{
@@ -231,7 +249,7 @@ resource "authwise_guard_resource_nodes" "wiki" {
 				ImportState:                          true,
 				ImportStateVerify:                    true,
 				ImportStateVerifyIdentifierAttribute: "name",
-				ImportStateVerifyIgnore:              []string{"code", "url", "network_id"},
+				ImportStateVerifyIgnore:              []string{"code", "url", "tenant_id", "network_id"},
 				ImportStateIdFunc:                    importByName(guardInviteAddr),
 			},
 			{
@@ -265,11 +283,7 @@ func TestAccGuard_NetworkCIDRReplaces(t *testing.T) {
 
 	config := func(cidr string) string {
 		return h.providerConfig() + fmt.Sprintf(`
-resource "authwise_guard_tenant" "acme" {
-  guard_tenant_id = "t-1"
-  display_name    = "Acme"
-}
-
+`+guardTenantHCL+`
 resource "authwise_guard_network" "office" {
   tenant_id    = authwise_guard_tenant.acme.guard_tenant_id
   display_name = "Office"
@@ -308,6 +322,7 @@ func TestAccGuard_Refusals(t *testing.T) {
 		"resource kind ip": {
 			config: `
 resource "authwise_guard_resource" "x" {
+  tenant_id  = authwise_guard_tenant.acme.guard_tenant_id
   network_id = authwise_guard_network.office.guard_network_id
   kind       = "ip"
   address    = "10.0.0.5"
@@ -317,6 +332,7 @@ resource "authwise_guard_resource" "x" {
 		"host inside the mesh": {
 			config: `
 resource "authwise_guard_resource" "x" {
+  tenant_id  = authwise_guard_tenant.acme.guard_tenant_id
   network_id = authwise_guard_network.office.guard_network_id
   kind       = "host"
   address    = "100.64.0.9"
@@ -326,6 +342,7 @@ resource "authwise_guard_resource" "x" {
 		"invite too long-lived": {
 			config: `
 resource "authwise_guard_invite" "x" {
+  tenant_id  = authwise_guard_tenant.acme.guard_tenant_id
   network_id = authwise_guard_network.office.guard_network_id
   expires_at = "2099-01-01T00:00:00Z"
 }`,
@@ -334,6 +351,7 @@ resource "authwise_guard_invite" "x" {
 		"node granted itself": {
 			config: `
 resource "authwise_guard_node" "x" {
+  tenant_id  = authwise_guard_tenant.acme.guard_tenant_id
   network_id = authwise_guard_network.office.guard_network_id
 }
 
@@ -346,18 +364,27 @@ resource "authwise_guard_node_grants" "x" {
 		"node address outside the network": {
 			config: `
 resource "authwise_guard_node" "x" {
+  tenant_id  = authwise_guard_tenant.acme.guard_tenant_id
   network_id = authwise_guard_network.office.guard_network_id
   address    = "10.1.2.3"
 }`,
 			want: regexp.MustCompile(`(?s)not\s+inside\s+the\s+network's\s+cidr`),
 		},
-		"tenant that is not a kit AWID": {
+		"tenant under a parent that is not an Authwise tenant": {
 			config: `
 resource "authwise_guard_tenant" "x" {
-  guard_tenant_id = "acme"
-  display_name    = "Acme"
+  parent_tenant_id = "acme"
+  display_name     = "Acme"
+  users            = authwise_guard_tenant.acme.users
 }`,
-			want: regexp.MustCompile(`(?s)tenant\s+AWID`),
+			want: regexp.MustCompile(`(?s)parent_tenant_id\s+takes\s+the\s+tenant's\s+id`),
+		},
+		"network in a kit tenant": {
+			config: `
+resource "authwise_guard_network" "x" {
+  tenant_id = "t-1"
+}`,
+			want: regexp.MustCompile(`(?s)tenant_id\s+takes\s+the\s+guard\s+tenant's\s+id,\s+which\s+starts\s+with\s+"gt-"`),
 		},
 	}
 
@@ -370,11 +397,7 @@ resource "authwise_guard_tenant" "x" {
 				ProtoV6ProviderFactories: protoFactories(),
 				Steps: []resource.TestStep{{
 					Config: h.providerConfig() + `
-resource "authwise_guard_tenant" "acme" {
-  guard_tenant_id = "t-1"
-  display_name    = "Acme"
-}
-
+` + guardTenantHCL + `
 resource "authwise_guard_network" "office" {
   tenant_id = authwise_guard_tenant.acme.guard_tenant_id
 }
@@ -404,11 +427,7 @@ provider "authwise" {
   tenant_id     = "t-1"
 }
 
-resource "authwise_guard_tenant" "acme" {
-  guard_tenant_id = "t-1"
-  display_name    = "Acme"
-}
-`, h.grpcAddr, h.tokenServer.URL+"/oauth/token"),
+`+guardTenantHCL, h.grpcAddr, h.tokenServer.URL+"/oauth/token"),
 			PlanOnly:    true,
 			ExpectError: regexp.MustCompile(`(?s)guard_endpoint\s+is\s+not\s+configured`),
 		}},
@@ -423,11 +442,7 @@ func TestAccGuard_NetworkRenameKeepsCIDR(t *testing.T) {
 
 	config := func(name string) string {
 		return h.providerConfig() + fmt.Sprintf(`
-resource "authwise_guard_tenant" "acme" {
-  guard_tenant_id = "t-1"
-  display_name    = "Acme"
-}
-
+`+guardTenantHCL+`
 resource "authwise_guard_network" "office" {
   tenant_id    = authwise_guard_tenant.acme.guard_tenant_id
   display_name = %q
@@ -447,6 +462,117 @@ resource "authwise_guard_network" "office" {
 					},
 				},
 				Check: resource.TestCheckResourceAttr(guardNetworkAddr, "cidr", "100.64.0.0/10"),
+			},
+		},
+	})
+}
+
+// A Guard tenant's display name changes in place; its users link is set at
+// create only, so a new one replaces the tenant.
+func TestAccGuard_TenantUsersReplaces(t *testing.T) {
+
+	h := newHarness(t)
+
+	config := func(name, audience string) string {
+		return h.providerConfig() + fmt.Sprintf(`
+resource "authwise_guard_tenant" "acme" {
+  parent_tenant_id = "t-1"
+  display_name     = %q
+  labels           = { env = "test" }
+  config           = jsonencode({ mode = "strict" })
+  users = {
+    issuer          = "https://id.example.com/t-1"
+    audience        = %q
+    access_endpoint = "access.example.com:443"
+  }
+}
+`, name, audience)
+	}
+
+	var id string
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: protoFactories(),
+		Steps: []resource.TestStep{
+			{
+				Config: config("Acme", "a-guard"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr(guardTenantAddr, "labels.env", "test"),
+					resource.TestCheckResourceAttr(guardTenantAddr, "config", `{"mode":"strict"}`),
+					resource.TestCheckResourceAttrWith(guardTenantAddr, "guard_tenant_id", func(v string) error {
+						id = v
+						return nil
+					}),
+				),
+			},
+			{
+				Config: config("Acme Corp", "a-guard"),
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{
+						plancheck.ExpectResourceAction(guardTenantAddr, plancheck.ResourceActionUpdate),
+					},
+				},
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr(guardTenantAddr, "display_name", "Acme Corp"),
+					resource.TestCheckResourceAttrWith(guardTenantAddr, "guard_tenant_id", equalTo(&id)),
+				),
+			},
+			{
+				Config: config("Acme Corp", "a-guard-2"),
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{
+						plancheck.ExpectResourceAction(guardTenantAddr, plancheck.ResourceActionDestroyBeforeCreate),
+					},
+				},
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr(guardTenantAddr, "users.audience", "a-guard-2"),
+					resource.TestCheckResourceAttrWith(guardTenantAddr, "guard_tenant_id", func(v string) error {
+						if v == id {
+							return fmt.Errorf("guard_tenant_id %s was kept; want a new tenant", v)
+						}
+						return nil
+					}),
+				),
+			},
+		},
+	})
+}
+
+// guard-control refuses to delete a tenant that still holds a network, and
+// the refusal names it.
+func TestAccGuard_TenantDeleteRefused(t *testing.T) {
+
+	h := newHarness(t)
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: protoFactories(),
+		Steps: []resource.TestStep{
+			{
+				Config: h.providerConfig() + guardTenantHCL + `
+resource "authwise_guard_network" "office" {
+  tenant_id = authwise_guard_tenant.acme.guard_tenant_id
+}
+`,
+			},
+			{
+				// A network made outside terraform keeps the tenant from
+				// going with the one terraform destroys.
+				PreConfig: func() {
+					h.guard.mu.Lock()
+					defer h.guard.mu.Unlock()
+					name := keys(h.guard.tenants)[0] + "/networks/n-outside"
+					h.guard.networks[name] = &guardpb.Network{Name: name, Cidr: meshRange.String()}
+				},
+				Config:      h.providerConfig(),
+				ExpectError: regexp.MustCompile(`(?s)cannot\s+delete\s+Guard\s+tenant.*not\s+empty:\s+1\s+network`),
+			},
+			{
+				PreConfig: func() {
+					h.guard.mu.Lock()
+					defer h.guard.mu.Unlock()
+					clear(h.guard.networks)
+				},
+				Config: h.providerConfig(),
 			},
 		},
 	})

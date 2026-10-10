@@ -2,14 +2,21 @@
 # invite.
 
 locals {
-  # The kit tenant to register with Guard: Guard's tenants are kit's.
-  tenant_id = "t-01"
+  # The kit tenant the Guard tenant is administered through.
+  parent_tenant_id = "t-01"
 }
 
-# 1. The tenant. Nothing else in Guard exists until it is registered.
+# 1. The Guard tenant, under the kit tenant. guard-control assigns its id
+#    (gt-…); nothing else in Guard exists until it does. users is where the
+#    tenant's people sign in and are decided.
 resource "authwise_guard_tenant" "this" {
-  guard_tenant_id = local.tenant_id
-  display_name    = "Acme"
+  parent_tenant_id = local.parent_tenant_id
+  display_name     = "Acme"
+  users = {
+    issuer          = "https://id.example.authwise.com/t-01/i-01"
+    audience        = "a-02"
+    access_endpoint = "api.example.authwise.com:443"
+  }
 }
 
 # 2. The network: a WireGuard mesh. Its cidr is the address space nodes get

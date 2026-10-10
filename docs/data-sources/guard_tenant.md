@@ -3,12 +3,12 @@
 page_title: "authwise_guard_tenant Data Source - Authwise"
 subcategory: "Guard"
 description: |-
-  A kit tenant registered with Guard. Nothing else in Guard exists until this does; destroying it unregisters the tenant. This data source reads one by its full resource name.
+  A Guard tenant, under a parent Authwise tenant. Nothing else in Guard exists until this does. users is where the tenant's people sign in and are decided; it and parent_tenant_id cannot change in place. Destroying it deletes the tenant, which guard-control refuses while it still has networks or users. This data source reads one by its full resource name.
 ---
 
 # authwise_guard_tenant (Data Source)
 
-A kit tenant registered with Guard. Nothing else in Guard exists until this does; destroying it unregisters the tenant. This data source reads one by its full resource name.
+A Guard tenant, under a parent Authwise tenant. Nothing else in Guard exists until this does. `users` is where the tenant's people sign in and are decided; it and `parent_tenant_id` cannot change in place. Destroying it deletes the tenant, which guard-control refuses while it still has networks or users. This data source reads one by its full resource name.
 
 
 
@@ -22,7 +22,19 @@ A kit tenant registered with Guard. Nothing else in Guard exists until this does
 ### Read-Only
 
 - `config` (String)
+- `created_by` (String)
 - `display_name` (String)
-- `guard_tenant_id` (String) Caller-assigned resource id — the last segment of `name`.
+- `guard_tenant_id` (String) Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.
 - `labels` (Map of String)
+- `parent_tenant_id` (String)
 - `status` (String)
+- `users` (Attributes) (see [below for nested schema](#nestedatt--users))
+
+<a id="nestedatt--users"></a>
+### Nested Schema for `users`
+
+Read-Only:
+
+- `access_endpoint` (String)
+- `audience` (String)
+- `issuer` (String)

@@ -30,6 +30,7 @@ A server's node in a Guard network, registered ahead of time. Created without a 
 - `endpoint` (String)
 - `guard_node_id` (String) Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.
 - `labels` (Map of String)
+- `last_seen_at` (String)
 - `network_id` (String)
 - `owner_id` (String)
 - `public_key` (String)

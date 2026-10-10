@@ -1,3 +1,33 @@
+## Unreleased
+
+BREAKING CHANGES:
+
+* **Guard tenants are Guard's own (#35).** Built against apis v0.24.0, whose
+  guard-control (v0.12.0, guard-control#41) removed `RegisterTenant` and
+  `UnregisterTenant`. A Guard tenant is now an entity of Guard's (`gt-…`)
+  created under a parent kit tenant through `GuardTenantAdminService`.
+  Against guard-control v0.12.0, 0.7.0's `authwise_guard_tenant` fails with
+  Unimplemented.
+  * `authwise_guard_tenant` takes `parent_tenant_id` (the kit tenant) and
+    `users` (`issuer`, `audience`, `access_endpoint`: where the tenant's
+    people sign in and are decided). Both are set at create only, so
+    changing either replaces the tenant. `guard_tenant_id` is now assigned
+    by guard-control and read-only. `created_by` is read back. Destroying it
+    deletes the tenant, and guard-control's refusal while the tenant has
+    networks or users is shown as it is.
+  * The other Guard resources and the Guard list data sources now require
+    `tenant_id`, and it must be a Guard tenant's id
+    (`authwise_guard_tenant.<name>.guard_tenant_id`). They no longer inherit
+    the provider's `tenant_id`, which is a kit tenant's.
+  * A tenant registered under 0.7.0 has no equivalent. Remove it from state
+    and create the Guard tenant again, or import one created elsewhere by
+    its name (`tenants/gt-…`).
+
+FEATURES:
+
+* `authwise_guard_node` and `authwise_guard_relay` read back
+  `last_seen_at`, which is read-only.
+
 ## 0.7.0 (October 7, 2026)
 
 NOTES:

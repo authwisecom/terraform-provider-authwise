@@ -16,9 +16,12 @@ import (
 	resource "github.com/hashicorp/terraform-plugin-framework/resource"
 	schema "github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	mapplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
+	objectplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/objectplanmodifier"
 	planmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	stringplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	validator "github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
+	basetypes "github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	protojson "google.golang.org/protobuf/encoding/protojson"
 	fieldmaskpb "google.golang.org/protobuf/types/known/fieldmaskpb"
 	structpb "google.golang.org/protobuf/types/known/structpb"
@@ -35,11 +38,15 @@ func TenantResourceSchema() schema.Schema {
 				Optional:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
+			"created_by": schema.StringAttribute{
+				Computed:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
 			"display_name": schema.StringAttribute{Required: true},
 			"guard_tenant_id": schema.StringAttribute{
-				MarkdownDescription: "Caller-assigned resource id — the last segment of `name`, which the server composes from the parent and this id. Changing it replaces the resource.",
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
-				Required:            true,
+				Computed:            true,
+				MarkdownDescription: "Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.",
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"labels": schema.MapAttribute{
 				Computed:      true,
@@ -52,34 +59,79 @@ func TenantResourceSchema() schema.Schema {
 				MarkdownDescription: "Full resource name; serves as the Terraform ID.",
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
+			"parent_tenant_id": schema.StringAttribute{
+				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Required:      true,
+				Validators:    []validator.String{tf.ReferenceID("t", "tenant", "")},
+			},
 			"status": schema.StringAttribute{
 				Computed:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
+			"users": schema.SingleNestedAttribute{
+				Attributes: map[string]schema.Attribute{
+					"access_endpoint": schema.StringAttribute{
+						Computed: true,
+						Optional: true,
+					},
+					"audience": schema.StringAttribute{
+						Computed: true,
+						Optional: true,
+					},
+					"issuer": schema.StringAttribute{
+						Computed: true,
+						Optional: true,
+					},
+				},
+				PlanModifiers: []planmodifier.Object{objectplanmodifier.RequiresReplace()},
+				Required:      true,
+			},
 		},
-		MarkdownDescription: "A kit tenant registered with Guard. Nothing else in Guard exists until this does; destroying it unregisters the tenant.",
+		MarkdownDescription: "A Guard tenant, under a parent Authwise tenant. Nothing else in Guard exists until this does. `users` is where the tenant's people sign in and are decided; it and `parent_tenant_id` cannot change in place. Destroying it deletes the tenant, which guard-control refuses while it still has networks or users.",
+	}
+}
+
+// TenantUsersModel is the Terraform model for Tenant's "users" nested attribute.
+type TenantUsersModel struct {
+	Issuer         types.String `tfsdk:"issuer"`
+	Audience       types.String `tfsdk:"audience"`
+	AccessEndpoint types.String `tfsdk:"access_endpoint"`
+}
+
+// TenantUsersAttrTypes returns the attribute types of the "users" nested attribute.
+func TenantUsersAttrTypes() map[string]attr.Type {
+	return map[string]attr.Type{
+		"access_endpoint": types.StringType,
+		"audience":        types.StringType,
+		"issuer":          types.StringType,
 	}
 }
 
 // TenantModel is the Terraform plan/state model for Tenant.
 type TenantModel struct {
-	Name          types.String         `tfsdk:"name"`
-	GuardTenantId types.String         `tfsdk:"guard_tenant_id"`
-	Labels        types.Map            `tfsdk:"labels"`
-	DisplayName   types.String         `tfsdk:"display_name"`
-	Config        jsontypes.Normalized `tfsdk:"config"`
-	Status        types.String         `tfsdk:"status"`
+	Name           types.String         `tfsdk:"name"`
+	GuardTenantId  types.String         `tfsdk:"guard_tenant_id"`
+	Labels         types.Map            `tfsdk:"labels"`
+	DisplayName    types.String         `tfsdk:"display_name"`
+	Config         jsontypes.Normalized `tfsdk:"config"`
+	Status         types.String         `tfsdk:"status"`
+	ParentTenantId types.String         `tfsdk:"parent_tenant_id"`
+	Users          types.Object         `tfsdk:"users"`
+	CreatedBy      types.String         `tfsdk:"created_by"`
 }
 
 // NewTenantModel returns a model with every attribute set to its typed null; collection types cannot be zero-valued.
 func NewTenantModel() *TenantModel {
 	return &TenantModel{
-		Config:        jsontypes.NewNormalizedNull(),
-		DisplayName:   types.StringNull(),
-		GuardTenantId: types.StringNull(),
-		Labels:        types.MapNull(types.StringType),
-		Name:          types.StringNull(),
-		Status:        types.StringNull(),
+		Config:         jsontypes.NewNormalizedNull(),
+		CreatedBy:      types.StringNull(),
+		DisplayName:    types.StringNull(),
+		GuardTenantId:  types.StringNull(),
+		Labels:         types.MapNull(types.StringType),
+		Name:           types.StringNull(),
+		ParentTenantId: types.StringNull(),
+		Status:         types.StringNull(),
+		Users:          types.ObjectNull(TenantUsersAttrTypes()),
 	}
 }
 
@@ -101,6 +153,17 @@ func (m *TenantModel) ToProto(ctx context.Context) (*v1alpha1.Tenant, diag.Diagn
 		}
 	}
 	out.Status = m.Status.ValueString()
+	out.ParentTenantId = m.ParentTenantId.ValueString()
+	if !m.Users.IsNull() && !m.Users.IsUnknown() {
+		var n TenantUsersModel
+		diags.Append(m.Users.As(ctx, &n, basetypes.ObjectAsOptions{})...)
+		v := &v1alpha1.TenantUsersLink{}
+		v.Issuer = n.Issuer.ValueString()
+		v.Audience = n.Audience.ValueString()
+		v.AccessEndpoint = n.AccessEndpoint.ValueString()
+		out.Users = v
+	}
+	out.CreatedBy = m.CreatedBy.ValueString()
 	return out, diags
 }
 
@@ -131,6 +194,38 @@ func (m *TenantModel) FromProto(ctx context.Context, e *v1alpha1.Tenant) diag.Di
 	} else {
 		m.Status = types.StringValue(e.Status)
 	}
+	m.ParentTenantId = types.StringValue(e.ParentTenantId)
+	if e.Users == nil {
+		m.Users = types.ObjectNull(TenantUsersAttrTypes())
+	} else {
+		var n TenantUsersModel
+		if !m.Users.IsNull() && !m.Users.IsUnknown() {
+			diags.Append(m.Users.As(ctx, &n, basetypes.ObjectAsOptions{})...)
+		}
+		if e.Users.Issuer == "" {
+			n.Issuer = types.StringNull()
+		} else {
+			n.Issuer = types.StringValue(e.Users.Issuer)
+		}
+		if e.Users.Audience == "" {
+			n.Audience = types.StringNull()
+		} else {
+			n.Audience = types.StringValue(e.Users.Audience)
+		}
+		if e.Users.AccessEndpoint == "" {
+			n.AccessEndpoint = types.StringNull()
+		} else {
+			n.AccessEndpoint = types.StringValue(e.Users.AccessEndpoint)
+		}
+		obj, d := types.ObjectValueFrom(ctx, TenantUsersAttrTypes(), n)
+		diags.Append(d...)
+		m.Users = obj
+	}
+	if e.CreatedBy == "" {
+		m.CreatedBy = types.StringNull()
+	} else {
+		m.CreatedBy = types.StringValue(e.CreatedBy)
+	}
 	return diags
 }
 
@@ -158,6 +253,12 @@ func (m *TenantModel) UpdateMask(ctx context.Context, prior *TenantModel) []stri
 			paths = append(paths, "config")
 		}
 	}
+	if !m.ParentTenantId.Equal(prior.ParentTenantId) {
+		paths = append(paths, "parent_tenant_id")
+	}
+	if !m.Users.Equal(prior.Users) {
+		paths = append(paths, "users")
+	}
 	return paths
 }
 
@@ -178,7 +279,6 @@ func newTenantCrud(providerData any) (*tf.Crud[*v1alpha1.Tenant, *TenantModel], 
 		return nil, diags
 	}
 	return tf.NewCrud(tf.CrudParams[*v1alpha1.Tenant, *TenantModel]{
-		CallerNamed: true,
 		Client: tf.CrudClient[*v1alpha1.Tenant]{
 			Get: func(ctx context.Context, name string) (*v1alpha1.Tenant, error) {
 				return client.GetTenant(ctx, &v1alpha1.GetTenantRequest{Name: name})
@@ -274,10 +374,11 @@ func TenantDataSourceSchema() schema1.Schema {
 				Computed:   true,
 				CustomType: jsontypes.NormalizedType{},
 			},
+			"created_by":   schema1.StringAttribute{Computed: true},
 			"display_name": schema1.StringAttribute{Computed: true},
 			"guard_tenant_id": schema1.StringAttribute{
 				Computed:            true,
-				MarkdownDescription: "Caller-assigned resource id — the last segment of `name`.",
+				MarkdownDescription: "Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.",
 			},
 			"labels": schema1.MapAttribute{
 				Computed:    true,
@@ -287,9 +388,18 @@ func TenantDataSourceSchema() schema1.Schema {
 				MarkdownDescription: "Full resource name of the object to read.",
 				Required:            true,
 			},
-			"status": schema1.StringAttribute{Computed: true},
+			"parent_tenant_id": schema1.StringAttribute{Computed: true},
+			"status":           schema1.StringAttribute{Computed: true},
+			"users": schema1.SingleNestedAttribute{
+				Attributes: map[string]schema1.Attribute{
+					"access_endpoint": schema1.StringAttribute{Computed: true},
+					"audience":        schema1.StringAttribute{Computed: true},
+					"issuer":          schema1.StringAttribute{Computed: true},
+				},
+				Computed: true,
+			},
 		},
-		MarkdownDescription: "A kit tenant registered with Guard. Nothing else in Guard exists until this does; destroying it unregisters the tenant. This data source reads one by its full resource name.",
+		MarkdownDescription: "A Guard tenant, under a parent Authwise tenant. Nothing else in Guard exists until this does. `users` is where the tenant's people sign in and are decided; it and `parent_tenant_id` cannot change in place. Destroying it deletes the tenant, which guard-control refuses while it still has networks or users. This data source reads one by its full resource name.",
 	}
 }
 
@@ -323,23 +433,29 @@ func (d *tenantDataSource) Read(ctx context.Context, req datasource.ReadRequest,
 
 // TenantItemModel is one element of the guard_tenants data source's "guard_tenants" list.
 type TenantItemModel struct {
-	GuardTenantId types.String         `tfsdk:"guard_tenant_id"`
-	Name          types.String         `tfsdk:"name"`
-	Labels        types.Map            `tfsdk:"labels"`
-	DisplayName   types.String         `tfsdk:"display_name"`
-	Config        jsontypes.Normalized `tfsdk:"config"`
-	Status        types.String         `tfsdk:"status"`
+	GuardTenantId  types.String         `tfsdk:"guard_tenant_id"`
+	Name           types.String         `tfsdk:"name"`
+	Labels         types.Map            `tfsdk:"labels"`
+	DisplayName    types.String         `tfsdk:"display_name"`
+	Config         jsontypes.Normalized `tfsdk:"config"`
+	Status         types.String         `tfsdk:"status"`
+	ParentTenantId types.String         `tfsdk:"parent_tenant_id"`
+	Users          types.Object         `tfsdk:"users"`
+	CreatedBy      types.String         `tfsdk:"created_by"`
 }
 
 // TenantItemAttrTypes returns the attribute types of one guard_tenants list element.
 func TenantItemAttrTypes() map[string]attr.Type {
 	return map[string]attr.Type{
-		"config":          jsontypes.NormalizedType{},
-		"display_name":    types.StringType,
-		"guard_tenant_id": types.StringType,
-		"labels":          types.MapType{ElemType: types.StringType},
-		"name":            types.StringType,
-		"status":          types.StringType,
+		"config":           jsontypes.NormalizedType{},
+		"created_by":       types.StringType,
+		"display_name":     types.StringType,
+		"guard_tenant_id":  types.StringType,
+		"labels":           types.MapType{ElemType: types.StringType},
+		"name":             types.StringType,
+		"parent_tenant_id": types.StringType,
+		"status":           types.StringType,
+		"users":            types.ObjectType{AttrTypes: TenantUsersAttrTypes()},
 	}
 }
 
@@ -359,10 +475,11 @@ func TenantListDataSourceSchema() schema1.Schema {
 					Computed:   true,
 					CustomType: jsontypes.NormalizedType{},
 				},
+				"created_by":   schema1.StringAttribute{Computed: true},
 				"display_name": schema1.StringAttribute{Computed: true},
 				"guard_tenant_id": schema1.StringAttribute{
 					Computed:            true,
-					MarkdownDescription: "Caller-assigned resource id — the last segment of `name`.",
+					MarkdownDescription: "Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.",
 				},
 				"labels": schema1.MapAttribute{
 					Computed:    true,
@@ -372,10 +489,19 @@ func TenantListDataSourceSchema() schema1.Schema {
 					Computed:            true,
 					MarkdownDescription: "Full resource name.",
 				},
-				"status": schema1.StringAttribute{Computed: true},
+				"parent_tenant_id": schema1.StringAttribute{Computed: true},
+				"status":           schema1.StringAttribute{Computed: true},
+				"users": schema1.SingleNestedAttribute{
+					Attributes: map[string]schema1.Attribute{
+						"access_endpoint": schema1.StringAttribute{Computed: true},
+						"audience":        schema1.StringAttribute{Computed: true},
+						"issuer":          schema1.StringAttribute{Computed: true},
+					},
+					Computed: true,
+				},
 			}},
 		}},
-		MarkdownDescription: "A kit tenant registered with Guard. Nothing else in Guard exists until this does; destroying it unregisters the tenant. This data source lists every one under a parent.",
+		MarkdownDescription: "A Guard tenant, under a parent Authwise tenant. Nothing else in Guard exists until this does. `users` is where the tenant's people sign in and are decided; it and `parent_tenant_id` cannot change in place. Destroying it deletes the tenant, which guard-control refuses while it still has networks or users. This data source lists every one under a parent.",
 	}
 }
 
@@ -406,6 +532,38 @@ func tenantItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Tenant, *T
 		item.Status = types.StringNull()
 	} else {
 		item.Status = types.StringValue(e.Status)
+	}
+	item.ParentTenantId = types.StringValue(e.ParentTenantId)
+	if e.Users == nil {
+		item.Users = types.ObjectNull(TenantUsersAttrTypes())
+	} else {
+		var n TenantUsersModel
+		if !item.Users.IsNull() && !item.Users.IsUnknown() {
+			diags.Append(item.Users.As(ctx, &n, basetypes.ObjectAsOptions{})...)
+		}
+		if e.Users.Issuer == "" {
+			n.Issuer = types.StringNull()
+		} else {
+			n.Issuer = types.StringValue(e.Users.Issuer)
+		}
+		if e.Users.Audience == "" {
+			n.Audience = types.StringNull()
+		} else {
+			n.Audience = types.StringValue(e.Users.Audience)
+		}
+		if e.Users.AccessEndpoint == "" {
+			n.AccessEndpoint = types.StringNull()
+		} else {
+			n.AccessEndpoint = types.StringValue(e.Users.AccessEndpoint)
+		}
+		obj, d := types.ObjectValueFrom(ctx, TenantUsersAttrTypes(), n)
+		diags.Append(d...)
+		item.Users = obj
+	}
+	if e.CreatedBy == "" {
+		item.CreatedBy = types.StringNull()
+	} else {
+		item.CreatedBy = types.StringValue(e.CreatedBy)
 	}
 	id, err := crud.IDFromName(e.Name)
 	if err != nil {

@@ -3,22 +3,30 @@
 page_title: "authwise_guard_tenant Resource - Authwise"
 subcategory: "Guard"
 description: |-
-  A kit tenant registered with Guard. Nothing else in Guard exists until this does; destroying it unregisters the tenant.
+  A Guard tenant, under a parent Authwise tenant. Nothing else in Guard exists until this does. users is where the tenant's people sign in and are decided; it and parent_tenant_id cannot change in place. Destroying it deletes the tenant, which guard-control refuses while it still has networks or users.
 ---
 
 # authwise_guard_tenant (Resource)
 
-A kit tenant registered with Guard. Nothing else in Guard exists until this does; destroying it unregisters the tenant.
+A Guard tenant, under a parent Authwise tenant. Nothing else in Guard exists until this does. `users` is where the tenant's people sign in and are decided; it and `parent_tenant_id` cannot change in place. Destroying it deletes the tenant, which guard-control refuses while it still has networks or users.
 
 ## Example Usage
 
 ```terraform
-# Register a kit tenant with Guard. guard_tenant_id is the kit tenant's AWID.
-# Destroying it unregisters the tenant, which guard-control refuses while
-# the tenant still has networks or users.
+# A Guard tenant under a kit tenant. guard-control assigns its id (gt-…),
+# which the rest of Guard's resources take as tenant_id. The users link is
+# where the tenant's people sign in and are decided; it and the parent are
+# set at create only, so changing either replaces the tenant. Destroying it
+# deletes the tenant, which guard-control refuses while it still has
+# networks or users.
 resource "authwise_guard_tenant" "acme" {
-  guard_tenant_id = "t-01"
-  display_name    = "Acme"
+  parent_tenant_id = "t-01"
+  display_name     = "Acme"
+  users = {
+    issuer          = "https://id.example.authwise.com/t-01/i-01"
+    audience        = "a-02"
+    access_endpoint = "api.example.authwise.com:443"
+  }
 }
 ```
 
@@ -28,7 +36,8 @@ resource "authwise_guard_tenant" "acme" {
 ### Required
 
 - `display_name` (String)
-- `guard_tenant_id` (String) Caller-assigned resource id — the last segment of `name`, which the server composes from the parent and this id. Changing it replaces the resource.
+- `parent_tenant_id` (String)
+- `users` (Attributes) The tenant's users link: where its people sign in and are decided. Changing it replaces the tenant. (see [below for nested schema](#nestedatt--users))
 
 ### Optional
 
@@ -37,8 +46,19 @@ resource "authwise_guard_tenant" "acme" {
 
 ### Read-Only
 
+- `created_by` (String)
+- `guard_tenant_id` (String) Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.
 - `name` (String) Full resource name; serves as the Terraform ID.
 - `status` (String)
+
+<a id="nestedatt--users"></a>
+### Nested Schema for `users`
+
+Required:
+
+- `access_endpoint` (String) The Access endpoint of that audience's home, where they are decided.
+- `audience` (String) The `aud` their tokens carry.
+- `issuer` (String) The issuer the tenant's people sign in at.
 
 ## Import
 
@@ -48,5 +68,5 @@ The [`terraform import` command](https://developer.hashicorp.com/terraform/cli/c
 
 ```shell
 # Import by full resource name.
-terraform import authwise_guard_tenant.acme tenants/t-01
+terraform import authwise_guard_tenant.acme tenants/gt-01
 ```
