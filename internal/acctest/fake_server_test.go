@@ -882,7 +882,6 @@ func newHarness(t *testing.T) *harness {
 	h.guardAddr = guardLis.Addr().String()
 	gs := grpc.NewServer()
 	guardpb.RegisterGuardControlServiceServer(gs, h.guard)
-	guardpb.RegisterGuardTenantAdminServiceServer(gs, h.guard)
 	guardpb.RegisterGuardNodeServiceServer(gs, h.guard)
 	go func() { _ = gs.Serve(guardLis) }()
 	t.Cleanup(gs.Stop)

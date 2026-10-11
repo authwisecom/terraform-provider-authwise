@@ -236,10 +236,9 @@ func (p *AuthwiseProvider) Configure(ctx context.Context, req provider.Configure
 			"identity": userContactClient{newAppearanceDefaultClient(identitypb.NewAuthwiseIdentityServiceClient(conn))},
 			"access":   accesspb.NewAuthwiseAccessServiceClient(conn),
 
-			guardClientKey:            guardpb.NewGuardControlServiceClient(guardConn),
-			guardTenantAdminClientKey: guardpb.NewGuardTenantAdminServiceClient(guardConn),
-			guardNodeClientKey:        guardpb.NewGuardNodeServiceClient(guardConn),
-			guardConfiguredKey:        guardConfigured,
+			guardClientKey:     guardpb.NewGuardControlServiceClient(guardConn),
+			guardNodeClientKey: guardpb.NewGuardNodeServiceClient(guardConn),
+			guardConfiguredKey: guardConfigured,
 		},
 		Defaults: defaults,
 	}
@@ -257,9 +256,9 @@ func (p *AuthwiseProvider) Resources(ctx context.Context) []func() resource.Reso
 		realmTypeName:             newRealmResource,
 		factorTypeName:            newFactorResource,
 		appearanceProfileTypeName: newAppearanceProfileResource,
-		guardTenantTypeName:       newGuardTenantResource,
 		guardInviteTypeName:       newGuardInviteResource,
 		guardNodeTypeName:         newGuardNodeResource,
+		guardTenantTypeName:       nil,
 	}),
 		newSecretResource,
 		newRealmAuthenticationPolicyResource,
@@ -269,7 +268,8 @@ func (p *AuthwiseProvider) Resources(ctx context.Context) []func() resource.Reso
 }
 
 // substitute replaces generated constructors with wrappers, matched on the
-// Terraform type name each resource reports rather than on list position.
+// Terraform type name each resource reports rather than on list position. A
+// nil wrapper drops the resource.
 func substitute(ctx context.Context, generated []func() resource.Resource, wrappers map[string]func() resource.Resource) []func() resource.Resource {
 
 	out := make([]func() resource.Resource, 0, len(generated))
@@ -278,6 +278,9 @@ func substitute(ctx context.Context, generated []func() resource.Resource, wrapp
 		resp := &resource.MetadataResponse{}
 		factory().Metadata(ctx, resource.MetadataRequest{ProviderTypeName: providerTypeName}, resp)
 		if w, ok := wrappers[resp.TypeName]; ok {
+			if w == nil {
+				continue
+			}
 			factory = w
 		}
 		out = append(out, factory)

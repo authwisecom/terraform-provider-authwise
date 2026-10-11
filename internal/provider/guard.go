@@ -4,7 +4,6 @@ import (
 	"context"
 	"strings"
 
-	guardpb "git.authwise.com/authwise/apis/authwise/guardcontrol/v1alpha1"
 	"git.authwise.com/authwise/terraform-provider-authwise/internal/generated"
 	tfruntime "github.com/activatedio/tfinfra/pkg/tf"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
@@ -19,7 +18,6 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/types/known/fieldmaskpb"
 )
 
 // Guard (guard-control, #32) is a second service behind the
@@ -31,9 +29,6 @@ const (
 	// guardClientKey is the ProviderData.Clients key of the guard-control
 	// client.
 	guardClientKey = "guard"
-	// guardTenantAdminClientKey is the key of its tenant admin client,
-	// which creates and deletes Guard tenants.
-	guardTenantAdminClientKey = "guard_tenant_admin"
 	// guardConfiguredKey holds whether guard_endpoint was set, so a Guard
 	// resource can refuse at plan rather than at apply.
 	guardConfiguredKey = "guard_configured"
@@ -42,7 +37,7 @@ const (
 
 	networkIDAttribute = "network_id"
 
-	guardTenantIDDescription = "The Guard tenant's id, `authwise_guard_tenant.<name>.guard_tenant_id` (`gt-…`); the provider's `tenant_id` is not used."
+	guardTenantIDDescription = "The Guard tenant's id (`gt-…`), as awtenant reports it or `authwise_guard_tenants` lists it; the provider's `tenant_id` is not used."
 )
 
 // guardTenantReference validates a Guard tenant's id: Guard's tenants are
@@ -223,135 +218,11 @@ func (d *guardDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 	d.inner.Read(ctx, req, resp)
 }
 
-// guardTenantTypeName is the Terraform type the tenant wrapper substitutes
-// for.
+// guardTenantTypeName is the generated Guard tenant resource, which the
+// provider does not register: a Guard tenant is created only through
+// guard-control's mTLS tenancy listener, by awtenant and the portal worker
+// (E22, #36). Its data sources remain.
 const guardTenantTypeName = "authwise_guard_tenant"
-
-// guardTenantResource is the generated tenant with create and delete, which
-// are GuardTenantAdminService's rather than CRUD (apis v0.24.0, #35): a
-// Guard tenant (`gt-…`) is created under its parent kit tenant with its
-// users link, and deleted (refused while it has networks or users). The
-// create takes only the display name and labels; config set at create
-// follows as a patch.
-type guardTenantResource struct {
-	inner  resource.Resource
-	client guardpb.GuardControlServiceClient
-	admin  guardpb.GuardTenantAdminServiceClient
-}
-
-func newGuardTenantResource() resource.Resource {
-	return &guardTenantResource{inner: generated.NewTenantResource()}
-}
-
-func (r *guardTenantResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
-	r.inner.Metadata(ctx, req, resp)
-}
-
-// Schema makes each part of the users link required: guard-control needs
-// all three, and nothing but the create sets them.
-func (r *guardTenantResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
-	r.inner.Schema(ctx, req, resp)
-	users, ok := resp.Schema.Attributes["users"].(schema.SingleNestedAttribute)
-	if !ok {
-		return
-	}
-	for name, description := range map[string]string{
-		"issuer":          "The issuer the tenant's people sign in at.",
-		"audience":        "The `aud` their tokens carry.",
-		"access_endpoint": "The Access endpoint of that audience's home, where they are decided.",
-	} {
-		if a, ok := users.Attributes[name].(schema.StringAttribute); ok {
-			a.Required, a.Optional, a.Computed = true, false, false
-			a.MarkdownDescription = description
-			users.Attributes[name] = a
-		}
-	}
-	users.MarkdownDescription = "The tenant's users link: where its people sign in and are decided. Changing it replaces the tenant."
-	resp.Schema.Attributes["users"] = users
-}
-
-func (r *guardTenantResource) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
-	if inner, ok := r.inner.(resource.ResourceWithConfigure); ok {
-		inner.Configure(ctx, req, resp)
-	}
-	if pd, ok := req.ProviderData.(*tfruntime.ProviderData); ok {
-		r.client, _ = pd.Clients[guardClientKey].(guardpb.GuardControlServiceClient)
-		r.admin, _ = pd.Clients[guardTenantAdminClientKey].(guardpb.GuardTenantAdminServiceClient)
-	}
-}
-
-func (r *guardTenantResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
-
-	plan := generated.NewTenantModel()
-	resp.Diagnostics.Append(req.Plan.Get(ctx, plan)...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-	want, diags := plan.ToProto(ctx)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
-	t, err := r.admin.CreateTenant(ctx, &guardpb.CreateTenantRequest{
-		ParentTenantId: want.GetParentTenantId(),
-		Tenant:         &guardpb.Tenant{DisplayName: want.GetDisplayName(), Labels: want.GetLabels()},
-		Users:          want.GetUsers(),
-	})
-	if err != nil {
-		resp.Diagnostics.AddError("cannot create Guard tenant", err.Error())
-		return
-	}
-
-	if !plan.Config.IsNull() && !plan.Config.IsUnknown() {
-		if t, err = r.client.PatchTenant(ctx, &guardpb.PatchTenantRequest{
-			Name:       t.GetName(),
-			Tenant:     want,
-			UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"config"}},
-		}); err != nil {
-			resp.Diagnostics.AddError("Guard tenant created, but its config was refused", err.Error())
-			return
-		}
-	}
-
-	state := generated.NewTenantModel()
-	resp.Diagnostics.Append(state.FromProto(ctx, t)...)
-	state.GuardTenantId = types.StringValue(strings.TrimPrefix(t.GetName(), "tenants/"))
-	resp.Diagnostics.Append(resp.State.Set(ctx, state)...)
-}
-
-func (r *guardTenantResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
-	r.inner.Read(ctx, req, resp)
-}
-
-func (r *guardTenantResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	r.inner.Update(ctx, req, resp)
-}
-
-// Delete surfaces guard-control's refusal, which names what the tenant
-// still holds.
-func (r *guardTenantResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
-
-	var name types.String
-	resp.Diagnostics.Append(req.State.GetAttribute(ctx, path.Root(tfruntime.NameAttribute), &name)...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
-	_, err := r.admin.DeleteTenant(ctx, &guardpb.DeleteTenantRequest{Name: name.ValueString()})
-	if status.Code(err) == codes.NotFound {
-		return
-	}
-	if err != nil {
-		resp.Diagnostics.AddError("cannot delete Guard tenant", err.Error())
-	}
-}
-
-func (r *guardTenantResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	if inner, ok := r.inner.(resource.ResourceWithImportState); ok {
-		inner.ImportState(ctx, req, resp)
-	}
-}
 
 // The Guard types whose create response alone carries a value: an invite's
 // code and join link, and a node's auth code.

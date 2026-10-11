@@ -25,13 +25,13 @@ func (h *harness) guardNodeConfig(dbName, extra string) string {
 	return h.providerConfig() + fmt.Sprintf(`
 `+guardTenantHCL+`
 resource "authwise_guard_network" "office" {
-  tenant_id    = authwise_guard_tenant.acme.guard_tenant_id
+  tenant_id    = data.authwise_guard_tenant.acme.guard_tenant_id
   display_name = "Office"
   cidr         = "100.96.0.0/16"
 }
 
 resource "authwise_guard_resource" "wiki" {
-  tenant_id    = authwise_guard_tenant.acme.guard_tenant_id
+  tenant_id    = data.authwise_guard_tenant.acme.guard_tenant_id
   network_id   = authwise_guard_network.office.guard_network_id
   display_name = "wiki"
   kind         = "host"
@@ -39,7 +39,7 @@ resource "authwise_guard_resource" "wiki" {
 }
 
 resource "authwise_guard_node" "db" {
-  tenant_id    = authwise_guard_tenant.acme.guard_tenant_id
+  tenant_id    = data.authwise_guard_tenant.acme.guard_tenant_id
   network_id   = authwise_guard_network.office.guard_network_id
   display_name = %q
 }
@@ -55,7 +55,7 @@ func TestAccGuardNode_RegisterEnrolGrant(t *testing.T) {
 	web := func(address string) string {
 		return fmt.Sprintf(`
 resource "authwise_guard_node" "web" {
-  tenant_id    = authwise_guard_tenant.acme.guard_tenant_id
+  tenant_id    = data.authwise_guard_tenant.acme.guard_tenant_id
   network_id   = authwise_guard_network.office.guard_network_id
   display_name = "web"
   public_key   = "d2ViLXB1YmxpYy1rZXk="
@@ -206,7 +206,8 @@ resource "authwise_guard_node_grants" "web" {
 		CheckDestroy: func(*terraform.State) error {
 			h.guard.mu.Lock()
 			defer h.guard.mu.Unlock()
-			if n := len(h.guard.nodes) + len(h.guard.networks) + len(h.guard.tenants); n != 0 {
+			// The tenant is awtenant's and stays.
+			if n := len(h.guard.nodes) + len(h.guard.networks); n != 0 {
 				return fmt.Errorf("%d Guard rows remain after destroy", n)
 			}
 			return nil

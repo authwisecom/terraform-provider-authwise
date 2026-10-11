@@ -79,9 +79,10 @@ The Guard resources talk to guard-control rather than kit. Set
 it sends `endpoint`, so the credential needs Guard's permissions too
 (`guardcontrol.*`, which the guard-catalog example creates). Without
 `guard_endpoint`, a Guard resource fails at plan. A Guard tenant is Guard's
-own (`gt-…`), created under a kit tenant by `authwise_guard_tenant`; the
-other Guard resources and data sources take its id as a required
-`tenant_id`, and do not inherit the provider's.
+own (`gt-…`), created under a kit tenant by awtenant, never by the
+provider; the Guard resources and data sources take its id as a required
+`tenant_id`, and do not inherit the provider's. `authwise_guard_tenants`
+lists the Guard tenants the credential can see.
 
 ## Scope defaults
 

@@ -17,7 +17,7 @@ A server's node in a Guard network, registered ahead of time. Created without a 
 # the agent on the server with the auth code to enrol it. Enrolment writes
 # public_key and endpoint, which read back without a diff.
 resource "authwise_guard_node" "gateway" {
-  tenant_id    = authwise_guard_tenant.acme.guard_tenant_id
+  tenant_id    = "gt-01" # the Guard tenant, from awtenant
   network_id   = authwise_guard_network.office.guard_network_id
   display_name = "office-gateway"
 }
@@ -34,7 +34,7 @@ output "gateway_auth_code" {
 ### Required
 
 - `network_id` (String) The network's id, `authwise_guard_network.<name>.guard_network_id`. Changing it replaces the resource.
-- `tenant_id` (String) The Guard tenant's id, `authwise_guard_tenant.<name>.guard_tenant_id` (`gt-…`); the provider's `tenant_id` is not used. Changing it replaces the resource.
+- `tenant_id` (String) The Guard tenant's id (`gt-…`), as awtenant reports it or `authwise_guard_tenants` lists it; the provider's `tenant_id` is not used. Changing it replaces the resource.
 
 ### Optional
 

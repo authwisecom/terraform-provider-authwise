@@ -1,6 +1,6 @@
 # A Guard network
 
-A Guard tenant, a network in it, a relay, the two things on the far side of
+A network in an existing Guard tenant, a relay, the two things on the far side of
 the network people reach (an office subnet and an internal application), a
 gateway server that routes to the subnet, and an invite that admits one
 person with both granted.
@@ -17,8 +17,8 @@ this `main.tf` under another name), which is how the provider's acceptance
 suite applies the two.
 
 ```sh
-# Edit provider.tf (endpoints, scope AWIDs), the locals at the top of
-# main.tf and the tenant's users link, then:
+# Edit provider.tf (endpoints, scope AWIDs) and the local at the top of
+# main.tf (the Guard tenant's id, from awtenant), then:
 terraform init
 terraform apply
 terraform output -raw invite_url          # send it to the person you invited
@@ -27,13 +27,17 @@ terraform output -raw gateway_auth_code   # enrol the gateway with it
 
 ## What terraform does not own
 
+- **The Guard tenant.** awtenant creates it (`gt-…`) under the Authwise
+  tenant, through guard-control's tenancy listener; no bearer API does.
+  Reference it by its id, as `tenant_id`; `authwise_guard_tenants` lists
+  the ones the credential can see.
 - **People's nodes.** A person's node joins by following an invite. A
   server's node is declared (`authwise_guard_node`) and enrols with its
   auth code; what it may reach is `authwise_guard_node_grants`.
 - **People.** Guard's users mirror the people who joined.
 
-Both matter on destroy: guard-control refuses to delete a network that still
-has nodes, and to delete a tenant that still has networks or users.
+Nodes matter on destroy: guard-control refuses to delete a network that
+still has nodes.
 
 ## Invites
 

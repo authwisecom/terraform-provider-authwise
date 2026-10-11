@@ -352,18 +352,17 @@ func main() {
 				withComputed("created_by"),
 				withReferences(map[string]gentf.Reference{"condition_id": refAccessCondition})),
 
-			// Guard (guard-control, #32). Since apis v0.24.0 (#35) a Guard
-			// tenant is Guard's own (`gt-…`), created under a parent kit
-			// tenant with a users link through GuardTenantAdminService, which
-			// the wrapper in internal/provider supplies for create and
-			// delete. The parent and the link are set at create only: the
-			// admin API shows them and never changes them.
+			// Guard (guard-control, #32). A Guard tenant is Guard's own
+			// (`gt-…`, #35), created under a parent Authwise tenant only
+			// through guard-control's mTLS tenancy listener, by awtenant and
+			// the portal worker (E22, #36): no bearer surface creates or
+			// deletes one. It is read-only here. tfinfra's data sources need
+			// the resource marker, so the resource is generated and
+			// internal/provider leaves it unregistered.
 			crud[guardpb.Tenant](tf.NewScope(),
-				withDescription("A Guard tenant, under a parent Authwise tenant. Nothing else in Guard exists until this does. `users` is where the tenant's people sign in and are decided; it and `parent_tenant_id` cannot change in place. Destroying it deletes the tenant, which guard-control refuses while it still has networks or users."),
+				withDescription("A Guard tenant, under a parent Authwise tenant. Nothing else in Guard exists until this does. awtenant creates it; the provider only reads it. `users` is where the tenant's people sign in and are decided."),
 				guard("tenant"), guardList("tenants"),
-				withOps(gentf.OpGet|gentf.OpList|gentf.OpPatch),
-				withRequired("display_name", "parent_tenant_id", "users"),
-				withImmutable("parent_tenant_id", "users"),
+				withOps(gentf.OpGet|gentf.OpList),
 				withComputed("status", "created_by"), withJSON("config"),
 				withReferences(map[string]gentf.Reference{"parent_tenant_id": scopeReferences["tenant_id"]})),
 			// cidr cannot change once the network has a node; replacing the

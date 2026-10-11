@@ -1,35 +1,24 @@
-# A Guard network, from the tenant down to a gateway server and the first
+# A Guard network, in a Guard tenant, down to a gateway server and the first
 # invite.
 
 locals {
-  # The kit tenant the Guard tenant is administered through.
-  parent_tenant_id = "t-01"
+  # The Guard tenant (gt-…). awtenant creates it under the Authwise tenant,
+  # with the users link its people sign in through, and reports its id; the
+  # provider cannot create one.
+  guard_tenant_id = "gt-01"
 }
 
-# 1. The Guard tenant, under the kit tenant. guard-control assigns its id
-#    (gt-…); nothing else in Guard exists until it does. users is where the
-#    tenant's people sign in and are decided.
-resource "authwise_guard_tenant" "this" {
-  parent_tenant_id = local.parent_tenant_id
-  display_name     = "Acme"
-  users = {
-    issuer          = "https://id.example.authwise.com/t-01/i-01"
-    audience        = "a-02"
-    access_endpoint = "api.example.authwise.com:443"
-  }
-}
-
-# 2. The network: a WireGuard mesh. Its cidr is the address space nodes get
+# 1. The network: a WireGuard mesh. Its cidr is the address space nodes get
 #    addresses from, inside 100.64.0.0/10; changing it replaces the network.
 resource "authwise_guard_network" "office" {
-  tenant_id    = authwise_guard_tenant.this.guard_tenant_id
+  tenant_id    = local.guard_tenant_id
   display_name = "Office"
   cidr         = "100.96.0.0/16"
 }
 
-# 3. A relay, for nodes that cannot reach each other directly.
+# 2. A relay, for nodes that cannot reach each other directly.
 resource "authwise_guard_relay" "us_west" {
-  tenant_id    = authwise_guard_tenant.this.guard_tenant_id
+  tenant_id    = local.guard_tenant_id
   network_id   = authwise_guard_network.office.guard_network_id
   display_name = "us-west"
   url          = "wss://relay.example.com:8443/v1/transport"
@@ -37,10 +26,10 @@ resource "authwise_guard_relay" "us_west" {
   priority     = 10
 }
 
-# 4. What people reach through the network: a subnet behind it and an
+# 3. What people reach through the network: a subnet behind it and an
 #    application by name.
 resource "authwise_guard_resource" "office_lan" {
-  tenant_id    = authwise_guard_tenant.this.guard_tenant_id
+  tenant_id    = local.guard_tenant_id
   network_id   = authwise_guard_network.office.guard_network_id
   display_name = "Office LAN"
   kind         = "subnet"
@@ -48,18 +37,18 @@ resource "authwise_guard_resource" "office_lan" {
 }
 
 resource "authwise_guard_resource" "wiki" {
-  tenant_id    = authwise_guard_tenant.this.guard_tenant_id
+  tenant_id    = local.guard_tenant_id
   network_id   = authwise_guard_network.office.guard_network_id
   display_name = "Wiki"
   kind         = "application"
   address      = "wiki.internal.example.com"
 }
 
-# 5. The gateway: a server in the office that routes to the LAN. It is
+# 4. The gateway: a server in the office that routes to the LAN. It is
 #    registered here and enrols itself with the auth code, which writes its
 #    key and endpoint; those read back without a diff.
 resource "authwise_guard_node" "gateway" {
-  tenant_id    = authwise_guard_tenant.this.guard_tenant_id
+  tenant_id    = local.guard_tenant_id
   network_id   = authwise_guard_network.office.guard_network_id
   display_name = "office-gateway"
 }
@@ -69,9 +58,9 @@ resource "authwise_guard_resource_nodes" "office_lan" {
   nodes          = [authwise_guard_node.gateway.name]
 }
 
-# 6. An invite for one person: the node they join with is granted both.
+# 5. An invite for one person: the node they join with is granted both.
 resource "authwise_guard_invite" "dana" {
-  tenant_id    = authwise_guard_tenant.this.guard_tenant_id
+  tenant_id    = local.guard_tenant_id
   network_id   = authwise_guard_network.office.guard_network_id
   display_name = "for Dana"
   grants = [

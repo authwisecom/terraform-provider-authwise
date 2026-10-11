@@ -17,7 +17,7 @@ A server's node in a Guard network, registered ahead of time. Created without a 
 
 ### Required
 
-- `tenant_id` (String) The Guard tenant's id, `authwise_guard_tenant.<name>.guard_tenant_id` (`gt-…`); the provider's `tenant_id` is not used.
+- `tenant_id` (String) The Guard tenant's id (`gt-…`), as awtenant reports it or `authwise_guard_tenants` lists it; the provider's `tenant_id` is not used.
 
 ### Optional
 

@@ -17,7 +17,7 @@ A Guard network: a WireGuard mesh in a tenant. `cidr` is its address space insid
 # 100.64.0.0/10; it cannot change in place, and guard-control refuses to
 # delete a network that still has nodes.
 resource "authwise_guard_network" "office" {
-  tenant_id    = authwise_guard_tenant.acme.guard_tenant_id
+  tenant_id    = "gt-01" # the Guard tenant, from awtenant
   display_name = "Office"
   cidr         = "100.96.0.0/16"
 }
@@ -28,7 +28,7 @@ resource "authwise_guard_network" "office" {
 
 ### Required
 
-- `tenant_id` (String) The Guard tenant's id, `authwise_guard_tenant.<name>.guard_tenant_id` (`gt-…`); the provider's `tenant_id` is not used. Changing it replaces the resource.
+- `tenant_id` (String) The Guard tenant's id (`gt-…`), as awtenant reports it or `authwise_guard_tenants` lists it; the provider's `tenant_id` is not used. Changing it replaces the resource.
 
 ### Optional
 

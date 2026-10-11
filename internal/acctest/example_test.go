@@ -289,7 +289,7 @@ func TestAccGuardCatalogExample(t *testing.T) {
 
 // TestAccGuardExample applies examples/guard and examples/guard-catalog as
 // one configuration (#32): kit's catalog, role, binding and console client
-// beside a Guard tenant, network, relay, two resources, a gateway node
+// beside a network in the Guard tenant awtenant made (#36), a relay, two resources, a gateway node
 // serving one of them, and an invite.
 func TestAccGuardExample(t *testing.T) {
 
@@ -299,6 +299,7 @@ func TestAccGuardExample(t *testing.T) {
 
 	h := newHarness(t)
 	h.access.seedPermissions(accessPrefix, "access", kitLinkPermissions...)
+	h.guard.seedTenant("gt-01")
 	r := newExampleRun(t, h, "guard", "guard-catalog")
 
 	r.apply()
@@ -313,10 +314,10 @@ func TestAccGuardExample(t *testing.T) {
 
 	h.guard.mu.Lock()
 	defer h.guard.mu.Unlock()
-	if len(h.guard.tenants) != 1 || len(h.guard.networks) != 1 || len(h.guard.relays) != 1 ||
+	if len(h.guard.networks) != 1 || len(h.guard.relays) != 1 ||
 		len(h.guard.resources) != 2 || len(h.guard.invites) != 1 || len(h.guard.nodes) != 1 {
-		t.Errorf("guard-control holds %d tenants, %d networks, %d relays, %d resources, %d invites, %d nodes; want 1, 1, 1, 2, 1, 1",
-			len(h.guard.tenants), len(h.guard.networks), len(h.guard.relays), len(h.guard.resources), len(h.guard.invites), len(h.guard.nodes))
+		t.Errorf("guard-control holds %d networks, %d relays, %d resources, %d invites, %d nodes; want 1, 1, 2, 1, 1",
+			len(h.guard.networks), len(h.guard.relays), len(h.guard.resources), len(h.guard.invites), len(h.guard.nodes))
 	}
 	for _, r := range h.guard.resources {
 		if r.GetKind() == "subnet" && len(r.GetServingNodeIds()) != 1 {

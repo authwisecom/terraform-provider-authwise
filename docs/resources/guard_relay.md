@@ -15,7 +15,7 @@ A relay a Guard network's nodes connect through when no direct path exists. guar
 ```terraform
 # A relay the network's nodes fall back to when no direct path exists.
 resource "authwise_guard_relay" "us_west" {
-  tenant_id    = authwise_guard_tenant.acme.guard_tenant_id
+  tenant_id    = "gt-01" # the Guard tenant, from awtenant
   network_id   = authwise_guard_network.office.guard_network_id
   display_name = "us-west"
   url          = "wss://relay.example.com:8443/v1/transport"
@@ -30,7 +30,7 @@ resource "authwise_guard_relay" "us_west" {
 ### Required
 
 - `network_id` (String) The network's id, `authwise_guard_network.<name>.guard_network_id`. Changing it replaces the resource.
-- `tenant_id` (String) The Guard tenant's id, `authwise_guard_tenant.<name>.guard_tenant_id` (`gt-…`); the provider's `tenant_id` is not used. Changing it replaces the resource.
+- `tenant_id` (String) The Guard tenant's id (`gt-…`), as awtenant reports it or `authwise_guard_tenants` lists it; the provider's `tenant_id` is not used. Changing it replaces the resource.
 - `url` (String)
 
 ### Optional

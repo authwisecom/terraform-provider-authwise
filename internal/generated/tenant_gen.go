@@ -23,7 +23,6 @@ import (
 	types "github.com/hashicorp/terraform-plugin-framework/types"
 	basetypes "github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	protojson "google.golang.org/protobuf/encoding/protojson"
-	fieldmaskpb "google.golang.org/protobuf/types/known/fieldmaskpb"
 	structpb "google.golang.org/protobuf/types/known/structpb"
 )
 
@@ -42,7 +41,11 @@ func TenantResourceSchema() schema.Schema {
 				Computed:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
-			"display_name": schema.StringAttribute{Required: true},
+			"display_name": schema.StringAttribute{
+				Computed:      true,
+				Optional:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
 			"guard_tenant_id": schema.StringAttribute{
 				Computed:            true,
 				MarkdownDescription: "Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.",
@@ -60,8 +63,9 @@ func TenantResourceSchema() schema.Schema {
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"parent_tenant_id": schema.StringAttribute{
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
-				Required:      true,
+				Computed:      true,
+				Optional:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 				Validators:    []validator.String{tf.ReferenceID("t", "tenant", "")},
 			},
 			"status": schema.StringAttribute{
@@ -82,12 +86,17 @@ func TenantResourceSchema() schema.Schema {
 						Computed: true,
 						Optional: true,
 					},
+					"tenant_id": schema.StringAttribute{
+						Computed: true,
+						Optional: true,
+					},
 				},
-				PlanModifiers: []planmodifier.Object{objectplanmodifier.RequiresReplace()},
-				Required:      true,
+				Computed:      true,
+				Optional:      true,
+				PlanModifiers: []planmodifier.Object{objectplanmodifier.UseStateForUnknown()},
 			},
 		},
-		MarkdownDescription: "A Guard tenant, under a parent Authwise tenant. Nothing else in Guard exists until this does. `users` is where the tenant's people sign in and are decided; it and `parent_tenant_id` cannot change in place. Destroying it deletes the tenant, which guard-control refuses while it still has networks or users.",
+		MarkdownDescription: "A Guard tenant, under a parent Authwise tenant. Nothing else in Guard exists until this does. awtenant creates it; the provider only reads it. `users` is where the tenant's people sign in and are decided.",
 	}
 }
 
@@ -96,6 +105,7 @@ type TenantUsersModel struct {
 	Issuer         types.String `tfsdk:"issuer"`
 	Audience       types.String `tfsdk:"audience"`
 	AccessEndpoint types.String `tfsdk:"access_endpoint"`
+	TenantId       types.String `tfsdk:"tenant_id"`
 }
 
 // TenantUsersAttrTypes returns the attribute types of the "users" nested attribute.
@@ -104,6 +114,7 @@ func TenantUsersAttrTypes() map[string]attr.Type {
 		"access_endpoint": types.StringType,
 		"audience":        types.StringType,
 		"issuer":          types.StringType,
+		"tenant_id":       types.StringType,
 	}
 }
 
@@ -161,6 +172,7 @@ func (m *TenantModel) ToProto(ctx context.Context) (*v1alpha1.Tenant, diag.Diagn
 		v.Issuer = n.Issuer.ValueString()
 		v.Audience = n.Audience.ValueString()
 		v.AccessEndpoint = n.AccessEndpoint.ValueString()
+		v.TenantId = n.TenantId.ValueString()
 		out.Users = v
 	}
 	out.CreatedBy = m.CreatedBy.ValueString()
@@ -178,7 +190,11 @@ func (m *TenantModel) FromProto(ctx context.Context, e *v1alpha1.Tenant) diag.Di
 		diags.Append(d...)
 		m.Labels = v
 	}
-	m.DisplayName = types.StringValue(e.DisplayName)
+	if e.DisplayName == "" {
+		m.DisplayName = types.StringNull()
+	} else {
+		m.DisplayName = types.StringValue(e.DisplayName)
+	}
 	if e.Config == nil {
 		m.Config = jsontypes.NewNormalizedNull()
 	} else {
@@ -194,7 +210,11 @@ func (m *TenantModel) FromProto(ctx context.Context, e *v1alpha1.Tenant) diag.Di
 	} else {
 		m.Status = types.StringValue(e.Status)
 	}
-	m.ParentTenantId = types.StringValue(e.ParentTenantId)
+	if e.ParentTenantId == "" {
+		m.ParentTenantId = types.StringNull()
+	} else {
+		m.ParentTenantId = types.StringValue(e.ParentTenantId)
+	}
 	if e.Users == nil {
 		m.Users = types.ObjectNull(TenantUsersAttrTypes())
 	} else {
@@ -216,6 +236,11 @@ func (m *TenantModel) FromProto(ctx context.Context, e *v1alpha1.Tenant) diag.Di
 			n.AccessEndpoint = types.StringNull()
 		} else {
 			n.AccessEndpoint = types.StringValue(e.Users.AccessEndpoint)
+		}
+		if e.Users.TenantId == "" {
+			n.TenantId = types.StringNull()
+		} else {
+			n.TenantId = types.StringValue(e.Users.TenantId)
 		}
 		obj, d := types.ObjectValueFrom(ctx, TenantUsersAttrTypes(), n)
 		diags.Append(d...)
@@ -292,13 +317,6 @@ func newTenantCrud(providerData any) (*tf.Crud[*v1alpha1.Tenant, *TenantModel], 
 					return nil, "", err
 				}
 				return out.Tenants, out.NextPageToken, nil
-			},
-			Patch: func(ctx context.Context, name string, entity *v1alpha1.Tenant, mask []string) (*v1alpha1.Tenant, error) {
-				return client.PatchTenant(ctx, &v1alpha1.PatchTenantRequest{
-					Name:       name,
-					Tenant:     entity,
-					UpdateMask: &fieldmaskpb.FieldMask{Paths: mask},
-				})
 			},
 		},
 		Collection:  "tenants",
@@ -395,11 +413,12 @@ func TenantDataSourceSchema() schema1.Schema {
 					"access_endpoint": schema1.StringAttribute{Computed: true},
 					"audience":        schema1.StringAttribute{Computed: true},
 					"issuer":          schema1.StringAttribute{Computed: true},
+					"tenant_id":       schema1.StringAttribute{Computed: true},
 				},
 				Computed: true,
 			},
 		},
-		MarkdownDescription: "A Guard tenant, under a parent Authwise tenant. Nothing else in Guard exists until this does. `users` is where the tenant's people sign in and are decided; it and `parent_tenant_id` cannot change in place. Destroying it deletes the tenant, which guard-control refuses while it still has networks or users. This data source reads one by its full resource name.",
+		MarkdownDescription: "A Guard tenant, under a parent Authwise tenant. Nothing else in Guard exists until this does. awtenant creates it; the provider only reads it. `users` is where the tenant's people sign in and are decided. This data source reads one by its full resource name.",
 	}
 }
 
@@ -496,12 +515,13 @@ func TenantListDataSourceSchema() schema1.Schema {
 						"access_endpoint": schema1.StringAttribute{Computed: true},
 						"audience":        schema1.StringAttribute{Computed: true},
 						"issuer":          schema1.StringAttribute{Computed: true},
+						"tenant_id":       schema1.StringAttribute{Computed: true},
 					},
 					Computed: true,
 				},
 			}},
 		}},
-		MarkdownDescription: "A Guard tenant, under a parent Authwise tenant. Nothing else in Guard exists until this does. `users` is where the tenant's people sign in and are decided; it and `parent_tenant_id` cannot change in place. Destroying it deletes the tenant, which guard-control refuses while it still has networks or users. This data source lists every one under a parent.",
+		MarkdownDescription: "A Guard tenant, under a parent Authwise tenant. Nothing else in Guard exists until this does. awtenant creates it; the provider only reads it. `users` is where the tenant's people sign in and are decided. This data source lists every one under a parent.",
 	}
 }
 
@@ -517,7 +537,11 @@ func tenantItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Tenant, *T
 		diags.Append(d...)
 		item.Labels = v
 	}
-	item.DisplayName = types.StringValue(e.DisplayName)
+	if e.DisplayName == "" {
+		item.DisplayName = types.StringNull()
+	} else {
+		item.DisplayName = types.StringValue(e.DisplayName)
+	}
 	if e.Config == nil {
 		item.Config = jsontypes.NewNormalizedNull()
 	} else {
@@ -533,7 +557,11 @@ func tenantItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Tenant, *T
 	} else {
 		item.Status = types.StringValue(e.Status)
 	}
-	item.ParentTenantId = types.StringValue(e.ParentTenantId)
+	if e.ParentTenantId == "" {
+		item.ParentTenantId = types.StringNull()
+	} else {
+		item.ParentTenantId = types.StringValue(e.ParentTenantId)
+	}
 	if e.Users == nil {
 		item.Users = types.ObjectNull(TenantUsersAttrTypes())
 	} else {
@@ -555,6 +583,11 @@ func tenantItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Tenant, *T
 			n.AccessEndpoint = types.StringNull()
 		} else {
 			n.AccessEndpoint = types.StringValue(e.Users.AccessEndpoint)
+		}
+		if e.Users.TenantId == "" {
+			n.TenantId = types.StringNull()
+		} else {
+			n.TenantId = types.StringValue(e.Users.TenantId)
 		}
 		obj, d := types.ObjectValueFrom(ctx, TenantUsersAttrTypes(), n)
 		diags.Append(d...)

@@ -16,7 +16,7 @@ A routed target in a Guard network that is not a node: a subnet, a host or an ap
 # A subnet behind the network: reachable once a node serves it
 # (authwise_guard_resource_nodes) and a node is granted it.
 resource "authwise_guard_resource" "office_lan" {
-  tenant_id    = authwise_guard_tenant.acme.guard_tenant_id
+  tenant_id    = "gt-01" # the Guard tenant, from awtenant
   network_id   = authwise_guard_network.office.guard_network_id
   display_name = "Office LAN"
   kind         = "subnet"
@@ -32,7 +32,7 @@ resource "authwise_guard_resource" "office_lan" {
 - `address` (String)
 - `kind` (String)
 - `network_id` (String) The network's id, `authwise_guard_network.<name>.guard_network_id`. Changing it replaces the resource.
-- `tenant_id` (String) The Guard tenant's id, `authwise_guard_tenant.<name>.guard_tenant_id` (`gt-…`); the provider's `tenant_id` is not used. Changing it replaces the resource.
+- `tenant_id` (String) The Guard tenant's id (`gt-…`), as awtenant reports it or `authwise_guard_tenants` lists it; the provider's `tenant_id` is not used. Changing it replaces the resource.
 
 ### Optional
 

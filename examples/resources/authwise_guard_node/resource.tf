@@ -2,7 +2,7 @@
 # the agent on the server with the auth code to enrol it. Enrolment writes
 # public_key and endpoint, which read back without a diff.
 resource "authwise_guard_node" "gateway" {
-  tenant_id    = authwise_guard_tenant.acme.guard_tenant_id
+  tenant_id    = "gt-01" # the Guard tenant, from awtenant
   network_id   = authwise_guard_network.office.guard_network_id
   display_name = "office-gateway"
 }

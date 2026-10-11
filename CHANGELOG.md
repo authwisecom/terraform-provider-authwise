@@ -1,3 +1,31 @@
+## Unreleased
+
+NOTES:
+
+* **apis v0.28.0, guard-control v0.15.0.** Built against apis v0.28.0, whose
+  only change to the provider's surface is guard-control's (guard-control#53).
+  The Guard resources need guard-control v0.15.0.
+
+BREAKING CHANGES:
+
+* **`authwise_guard_tenant` is gone (#36).** Under E22 (estate tenancy), a
+  Guard tenant is created only through guard-control's mTLS tenancy
+  listener, by awtenant and the portal worker. apis v0.28.0 removes
+  `CreateTenant`, `DeleteTenant` and `ListTenantParents` from
+  `GuardTenantAdminService`, so no bearer surface creates or deletes one.
+  The same already holds for an Authwise tenant.
+  * The Guard tenant's id (`gt-…`) now comes from awtenant. Set it as
+    `tenant_id` on the Guard resources and data sources, the way the
+    provider already references an Authwise tenant it does not create.
+  * The `authwise_guard_tenant` and `authwise_guard_tenants` data sources
+    stay and read a tenant by its name (`tenants/gt-…`) or list the ones
+    the credential can see. Their `users` gains `tenant_id`.
+  * To upgrade, remove the tenant from state (`terraform state rm
+    authwise_guard_tenant.<name>`) and replace references to
+    `authwise_guard_tenant.<name>.guard_tenant_id` with the id. A state
+    that still holds one fails to plan, since the provider no longer has
+    the type. Do not destroy it under 0.9.0 first: that deletes the tenant.
+
 ## 0.9.0 (October 9, 2026)
 
 NOTES:

@@ -3,12 +3,12 @@
 page_title: "authwise_guard_tenants Data Source - Authwise"
 subcategory: "Guard"
 description: |-
-  A Guard tenant, under a parent Authwise tenant. Nothing else in Guard exists until this does. users is where the tenant's people sign in and are decided; it and parent_tenant_id cannot change in place. Destroying it deletes the tenant, which guard-control refuses while it still has networks or users. This data source lists every one under a parent.
+  A Guard tenant, under a parent Authwise tenant. Nothing else in Guard exists until this does. awtenant creates it; the provider only reads it. users is where the tenant's people sign in and are decided. This data source lists every one under a parent.
 ---
 
 # authwise_guard_tenants (Data Source)
 
-A Guard tenant, under a parent Authwise tenant. Nothing else in Guard exists until this does. `users` is where the tenant's people sign in and are decided; it and `parent_tenant_id` cannot change in place. Destroying it deletes the tenant, which guard-control refuses while it still has networks or users. This data source lists every one under a parent.
+A Guard tenant, under a parent Authwise tenant. Nothing else in Guard exists until this does. awtenant creates it; the provider only reads it. `users` is where the tenant's people sign in and are decided. This data source lists every one under a parent.
 
 
 
@@ -42,3 +42,4 @@ Read-Only:
 - `access_endpoint` (String)
 - `audience` (String)
 - `issuer` (String)
+- `tenant_id` (String)

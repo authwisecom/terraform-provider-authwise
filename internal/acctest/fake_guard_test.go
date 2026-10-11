@@ -19,9 +19,9 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-// fakeGuardServer is guard-control v0.12.0's admin API (apis v0.24.0) as the
-// Guard resources use it: Guard tenants created under a kit tenant through
-// GuardTenantAdminService (#35), networks
+// fakeGuardServer is guard-control v0.15.0's admin API (apis v0.28.0) as the
+// Guard resources use it: one Guard tenant, gt-acme, seeded as awtenant
+// would create it through the tenancy listener (E22, #36), networks
 // with a cidr in the mesh range, relays, resources and the nodes serving
 // them, and invites whose code is returned once. The rules are
 // guard-control's creator.go and validations.go.
@@ -29,7 +29,6 @@ import (
 // server's node is created through CreateNode.
 type fakeGuardServer struct {
 	guardpb.UnimplementedGuardControlServiceServer
-	guardpb.UnimplementedGuardTenantAdminServiceServer
 	guardpb.UnimplementedGuardNodeServiceServer
 
 	mu        sync.Mutex
@@ -51,7 +50,7 @@ type fakeGuardServer struct {
 }
 
 func newFakeGuardServer() *fakeGuardServer {
-	return &fakeGuardServer{
+	f := &fakeGuardServer{
 		tenants:   map[string]*guardpb.Tenant{},
 		networks:  map[string]*guardpb.Network{},
 		relays:    map[string]*guardpb.Relay{},
@@ -60,6 +59,29 @@ func newFakeGuardServer() *fakeGuardServer {
 		nodes:     map[string]*guardpb.Node{},
 		codes:     map[string]string{},
 		grants:    map[string][]string{},
+	}
+	f.seedTenant("gt-acme")
+	return f
+}
+
+// seedTenant adds a Guard tenant under the kit tenant t-1, as awtenant
+// would create it through the tenancy listener: no bearer surface does.
+func (f *fakeGuardServer) seedTenant(id string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	name := "tenants/" + id
+	f.tenants[name] = &guardpb.Tenant{
+		Name:           name,
+		DisplayName:    "Acme",
+		Status:         "ACTIVE",
+		ParentTenantId: "t-1",
+		Users: &guardpb.TenantUsersLink{
+			Issuer:         "https://id.example.com/t-1",
+			Audience:       "a-guard",
+			AccessEndpoint: "access.example.com:443",
+			TenantId:       "t-1",
+		},
+		CreatedBy: "awtenant",
 	}
 }
 
@@ -130,36 +152,6 @@ func (f *fakeGuardServer) hasNodes(network string) bool {
 
 // --- Tenant ---
 
-// CreateTenant is GuardTenantAdminService's: a Guard tenant of its own
-// (`gt-…`) under a kit tenant, with the users link its people sign in
-// through. The creator is the caller.
-func (f *fakeGuardServer) CreateTenant(ctx context.Context, in *guardpb.CreateTenantRequest) (*guardpb.Tenant, error) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	f.record(ctx)
-	if !strings.HasPrefix(in.GetParentTenantId(), "t-") {
-		return nil, status.Error(codes.InvalidArgument, "parent_tenant_id must be an Authwise tenant (t-...)")
-	}
-	if in.GetTenant().GetDisplayName() == "" {
-		return nil, status.Error(codes.InvalidArgument, "tenant.display_name is required")
-	}
-	u := in.GetUsers()
-	if u.GetIssuer() == "" || u.GetAudience() == "" || u.GetAccessEndpoint() == "" {
-		return nil, status.Error(codes.InvalidArgument, "users needs issuer, audience and access_endpoint")
-	}
-	t := &guardpb.Tenant{
-		Name:           "tenants/" + f.nextID("gt"),
-		DisplayName:    in.GetTenant().GetDisplayName(),
-		Labels:         in.GetTenant().GetLabels(),
-		Status:         "ACTIVE",
-		ParentTenantId: in.GetParentTenantId(),
-		Users:          proto.Clone(u).(*guardpb.TenantUsersLink),
-		CreatedBy:      "acc-client",
-	}
-	f.tenants[t.GetName()] = t
-	return proto.Clone(t).(*guardpb.Tenant), nil
-}
-
 func (f *fakeGuardServer) GetTenant(ctx context.Context, in *guardpb.GetTenantRequest) (*guardpb.Tenant, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -201,27 +193,6 @@ func (f *fakeGuardServer) PatchTenant(ctx context.Context, in *guardpb.PatchTena
 	}
 	f.tenants[in.GetName()] = next
 	return proto.Clone(next).(*guardpb.Tenant), nil
-}
-
-func (f *fakeGuardServer) DeleteTenant(ctx context.Context, in *guardpb.DeleteTenantRequest) (*emptypb.Empty, error) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	f.record(ctx)
-	if _, ok := f.tenants[in.GetName()]; !ok {
-		return nil, status.Errorf(codes.NotFound, "tenant %s not found", in.GetName())
-	}
-	n := 0
-	for name := range f.networks {
-		if strings.HasPrefix(name, in.GetName()+"/networks/") {
-			n++
-		}
-	}
-	if n > 0 {
-		return nil, status.Errorf(codes.FailedPrecondition,
-			"tenant %s is not empty: %d network(s), 0 user(s); delete them first", in.GetName(), n)
-	}
-	delete(f.tenants, in.GetName())
-	return &emptypb.Empty{}, nil
 }
 
 // --- Network ---

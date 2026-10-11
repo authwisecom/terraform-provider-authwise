@@ -108,15 +108,17 @@ Two things worth knowing:
 ## Guard
 
 The `authwise_guard_*` resources manage Guard, the mesh VPN, over
-guard-control's API rather than kit's (#32): `authwise_guard_tenant`,
-`authwise_guard_network`, `authwise_guard_relay`, `authwise_guard_resource`
-with `authwise_guard_resource_nodes`, `authwise_guard_node` with
+guard-control's API rather than kit's (#32): `authwise_guard_network`,
+`authwise_guard_relay`, `authwise_guard_resource` with
+`authwise_guard_resource_nodes`, `authwise_guard_node` with
 `authwise_guard_node_grants`, and `authwise_guard_invite`, each entity with
-its singular and plural data sources. Set `guard_endpoint` (or
+its singular and plural data sources. A Guard tenant (`gt-…`) is created by
+awtenant, not here (#36); its data sources, `authwise_guard_tenant` and
+`authwise_guard_tenants`, read it. Set `guard_endpoint` (or
 `AUTHWISE_GUARD_ENDPOINT`) to guard-control's gRPC address; the same bearer
 goes to both services, and without it a Guard resource fails at plan.
 
-`examples/guard` is a network from the tenant down to a gateway server and
+`examples/guard` is a network in a Guard tenant down to a gateway server and
 an invite, applied by the acceptance suite together with
 `examples/guard-catalog`. A server's node is declared and enrols itself with
 its one-time `auth_code`; the key and endpoint enrolment writes read back
@@ -255,9 +257,8 @@ omitted; per-resource values always override.
 
 ## Tenants are not managed here
 
-The provider works inside an existing tenant and never creates one.
-(`authwise_guard_tenant` does not either: it registers an existing kit
-tenant with Guard.) There
+The provider works inside an existing tenant and never creates one, and
+the same holds for a Guard tenant, which awtenant creates (#36). There
 is no `authwise_tenant` resource. Tenants are provisioned out of band,
 through the operator-facing tenancy admin API, which is not part of the
 published contract. A configuration names its tenant with the provider's
