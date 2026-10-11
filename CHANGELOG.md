@@ -1,10 +1,11 @@
-## Unreleased
+## 0.10.0 (October 10, 2026)
 
 NOTES:
 
-* **apis v0.28.0, guard-control v0.15.0.** Built against apis v0.28.0, whose
-  only change to the provider's surface is guard-control's (guard-control#53).
-  The Guard resources need guard-control v0.15.0.
+* **apis v0.28.0, guard-control v0.15.0, kit v1.38.0.** Built against apis
+  v0.28.0, whose only change to the provider's surface is guard-control's
+  (guard-control#53). kit's surfaces are unchanged, so the provider still
+  pairs with kit v1.38.0. The Guard resources need guard-control v0.15.0.
 
 BREAKING CHANGES:
 
