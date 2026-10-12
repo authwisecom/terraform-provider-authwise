@@ -53,18 +53,15 @@ login` credential store instead, which suits interactive use.
 A pipeline's credential is a service account: a machine principal the
 tenant owns, so its access is the roles bound to it and its actions are
 audited as its own `c-…`, not as a person's. A tenant administrator creates
-one with `authwise_service_account`, binds `tenant.admin` at the tenant with
-`authwise_access_binding` (`subject_type = "client"`, `subject_id` its
-`client_id`), and mints a secret with `authwise_service_account_secret`.
-The pipeline then sets `AUTHWISE_TOKEN_URL`, `AUTHWISE_CLIENT_ID`,
+one with `authwise_service_account`, gives it `roles = ["tenant.admin"]`,
+and mints a secret with `authwise_service_account_secret`. The pipeline
+then sets `AUTHWISE_TOKEN_URL`, `AUTHWISE_CLIENT_ID`,
 `AUTHWISE_CLIENT_SECRET` and `AUTHWISE_AUDIENCE="a-01"`. The secret's
 `token_url` and `audience` attributes give the first and last of these.
 
-Service accounts are served at central only. On kit's current release,
-writing the binding needs `access.bindings.create` in the estate audience,
-which an operator holds and a tenant administrator does not, so an operator
-binds the role for now. A `roles` argument on `authwise_service_account`
-will let the tenant administrator bind it (kit#763).
+A service account may hold `tenant.admin`, `tenant.viewer` and
+`guardcontrol.admin`, at its own tenant. Service accounts, `roles`
+included, are served at central only, from kit v1.43.0.
 
 {{ tffile "examples/resources/authwise_service_account/resource.tf" }}
 

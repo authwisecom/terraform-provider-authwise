@@ -3,38 +3,26 @@
 page_title: "authwise_service_account Resource - Authwise"
 subcategory: "Identity"
 description: |-
-  A service account: a machine principal the tenant owns, for CI and automation. It is a client of the admin issuer, made with a member seat at the tenant, no roles and no secret: mint a secret with authwise_service_account_secret. Its token, asked for at the estate audience, is accepted by kit's admin API.
-  Nothing changes an account in place, so changing any argument replaces it. kit refuses to delete an account while any role is bound to it. Service accounts are served at central only: against a satellite, kit refuses and names central.
+  A service account: a machine principal the tenant owns, for CI and automation. It is a client of the admin issuer, made with a member seat at the tenant and no secret: mint a secret with authwise_service_account_secret. Its token, asked for at the estate audience, is accepted by kit's admin API.
+  roles are what it may do at its tenant, and change in place; every other argument replaces the account. Destroying it unbinds its roles first. kit refuses to delete it while any other binding names it. Service accounts are served at central only: against a satellite, kit refuses and names central.
 ---
 
 # authwise_service_account (Resource)
 
-A service account: a machine principal the tenant owns, for CI and automation. It is a client of the admin issuer, made with a member seat at the tenant, no roles and no secret: mint a secret with `authwise_service_account_secret`. Its token, asked for at the estate audience, is accepted by kit's admin API.
+A service account: a machine principal the tenant owns, for CI and automation. It is a client of the admin issuer, made with a member seat at the tenant and no secret: mint a secret with `authwise_service_account_secret`. Its token, asked for at the estate audience, is accepted by kit's admin API.
 
-Nothing changes an account in place, so changing any argument replaces it. kit refuses to delete an account while any role is bound to it. Service accounts are served at central only: against a satellite, kit refuses and names central.
+`roles` are what it may do at its tenant, and change in place; every other argument replaces the account. Destroying it unbinds its `roles` first. kit refuses to delete it while any other binding names it. Service accounts are served at central only: against a satellite, kit refuses and names central.
 
 ## Example Usage
 
 ```terraform
-# A service account for CI: a machine principal the tenant owns. It starts
-# with a member seat at the tenant and no roles; bind one with
-# authwise_access_binding. Service accounts are served at central only.
+# A service account for CI: a machine principal the tenant owns. Its roles
+# are what it may do at the tenant; the tenant's administrators set them,
+# from tenant.admin, tenant.viewer and guardcontrol.admin. Service accounts
+# are served at central only.
 resource "authwise_service_account" "ci" {
   display_name = "terraform"
-}
-
-# Its subject in Access: subject_type "client", subject_id its client_id.
-# Referencing it by expression lets Terraform remove the binding before the
-# account, which kit refuses to delete while a binding names it.
-resource "authwise_access_binding" "ci_admin" {
-  tenant_id     = "t-01"
-  issuer_id     = "i-01"
-  audience_id   = "a-01"
-  subject_type  = "client"
-  subject_id    = authwise_service_account.ci.client_id
-  role_name     = "tenant.admin"
-  resource_type = "tenant"
-  resource_id   = authwise_service_account.ci.tenant_id
+  roles        = ["tenant.admin"]
 }
 ```
 
@@ -48,6 +36,7 @@ resource "authwise_access_binding" "ci_admin" {
 ### Optional
 
 - `expires_at` (String) When set (RFC 3339), the token endpoint refuses the account after it. Changing it replaces the account.
+- `roles` (Set of String) The roles the account holds at its tenant, by key: `tenant.admin`, `tenant.viewer` or `guardcontrol.admin` (kit refuses any other). Set, it is authoritative: the account holds exactly these, and an empty set unbinds them all. Unset, Terraform leaves the account's roles alone and reads them back.
 - `tenant_id` (String) The tenant that owns the account; overrides the provider default. Changing it replaces the account.
 
 ### Read-Only

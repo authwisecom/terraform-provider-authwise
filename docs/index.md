@@ -74,39 +74,24 @@ login` credential store instead, which suits interactive use.
 A pipeline's credential is a service account: a machine principal the
 tenant owns, so its access is the roles bound to it and its actions are
 audited as its own `c-…`, not as a person's. A tenant administrator creates
-one with `authwise_service_account`, binds `tenant.admin` at the tenant with
-`authwise_access_binding` (`subject_type = "client"`, `subject_id` its
-`client_id`), and mints a secret with `authwise_service_account_secret`.
-The pipeline then sets `AUTHWISE_TOKEN_URL`, `AUTHWISE_CLIENT_ID`,
+one with `authwise_service_account`, gives it `roles = ["tenant.admin"]`,
+and mints a secret with `authwise_service_account_secret`. The pipeline
+then sets `AUTHWISE_TOKEN_URL`, `AUTHWISE_CLIENT_ID`,
 `AUTHWISE_CLIENT_SECRET` and `AUTHWISE_AUDIENCE="a-01"`. The secret's
 `token_url` and `audience` attributes give the first and last of these.
 
-Service accounts are served at central only. On kit's current release,
-writing the binding needs `access.bindings.create` in the estate audience,
-which an operator holds and a tenant administrator does not, so an operator
-binds the role for now. A `roles` argument on `authwise_service_account`
-will let the tenant administrator bind it (kit#763).
+A service account may hold `tenant.admin`, `tenant.viewer` and
+`guardcontrol.admin`, at its own tenant. Service accounts, `roles`
+included, are served at central only, from kit v1.43.0.
 
 ```terraform
-# A service account for CI: a machine principal the tenant owns. It starts
-# with a member seat at the tenant and no roles; bind one with
-# authwise_access_binding. Service accounts are served at central only.
+# A service account for CI: a machine principal the tenant owns. Its roles
+# are what it may do at the tenant; the tenant's administrators set them,
+# from tenant.admin, tenant.viewer and guardcontrol.admin. Service accounts
+# are served at central only.
 resource "authwise_service_account" "ci" {
   display_name = "terraform"
-}
-
-# Its subject in Access: subject_type "client", subject_id its client_id.
-# Referencing it by expression lets Terraform remove the binding before the
-# account, which kit refuses to delete while a binding names it.
-resource "authwise_access_binding" "ci_admin" {
-  tenant_id     = "t-01"
-  issuer_id     = "i-01"
-  audience_id   = "a-01"
-  subject_type  = "client"
-  subject_id    = authwise_service_account.ci.client_id
-  role_name     = "tenant.admin"
-  resource_type = "tenant"
-  resource_id   = authwise_service_account.ci.tenant_id
+  roles        = ["tenant.admin"]
 }
 ```
 

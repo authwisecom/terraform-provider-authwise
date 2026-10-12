@@ -19,8 +19,9 @@ import (
 )
 
 // fakeTenancyServer is the public tenancy service's service accounts as
-// kit#756 built them (apis v0.30.0): a client of the admin issuer the
-// tenant owns, made with no secret; secrets minted once, shown once, and
+// kit#756 and kit#763 built them (apis v0.31.0): a client of the admin
+// issuer the tenant owns, made with no secret and no roles; roles from a
+// fixed list, set as a whole; secrets minted once, shown once, and
 // listed live (unexpired) on the account; a rotating mint giving the
 // others a bounded grace; and delete refused while any binding names the
 // account. Bindings are the fake Access server's.
@@ -32,6 +33,7 @@ type fakeTenancyServer struct {
 	mu       sync.Mutex
 	accounts map[string]*tenancypb.ServiceAccount
 	mints    int
+	roleSets int
 	seq      int
 }
 
@@ -117,7 +119,7 @@ func (f *fakeTenancyServer) ListServiceAccounts(_ context.Context, in *tenancypb
 }
 
 // DeleteServiceAccount refuses while any binding, at any anchor, names the
-// account (SERVICE_ACCOUNTS §9.2).
+// account (SERVICE_ACCOUNTS §9.2), its own roles included.
 func (f *fakeTenancyServer) DeleteServiceAccount(_ context.Context, in *tenancypb.DeleteServiceAccountRequest) (*emptypb.Empty, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -133,6 +135,9 @@ func (f *fakeTenancyServer) DeleteServiceAccount(_ context.Context, in *tenancyp
 		}
 	}
 	f.access.mu.Unlock()
+	for _, role := range sa.GetRoles() {
+		bound = append(bound, "role "+role)
+	}
 	if len(bound) > 0 {
 		slices.Sort(bound)
 		return nil, status.Errorf(codes.FailedPrecondition, "service account %s is still bound: %s", sa.GetClientId(), strings.Join(bound, ", "))
@@ -180,6 +185,29 @@ func (f *fakeTenancyServer) MintServiceAccountSecret(_ context.Context, in *tena
 		Audience:       fakeEstateAud,
 		RotatedSecrets: rotated,
 	}, nil
+}
+
+// serviceAccountRoles are the roles a service account may hold (kit#763).
+var serviceAccountRoles = map[string]bool{"tenant.admin": true, "tenant.viewer": true, "guardcontrol.admin": true}
+
+func (f *fakeTenancyServer) SetServiceAccountRoles(_ context.Context, in *tenancypb.SetServiceAccountRolesRequest) (*tenancypb.ServiceAccount, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	sa, ok := f.accounts[in.GetName()]
+	if !ok {
+		return nil, status.Errorf(codes.NotFound, "service account %q not found", in.GetName())
+	}
+	for _, role := range in.GetRoles() {
+		if !serviceAccountRoles[role] {
+			return nil, status.Errorf(codes.InvalidArgument, "role %q is not one a service account may hold", role)
+		}
+	}
+	f.roleSets++
+	roles := slices.Clone(in.GetRoles())
+	slices.Sort(roles)
+	sa.Roles = slices.Compact(roles)
+	sa.UpdatedAt = timestamppb.Now()
+	return f.liveLocked(sa), nil
 }
 
 // secret returns a stored secret by id, expired or not.

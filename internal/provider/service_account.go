@@ -16,9 +16,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/setplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -108,6 +108,7 @@ type serviceAccountModel struct {
 	TenantID    types.String `tfsdk:"tenant_id"`
 	DisplayName types.String `tfsdk:"display_name"`
 	ExpiresAt   types.String `tfsdk:"expires_at"`
+	Roles       types.Set    `tfsdk:"roles"`
 	ClientID    types.String `tfsdk:"client_id"`
 	Status      types.String `tfsdk:"status"`
 	Secrets     types.List   `tfsdk:"secrets"`
@@ -139,10 +140,10 @@ func (r *serviceAccountResource) Schema(_ context.Context, _ resource.SchemaRequ
 
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "A service account: a machine principal the tenant owns, for CI and automation. " +
-			"It is a client of the admin issuer, made with a member seat at the tenant, no roles and no secret: " +
+			"It is a client of the admin issuer, made with a member seat at the tenant and no secret: " +
 			"mint a secret with `authwise_service_account_secret`. Its token, asked for at the estate audience, is accepted by kit's admin API.\n\n" +
-			"Nothing changes an account in place, so changing any argument replaces it. " +
-			"kit refuses to delete an account while any role is bound to it. " +
+			"`roles` are what it may do at its tenant, and change in place; every other argument replaces the account. " +
+			"Destroying it unbinds its `roles` first. kit refuses to delete it while any other binding names it. " +
 			"Service accounts are served at central only: against a satellite, kit refuses and names central.",
 		Attributes: map[string]schema.Attribute{
 			tfruntime.NameAttribute: computed("Full resource name (`tenants/{t}/service-accounts/{c}`); serves as the Terraform ID, and is what `authwise_service_account_secret` takes."),
@@ -163,6 +164,14 @@ func (r *serviceAccountResource) Schema(_ context.Context, _ resource.SchemaRequ
 				MarkdownDescription: "When set (RFC 3339), the token endpoint refuses the account after it. Changing it replaces the account.",
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
+			"roles": schema.SetAttribute{
+				Optional:    true,
+				Computed:    true,
+				ElementType: types.StringType,
+				MarkdownDescription: "The roles the account holds at its tenant, by key: `tenant.admin`, `tenant.viewer` or `guardcontrol.admin` (kit refuses any other). " +
+					"Set, it is authoritative: the account holds exactly these, and an empty set unbinds them all. Unset, Terraform leaves the account's roles alone and reads them back.",
+				PlanModifiers: []planmodifier.Set{setplanmodifier.UseStateForUnknown()},
+			},
 			"client_id": computed("The client's id (`c-…`): the `client_id` at the token endpoint, and the subject its tokens carry, which an `authwise_access_binding` names with `subject_type = \"client\"`."),
 			"status":    computed("`CLIENT_STATUS_ACTIVE` unless an operator disabled or quarantined the client, as on `authwise_client`."),
 			"secrets": schema.ListNestedAttribute{
@@ -175,10 +184,10 @@ func (r *serviceAccountResource) Schema(_ context.Context, _ resource.SchemaRequ
 						expiresAtAttribute: schema.StringAttribute{Computed: true, MarkdownDescription: "Unset: the secret does not expire."},
 					},
 				},
-				PlanModifiers: []planmodifier.List{listplanmodifier.UseStateForUnknown()},
 			},
 			createdAtAttribute: computed(""),
-			"updated_at":       computed(""),
+			// updated_at and secrets move with a change of roles.
+			"updated_at": schema.StringAttribute{Computed: true},
 		},
 	}
 }
@@ -210,32 +219,78 @@ func (r *serviceAccountResource) Create(ctx context.Context, req resource.Create
 		return
 	}
 
+	in := r.createRequest(&plan, &resp.Diagnostics)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	out, err := r.client.CreateServiceAccount(ctx, in)
+	if err != nil {
+		resp.Diagnostics.AddError("create service account failed", err.Error())
+		return
+	}
+
+	roles := plan.Roles
+	resp.Diagnostics.Append(plan.fromProto(ctx, out)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	// Roles are a second call: create binds none. If it fails, the account
+	// is kept in state, so Terraform taints it rather than losing it.
+	if !roles.IsNull() && !roles.IsUnknown() {
+		if out = r.setRoles(ctx, out.GetName(), roles, &resp.Diagnostics); out != nil {
+			resp.Diagnostics.Append(plan.fromProto(ctx, out)...)
+		}
+	}
+
+	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+}
+
+// createRequest builds the create from the plan: the tenant from the
+// resource or the provider default, the display name and expiry.
+func (r *serviceAccountResource) createRequest(plan *serviceAccountModel, diags *diag.Diagnostics) *tenancypb.CreateServiceAccountRequest {
+
 	ids := map[string]string{tenantIDAttribute: r.defaults[tenantIDAttribute]}
 	if v := plan.TenantID.ValueString(); v != "" {
 		ids[tenantIDAttribute] = v
 	}
 	parent, err := serviceAccountScope.ComposeParent(ids)
 	if err != nil {
-		resp.Diagnostics.AddError("cannot resolve parent for service account", err.Error()+"; set it on the resource or as a provider default")
-		return
+		diags.AddError("cannot resolve parent for service account", err.Error()+"; set it on the resource or as a provider default")
+		return nil
 	}
 
-	expires := parseTimestamp(plan.ExpiresAt, path.Root(expiresAtAttribute), &resp.Diagnostics)
-	if resp.Diagnostics.HasError() {
-		return
+	return &tenancypb.CreateServiceAccountRequest{
+		Parent: parent,
+		ServiceAccount: &tenancypb.ServiceAccount{
+			DisplayName: plan.DisplayName.ValueString(),
+			ExpiresAt:   parseTimestamp(plan.ExpiresAt, path.Root(expiresAtAttribute), diags),
+		},
+	}
+}
+
+// setRoles writes the account's roles; nil means it failed and diags says
+// why.
+func (r *serviceAccountResource) setRoles(ctx context.Context, name string, roles types.Set, diags *diag.Diagnostics) *tenancypb.ServiceAccount {
+
+	var keys []string
+	diags.Append(roles.ElementsAs(ctx, &keys, false)...)
+	if diags.HasError() {
+		return nil
 	}
 
-	out, err := r.client.CreateServiceAccount(ctx, &tenancypb.CreateServiceAccountRequest{
-		Parent:         parent,
-		ServiceAccount: &tenancypb.ServiceAccount{DisplayName: plan.DisplayName.ValueString(), ExpiresAt: expires},
-	})
-	if err != nil {
-		resp.Diagnostics.AddError("create service account failed", err.Error())
-		return
+	out, err := r.client.SetServiceAccountRoles(ctx, &tenancypb.SetServiceAccountRolesRequest{Name: name, Roles: keys})
+	switch {
+	case err == nil:
+		return out
+	case status.Code(err) == codes.InvalidArgument:
+		diags.AddAttributeError(path.Root("roles"), "kit refused the service account's roles",
+			err.Error()+"\n\nA service account may hold only tenant.admin, tenant.viewer and guardcontrol.admin, and only those the estate's catalog declares.")
+	default:
+		diags.AddError("setting the service account's roles failed", err.Error())
 	}
-
-	resp.Diagnostics.Append(plan.fromProto(ctx, out)...)
-	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+	return nil
 }
 
 func (r *serviceAccountResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
@@ -264,9 +319,32 @@ func (r *serviceAccountResource) Read(ctx context.Context, req resource.ReadRequ
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
-// Update is never planned: every argument replaces the account.
-func (r *serviceAccountResource) Update(_ context.Context, _ resource.UpdateRequest, resp *resource.UpdateResponse) {
-	resp.Diagnostics.AddError("service account cannot change in place", "every argument of authwise_service_account replaces it; this is a provider bug")
+// Update writes roles, the one argument that changes in place.
+func (r *serviceAccountResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+
+	if !r.configured(&resp.Diagnostics) {
+		return
+	}
+
+	var plan, state serviceAccountModel
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	if plan.Roles.IsUnknown() || plan.Roles.Equal(state.Roles) {
+		resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
+		return
+	}
+
+	out := r.setRoles(ctx, state.Name.ValueString(), plan.Roles, &resp.Diagnostics)
+	if out == nil {
+		return
+	}
+
+	resp.Diagnostics.Append(state.fromProto(ctx, out)...)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
 // Delete surfaces kit's refusal while a role is bound to the account, with
@@ -283,12 +361,22 @@ func (r *serviceAccountResource) Delete(ctx context.Context, req resource.Delete
 		return
 	}
 
+	// Its roles are its own, written only through SetServiceAccountRoles;
+	// they go with it. Any other binding naming it still refuses.
+	if len(state.Roles.Elements()) > 0 {
+		_, err := r.client.SetServiceAccountRoles(ctx, &tenancypb.SetServiceAccountRolesRequest{Name: state.Name.ValueString()})
+		if err != nil && !aip.IsNotFound(err) {
+			resp.Diagnostics.AddError("unbinding the service account's roles failed", err.Error())
+			return
+		}
+	}
+
 	_, err := r.client.DeleteServiceAccount(ctx, &tenancypb.DeleteServiceAccountRequest{Name: state.Name.ValueString()})
 	switch {
 	case err == nil, aip.IsNotFound(err):
 	case status.Code(err) == codes.FailedPrecondition:
-		resp.Diagnostics.AddError("the service account still holds a role",
-			err.Error()+"\n\nkit refuses to delete a service account while any binding names it. "+
+		resp.Diagnostics.AddError("the service account is still bound",
+			err.Error()+"\n\nkit refuses to delete a service account while a binding other than its roles names it. "+
 				"Remove the binding first: referencing the account by expression (authwise_service_account.x.client_id) makes Terraform destroy the binding before the account.")
 	default:
 		resp.Diagnostics.AddError("delete service account failed", err.Error())
@@ -306,7 +394,7 @@ func (r *serviceAccountResource) ImportState(ctx context.Context, req resource.I
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root(tfruntime.NameAttribute), req.ID)...)
 }
 
-func (m *serviceAccountModel) fromProto(_ context.Context, e *tenancypb.ServiceAccount) diag.Diagnostics {
+func (m *serviceAccountModel) fromProto(ctx context.Context, e *tenancypb.ServiceAccount) diag.Diagnostics {
 
 	var diags diag.Diagnostics
 
@@ -321,6 +409,9 @@ func (m *serviceAccountModel) fromProto(_ context.Context, e *tenancypb.ServiceA
 	m.DisplayName = types.StringValue(e.GetDisplayName())
 	m.ExpiresAt = timestampString(e.GetExpiresAt())
 	m.ClientID = types.StringValue(e.GetClientId())
+	roles, d := types.SetValueFrom(ctx, types.StringType, append([]string{}, e.GetRoles()...))
+	diags.Append(d...)
+	m.Roles = roles
 	m.Status = types.StringValue(e.GetStatus().String())
 	m.CreatedAt = timestampString(e.GetCreatedAt())
 	m.UpdatedAt = timestampString(e.GetUpdatedAt())

@@ -245,7 +245,7 @@ Two lanes, the same bearer credentials as awctl:
   plus optional `audience`). Partial configuration is an error naming the
   gaps. For CI, the credential is a service account (#37):
   `authwise_service_account`, a client of the admin issuer the tenant
-  owns, and `authwise_service_account_secret`, its secret, minted once and
+  owns, with the `roles` it holds there, and `authwise_service_account_secret`, its secret, minted once and
   kept in state like a client secret. Both go through the public tenancy
   service on `endpoint`, at central only. Replacing the secret rotates it,
   and the old one keeps working for `grace`. Destroying it does not revoke

@@ -8,6 +8,7 @@ package acctest_test
 import (
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -203,7 +204,7 @@ resource "authwise_access_binding" "ci" {
 					h.access.bindings[name] = &corepb.AccessBinding{Name: name, SubjectType: "client", SubjectId: client, RoleName: "tenant.admin"}
 				},
 				Config:      h.providerConfig(),
-				ExpectError: regexp.MustCompile(`(?s)the\s+service\s+account\s+still\s+holds\s+a\s+role.*still\s+bound:.*axb-outside`),
+				ExpectError: regexp.MustCompile(`(?s)the\s+service\s+account\s+is\s+still\s+bound.*still\s+bound:.*axb-outside`),
 			},
 			{
 				PreConfig: func() {
@@ -213,6 +214,99 @@ resource "authwise_access_binding" "ci" {
 				},
 				Config: h.providerConfig(),
 			},
+		},
+	})
+}
+
+// roles bind at create, change in place, refuse a role kit does not allow,
+// and go with the account on destroy.
+func TestAccServiceAccount_Roles(t *testing.T) {
+
+	h := newHarness(t)
+
+	config := func(roles string) string {
+		return h.providerConfig() + fmt.Sprintf(`
+resource "authwise_service_account" "ci" {
+  display_name = "terraform"
+  roles        = %s
+}
+`, roles)
+	}
+
+	var name string
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: protoFactories(),
+		Steps: []resource.TestStep{
+			{
+				Config: config(`["tenant.admin"]`),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr(serviceAccountAddr, "roles.#", "1"),
+					resource.TestCheckTypeSetElemAttr(serviceAccountAddr, "roles.*", "tenant.admin"),
+					resource.TestCheckResourceAttrWith(serviceAccountAddr, "name", func(v string) error {
+						name = v
+						return nil
+					}),
+				),
+			},
+			{
+				Config: config(`["tenant.viewer", "guardcontrol.admin"]`),
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{
+						plancheck.ExpectResourceAction(serviceAccountAddr, plancheck.ResourceActionUpdate),
+					},
+				},
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr(serviceAccountAddr, "roles.#", "2"),
+					resource.TestCheckTypeSetElemAttr(serviceAccountAddr, "roles.*", "guardcontrol.admin"),
+					resource.TestCheckResourceAttrWith(serviceAccountAddr, "name", equalTo(&name)),
+					checkServer(func() error {
+						h.tenancy.mu.Lock()
+						defer h.tenancy.mu.Unlock()
+						if got := h.tenancy.accounts[name].GetRoles(); !slices.Equal(got, []string{"guardcontrol.admin", "tenant.viewer"}) {
+							return fmt.Errorf("server roles = %v", got)
+						}
+						return nil
+					}),
+				),
+			},
+			{
+				Config:      config(`["operator"]`),
+				ExpectError: regexp.MustCompile(`(?s)kit\s+refused\s+the\s+service\s+account's\s+roles.*"operator"\s+is\s+not\s+one`),
+			},
+			{
+				// Unset, roles are left alone and read back: no diff.
+				PreConfig: func() {
+					h.tenancy.mu.Lock()
+					defer h.tenancy.mu.Unlock()
+					h.tenancy.accounts[name].Roles = []string{"tenant.admin"}
+				},
+				Config: h.providerConfig() + `
+resource "authwise_service_account" "ci" {
+  display_name = "terraform"
+}
+`,
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{plancheck.ExpectEmptyPlan()},
+				},
+				Check: resource.TestCheckTypeSetElemAttr(serviceAccountAddr, "roles.*", "tenant.admin"),
+			},
+			{
+				Config: config(`[]`),
+				Check:  resource.TestCheckResourceAttr(serviceAccountAddr, "roles.#", "0"),
+			},
+			{
+				// Destroy unbinds the roles, then deletes.
+				Config: config(`["tenant.admin"]`),
+			},
+		},
+		CheckDestroy: func(*terraform.State) error {
+			h.tenancy.mu.Lock()
+			defer h.tenancy.mu.Unlock()
+			if n := len(h.tenancy.accounts); n != 0 {
+				return fmt.Errorf("%d service accounts remain after destroy", n)
+			}
+			return nil
 		},
 	})
 }
