@@ -41,6 +41,7 @@ Read-Only:
 - `labels` (Map of String)
 - `login_url` (String)
 - `name` (String) Full resource name.
+- `owning_tenant_id` (String)
 - `post_logout_redirect_uris` (List of String)
 - `status` (String)
 - `token_endpoint_auth_method` (String)

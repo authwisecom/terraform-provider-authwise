@@ -33,6 +33,7 @@ An OAuth 2.0 client of an issuer: an application that signs people in or calls a
 - `kind` (String)
 - `labels` (Map of String)
 - `login_url` (String)
+- `owning_tenant_id` (String)
 - `post_logout_redirect_uris` (List of String)
 - `status` (String)
 - `tenant_id` (String)

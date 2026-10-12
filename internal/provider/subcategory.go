@@ -26,6 +26,7 @@ var identityTypes = map[string]bool{
 	"client_secret": true, "interactive_client_config": true,
 	"saml_relying_party_config": true, "user": true,
 	"realm_authentication_policy": true, "realm_authentication_context_schema": true,
+	"service_account": true, "service_account_secret": true,
 }
 
 // families are the groups that go by prefix, so a new Guard, Access,

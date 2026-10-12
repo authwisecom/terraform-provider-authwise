@@ -108,6 +108,10 @@ func ClientResourceSchema() schema.Schema {
 				MarkdownDescription: "Full resource name; serves as the Terraform ID.",
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
+			"owning_tenant_id": schema.StringAttribute{
+				Computed:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
 			"post_logout_redirect_uris": schema.ListAttribute{
 				Computed:      true,
 				ElementType:   types.StringType,
@@ -155,6 +159,7 @@ type ClientModel struct {
 	TokenEndpointAuthMethod types.String         `tfsdk:"token_endpoint_auth_method"`
 	Status                  types.String         `tfsdk:"status"`
 	ExpiresAt               types.String         `tfsdk:"expires_at"`
+	OwningTenantId          types.String         `tfsdk:"owning_tenant_id"`
 }
 
 // NewClientModel returns a model with every attribute set to its typed null; collection types cannot be zero-valued.
@@ -173,6 +178,7 @@ func NewClientModel() *ClientModel {
 		Labels:                  types.MapNull(types.StringType),
 		LoginUrl:                types.StringNull(),
 		Name:                    types.StringNull(),
+		OwningTenantId:          types.StringNull(),
 		PostLogoutRedirectUris:  types.ListNull(types.StringType),
 		Status:                  types.StringNull(),
 		TenantId:                types.StringNull(),
@@ -222,6 +228,7 @@ func (m *ClientModel) ToProto(ctx context.Context) (*v1alpha1.Client, diag.Diagn
 			out.ExpiresAt = timestamppb.New(t)
 		}
 	}
+	out.OwningTenantId = m.OwningTenantId.ValueString()
 	return out, diags
 }
 
@@ -296,6 +303,11 @@ func (m *ClientModel) FromProto(ctx context.Context, e *v1alpha1.Client) diag.Di
 		m.ExpiresAt = types.StringNull()
 	} else {
 		m.ExpiresAt = types.StringValue(e.ExpiresAt.AsTime().Format(time.RFC3339))
+	}
+	if e.OwningTenantId == "" {
+		m.OwningTenantId = types.StringNull()
+	} else {
+		m.OwningTenantId = types.StringValue(e.OwningTenantId)
 	}
 	return diags
 }
@@ -512,6 +524,7 @@ func ClientDataSourceSchema() schema1.Schema {
 				MarkdownDescription: "Full resource name of the object to read.",
 				Required:            true,
 			},
+			"owning_tenant_id": schema1.StringAttribute{Computed: true},
 			"post_logout_redirect_uris": schema1.ListAttribute{
 				Computed:    true,
 				ElementType: types.StringType,
@@ -569,6 +582,7 @@ type ClientItemModel struct {
 	TokenEndpointAuthMethod types.String         `tfsdk:"token_endpoint_auth_method"`
 	Status                  types.String         `tfsdk:"status"`
 	ExpiresAt               types.String         `tfsdk:"expires_at"`
+	OwningTenantId          types.String         `tfsdk:"owning_tenant_id"`
 }
 
 // ClientItemAttrTypes returns the attribute types of one clients list element.
@@ -586,6 +600,7 @@ func ClientItemAttrTypes() map[string]attr.Type {
 		"labels":                     types.MapType{ElemType: types.StringType},
 		"login_url":                  types.StringType,
 		"name":                       types.StringType,
+		"owning_tenant_id":           types.StringType,
 		"post_logout_redirect_uris":  types.ListType{ElemType: types.StringType},
 		"status":                     types.StringType,
 		"token_endpoint_auth_method": types.StringType,
@@ -634,6 +649,7 @@ func ClientListDataSourceSchema() schema1.Schema {
 						Computed:            true,
 						MarkdownDescription: "Full resource name.",
 					},
+					"owning_tenant_id": schema1.StringAttribute{Computed: true},
 					"post_logout_redirect_uris": schema1.ListAttribute{
 						Computed:    true,
 						ElementType: types.StringType,
@@ -729,6 +745,11 @@ func clientItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Client, *C
 		item.ExpiresAt = types.StringNull()
 	} else {
 		item.ExpiresAt = types.StringValue(e.ExpiresAt.AsTime().Format(time.RFC3339))
+	}
+	if e.OwningTenantId == "" {
+		item.OwningTenantId = types.StringNull()
+	} else {
+		item.OwningTenantId = types.StringValue(e.OwningTenantId)
 	}
 	id, err := crud.IDFromName(e.Name)
 	if err != nil {

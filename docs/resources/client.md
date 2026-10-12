@@ -56,6 +56,7 @@ resource "authwise_client" "console" {
 
 - `client_id` (String) Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.
 - `name` (String) Full resource name; serves as the Terraform ID.
+- `owning_tenant_id` (String)
 
 ## Import
 

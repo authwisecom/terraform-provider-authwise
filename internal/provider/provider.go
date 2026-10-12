@@ -15,6 +15,7 @@ import (
 	accesspb "git.authwise.com/authwise/apis/authwise/access/v1alpha1"
 	guardpb "git.authwise.com/authwise/apis/authwise/guardcontrol/v1alpha1"
 	identitypb "git.authwise.com/authwise/apis/authwise/identity/v1alpha1"
+	tenancypb "git.authwise.com/authwise/apis/authwise/tenancy/v1alpha1"
 	"git.authwise.com/authwise/terraform-provider-authwise/internal/generated"
 	tfruntime "github.com/activatedio/tfinfra/pkg/tf"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
@@ -235,6 +236,9 @@ func (p *AuthwiseProvider) Configure(ctx context.Context, req provider.Configure
 		Clients: map[string]any{
 			"identity": userContactClient{newAppearanceDefaultClient(identitypb.NewAuthwiseIdentityServiceClient(conn))},
 			"access":   accesspb.NewAuthwiseAccessServiceClient(conn),
+			// The public tenancy service, on kit's endpoint: service
+			// accounts (#37).
+			tenancyClientKey: tenancypb.NewAuthwiseTenancyServiceClient(conn),
 
 			guardClientKey:     guardpb.NewGuardControlServiceClient(guardConn),
 			guardNodeClientKey: guardpb.NewGuardNodeServiceClient(guardConn),
@@ -264,6 +268,8 @@ func (p *AuthwiseProvider) Resources(ctx context.Context) []func() resource.Reso
 		newRealmAuthenticationPolicyResource,
 		newAssetContentResource,
 		newGuardNodeGrantsResource,
+		newServiceAccountResource,
+		newServiceAccountSecretResource,
 	))
 }
 

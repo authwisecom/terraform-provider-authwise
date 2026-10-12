@@ -243,7 +243,13 @@ Two lanes, the same bearer credentials as awctl:
 - **Client credentials** — set `token_url`/`client_id`/`client_secret`
   (or `AUTHWISE_TOKEN_URL`/`AUTHWISE_CLIENT_ID`/`AUTHWISE_CLIENT_SECRET`,
   plus optional `audience`). Partial configuration is an error naming the
-  gaps.
+  gaps. For CI, the credential is a service account (#37):
+  `authwise_service_account`, a client of the admin issuer the tenant
+  owns, and `authwise_service_account_secret`, its secret, minted once and
+  kept in state like a client secret. Both go through the public tenancy
+  service on `endpoint`, at central only. Replacing the secret rotates it,
+  and the old one keeps working for `grace`. Destroying it does not revoke
+  it: the tenancy service has no per-secret revoke.
 - **awctl store** — with no client credentials configured, the provider
   reads the token stored by `awctl auth login`
   (`~/.awctl.d/credentials/credentials.json`) — convenient for local

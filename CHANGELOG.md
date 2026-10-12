@@ -1,3 +1,35 @@
+## Unreleased
+
+NOTES:
+
+* **apis v0.30.0.** Built against apis v0.30.0, which carries kit#756's
+  service accounts. They need the kit release that serves them, at central.
+
+FEATURES:
+
+* **`authwise_service_account` (#37):** a machine principal the tenant
+  owns, for CI. It is a client of the admin issuer, created through the
+  public tenancy service with a member seat at the tenant and no roles.
+  `display_name` and `expires_at` replace it when changed, since nothing
+  changes an account in place. It exposes `client_id`, `status` and its live
+  `secrets` (id, created, expiry, never the plaintext), and imports by its
+  name (`tenants/{t}/service-accounts/{c}`). kit refuses to delete it while
+  a binding names it, and the error says to remove the binding first.
+* **`authwise_service_account_secret` (#37):** the account's secret, minted
+  once and kept in state as a sensitive attribute, like
+  `authwise_client_secret`. It also returns the `token_url` and `audience`
+  to use it with. Replace it to rotate (`keepers`): with `rotate` (the
+  default) the other live secrets keep working for `grace` (24 hours
+  unless set) and then lapse. Destroying it does not revoke the secret,
+  because the tenancy service has no per-secret revoke. A secret that has
+  expired or lapsed drops out of state, and the next apply mints another.
+* **`authwise_client.owning_tenant_id`**, read-only: set on a service
+  account's client.
+* The provider doc's Authentication section gains "CI: a service account".
+  Until kit#763 adds `roles`, binding a role to the account needs an
+  operator: a tenant administrator holds no `access.bindings.create` in the
+  estate audience.
+
 ## 0.10.0 (October 10, 2026)
 
 NOTES:

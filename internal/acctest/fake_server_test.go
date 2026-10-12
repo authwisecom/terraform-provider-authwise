@@ -16,6 +16,7 @@ import (
 	accesspb "git.authwise.com/authwise/apis/authwise/access/v1alpha1"
 	guardpb "git.authwise.com/authwise/apis/authwise/guardcontrol/v1alpha1"
 	identitypb "git.authwise.com/authwise/apis/authwise/identity/v1alpha1"
+	tenancypb "git.authwise.com/authwise/apis/authwise/tenancy/v1alpha1"
 	corepb "git.authwise.com/authwise/apis/authwise/types/core/v1alpha1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -849,6 +850,7 @@ func (f *fakeIdentityServer) DeleteCertificate(ctx context.Context, in *identity
 type harness struct {
 	fake     *fakeIdentityServer
 	access   *fakeAccessServer
+	tenancy  *fakeTenancyServer
 	grpcAddr string
 	// guard is guard-control, on its own listener as in a deployment.
 	guard       *fakeGuardServer
@@ -862,6 +864,7 @@ func newHarness(t *testing.T) *harness {
 	t.Helper()
 
 	h := &harness{fake: newFakeIdentityServer(), access: newFakeAccessServer(), guard: newFakeGuardServer()}
+	h.tenancy = newFakeTenancyServer(h.access)
 
 	lis, err := new(net.ListenConfig).Listen(t.Context(), "tcp", "127.0.0.1:0")
 	if err != nil {
@@ -872,6 +875,7 @@ func newHarness(t *testing.T) *harness {
 	s := grpc.NewServer()
 	identitypb.RegisterAuthwiseIdentityServiceServer(s, h.fake)
 	accesspb.RegisterAuthwiseAccessServiceServer(s, h.access)
+	tenancypb.RegisterAuthwiseTenancyServiceServer(s, h.tenancy)
 	go func() { _ = s.Serve(lis) }()
 	t.Cleanup(s.Stop)
 

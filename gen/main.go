@@ -15,7 +15,10 @@
 // shapes are beyond tfinfra: authwise_secret (the material rides the create
 // request and the :addVersion RPC, never the entity) and
 // authwise_realm_authentication_policy (oneofs, repeated messages and
-// durations nested several levels deep inside RealmConfig).
+// durations nested several levels deep inside RealmConfig), and
+// authwise_service_account with authwise_service_account_secret (the
+// account's secrets are a repeated message, and a secret has no read or
+// delete of its own).
 package main
 
 //go:generate go run .
@@ -304,6 +307,9 @@ func main() {
 			// Issuer-scoped.
 			crud[corepb.Client](scopeIssuer,
 				withDescription("An OAuth 2.0 client of an issuer: an application that signs people in or calls an API."), withJSON("config"),
+				// owning_tenant_id marks a service account (kit#756): kit
+				// sets it on CreateServiceAccount and refuses it here.
+				withComputed("owning_tenant_id"),
 				withReferences(map[string]gentf.Reference{"audience_id": refAudience, "appearance_profile_id": refAppearanceProfile})),
 			clientSecret(),
 			crud[corepb.Audience](scopeIssuer,

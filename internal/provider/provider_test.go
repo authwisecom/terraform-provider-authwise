@@ -58,8 +58,10 @@ func TestProviderSurface(t *testing.T) {
 	// entity resources and the guard_resource_nodes association; stage 2
 	// the node and the hand-written guard_node_grants. access_resource_type
 	// came with the guard-control v0.12.0 catalog. The Guard tenant has its
-	// data sources but no resource: awtenant creates one (#36).
-	assert.Len(t, resourceTypes, 32)
+	// data sources but no resource: awtenant creates one (#36). Service
+	// accounts (#37) add the hand-written service_account and
+	// service_account_secret.
+	assert.Len(t, resourceTypes, 34)
 	assert.False(t, resourceTypes["authwise_guard_tenant"], "a Guard tenant is awtenant's to create")
 	for _, want := range []string{
 		"authwise_guard_network",
@@ -81,6 +83,8 @@ func TestProviderSurface(t *testing.T) {
 		"authwise_secret",
 		"authwise_realm_authentication_policy",
 		"authwise_asset_content",
+		"authwise_service_account",
+		"authwise_service_account_secret",
 	} {
 		assert.True(t, resourceTypes[want], "missing resource %s", want)
 	}
