@@ -1,3 +1,27 @@
+## 0.12.0 (October 12, 2026)
+
+NOTES:
+
+* **apis v0.31.0, kit v1.43.0, guard-control v0.15.0.** Built against apis
+  v0.31.0. kit v1.43.0 is the first kit release that serves service accounts
+  (kit#756) and their roles (kit#763), at central. The rest of the provider
+  still works with kit v1.38.0.
+
+FEATURES:
+
+* **`authwise_service_account.roles` (#37, kit#763):** the roles the account
+  holds at its tenant, by key. A service account may hold `tenant.admin`,
+  `tenant.viewer` and `guardcontrol.admin`, and kit refuses any other; the
+  refusal is shown on `roles`. When set, `roles` is authoritative: the
+  account holds exactly these, it changes in place, and an empty set unbinds
+  them all. Unset, the provider leaves the account's roles alone and reads
+  them back. A tenant administrator can now give the account a role, which
+  0.11.0 left to an operator.
+* Destroying an account unbinds its `roles` first. kit still refuses while
+  any other binding names it.
+* The provider doc's "CI: a service account" now sets `roles` instead of
+  having an operator write the binding.
+
 ## 0.11.0 (October 12, 2026)
 
 NOTES:
