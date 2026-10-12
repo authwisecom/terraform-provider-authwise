@@ -1,9 +1,11 @@
-## Unreleased
+## 0.11.0 (October 12, 2026)
 
 NOTES:
 
-* **apis v0.30.0.** Built against apis v0.30.0, which carries kit#756's
-  service accounts. They need the kit release that serves them, at central.
+* **apis v0.30.0, guard-control v0.15.0, kit v1.38.0.** Built against apis
+  v0.30.0, which carries kit#756's service accounts. Every other resource
+  still pairs with kit v1.38.0. The two service account resources need the
+  first kit release after v1.40.1 that carries kit#756, served at central.
 
 FEATURES:
 
