@@ -40,6 +40,9 @@ const (
 	tenancyClientKey = "tenancy"
 
 	serviceAccountCollection = "service-accounts"
+
+	createdAtAttribute = "created_at"
+	expiresAtAttribute = "expires_at"
 )
 
 var serviceAccountScope = aip.NewScope("tenants")
@@ -113,7 +116,7 @@ type serviceAccountModel struct {
 }
 
 func serviceAccountSecretAttrTypes() map[string]attr.Type {
-	return map[string]attr.Type{"id": types.StringType, "created_at": types.StringType, "expires_at": types.StringType}
+	return map[string]attr.Type{"id": types.StringType, createdAtAttribute: types.StringType, expiresAtAttribute: types.StringType}
 }
 
 func newServiceAccountResource() resource.Resource {
@@ -142,7 +145,7 @@ func (r *serviceAccountResource) Schema(_ context.Context, _ resource.SchemaRequ
 			"kit refuses to delete an account while any role is bound to it. " +
 			"Service accounts are served at central only: against a satellite, kit refuses and names central.",
 		Attributes: map[string]schema.Attribute{
-			"name": computed("Full resource name (`tenants/{t}/service-accounts/{c}`); serves as the Terraform ID, and is what `authwise_service_account_secret` takes."),
+			tfruntime.NameAttribute: computed("Full resource name (`tenants/{t}/service-accounts/{c}`); serves as the Terraform ID, and is what `authwise_service_account_secret` takes."),
 			tenantIDAttribute: schema.StringAttribute{
 				Optional:            true,
 				Computed:            true,
@@ -155,7 +158,7 @@ func (r *serviceAccountResource) Schema(_ context.Context, _ resource.SchemaRequ
 				MarkdownDescription: "Unique among the tenant's service accounts. Changing it replaces the account.",
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
-			"expires_at": schema.StringAttribute{
+			expiresAtAttribute: schema.StringAttribute{
 				Optional:            true,
 				MarkdownDescription: "When set (RFC 3339), the token endpoint refuses the account after it. Changing it replaces the account.",
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
@@ -167,15 +170,15 @@ func (r *serviceAccountResource) Schema(_ context.Context, _ resource.SchemaRequ
 				MarkdownDescription: "The live secrets, newest last: unexpired, and never the plaintext.",
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
-						"id":         schema.StringAttribute{Computed: true, MarkdownDescription: "The secret's id: the part of the minted secret before the underscore."},
-						"created_at": schema.StringAttribute{Computed: true},
-						"expires_at": schema.StringAttribute{Computed: true, MarkdownDescription: "Unset: the secret does not expire."},
+						"id":               schema.StringAttribute{Computed: true, MarkdownDescription: "The secret's id: the part of the minted secret before the underscore."},
+						createdAtAttribute: schema.StringAttribute{Computed: true},
+						expiresAtAttribute: schema.StringAttribute{Computed: true, MarkdownDescription: "Unset: the secret does not expire."},
 					},
 				},
 				PlanModifiers: []planmodifier.List{listplanmodifier.UseStateForUnknown()},
 			},
-			"created_at": computed(""),
-			"updated_at": computed(""),
+			createdAtAttribute: computed(""),
+			"updated_at":       computed(""),
 		},
 	}
 }
@@ -217,7 +220,7 @@ func (r *serviceAccountResource) Create(ctx context.Context, req resource.Create
 		return
 	}
 
-	expires := parseTimestamp(plan.ExpiresAt, path.Root("expires_at"), &resp.Diagnostics)
+	expires := parseTimestamp(plan.ExpiresAt, path.Root(expiresAtAttribute), &resp.Diagnostics)
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -300,7 +303,7 @@ func (r *serviceAccountResource) ImportState(ctx context.Context, req resource.I
 		return
 	}
 
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("name"), req.ID)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root(tfruntime.NameAttribute), req.ID)...)
 }
 
 func (m *serviceAccountModel) fromProto(_ context.Context, e *tenancypb.ServiceAccount) diag.Diagnostics {
@@ -326,9 +329,9 @@ func (m *serviceAccountModel) fromProto(_ context.Context, e *tenancypb.ServiceA
 	secrets := make([]attr.Value, 0, len(e.GetSecrets()))
 	for _, s := range e.GetSecrets() {
 		v, d := types.ObjectValue(serviceAccountSecretAttrTypes(), map[string]attr.Value{
-			"id":         types.StringValue(s.GetId()),
-			"created_at": timestampString(s.GetCreatedAt()),
-			"expires_at": timestampString(s.GetExpiresAt()),
+			"id":               types.StringValue(s.GetId()),
+			createdAtAttribute: timestampString(s.GetCreatedAt()),
+			expiresAtAttribute: timestampString(s.GetExpiresAt()),
 		})
 		diags.Append(d...)
 		secrets = append(secrets, v)
@@ -393,7 +396,7 @@ func (r *serviceAccountSecretResource) Schema(_ context.Context, _ resource.Sche
 				MarkdownDescription: "The account's full resource name, `authwise_service_account.<name>.name`. Changing it mints a new secret.",
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
-			"expires_at": schema.StringAttribute{
+			expiresAtAttribute: schema.StringAttribute{
 				Optional:            true,
 				MarkdownDescription: "When the secret stops authenticating (RFC 3339, in the future). Unset: it does not expire. Changing it mints a new secret.",
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
@@ -422,9 +425,9 @@ func (r *serviceAccountSecretResource) Schema(_ context.Context, _ resource.Sche
 				MarkdownDescription: "The client secret, from the mint. No read returns it again.",
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
-			"token_url":  computed("Where to exchange it: the admin issuer's token endpoint."),
-			"audience":   computed("The audience to ask for: the estate audience kit's admin API accepts."),
-			"created_at": computed(""),
+			"token_url":        computed("Where to exchange it: the admin issuer's token endpoint."),
+			"audience":         computed("The audience to ask for: the estate audience kit's admin API accepts."),
+			createdAtAttribute: computed(""),
 		},
 	}
 }
@@ -455,7 +458,7 @@ func (r *serviceAccountSecretResource) Create(ctx context.Context, req resource.
 
 	mint := &tenancypb.MintServiceAccountSecretRequest{
 		Name:      plan.ServiceAccount.ValueString(),
-		ExpiresAt: parseTimestamp(plan.ExpiresAt, path.Root("expires_at"), &resp.Diagnostics),
+		ExpiresAt: parseTimestamp(plan.ExpiresAt, path.Root(expiresAtAttribute), &resp.Diagnostics),
 		Rotate:    plan.Rotate.ValueBool(),
 	}
 	if v := plan.Grace.ValueString(); v != "" {
