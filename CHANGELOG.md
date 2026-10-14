@@ -1,4 +1,11 @@
-## Unreleased
+## 0.13.0 (October 13, 2026)
+
+NOTES:
+
+* **apis v0.31.0, kit v1.43.0, guard-control v0.15.0.** No new server
+  requirement: the config data sources make no API call, and the configs
+  they build are the ones kit already accepts. As in 0.12.0, service
+  accounts need kit v1.43.0 and the rest works with kit v1.38.0.
 
 FEATURES:
 
