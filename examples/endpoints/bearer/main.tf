@@ -35,11 +35,12 @@ resource "authwise_endpoint" "risk" {
   # install's default (5s) when unset.
   timeout = "2s"
 
-  # auth is the protojson form of EndpointAuth, so its keys are lowerCamel.
-  # Naming the secret here orders the endpoint after it.
-  auth = jsonencode({
-    bearer = {
-      token = { name = authwise_secret.risk_token.name }
-    }
-  })
+  auth = data.authwise_endpoint_auth.risk.json
+}
+
+# Naming the secret here orders the endpoint after it.
+data "authwise_endpoint_auth" "risk" {
+  bearer = {
+    token = { name = authwise_secret.risk_token.name }
+  }
 }

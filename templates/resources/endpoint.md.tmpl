@@ -37,11 +37,13 @@ resource "authwise_endpoint" "risk" {
   address      = "https://risk.example.com/v1"
   timeout      = "2s"
 
-  auth = jsonencode({
-    bearer = {
-      token = { name = authwise_secret.risk_token.name }
-    }
-  })
+  auth = data.authwise_endpoint_auth.risk.json
+}
+
+data "authwise_endpoint_auth" "risk" {
+  bearer = {
+    token = { name = authwise_secret.risk_token.name }
+  }
 }
 ```
 
@@ -63,12 +65,14 @@ resource "authwise_endpoint" "ledger" {
     server_name = "ledger.internal"
   }
 
-  auth = jsonencode({
-    kitToken = {
-      issuer   = authwise_issuer.internal.name
-      audience = "https://ledger.example.com"
-    }
-  })
+  auth = data.authwise_endpoint_auth.ledger.json
+}
+
+data "authwise_endpoint_auth" "ledger" {
+  kit_token = {
+    issuer   = authwise_issuer.internal.name
+    audience = "https://ledger.example.com"
+  }
 }
 ```
 
@@ -121,21 +125,24 @@ unless the install sets `integration.allowPrivateAddresses`.
 
 ## `auth`
 
-`auth` is the protojson encoding of `EndpointAuth`, written with
-`jsonencode`. Its keys are **lowerCamel**, such as `kitToken` rather than
-`kit_token`. The value kit returns is compared with the value you wrote, and
-kit returns lowerCamel. It holds exactly one scheme:
+`auth` is the protojson encoding of `EndpointAuth`. Build it with the
+`authwise_endpoint_auth` data source and pass its `json`. It holds exactly
+one scheme, and the data source refuses a second at plan:
 
-| scheme | sends | JSON |
+| scheme | sends | `authwise_endpoint_auth` |
 | --- | --- | --- |
-| `bearer` | `authorization: Bearer <secret>` | `{ bearer = { token = { name = <secret> } } }` |
-| `basic` | HTTP basic; only the password is secret | `{ basic = { username = "kit", password = { name = <secret> } } }` |
-| `header` | any header, lower-cased on the wire | `{ header = { name = "x-api-key", value = { name = <secret> } } }` |
-| `kitToken` | a token kit signs; nothing stored | `{ kitToken = { issuer = <issuer>, audience = "…" } }` |
+| `bearer` | `authorization: Bearer <secret>` | `bearer = { token = { name = <secret> } }` |
+| `basic` | HTTP basic; only the password is secret | `basic = { username = "kit", password = { name = <secret> } }` |
+| `header` | any header, lower-cased on the wire | `header = { name = "x-api-key", value = { name = <secret> } }` |
+| `kit_token` | a token kit signs; nothing stored | `kit_token = { issuer = <issuer>, audience = "…" }` |
 
 `<secret>` is an `authwise_secret`'s `name` and `<issuer>` is an
 `authwise_issuer`'s `name`, both of the endpoint's tenant. Referencing them
-inside `jsonencode` orders the endpoint after them. Writing a secret-backed
+orders the endpoint after them.
+
+`auth` can also be written with `jsonencode`. Its keys are then
+**lowerCamel**, such as `kitToken` rather than `kit_token`, because the
+value kit returns is compared with the value you wrote. Writing a secret-backed
 scheme needs `identity.secrets.use`. Leaving `auth` unset means kit presents
 nothing.
 
@@ -167,20 +174,22 @@ endpoint's `kitToken` signs from it.
 Terraform orders destroys by references, so the way you name the endpoint
 matters:
 
-- **Reference it**, even inside `jsonencode`, and the holder is destroyed
-  first:
+- **Reference it**, through a config data source or inside `jsonencode`,
+  and the holder is destroyed first:
 
   ```terraform
+  data "authwise_audience_config" "api" {
+    flow_integration_config = { endpoint_name = authwise_endpoint.flow.name }
+  }
+
   resource "authwise_audience" "api" {
     display_name = "https://api.example.com"
-    config = jsonencode({
-      flowIntegrationConfig = { endpointName = authwise_endpoint.flow.name }
-    })
+    config       = data.authwise_audience_config.api.json
   }
   ```
 
   `tls.client_certificate = authwise_certificate.x.name` and
-  `kitToken.issuer = authwise_issuer.x.name` order the same way.
+  `kit_token.issuer = authwise_issuer.x.name` order the same way.
 
 - **A literal name string** such as `"tenants/t-01/endpoints/e-01"` gives
   Terraform no edge. Destroy may then remove the endpoint first and fail

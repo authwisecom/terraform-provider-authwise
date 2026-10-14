@@ -16,10 +16,19 @@ A realm: a population of users with its own providers, factors and authenticatio
 # Tenant-scoped: tenant_id comes from the provider default unless set here.
 resource "authwise_realm" "employees" {
   display_name = "Employees"
-  config       = jsonencode({ defaultLocale = "en" })
+  config       = data.authwise_realm_config.employees.json
 
   labels = {
     team = "platform"
+  }
+}
+
+data "authwise_realm_config" "employees" {
+  default_locale = "en"
+
+  recovery = {
+    self_service_reset = true
+    reset_ttl          = "30m"
   }
 }
 ```

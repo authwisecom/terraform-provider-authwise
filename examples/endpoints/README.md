@@ -26,24 +26,29 @@ directory here applies on its own:
 
 ## `auth`
 
-`auth` is the protojson encoding of `EndpointAuth`, written with
-`jsonencode`. Its keys are **lowerCamel** (`kitToken`, not `kit_token`),
-because the value kit returns is compared with the one you wrote. It holds
-exactly one scheme:
+`auth` is the protojson encoding of `EndpointAuth`, built by the
+`authwise_endpoint_auth` data source and passed as its `json`. It holds
+exactly one scheme, and the data source refuses a second at plan:
 
 ```hcl
-# Authorization: Bearer <secret>
-auth = jsonencode({ bearer = { token = { name = authwise_secret.t.name } } })
+data "authwise_endpoint_auth" "x" {
+  # Authorization: Bearer <secret>
+  bearer = { token = { name = authwise_secret.t.name } }
 
-# HTTP basic; only the password is secret.
-auth = jsonencode({ basic = { username = "kit", password = { name = authwise_secret.p.name } } })
+  # or HTTP basic; only the password is secret.
+  # basic = { username = "kit", password = { name = authwise_secret.p.name } }
 
-# Any header, lower-cased on the wire.
-auth = jsonencode({ header = { name = "x-api-key", value = { name = authwise_secret.k.name } } })
+  # or any header, lower-cased on the wire.
+  # header = { name = "x-api-key", value = { name = authwise_secret.k.name } }
 
-# A token kit signs; nothing stored.
-auth = jsonencode({ kitToken = { issuer = authwise_issuer.i.name, audience = "https://svc.example.com" } })
+  # or a token kit signs; nothing stored.
+  # kit_token = { issuer = authwise_issuer.i.name, audience = "https://svc.example.com" }
+}
 ```
+
+`jsonencode` works too, with **lowerCamel** keys (`kitToken`, not
+`kit_token`), because the value kit returns is compared with the one you
+wrote.
 
 A secret-backed scheme always names a secret; the endpoint never holds a
 credential. Setting one needs `identity.secrets.use`. The client
@@ -55,8 +60,8 @@ certificate for mTLS is not an `auth` scheme: it sits in
 kit refuses to delete an endpoint while anything names it, and the error
 names the holder. It also refuses to delete a certificate or an issuer
 while an endpoint uses it. Name the endpoint by reference
-(`authwise_endpoint.x.name`, even inside `jsonencode`), and Terraform
-destroys the holder first. A literal name string gives Terraform no
+(`authwise_endpoint.x.name`, in a config data source or inside
+`jsonencode`), and Terraform destroys the holder first. A literal name string gives Terraform no
 ordering edge, so add `depends_on` to the holder or replace the literal
 with a reference.
 

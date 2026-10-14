@@ -6,12 +6,14 @@ import (
 	"time"
 
 	corepb "git.authwise.com/authwise/apis/authwise/types/core/v1alpha1"
+	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/durationpb"
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
 // TestProtoattr_RoundTrip converts policies to Terraform values and back.
@@ -152,4 +154,92 @@ func TestParseDisplayStrings(t *testing.T) {
 			assert.Equal(t, v.want, parseDisplayStrings(v.in))
 		})
 	}
+}
+
+func TestProtoattr_Oneof(t *testing.T) {
+
+	ctx := context.Background()
+	md := (&corepb.IssuerConfig{}).ProtoReflect().Descriptor()
+	typ, ok := schema.Schema{Attributes: protoAttributes(md, nil)}.Type().TerraformType(ctx).(tftypes.Object)
+	require.True(t, ok)
+
+	single := func(realm string) *corepb.IssuerConfig {
+		return &corepb.IssuerConfig{ProviderSelector: &corepb.IssuerConfig_SingleRealmProviderSelector{
+			SingleRealmProviderSelector: &corepb.SingleRealmProviderSelector{RealmName: realm},
+		}}
+	}
+
+	t.Run("one member round-trips", func(t *testing.T) {
+		in := single("tenants/t-1/realms/r-1")
+		back := &corepb.IssuerConfig{}
+		require.NoError(t, valueToProto(protoToValue(in.ProtoReflect(), typ), back.ProtoReflect()))
+		assert.True(t, proto.Equal(in, back), "expected %v, got %v", in, back)
+	})
+
+	t.Run("a second member is refused", func(t *testing.T) {
+		v := protoToValue(single("tenants/t-1/realms/r-1").ProtoReflect(), typ)
+		var attrs map[string]tftypes.Value
+		require.NoError(t, v.As(&attrs))
+		ext := typ.AttributeTypes["external_provider_selector"]
+		attrs["external_provider_selector"] = tftypes.NewValue(ext, map[string]tftypes.Value{
+			"endpoint_name": tftypes.NewValue(tftypes.String, "tenants/t-1/endpoints/e-1"),
+		})
+
+		err := valueToProto(tftypes.NewValue(typ, attrs), (&corepb.IssuerConfig{}).ProtoReflect())
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "At most one of")
+	})
+}
+
+func TestProtoattr_Struct(t *testing.T) {
+
+	ctx := context.Background()
+	md := (&corepb.PasswordValidatorConfig{}).ProtoReflect().Descriptor()
+	typ, ok := schema.Schema{Attributes: protoAttributes(md, nil)}.Type().TerraformType(ctx).(tftypes.Object)
+	require.True(t, ok)
+
+	cfg, err := structpb.NewStruct(map[string]any{"min_length": 12.0, "classes": []any{"upper", "digit"}})
+	require.NoError(t, err)
+	in := &corepb.PasswordValidatorConfig{Name: "length", Type: "length", Config: cfg}
+
+	back := &corepb.PasswordValidatorConfig{}
+	require.NoError(t, valueToProto(protoToValue(in.ProtoReflect(), typ), back.ProtoReflect()))
+	assert.True(t, proto.Equal(in, back), "expected %v, got %v", in, back)
+}
+
+func TestConfigJSON(t *testing.T) {
+
+	ctx := context.Background()
+
+	for _, spec := range configJSONSpecs {
+		t.Run(spec.typeName, func(t *testing.T) {
+			// Every message's schema builds, and the schema is valid.
+			resp := &datasource.SchemaResponse{}
+			(&configJSONDataSource{spec: spec}).Schema(ctx, datasource.SchemaRequest{}, resp)
+			require.False(t, resp.Diagnostics.HasError(), "%v", resp.Diagnostics)
+			require.Empty(t, resp.Schema.ValidateImplementation(ctx))
+		})
+	}
+
+	t.Run("realm config leaves the policy out", func(t *testing.T) {
+		resp := &datasource.SchemaResponse{}
+		(&configJSONDataSource{spec: configJSONSpecs[1]}).Schema(ctx, datasource.SchemaRequest{}, resp)
+		assert.NotContains(t, resp.Schema.Attributes, authenticationKey)
+		assert.Contains(t, resp.Schema.Attributes, "provisioning")
+	})
+
+	t.Run("encoding is lowerCamel and without zero values", func(t *testing.T) {
+		got, err := configJSON(&corepb.IssuerConfig{
+			AccessTokenExpireSeconds: 900,
+			ProviderSelector: &corepb.IssuerConfig_MultiRealmProviderSelector{
+				MultiRealmProviderSelector: &corepb.MultiRealmProviderSelector{
+					RealmNames:    []string{"tenants/t-1/realms/r-1"},
+					Identifier:    &corepb.IdentifierField{Kind: corepb.IdentifierField_KIND_UNSPECIFIED},
+					DefaultTarget: &corepb.RoutingTarget{RealmName: "tenants/t-1/realms/r-1"},
+				},
+			},
+		})
+		require.NoError(t, err)
+		assert.JSONEq(t, `{"accessTokenExpireSeconds":900,"multiRealmProviderSelector":{"defaultTarget":{"realmName":"tenants/t-1/realms/r-1"},"identifier":{},"realmNames":["tenants/t-1/realms/r-1"]}}`, got)
+	})
 }

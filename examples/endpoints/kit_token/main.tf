@@ -27,12 +27,13 @@ resource "authwise_endpoint" "ledger" {
     server_name = "ledger.internal"
   }
 
-  # protojson keys are lowerCamel: kitToken, not kit_token. Naming the
-  # issuer here orders the endpoint after it.
-  auth = jsonencode({
-    kitToken = {
-      issuer   = authwise_issuer.internal.name
-      audience = "https://ledger.example.com"
-    }
-  })
+  auth = data.authwise_endpoint_auth.ledger.json
+}
+
+# Naming the issuer here orders the endpoint after it.
+data "authwise_endpoint_auth" "ledger" {
+  kit_token = {
+    issuer   = authwise_issuer.internal.name
+    audience = "https://ledger.example.com"
+  }
 }

@@ -5,116 +5,226 @@ import (
 	"fmt"
 	"math"
 	"math/big"
+	"strings"
 	"time"
 
+	"github.com/hashicorp/terraform-plugin-framework-jsontypes/jsontypes"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
+	dsschema "github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
+	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/known/durationpb"
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
 // protoattr bridges a proto message and a Terraform object for the
-// hand-written resources whose shapes tfinfra does not generate: messages
-// nested several levels deep, repeated messages, durations and non-string
-// maps. The schema is derived from the message descriptor, so a field kit
-// adds to the message surfaces without a code change here, and the
-// conversions walk tftypes values against it.
+// hand-written resources and data sources whose shapes tfinfra does not
+// generate: messages nested several levels deep, repeated messages,
+// durations, non-string maps and oneofs. The schema is derived from the
+// message descriptor, so a field kit adds to the message surfaces without a
+// code change here, and the conversions walk tftypes values against it.
 //
 // Every attribute is Optional and plain, never Computed. Reads map proto
 // zero values to null, because proto3 cannot tell zero from unset; the
 // resources pair that with a refresh that keeps prior state whenever it
 // converts to the same proto as the server's, so an explicit zero in
 // configuration (min_factors = 0) never shows up as drift.
+//
+// A oneof's members are attributes side by side, of which at most one may
+// be set; valueToProto refuses a second. A google.protobuf.Struct has no
+// schema to derive, so it is a JSON string.
 
-var durationName = (&durationpb.Duration{}).ProtoReflect().Descriptor().FullName()
+var (
+	durationName = (&durationpb.Duration{}).ProtoReflect().Descriptor().FullName()
+	structName   = (&structpb.Struct{}).ProtoReflect().Descriptor().FullName()
+)
+
+// attrKind makes the attributes of one schema package. A resource's
+// (resource/schema) and a data source's (datasource/schema) take the same
+// shapes and the same conversions; only the Go types differ.
+type attrKind[A any] struct {
+	boolean      func(desc string) A
+	int64        func(desc string) A
+	float64      func(desc string) A
+	str          func(desc string, validators []validator.String) A
+	json         func(desc string) A
+	list         func(elem attr.Type, desc string) A
+	strMap       func(elem attr.Type, desc string) A
+	listNested   func(attrs map[string]A, desc string) A
+	singleNested func(attrs map[string]A, desc string) A
+}
 
 // protoAttributes derives resource schema attributes for the fields of md.
 // descriptions is keyed by dotted field path ("floor.mode") relative to md.
 func protoAttributes(md protoreflect.MessageDescriptor, descriptions map[string]string) map[string]schema.Attribute {
-	return protoAttributesAt(md, "", descriptions)
+	return protoAttributesAt(resourceAttrs, md, "", descriptions, nil)
 }
 
-func protoAttributesAt(md protoreflect.MessageDescriptor, prefix string, descriptions map[string]string) map[string]schema.Attribute {
+// protoDataSourceAttributes is protoAttributes for a data source schema.
+// The top-level fields named in omit are left out.
+func protoDataSourceAttributes(md protoreflect.MessageDescriptor, descriptions map[string]string, omit map[string]bool) map[string]dsschema.Attribute {
+	return protoAttributesAt(dataSourceAttrs, md, "", descriptions, omit)
+}
 
-	attrs := map[string]schema.Attribute{}
+func protoAttributesAt[A any](k attrKind[A], md protoreflect.MessageDescriptor, prefix string, descriptions map[string]string, omit map[string]bool) map[string]A {
+
+	attrs := map[string]A{}
 
 	fields := md.Fields()
 	for i := 0; i < fields.Len(); i++ {
 		fd := fields.Get(i)
-		if fd.ContainingOneof() != nil && !fd.ContainingOneof().IsSynthetic() {
-			panic(fmt.Sprintf("protoattr: %s: oneofs are not supported", fd.FullName()))
-		}
 		name := string(fd.Name())
-		attrs[name] = protoAttribute(fd, prefix+name, descriptions)
+		if omit[name] {
+			continue
+		}
+		desc := descriptions[prefix+name]
+		if od := realOneof(fd); od != nil {
+			desc = withSuffix(desc, oneofNote(od))
+		}
+		attrs[name] = protoAttribute(k, fd, prefix+name, desc, descriptions)
 	}
 
 	return attrs
 }
 
-func protoAttribute(fd protoreflect.FieldDescriptor, path string, descriptions map[string]string) schema.Attribute {
-
-	desc := descriptions[path]
+func protoAttribute[A any](k attrKind[A], fd protoreflect.FieldDescriptor, path, desc string, descriptions map[string]string) A {
 
 	switch {
 	case fd.IsMap():
 		if fd.MapKey().Kind() != protoreflect.StringKind {
 			panic(fmt.Sprintf("protoattr: %s: only string-keyed maps are supported", fd.FullName()))
 		}
-		return schema.MapAttribute{Optional: true, MarkdownDescription: desc, ElementType: scalarType(fd.MapValue())}
+		return k.strMap(scalarType(fd.MapValue()), desc)
 	case fd.IsList() && fd.Kind() == protoreflect.MessageKind:
-		return schema.ListNestedAttribute{
-			Optional:            true,
-			MarkdownDescription: desc,
-			NestedObject: schema.NestedAttributeObject{
-				Attributes: protoAttributesAt(fd.Message(), path+".", descriptions),
-			},
-		}
+		return k.listNested(protoAttributesAt(k, fd.Message(), path+".", descriptions, nil), desc)
 	case fd.IsList():
-		return schema.ListAttribute{Optional: true, MarkdownDescription: desc, ElementType: scalarType(fd)}
+		return k.list(scalarType(fd), desc)
 	case isDuration(fd):
-		return schema.StringAttribute{
-			Optional:            true,
-			MarkdownDescription: withSuffix(desc, "A Go duration string, e.g. `90s`, `15m`, `12h`."),
-			Validators:          []validator.String{durationValidator{}},
-		}
+		return k.str(withSuffix(desc, "A Go duration string, e.g. `90s`, `15m`, `12h`."), []validator.String{durationValidator{}})
+	case isStruct(fd):
+		return k.json(withSuffix(desc, "A JSON object, e.g. from `jsonencode`."))
 	case fd.Kind() == protoreflect.MessageKind:
-		return schema.SingleNestedAttribute{
-			Optional:            true,
-			MarkdownDescription: desc,
-			Attributes:          protoAttributesAt(fd.Message(), path+".", descriptions),
-		}
-	default:
-		return scalarAttribute(fd, desc)
+		return k.singleNested(protoAttributesAt(k, fd.Message(), path+".", descriptions, nil), desc)
 	}
+
+	return scalarAttribute(k, fd, desc)
 }
 
 // scalarAttribute builds the attribute for a singular scalar field; enums
 // are validated against their value names.
-func scalarAttribute(fd protoreflect.FieldDescriptor, desc string) schema.Attribute {
+func scalarAttribute[A any](k attrKind[A], fd protoreflect.FieldDescriptor, desc string) A {
 
 	switch scalarType(fd) {
 	case types.BoolType:
-		return schema.BoolAttribute{Optional: true, MarkdownDescription: desc}
+		return k.boolean(desc)
 	case types.Int64Type:
-		return schema.Int64Attribute{Optional: true, MarkdownDescription: desc}
+		return k.int64(desc)
 	case types.Float64Type:
-		return schema.Float64Attribute{Optional: true, MarkdownDescription: desc}
+		return k.float64(desc)
 	}
 
-	a := schema.StringAttribute{Optional: true, MarkdownDescription: desc}
+	var validators []validator.String
 	if fd.Kind() == protoreflect.EnumKind {
 		values := fd.Enum().Values()
 		names := make([]string, 0, values.Len())
 		for i := 0; i < values.Len(); i++ {
 			names = append(names, string(values.Get(i).Name()))
 		}
-		a.Validators = []validator.String{stringvalidator.OneOf(names...)}
+		validators = []validator.String{stringvalidator.OneOf(names...)}
 	}
-	return a
+	return k.str(desc, validators)
+}
+
+// realOneof is the oneof fd belongs to, or nil for a plain field or a
+// proto3 optional (whose oneof is synthetic).
+func realOneof(fd protoreflect.FieldDescriptor) protoreflect.OneofDescriptor {
+	if od := fd.ContainingOneof(); od != nil && !od.IsSynthetic() {
+		return od
+	}
+	return nil
+}
+
+// oneofNote names the members of od for each member's description.
+func oneofNote(od protoreflect.OneofDescriptor) string {
+	fields := od.Fields()
+	names := make([]string, 0, fields.Len())
+	for i := 0; i < fields.Len(); i++ {
+		names = append(names, "`"+string(fields.Get(i).Name())+"`")
+	}
+	return "At most one of " + strings.Join(names, ", ") + " may be set."
+}
+
+var resourceAttrs = attrKind[schema.Attribute]{
+	boolean: func(desc string) schema.Attribute {
+		return schema.BoolAttribute{Optional: true, MarkdownDescription: desc}
+	},
+	int64: func(desc string) schema.Attribute {
+		return schema.Int64Attribute{Optional: true, MarkdownDescription: desc}
+	},
+	float64: func(desc string) schema.Attribute {
+		return schema.Float64Attribute{Optional: true, MarkdownDescription: desc}
+	},
+	str: func(desc string, validators []validator.String) schema.Attribute {
+		return schema.StringAttribute{Optional: true, MarkdownDescription: desc, Validators: validators}
+	},
+	json: func(desc string) schema.Attribute {
+		return schema.StringAttribute{Optional: true, MarkdownDescription: desc, CustomType: jsontypes.NormalizedType{}}
+	},
+	list: func(elem attr.Type, desc string) schema.Attribute {
+		return schema.ListAttribute{Optional: true, MarkdownDescription: desc, ElementType: elem}
+	},
+	strMap: func(elem attr.Type, desc string) schema.Attribute {
+		return schema.MapAttribute{Optional: true, MarkdownDescription: desc, ElementType: elem}
+	},
+	listNested: func(attrs map[string]schema.Attribute, desc string) schema.Attribute {
+		return schema.ListNestedAttribute{
+			Optional:            true,
+			MarkdownDescription: desc,
+			NestedObject:        schema.NestedAttributeObject{Attributes: attrs},
+		}
+	},
+	singleNested: func(attrs map[string]schema.Attribute, desc string) schema.Attribute {
+		return schema.SingleNestedAttribute{Optional: true, MarkdownDescription: desc, Attributes: attrs}
+	},
+}
+
+var dataSourceAttrs = attrKind[dsschema.Attribute]{
+	boolean: func(desc string) dsschema.Attribute {
+		return dsschema.BoolAttribute{Optional: true, MarkdownDescription: desc}
+	},
+	int64: func(desc string) dsschema.Attribute {
+		return dsschema.Int64Attribute{Optional: true, MarkdownDescription: desc}
+	},
+	float64: func(desc string) dsschema.Attribute {
+		return dsschema.Float64Attribute{Optional: true, MarkdownDescription: desc}
+	},
+	str: func(desc string, validators []validator.String) dsschema.Attribute {
+		return dsschema.StringAttribute{Optional: true, MarkdownDescription: desc, Validators: validators}
+	},
+	json: func(desc string) dsschema.Attribute {
+		return dsschema.StringAttribute{Optional: true, MarkdownDescription: desc, CustomType: jsontypes.NormalizedType{}}
+	},
+	list: func(elem attr.Type, desc string) dsschema.Attribute {
+		return dsschema.ListAttribute{Optional: true, MarkdownDescription: desc, ElementType: elem}
+	},
+	strMap: func(elem attr.Type, desc string) dsschema.Attribute {
+		return dsschema.MapAttribute{Optional: true, MarkdownDescription: desc, ElementType: elem}
+	},
+	listNested: func(attrs map[string]dsschema.Attribute, desc string) dsschema.Attribute {
+		return dsschema.ListNestedAttribute{
+			Optional:            true,
+			MarkdownDescription: desc,
+			NestedObject:        dsschema.NestedAttributeObject{Attributes: attrs},
+		}
+	},
+	singleNested: func(attrs map[string]dsschema.Attribute, desc string) dsschema.Attribute {
+		return dsschema.SingleNestedAttribute{Optional: true, MarkdownDescription: desc, Attributes: attrs}
+	},
 }
 
 func withSuffix(desc, suffix string) string {
@@ -126,6 +236,10 @@ func withSuffix(desc, suffix string) string {
 
 func isDuration(fd protoreflect.FieldDescriptor) bool {
 	return fd.Kind() == protoreflect.MessageKind && fd.Message().FullName() == durationName
+}
+
+func isStruct(fd protoreflect.FieldDescriptor) bool {
+	return fd.Kind() == protoreflect.MessageKind && fd.Message().FullName() == structName
 }
 
 // scalarType is the framework type of a scalar proto kind. Every integer
@@ -174,9 +288,28 @@ func valueToProto(v tftypes.Value, m protoreflect.Message) error {
 			continue
 		}
 
+		if err := oneofFree(fd, m); err != nil {
+			return err
+		}
+
 		if err := fieldToProto(fd, av, m); err != nil {
 			return fmt.Errorf("%s: %w", fd.Name(), err)
 		}
+	}
+
+	return nil
+}
+
+// oneofFree refuses fd when another member of its oneof is already set on
+// m: the second would silently replace the first.
+func oneofFree(fd protoreflect.FieldDescriptor, m protoreflect.Message) error {
+
+	od := realOneof(fd)
+	if od == nil {
+		return nil
+	}
+	if set := m.WhichOneof(od); set != nil {
+		return fmt.Errorf("%s: cannot be set with %s: %s", fd.Name(), set.Name(), oneofNote(od))
 	}
 
 	return nil
@@ -204,6 +337,12 @@ func fieldToProto(fd protoreflect.FieldDescriptor, v tftypes.Value, m protorefle
 		dm.Set(dfs.ByName("seconds"), protoreflect.ValueOfInt64(dp.GetSeconds()))
 		dm.Set(dfs.ByName("nanos"), protoreflect.ValueOfInt32(dp.GetNanos()))
 		return nil
+	case isStruct(fd):
+		var s string
+		if err := v.As(&s); err != nil {
+			return err
+		}
+		return protojson.Unmarshal([]byte(s), m.Mutable(fd).Message().Interface())
 	case fd.Kind() == protoreflect.MessageKind:
 		return valueToProto(v, m.Mutable(fd).Message())
 	default:
@@ -397,6 +536,13 @@ func fieldToValue(fd protoreflect.FieldDescriptor, pv protoreflect.Value, typ tf
 		d := time.Duration(dm.Get(dfs.ByName("seconds")).Int())*time.Second +
 			time.Duration(dm.Get(dfs.ByName("nanos")).Int())
 		return tftypes.NewValue(tftypes.String, d.String())
+	case isStruct(fd):
+		b, err := protojson.Marshal(pv.Message().Interface())
+		if err != nil {
+			// A Struct holds only JSON values, so it always encodes.
+			panic(fmt.Sprintf("protoattr: %s: %v", fd.FullName(), err))
+		}
+		return tftypes.NewValue(tftypes.String, string(b))
 	case fd.Kind() == protoreflect.MessageKind:
 		return protoToValue(pv.Message(), typ.(tftypes.Object))
 	default:

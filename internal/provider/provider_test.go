@@ -114,9 +114,13 @@ func TestProviderSurface(t *testing.T) {
 	// provider_oauth with #20), and the hand-written secret and
 	// realm_authentication_context_schema. Guard (#32) adds a singular and
 	// a plural data source for each of its six entities, and
-	// access_resource_type a pair of its own.
-	assert.Len(t, dataSourceTypes, 73)
-	for _, want := range []string{"authwise_guard_tenant", "authwise_guard_tenants", "authwise_guard_invites"} {
+	// access_resource_type a pair of its own. #38 adds the four
+	// hand-written config JSON builders.
+	assert.Len(t, dataSourceTypes, 77)
+	for _, want := range []string{
+		"authwise_guard_tenant", "authwise_guard_tenants", "authwise_guard_invites",
+		"authwise_issuer_config", "authwise_realm_config", "authwise_audience_config", "authwise_endpoint_auth",
+	} {
 		assert.True(t, dataSourceTypes[want], "missing data source %s", want)
 	}
 	assert.False(t, dataSourceTypes["authwise_client_secret"], "a minted resource has no singular data source")

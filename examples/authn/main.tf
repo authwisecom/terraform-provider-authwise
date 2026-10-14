@@ -27,7 +27,11 @@ variable "passkeys_status" {
 
 resource "authwise_realm" "workforce" {
   display_name = "Workforce"
-  config       = jsonencode({ defaultLocale = "en" })
+  config       = data.authwise_realm_config.workforce.json
+}
+
+data "authwise_realm_config" "workforce" {
+  default_locale = "en"
 }
 
 locals {

@@ -41,44 +41,47 @@ resource "authwise_provider" "partner_saml" {
   config        = data.authwise_provider_saml.partner.any
 }
 
+# The issuer's config, typed: authwise_issuer_config checks the attribute
+# names and enum values at plan and writes the protojson for config.
+data "authwise_issuer_config" "login" {
+  multi_realm_provider_selector = {
+    # The realms this issuer serves. Every target below must be one of
+    # them; invitations and SCIM admission read this list too.
+    realm_names = [
+      authwise_realm.consumers.name,
+      authwise_realm.partner.name,
+    ]
+
+    # The identifier screen. kind is left out: that is EMAIL. Set
+    # "USERNAME" or "ANY" to change it.
+    identifier = {
+      label = "Work or personal email"
+    }
+
+    # Ordered; the first match wins. The name is recorded on each login's
+    # audit row as routing_rule.
+    rules = [
+      {
+        name    = "partner-co"
+        domains = ["partner-co.example", "*.partner-co.example"]
+        target = {
+          realm_name    = authwise_realm.partner.name
+          provider_name = authwise_provider.partner_saml.name
+        }
+      },
+    ]
+
+    # Everyone else. Required. With no provider_name, the realm's own
+    # selection applies: its password provider here.
+    default_target = {
+      realm_name = authwise_realm.consumers.name
+    }
+  }
+}
+
 resource "authwise_issuer" "login" {
   domain_name = "login.example.com"
 
-  # config is IssuerConfig as protojson, so its keys are lowerCamel. The
-  # selector is written whole on every change.
-  config = jsonencode({
-    multiRealmProviderSelector = {
-      # The realms this issuer serves. Every target below must be one of
-      # them; invitations and SCIM admission read this list too.
-      realmNames = [
-        authwise_realm.consumers.name,
-        authwise_realm.partner.name,
-      ]
-
-      # The identifier screen. kind is left out: that is EMAIL. Write
-      # "USERNAME" or "ANY" to change it, but never "KIND_UNSPECIFIED".
-      identifier = {
-        label = "Work or personal email"
-      }
-
-      # Ordered; the first match wins. The name is recorded on each login's
-      # audit row as routing_rule.
-      rules = [
-        {
-          name    = "partner-co"
-          domains = ["partner-co.example", "*.partner-co.example"]
-          target = {
-            realmName    = authwise_realm.partner.name
-            providerName = authwise_provider.partner_saml.name
-          }
-        },
-      ]
-
-      # Everyone else. Required. With no providerName, the realm's own
-      # selection applies: its password provider here.
-      defaultTarget = {
-        realmName = authwise_realm.consumers.name
-      }
-    }
-  })
+  # The selector is written whole on every change.
+  config = data.authwise_issuer_config.login.json
 }

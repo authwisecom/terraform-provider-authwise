@@ -123,9 +123,34 @@ resource "authwise_provider" "google" {
 }
 ```
 
-Other structured configs, such as `authwise_issuer.config`, are written as
-their protojson encoding with `jsonencode`. Keys are lowerCamel. Leave zero
-values out rather than writing them, because the server omits zero values
-when it returns them.
+Issuers, realms and audiences carry a config that is one fixed message, and
+an endpoint its `auth`. Each is the message's protojson encoding, and each
+has a data source that builds it the same way. Reference its `json` output:
+
+| data source | builds |
+| --- | --- |
+| `authwise_issuer_config` | `authwise_issuer.config` |
+| `authwise_realm_config` | `authwise_realm.config` |
+| `authwise_audience_config` | `authwise_audience.config` |
+| `authwise_endpoint_auth` | `authwise_endpoint.auth` |
+
+```terraform
+data "authwise_realm_config" "this" {
+  default_locale = "en"
+  recovery       = { self_service_reset = true, reset_ttl = "30m" }
+}
+
+resource "authwise_realm" "this" {
+  display_name = "Customers"
+  config       = data.authwise_realm_config.this.json
+}
+```
+
+Their attributes are the message's fields in snake_case, checked at plan.
+Durations are Go strings such as `30m`, and the output leaves zero values
+out, as the server does when it returns them.
+
+Writing the JSON with `jsonencode` still works. Its keys are lowerCamel,
+and zero values must be left out rather than written.
 
 {{ .SchemaMarkdown | trimspace }}

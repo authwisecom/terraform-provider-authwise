@@ -13,9 +13,12 @@ between realms lives in `config`, in one of three provider selectors:
 
 | selector | when |
 | --- | --- |
-| `singleRealmProviderSelector` | every login goes to one realm |
-| `multiRealmProviderSelector` | **identifier-first**: the login page asks for an identifier, and ordered rules route it to a realm |
-| `externalProviderSelector` | an endpoint decides |
+| `single_realm_provider_selector` | every login goes to one realm |
+| `multi_realm_provider_selector` | **identifier-first**: the login page asks for an identifier, and ordered rules route it to a realm |
+| `external_provider_selector` | an endpoint decides |
+
+Build `config` with the `authwise_issuer_config` data source and pass its
+`json`.
 
 ## Example Usage: identifier-first login
 
@@ -27,44 +30,45 @@ applies as it is from
 acceptance suite runs it the same way.
 
 ```terraform
+data "authwise_issuer_config" "login" {
+  multi_realm_provider_selector = {
+    realm_names = [
+      authwise_realm.consumers.name,
+      authwise_realm.partner.name,
+    ]
+
+    identifier = {
+      label = "Work or personal email" # kind left out: EMAIL
+    }
+
+    rules = [
+      {
+        name    = "partner-co"
+        domains = ["partner-co.example", "*.partner-co.example"]
+        target = {
+          realm_name    = authwise_realm.partner.name
+          provider_name = authwise_provider.partner_saml.name
+        }
+      },
+    ]
+
+    default_target = {
+      realm_name = authwise_realm.consumers.name
+    }
+  }
+}
+
 resource "authwise_issuer" "login" {
   domain_name = "login.example.com"
-
-  config = jsonencode({
-    multiRealmProviderSelector = {
-      realmNames = [
-        authwise_realm.consumers.name,
-        authwise_realm.partner.name,
-      ]
-
-      identifier = {
-        label = "Work or personal email" # kind left out: EMAIL
-      }
-
-      rules = [
-        {
-          name    = "partner-co"
-          domains = ["partner-co.example", "*.partner-co.example"]
-          target = {
-            realmName    = authwise_realm.partner.name
-            providerName = authwise_provider.partner_saml.name
-          }
-        },
-      ]
-
-      defaultTarget = {
-        realmName = authwise_realm.consumers.name
-      }
-    }
-  })
+  config      = data.authwise_issuer_config.login.json
 }
 ```
 
 ## The routing selector
 
-`multiRealmProviderSelector` holds four fields:
+`multi_realm_provider_selector` holds four fields:
 
-- **`realmNames`**: the realms this issuer serves, as realm names. Every
+- **`realm_names`**: the realms this issuer serves, as realm names. Every
   target must name one of them. Invitations and SCIM admission read this
   list too.
 - **`identifier`**: the identifier screen. It has two fields:
@@ -82,18 +86,18 @@ resource "authwise_issuer" "login" {
     `domain` that returns a bool, such as
     `local_part.endsWith(".ext")`. When a rule has both domains and a
     condition, both must hold.
-  - `target`: `realmName`, plus an optional `providerName` in that realm.
-    Without `providerName`, the realm's own selection applies: username and
+  - `target`: `realm_name`, plus an optional `provider_name` in that realm.
+    Without `provider_name`, the realm's own selection applies: username and
     password when present, else its only provider, else a choice.
-- **`defaultTarget`**: where an identifier that matches no rule goes.
+- **`default_target`**: where an identifier that matches no rule goes.
   **Required.**
 
 kit refuses a selector it could not honour, and the error names the field,
 for example `config.multi_realm_provider_selector.rules[0].domains: …`. It
 refuses:
 
-- a selector with no `defaultTarget`, such as one with only `realmNames`;
-- a target outside `realmNames`, a realm of another tenant, or a provider
+- a selector with no `default_target`, such as one with only `realm_names`;
+- a target outside `realm_names`, a realm of another tenant, or a provider
   outside its target realm;
 - a rule with no name, a duplicate name, or neither domains nor a
   condition;
@@ -105,23 +109,25 @@ refuses:
 
 ## Writing `config`
 
-`config` is the protojson encoding of `IssuerConfig`, so:
+`config` is the protojson encoding of `IssuerConfig`.
 
-- **Keys are lowerCamel**, such as `multiRealmProviderSelector` and
-  `defaultTarget`. The value kit returns is compared with the value you
-  wrote.
-- **Leave zero values out** rather than writing them. kit stores what it is
-  sent, but it omits zero values when it returns them, so an explicit
-  `kind = "KIND_UNSPECIFIED"`, `label = ""` or `domains = []` comes back
-  absent. Terraform then reports an inconsistent result after apply. Omit
-  `kind` for `EMAIL`, or write `"EMAIL"`, which is not the zero value and
-  round-trips.
+- **`authwise_issuer_config` builds it.** Its attributes are the message's
+  fields in snake_case, checked at plan: a misspelt field, an unknown
+  `kind` or a second selector fails there, not at apply. Its `json` leaves
+  zero values out, as kit does when it returns them.
 - **The selector is written whole.** Any change to it replaces the whole
   member. kit refuses a partial update below
   `config.multiRealmProviderSelector`, and the provider never sends one.
 - **References order the plan.** Naming `authwise_realm.x.name` and
-  `authwise_provider.y.name` inside `jsonencode` creates the realms and
+  `authwise_provider.y.name` in the data source creates the realms and
   providers first, and destroys them last.
+- **`jsonencode` works too.** Its keys are then lowerCamel, such as
+  `multiRealmProviderSelector` and `defaultTarget`, because the value kit
+  returns is compared with the value you wrote. Leave zero values out
+  rather than writing them: kit omits them when it returns them, so an
+  explicit `kind = "KIND_UNSPECIFIED"`, `label = ""` or `domains = []`
+  comes back absent and Terraform reports an inconsistent result after
+  apply.
 
 <!-- schema generated by tfplugindocs -->
 ## Schema

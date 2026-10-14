@@ -1,3 +1,24 @@
+## Unreleased
+
+FEATURES:
+
+* **Typed config data sources (#38):** `authwise_issuer_config`,
+  `authwise_realm_config`, `authwise_audience_config` and
+  `authwise_endpoint_auth` build `authwise_issuer.config`,
+  `authwise_realm.config`, `authwise_audience.config` and
+  `authwise_endpoint.auth` from typed attributes, and expose the protojson
+  as `json`. The attribute names are the message's fields in snake_case and
+  are checked at plan, along with enum values, durations (Go strings such
+  as `30m`) and the oneofs: an issuer takes at most one provider selector,
+  an endpoint at most one auth scheme. Zero values are left out of `json`,
+  as kit leaves them out of what it returns. They make no API calls, and
+  the schemas come from the apis messages, so a field apis adds appears
+  without a provider change. `authwise_realm_config` has no
+  `authentication`, which belongs to `authwise_realm_authentication_policy`.
+  `jsonencode` still works.
+* The identifier-first, endpoint and authn examples, and the issuer,
+  endpoint and provider docs, now use the data sources.
+
 ## 0.12.0 (October 12, 2026)
 
 NOTES:
