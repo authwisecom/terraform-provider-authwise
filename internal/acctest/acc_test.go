@@ -110,7 +110,7 @@ resource "authwise_realm" "test" {
 		},
 	})
 
-	if h.fake.lastAuthorization != "Bearer acc-test-token" {
+	if h.fake.lastAuthorization != accTestBearer {
 		t.Fatalf("bearer flow broken: authorization = %q", h.fake.lastAuthorization)
 	}
 	if h.tokenCalls < 1 {

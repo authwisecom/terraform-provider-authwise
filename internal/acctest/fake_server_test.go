@@ -872,7 +872,7 @@ func newHarness(t *testing.T) *harness {
 	}
 	h.grpcAddr = lis.Addr().String()
 
-	s := grpc.NewServer()
+	s := grpc.NewServer(requireBearer()...)
 	identitypb.RegisterAuthwiseIdentityServiceServer(s, h.fake)
 	accesspb.RegisterAuthwiseAccessServiceServer(s, h.access)
 	tenancypb.RegisterAuthwiseTenancyServiceServer(s, h.tenancy)
@@ -884,7 +884,7 @@ func newHarness(t *testing.T) *harness {
 		t.Fatal(err)
 	}
 	h.guardAddr = guardLis.Addr().String()
-	gs := grpc.NewServer()
+	gs := grpc.NewServer(requireBearer()...)
 	guardpb.RegisterGuardControlServiceServer(gs, h.guard)
 	guardpb.RegisterGuardNodeServiceServer(gs, h.guard)
 	go func() { _ = gs.Serve(guardLis) }()
@@ -901,6 +901,35 @@ func newHarness(t *testing.T) *harness {
 	t.Cleanup(h.tokenServer.Close)
 
 	return h
+}
+
+// accTestBearer is the authorization the fake token endpoint's token makes.
+const accTestBearer = "Bearer acc-test-token"
+
+// requireBearer refuses, as kit's authenticator does, any call, unary or
+// streaming, that does not carry the token the fake token endpoint mints.
+// Without it an unauthenticated stream passes against the fakes (#39).
+func requireBearer() []grpc.ServerOption {
+	check := func(ctx context.Context) error {
+		if authorizationOf(ctx) != accTestBearer {
+			return status.Error(codes.Unauthenticated, "Unauthenticated")
+		}
+		return nil
+	}
+	return []grpc.ServerOption{
+		grpc.ChainUnaryInterceptor(func(ctx context.Context, req any, _ *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
+			if err := check(ctx); err != nil {
+				return nil, err
+			}
+			return handler(ctx, req)
+		}),
+		grpc.ChainStreamInterceptor(func(srv any, ss grpc.ServerStream, _ *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
+			if err := check(ss.Context()); err != nil {
+				return err
+			}
+			return handler(srv, ss)
+		}),
+	}
 }
 
 // providerConfig renders the provider block for the fake stack. Scope

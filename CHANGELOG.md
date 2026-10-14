@@ -1,3 +1,25 @@
+## 0.13.1 (October 14, 2026)
+
+NOTES:
+
+* **api-client-support v0.4.1; apis v0.31.0, kit v1.43.0, guard-control
+  v0.15.0.** No new server requirement.
+
+BUG FIXES:
+
+* **`authwise_asset_content` failed `Unauthenticated` (#39):** the
+  provider attached the bearer to unary calls only, so `UploadAsset` and
+  `DownloadAsset`, the asset content's two streaming calls, reached kit
+  without one. Every create, update and refresh of the resource failed,
+  while `authwise_asset` worked with the same credentials. Streaming calls
+  now carry the bearer too. The acceptance stack now refuses any call,
+  unary or streaming, that has no bearer, so a missing token fails the
+  tests the way it fails against kit.
+* The move from api-client-support v0.2.1 to v0.4.1 brings v0.3.0's
+  renewal of the local `awctl auth login` through the refresh grant: the
+  login is renewed rather than expiring after the access token's lifetime.
+  Client-credentials auth is unchanged.
+
 ## 0.13.0 (October 13, 2026)
 
 NOTES:

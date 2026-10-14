@@ -205,6 +205,11 @@ func (p *AuthwiseProvider) Configure(ctx context.Context, req provider.Configure
 				authwise.NewBearerCredentialsInterceptor(bearerService),
 				warningInterceptor,
 			),
+			// UploadAsset and DownloadAsset stream: without this they carry
+			// no bearer (#39). Streams carry no warning header.
+			grpc.WithChainStreamInterceptor(
+				authwise.NewBearerCredentialsStreamInterceptor(bearerService),
+			),
 		)
 	}
 

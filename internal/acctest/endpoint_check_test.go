@@ -4,6 +4,7 @@
 package acctest_test
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"regexp"
@@ -15,13 +16,19 @@ import (
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/metadata"
 )
 
 // identityClient dials the harness's stub the way a consumer of the
-// published client would.
+// published client would, carrying the bearer the stub requires.
 func identityClient(t *testing.T, h *harness) identitypb.AuthwiseIdentityServiceClient {
 	t.Helper()
-	conn, err := grpc.NewClient(h.grpcAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := grpc.NewClient(h.grpcAddr,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithUnaryInterceptor(func(ctx context.Context, method string, req, reply any, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
+			return invoker(metadata.AppendToOutgoingContext(ctx, "authorization", accTestBearer), method, req, reply, cc, opts...)
+		}),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}

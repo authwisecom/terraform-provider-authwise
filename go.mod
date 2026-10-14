@@ -3,7 +3,7 @@ module git.authwise.com/authwise/terraform-provider-authwise
 go 1.25.8
 
 require (
-	git.authwise.com/authwise/api-client-support v0.2.1
+	git.authwise.com/authwise/api-client-support v0.4.1
 	git.authwise.com/authwise/apis v0.31.0
 	github.com/activatedio/tfinfra v0.0.16
 	github.com/hashicorp/terraform-plugin-framework v1.19.0
@@ -34,6 +34,7 @@ require (
 	github.com/dave/jennifer v1.7.1 // indirect
 	github.com/fatih/color v1.18.0 // indirect
 	github.com/gertd/go-pluralize v0.2.1 // indirect
+	github.com/go-resty/resty/v2 v2.17.2 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect

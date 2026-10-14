@@ -138,7 +138,7 @@ resource "authwise_guard_resource_nodes" "wiki" {
 						h.guard.mu.Lock()
 						defer h.guard.mu.Unlock()
 						for _, a := range h.guard.auths {
-							if a != "Bearer acc-test-token" {
+							if a != accTestBearer {
 								return fmt.Errorf("guard-control saw authorization %q", a)
 							}
 						}
