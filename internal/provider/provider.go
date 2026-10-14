@@ -275,6 +275,7 @@ func (p *AuthwiseProvider) Resources(ctx context.Context) []func() resource.Reso
 		newGuardNodeGrantsResource,
 		newServiceAccountResource,
 		newServiceAccountSecretResource,
+		newTenantConfigResource,
 	))
 }
 

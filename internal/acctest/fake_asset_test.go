@@ -69,6 +69,9 @@ func (f *fakeIdentityServer) PatchAsset(ctx context.Context, in *identitypb.Patc
 }
 
 func (f *fakeIdentityServer) DeleteAsset(ctx context.Context, in *identitypb.DeleteAssetRequest) (*emptypb.Empty, error) {
+	if err := f.brandRefusal(in.GetName()); err != nil {
+		return nil, err
+	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.recordAuth(ctx)
@@ -135,6 +138,9 @@ func (f *fakeIdentityServer) DownloadAsset(in *identitypb.DownloadAssetRequest, 
 }
 
 func (f *fakeIdentityServer) RemoveAsset(ctx context.Context, in *identitypb.RemoveAssetRequest) (*emptypb.Empty, error) {
+	if err := f.brandRefusal(in.GetName()); err != nil {
+		return nil, err
+	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.recordAuth(ctx)

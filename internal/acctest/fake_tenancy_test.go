@@ -28,17 +28,26 @@ import (
 type fakeTenancyServer struct {
 	tenancypb.UnimplementedAuthwiseTenancyServiceServer
 
-	access *fakeAccessServer
+	access   *fakeAccessServer
+	identity *fakeIdentityServer
 
 	mu       sync.Mutex
 	accounts map[string]*tenancypb.ServiceAccount
+	tenants  map[string]*corepb.Tenant
 	mints    int
 	roleSets int
 	seq      int
 }
 
-func newFakeTenancyServer(access *fakeAccessServer) *fakeTenancyServer {
-	return &fakeTenancyServer{access: access, accounts: map[string]*tenancypb.ServiceAccount{}}
+func newFakeTenancyServer(access *fakeAccessServer, identity *fakeIdentityServer) *fakeTenancyServer {
+	t := seedTenant()
+	f := &fakeTenancyServer{
+		access: access, identity: identity,
+		accounts: map[string]*tenancypb.ServiceAccount{},
+		tenants:  map[string]*corepb.Tenant{t.GetName(): t},
+	}
+	identity.brandHolding = f.brandHolding
+	return f
 }
 
 var tenancyParent = regexp.MustCompile(`^tenants/[^/]+$`)

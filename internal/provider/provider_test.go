@@ -60,8 +60,8 @@ func TestProviderSurface(t *testing.T) {
 	// came with the guard-control v0.12.0 catalog. The Guard tenant has its
 	// data sources but no resource: awtenant creates one (#36). Service
 	// accounts (#37) add the hand-written service_account and
-	// service_account_secret.
-	assert.Len(t, resourceTypes, 34)
+	// service_account_secret. #40 adds the hand-written tenant_config.
+	assert.Len(t, resourceTypes, 35)
 	assert.False(t, resourceTypes["authwise_guard_tenant"], "a Guard tenant is awtenant's to create")
 	for _, want := range []string{
 		"authwise_guard_network",
@@ -115,8 +115,8 @@ func TestProviderSurface(t *testing.T) {
 	// realm_authentication_context_schema. Guard (#32) adds a singular and
 	// a plural data source for each of its six entities, and
 	// access_resource_type a pair of its own. #38 adds the four
-	// hand-written config JSON builders.
-	assert.Len(t, dataSourceTypes, 77)
+	// hand-written config JSON builders, and #40 a fifth, tenant_config.
+	assert.Len(t, dataSourceTypes, 78)
 	for _, want := range []string{
 		"authwise_guard_tenant", "authwise_guard_tenants", "authwise_guard_invites",
 		"authwise_issuer_config", "authwise_realm_config", "authwise_audience_config", "authwise_endpoint_auth",

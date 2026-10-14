@@ -1,3 +1,31 @@
+## 0.14.0 (Unreleased)
+
+NOTES:
+
+* **apis v0.31.0, api-client-support v0.4.1, kit v1.45.0, guard-control
+  v0.15.0.** `authwise_tenant_config` needs kit v1.45.0, the first kit
+  release in which `tenant.admin` carries `tenancy.tenants.update` (kit#769).
+  On an estate that was already running, the `tenant.admin` role at central
+  also needs that permission written to it in Access. Without it, under
+  client-credentials auth, every write the resource makes is refused with
+  PermissionDenied. The data source makes no API call. The rest of the
+  provider still works with kit v1.43.0.
+
+FEATURES:
+
+* **`authwise_tenant_config` resource and data source (#40):** manage an
+  existing tenant's `TenantConfig` (its brand, `branding.logo_asset_id` and
+  `branding.logo_dark_asset_id`, and the tenant-level token lifetimes and
+  CORS) and optionally its `labels` through `PatchTenant`, with a mask over
+  only those. The tenant's display name, owner and classification are left
+  alone, and the resource never creates or deletes a tenant. `config` is
+  authoritative. Destroy clears the config, and `labels` when set, so the
+  logo assets can be deleted after it: name the logo as
+  `authwise_asset_content.x.asset_id`, since kit refuses deleting an asset,
+  or removing its content, while the brand names it. The data source
+  builds the config from typed attributes, as `authwise_issuer_config`
+  does. Import by `t-…` or `tenants/t-…`.
+
 ## 0.13.1 (October 14, 2026)
 
 NOTES:
@@ -19,6 +47,7 @@ BUG FIXES:
   renewal of the local `awctl auth login` through the refresh grant: the
   login is renewed rather than expiring after the access token's lifetime.
   Client-credentials auth is unchanged.
+
 
 ## 0.13.0 (October 13, 2026)
 

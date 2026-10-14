@@ -92,6 +92,10 @@ type fakeIdentityServer struct {
 	// lastAuthorization records the auth metadata of the most recent call
 	// so tests can assert the bearer flow end to end.
 	lastAuthorization string
+
+	// brandHolding refuses removing an asset a tenant's brand names; the
+	// fake tenancy server's.
+	brandHolding func(asset string) error
 }
 
 func newFakeIdentityServer() *fakeIdentityServer {
@@ -864,7 +868,7 @@ func newHarness(t *testing.T) *harness {
 	t.Helper()
 
 	h := &harness{fake: newFakeIdentityServer(), access: newFakeAccessServer(), guard: newFakeGuardServer()}
-	h.tenancy = newFakeTenancyServer(h.access)
+	h.tenancy = newFakeTenancyServer(h.access, h.fake)
 
 	lis, err := new(net.ListenConfig).Listen(t.Context(), "tcp", "127.0.0.1:0")
 	if err != nil {
