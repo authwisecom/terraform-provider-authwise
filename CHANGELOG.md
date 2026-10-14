@@ -1,3 +1,43 @@
+## 0.15.0 (October 14, 2026)
+
+NOTES:
+
+* **apis v0.33.0, guard-control v0.16.0, kit v1.46.0.** The two new Guard
+  resources and the data source need guard-control v0.16.0; against an older
+  guard-control every call fails Unimplemented. An enrolment grant is
+  written on the users-link home with the provider's own bearer, which
+  must administer the users-link tenant: a tenant administrator's
+  credential is admitted by a home on kit v1.46.0 or later (kit#770). On
+  an older home, apply with an operator credential or one holding
+  `access.bindingAdmin` at the tenant. The deprovisioning account needs a
+  guard-control install with `sweep.sealKeyFile` in remote access mode.
+  The rest of the provider still works with kit v1.45.0 and guard-control
+  v0.15.0.
+
+FEATURES:
+
+* **`authwise_guard_enrolment_grant` resource (#41):** lets one user or
+  group of a Guard tenant's users-link tenant enrol devices: a
+  `guardcontrol.user` binding at the Guard tenant, written through
+  guard-control's `GrantEnrolment`, which fixes the role and the resource.
+  Every argument replaces the grant, and destroying it revokes the
+  binding. It is the same row an `authwise_access_binding` with that role
+  writes, so declare a grant one way only. Import by
+  `<gt-id>/<binding>`; a grant anchored at a network is refused.
+* **`authwise_guard_deprovisioning` resource and data source (#41):** the
+  service account the deprovisioning sweep re-checks the users-link home
+  with. `client_secret_wo` is write-only, as `authwise_secret.payload_wo` is:
+  sent on every change and bumped with `client_secret_wo_version`, never
+  stored. guard-control tests the credential before storing it, and
+  destroying the resource clears it. The data source reads the last
+  sweep's result (`last_result`, `last_message`, `last_revoked`). Import by
+  `gt-…`.
+
+IMPROVEMENTS:
+
+* Guard resources now run their own config validation; the wrapper that
+  refuses a Guard resource without `guard_endpoint` used to hide it.
+
 ## 0.14.0 (October 14, 2026)
 
 NOTES:

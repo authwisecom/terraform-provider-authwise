@@ -60,8 +60,9 @@ func TestProviderSurface(t *testing.T) {
 	// came with the guard-control v0.12.0 catalog. The Guard tenant has its
 	// data sources but no resource: awtenant creates one (#36). Service
 	// accounts (#37) add the hand-written service_account and
-	// service_account_secret. #40 adds the hand-written tenant_config.
-	assert.Len(t, resourceTypes, 35)
+	// service_account_secret. #40 adds the hand-written tenant_config, and
+	// #41 the hand-written guard_enrolment_grant and guard_deprovisioning.
+	assert.Len(t, resourceTypes, 37)
 	assert.False(t, resourceTypes["authwise_guard_tenant"], "a Guard tenant is awtenant's to create")
 	for _, want := range []string{
 		"authwise_guard_network",
@@ -71,6 +72,8 @@ func TestProviderSurface(t *testing.T) {
 		"authwise_guard_invite",
 		"authwise_guard_node",
 		"authwise_guard_node_grants",
+		"authwise_guard_enrolment_grant",
+		"authwise_guard_deprovisioning",
 		"authwise_client_secret",
 		"authwise_access_permission",
 		"authwise_access_role",
@@ -116,9 +119,10 @@ func TestProviderSurface(t *testing.T) {
 	// a plural data source for each of its six entities, and
 	// access_resource_type a pair of its own. #38 adds the four
 	// hand-written config JSON builders, and #40 a fifth, tenant_config.
-	assert.Len(t, dataSourceTypes, 78)
+	// #41 adds the hand-written guard_deprovisioning.
+	assert.Len(t, dataSourceTypes, 79)
 	for _, want := range []string{
-		"authwise_guard_tenant", "authwise_guard_tenants", "authwise_guard_invites",
+		"authwise_guard_tenant", "authwise_guard_tenants", "authwise_guard_invites", "authwise_guard_deprovisioning",
 		"authwise_issuer_config", "authwise_realm_config", "authwise_audience_config", "authwise_endpoint_auth",
 	} {
 		assert.True(t, dataSourceTypes[want], "missing data source %s", want)

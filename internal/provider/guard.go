@@ -135,6 +135,12 @@ func (r *guardResource) Configure(ctx context.Context, req resource.ConfigureReq
 	}
 }
 
+func (r *guardResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	if inner, ok := r.inner.(resource.ResourceWithValidateConfig); ok {
+		inner.ValidateConfig(ctx, req, resp)
+	}
+}
+
 func (r *guardResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
 	if !r.configured && !req.Plan.Raw.IsNull() {
 		resp.Diagnostics.AddError("Guard is not configured", errGuardNotConfigured)
