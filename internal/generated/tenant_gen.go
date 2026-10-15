@@ -68,6 +68,16 @@ func TenantResourceSchema() schema.Schema {
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 				Validators:    []validator.String{tf.ReferenceID("t", "tenant", "")},
 			},
+			"product_client_id": schema.StringAttribute{
+				Computed:      true,
+				Optional:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
+			"slug": schema.StringAttribute{
+				Computed:      true,
+				Optional:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
 			"status": schema.StringAttribute{
 				Computed:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
@@ -78,11 +88,23 @@ func TenantResourceSchema() schema.Schema {
 						Computed: true,
 						Optional: true,
 					},
+					"administers": schema.BoolAttribute{
+						Computed: true,
+						Optional: true,
+					},
 					"audience": schema.StringAttribute{
 						Computed: true,
 						Optional: true,
 					},
+					"console_client_id": schema.StringAttribute{
+						Computed: true,
+						Optional: true,
+					},
 					"issuer": schema.StringAttribute{
+						Computed: true,
+						Optional: true,
+					},
+					"step_up_condition_id": schema.StringAttribute{
 						Computed: true,
 						Optional: true,
 					},
@@ -102,47 +124,57 @@ func TenantResourceSchema() schema.Schema {
 
 // TenantUsersModel is the Terraform model for Tenant's "users" nested attribute.
 type TenantUsersModel struct {
-	Issuer         types.String `tfsdk:"issuer"`
-	Audience       types.String `tfsdk:"audience"`
-	AccessEndpoint types.String `tfsdk:"access_endpoint"`
-	TenantId       types.String `tfsdk:"tenant_id"`
+	Issuer            types.String `tfsdk:"issuer"`
+	Audience          types.String `tfsdk:"audience"`
+	AccessEndpoint    types.String `tfsdk:"access_endpoint"`
+	TenantId          types.String `tfsdk:"tenant_id"`
+	Administers       types.Bool   `tfsdk:"administers"`
+	ConsoleClientId   types.String `tfsdk:"console_client_id"`
+	StepUpConditionId types.String `tfsdk:"step_up_condition_id"`
 }
 
 // TenantUsersAttrTypes returns the attribute types of the "users" nested attribute.
 func TenantUsersAttrTypes() map[string]attr.Type {
 	return map[string]attr.Type{
-		"access_endpoint": types.StringType,
-		"audience":        types.StringType,
-		"issuer":          types.StringType,
-		"tenant_id":       types.StringType,
+		"access_endpoint":      types.StringType,
+		"administers":          types.BoolType,
+		"audience":             types.StringType,
+		"console_client_id":    types.StringType,
+		"issuer":               types.StringType,
+		"step_up_condition_id": types.StringType,
+		"tenant_id":            types.StringType,
 	}
 }
 
 // TenantModel is the Terraform plan/state model for Tenant.
 type TenantModel struct {
-	Name           types.String         `tfsdk:"name"`
-	GuardTenantId  types.String         `tfsdk:"guard_tenant_id"`
-	Labels         types.Map            `tfsdk:"labels"`
-	DisplayName    types.String         `tfsdk:"display_name"`
-	Config         jsontypes.Normalized `tfsdk:"config"`
-	Status         types.String         `tfsdk:"status"`
-	ParentTenantId types.String         `tfsdk:"parent_tenant_id"`
-	Users          types.Object         `tfsdk:"users"`
-	CreatedBy      types.String         `tfsdk:"created_by"`
+	Name            types.String         `tfsdk:"name"`
+	GuardTenantId   types.String         `tfsdk:"guard_tenant_id"`
+	Labels          types.Map            `tfsdk:"labels"`
+	DisplayName     types.String         `tfsdk:"display_name"`
+	Config          jsontypes.Normalized `tfsdk:"config"`
+	Status          types.String         `tfsdk:"status"`
+	ParentTenantId  types.String         `tfsdk:"parent_tenant_id"`
+	Users           types.Object         `tfsdk:"users"`
+	CreatedBy       types.String         `tfsdk:"created_by"`
+	Slug            types.String         `tfsdk:"slug"`
+	ProductClientId types.String         `tfsdk:"product_client_id"`
 }
 
 // NewTenantModel returns a model with every attribute set to its typed null; collection types cannot be zero-valued.
 func NewTenantModel() *TenantModel {
 	return &TenantModel{
-		Config:         jsontypes.NewNormalizedNull(),
-		CreatedBy:      types.StringNull(),
-		DisplayName:    types.StringNull(),
-		GuardTenantId:  types.StringNull(),
-		Labels:         types.MapNull(types.StringType),
-		Name:           types.StringNull(),
-		ParentTenantId: types.StringNull(),
-		Status:         types.StringNull(),
-		Users:          types.ObjectNull(TenantUsersAttrTypes()),
+		Config:          jsontypes.NewNormalizedNull(),
+		CreatedBy:       types.StringNull(),
+		DisplayName:     types.StringNull(),
+		GuardTenantId:   types.StringNull(),
+		Labels:          types.MapNull(types.StringType),
+		Name:            types.StringNull(),
+		ParentTenantId:  types.StringNull(),
+		ProductClientId: types.StringNull(),
+		Slug:            types.StringNull(),
+		Status:          types.StringNull(),
+		Users:           types.ObjectNull(TenantUsersAttrTypes()),
 	}
 }
 
@@ -173,9 +205,14 @@ func (m *TenantModel) ToProto(ctx context.Context) (*v1alpha1.Tenant, diag.Diagn
 		v.Audience = n.Audience.ValueString()
 		v.AccessEndpoint = n.AccessEndpoint.ValueString()
 		v.TenantId = n.TenantId.ValueString()
+		v.Administers = n.Administers.ValueBool()
+		v.ConsoleClientId = n.ConsoleClientId.ValueString()
+		v.StepUpConditionId = n.StepUpConditionId.ValueString()
 		out.Users = v
 	}
 	out.CreatedBy = m.CreatedBy.ValueString()
+	out.Slug = m.Slug.ValueString()
+	out.ProductClientId = m.ProductClientId.ValueString()
 	return out, diags
 }
 
@@ -242,6 +279,17 @@ func (m *TenantModel) FromProto(ctx context.Context, e *v1alpha1.Tenant) diag.Di
 		} else {
 			n.TenantId = types.StringValue(e.Users.TenantId)
 		}
+		n.Administers = types.BoolValue(e.Users.Administers)
+		if e.Users.ConsoleClientId == "" {
+			n.ConsoleClientId = types.StringNull()
+		} else {
+			n.ConsoleClientId = types.StringValue(e.Users.ConsoleClientId)
+		}
+		if e.Users.StepUpConditionId == "" {
+			n.StepUpConditionId = types.StringNull()
+		} else {
+			n.StepUpConditionId = types.StringValue(e.Users.StepUpConditionId)
+		}
 		obj, d := types.ObjectValueFrom(ctx, TenantUsersAttrTypes(), n)
 		diags.Append(d...)
 		m.Users = obj
@@ -250,6 +298,16 @@ func (m *TenantModel) FromProto(ctx context.Context, e *v1alpha1.Tenant) diag.Di
 		m.CreatedBy = types.StringNull()
 	} else {
 		m.CreatedBy = types.StringValue(e.CreatedBy)
+	}
+	if e.Slug == "" {
+		m.Slug = types.StringNull()
+	} else {
+		m.Slug = types.StringValue(e.Slug)
+	}
+	if e.ProductClientId == "" {
+		m.ProductClientId = types.StringNull()
+	} else {
+		m.ProductClientId = types.StringValue(e.ProductClientId)
 	}
 	return diags
 }
@@ -283,6 +341,12 @@ func (m *TenantModel) UpdateMask(ctx context.Context, prior *TenantModel) []stri
 	}
 	if !m.Users.Equal(prior.Users) {
 		paths = append(paths, "users")
+	}
+	if !m.Slug.Equal(prior.Slug) {
+		paths = append(paths, "slug")
+	}
+	if !m.ProductClientId.Equal(prior.ProductClientId) {
+		paths = append(paths, "product_client_id")
 	}
 	return paths
 }
@@ -406,14 +470,19 @@ func TenantDataSourceSchema() schema1.Schema {
 				MarkdownDescription: "Full resource name of the object to read.",
 				Required:            true,
 			},
-			"parent_tenant_id": schema1.StringAttribute{Computed: true},
-			"status":           schema1.StringAttribute{Computed: true},
+			"parent_tenant_id":  schema1.StringAttribute{Computed: true},
+			"product_client_id": schema1.StringAttribute{Computed: true},
+			"slug":              schema1.StringAttribute{Computed: true},
+			"status":            schema1.StringAttribute{Computed: true},
 			"users": schema1.SingleNestedAttribute{
 				Attributes: map[string]schema1.Attribute{
-					"access_endpoint": schema1.StringAttribute{Computed: true},
-					"audience":        schema1.StringAttribute{Computed: true},
-					"issuer":          schema1.StringAttribute{Computed: true},
-					"tenant_id":       schema1.StringAttribute{Computed: true},
+					"access_endpoint":      schema1.StringAttribute{Computed: true},
+					"administers":          schema1.BoolAttribute{Computed: true},
+					"audience":             schema1.StringAttribute{Computed: true},
+					"console_client_id":    schema1.StringAttribute{Computed: true},
+					"issuer":               schema1.StringAttribute{Computed: true},
+					"step_up_condition_id": schema1.StringAttribute{Computed: true},
+					"tenant_id":            schema1.StringAttribute{Computed: true},
 				},
 				Computed: true,
 			},
@@ -452,29 +521,33 @@ func (d *tenantDataSource) Read(ctx context.Context, req datasource.ReadRequest,
 
 // TenantItemModel is one element of the guard_tenants data source's "guard_tenants" list.
 type TenantItemModel struct {
-	GuardTenantId  types.String         `tfsdk:"guard_tenant_id"`
-	Name           types.String         `tfsdk:"name"`
-	Labels         types.Map            `tfsdk:"labels"`
-	DisplayName    types.String         `tfsdk:"display_name"`
-	Config         jsontypes.Normalized `tfsdk:"config"`
-	Status         types.String         `tfsdk:"status"`
-	ParentTenantId types.String         `tfsdk:"parent_tenant_id"`
-	Users          types.Object         `tfsdk:"users"`
-	CreatedBy      types.String         `tfsdk:"created_by"`
+	GuardTenantId   types.String         `tfsdk:"guard_tenant_id"`
+	Name            types.String         `tfsdk:"name"`
+	Labels          types.Map            `tfsdk:"labels"`
+	DisplayName     types.String         `tfsdk:"display_name"`
+	Config          jsontypes.Normalized `tfsdk:"config"`
+	Status          types.String         `tfsdk:"status"`
+	ParentTenantId  types.String         `tfsdk:"parent_tenant_id"`
+	Users           types.Object         `tfsdk:"users"`
+	CreatedBy       types.String         `tfsdk:"created_by"`
+	Slug            types.String         `tfsdk:"slug"`
+	ProductClientId types.String         `tfsdk:"product_client_id"`
 }
 
 // TenantItemAttrTypes returns the attribute types of one guard_tenants list element.
 func TenantItemAttrTypes() map[string]attr.Type {
 	return map[string]attr.Type{
-		"config":           jsontypes.NormalizedType{},
-		"created_by":       types.StringType,
-		"display_name":     types.StringType,
-		"guard_tenant_id":  types.StringType,
-		"labels":           types.MapType{ElemType: types.StringType},
-		"name":             types.StringType,
-		"parent_tenant_id": types.StringType,
-		"status":           types.StringType,
-		"users":            types.ObjectType{AttrTypes: TenantUsersAttrTypes()},
+		"config":            jsontypes.NormalizedType{},
+		"created_by":        types.StringType,
+		"display_name":      types.StringType,
+		"guard_tenant_id":   types.StringType,
+		"labels":            types.MapType{ElemType: types.StringType},
+		"name":              types.StringType,
+		"parent_tenant_id":  types.StringType,
+		"product_client_id": types.StringType,
+		"slug":              types.StringType,
+		"status":            types.StringType,
+		"users":             types.ObjectType{AttrTypes: TenantUsersAttrTypes()},
 	}
 }
 
@@ -508,14 +581,19 @@ func TenantListDataSourceSchema() schema1.Schema {
 					Computed:            true,
 					MarkdownDescription: "Full resource name.",
 				},
-				"parent_tenant_id": schema1.StringAttribute{Computed: true},
-				"status":           schema1.StringAttribute{Computed: true},
+				"parent_tenant_id":  schema1.StringAttribute{Computed: true},
+				"product_client_id": schema1.StringAttribute{Computed: true},
+				"slug":              schema1.StringAttribute{Computed: true},
+				"status":            schema1.StringAttribute{Computed: true},
 				"users": schema1.SingleNestedAttribute{
 					Attributes: map[string]schema1.Attribute{
-						"access_endpoint": schema1.StringAttribute{Computed: true},
-						"audience":        schema1.StringAttribute{Computed: true},
-						"issuer":          schema1.StringAttribute{Computed: true},
-						"tenant_id":       schema1.StringAttribute{Computed: true},
+						"access_endpoint":      schema1.StringAttribute{Computed: true},
+						"administers":          schema1.BoolAttribute{Computed: true},
+						"audience":             schema1.StringAttribute{Computed: true},
+						"console_client_id":    schema1.StringAttribute{Computed: true},
+						"issuer":               schema1.StringAttribute{Computed: true},
+						"step_up_condition_id": schema1.StringAttribute{Computed: true},
+						"tenant_id":            schema1.StringAttribute{Computed: true},
 					},
 					Computed: true,
 				},
@@ -589,6 +667,17 @@ func tenantItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Tenant, *T
 		} else {
 			n.TenantId = types.StringValue(e.Users.TenantId)
 		}
+		n.Administers = types.BoolValue(e.Users.Administers)
+		if e.Users.ConsoleClientId == "" {
+			n.ConsoleClientId = types.StringNull()
+		} else {
+			n.ConsoleClientId = types.StringValue(e.Users.ConsoleClientId)
+		}
+		if e.Users.StepUpConditionId == "" {
+			n.StepUpConditionId = types.StringNull()
+		} else {
+			n.StepUpConditionId = types.StringValue(e.Users.StepUpConditionId)
+		}
 		obj, d := types.ObjectValueFrom(ctx, TenantUsersAttrTypes(), n)
 		diags.Append(d...)
 		item.Users = obj
@@ -597,6 +686,16 @@ func tenantItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Tenant, *T
 		item.CreatedBy = types.StringNull()
 	} else {
 		item.CreatedBy = types.StringValue(e.CreatedBy)
+	}
+	if e.Slug == "" {
+		item.Slug = types.StringNull()
+	} else {
+		item.Slug = types.StringValue(e.Slug)
+	}
+	if e.ProductClientId == "" {
+		item.ProductClientId = types.StringNull()
+	} else {
+		item.ProductClientId = types.StringValue(e.ProductClientId)
 	}
 	id, err := crud.IDFromName(e.Name)
 	if err != nil {

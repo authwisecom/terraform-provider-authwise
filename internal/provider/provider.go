@@ -249,7 +249,9 @@ func (p *AuthwiseProvider) Configure(ctx context.Context, req provider.Configure
 			guardNodeClientKey: guardpb.NewGuardNodeServiceClient(guardConn),
 			// A Guard tenant's people and deprovisioning (#41).
 			guardTenantAdminClientKey: guardpb.NewGuardTenantAdminServiceClient(guardConn),
-			guardConfiguredKey:        guardConfigured,
+			// A Guard tenant by slug (#42).
+			guardDirectoryClientKey: guardpb.NewGuardDirectoryServiceClient(guardConn),
+			guardConfiguredKey:      guardConfigured,
 		},
 		Defaults: defaults,
 	}
@@ -316,5 +318,24 @@ func newFactorResource() resource.Resource {
 // DataSources implements provider.Provider with the generated constructors
 // plus the hand-written ones.
 func (p *AuthwiseProvider) DataSources(ctx context.Context) []func() datasource.DataSource {
-	return guardDataSourceWrap(ctx, append(append(generated.DataSources(), newSecretDataSource, newRealmAuthenticationContextSchemaDataSource, newGuardDeprovisioningDataSource), configJSONDataSources()...))
+	return guardDataSourceWrap(ctx, append(append(substituteDataSources(ctx, generated.DataSources(), map[string]func() datasource.DataSource{
+		guardTenantTypeName: newGuardTenantDataSource,
+	}), newSecretDataSource, newRealmAuthenticationContextSchemaDataSource, newGuardDeprovisioningDataSource), configJSONDataSources()...))
+}
+
+// substituteDataSources is substitute for data sources.
+func substituteDataSources(ctx context.Context, generated []func() datasource.DataSource, wrappers map[string]func() datasource.DataSource) []func() datasource.DataSource {
+
+	out := make([]func() datasource.DataSource, 0, len(generated))
+
+	for _, factory := range generated {
+		resp := &datasource.MetadataResponse{}
+		factory().Metadata(ctx, datasource.MetadataRequest{ProviderTypeName: providerTypeName}, resp)
+		if w, ok := wrappers[resp.TypeName]; ok {
+			factory = w
+		}
+		out = append(out, factory)
+	}
+
+	return out
 }

@@ -62,6 +62,11 @@ func NetworkResourceSchema() schema.Schema {
 				MarkdownDescription: "Full resource name; serves as the Terraform ID.",
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
+			"slug": schema.StringAttribute{
+				Computed:      true,
+				Optional:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
 			"tenant_id": schema.StringAttribute{
 				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default. Changing it replaces the resource.",
 				Optional:            true,
@@ -82,6 +87,7 @@ type NetworkModel struct {
 	DisplayName    types.String         `tfsdk:"display_name"`
 	Cidr           types.String         `tfsdk:"cidr"`
 	Config         jsontypes.Normalized `tfsdk:"config"`
+	Slug           types.String         `tfsdk:"slug"`
 }
 
 // NewNetworkModel returns a model with every attribute set to its typed null; collection types cannot be zero-valued.
@@ -93,6 +99,7 @@ func NewNetworkModel() *NetworkModel {
 		GuardNetworkId: types.StringNull(),
 		Labels:         types.MapNull(types.StringType),
 		Name:           types.StringNull(),
+		Slug:           types.StringNull(),
 		TenantId:       types.StringNull(),
 	}
 }
@@ -115,6 +122,7 @@ func (m *NetworkModel) ToProto(ctx context.Context) (*v1alpha1.Network, diag.Dia
 			out.Config = v
 		}
 	}
+	out.Slug = m.Slug.ValueString()
 	return out, diags
 }
 
@@ -149,6 +157,11 @@ func (m *NetworkModel) FromProto(ctx context.Context, e *v1alpha1.Network) diag.
 			m.Config = jsontypes.NewNormalizedValue(string(b))
 		}
 	}
+	if e.Slug == "" {
+		m.Slug = types.StringNull()
+	} else {
+		m.Slug = types.StringValue(e.Slug)
+	}
 	return diags
 }
 
@@ -178,6 +191,9 @@ func (m *NetworkModel) UpdateMask(ctx context.Context, prior *NetworkModel) []st
 		if eq, _ := m.Config.StringSemanticEquals(ctx, prior.Config); !eq {
 			paths = append(paths, "config")
 		}
+	}
+	if !m.Slug.Equal(prior.Slug) {
+		paths = append(paths, "slug")
 	}
 	return paths
 }
@@ -324,6 +340,7 @@ func NetworkDataSourceSchema() schema1.Schema {
 				MarkdownDescription: "Full resource name of the object to read.",
 				Required:            true,
 			},
+			"slug":      schema1.StringAttribute{Computed: true},
 			"tenant_id": schema1.StringAttribute{Computed: true},
 		},
 		MarkdownDescription: "A Guard network: a WireGuard mesh in a tenant. `cidr` is its address space inside 100.64.0.0/10, the whole of it when unset; changing it replaces the network. This data source reads one by its full resource name.",
@@ -366,6 +383,7 @@ type NetworkItemModel struct {
 	DisplayName    types.String         `tfsdk:"display_name"`
 	Cidr           types.String         `tfsdk:"cidr"`
 	Config         jsontypes.Normalized `tfsdk:"config"`
+	Slug           types.String         `tfsdk:"slug"`
 }
 
 // NetworkItemAttrTypes returns the attribute types of one guard_networks list element.
@@ -377,6 +395,7 @@ func NetworkItemAttrTypes() map[string]attr.Type {
 		"guard_network_id": types.StringType,
 		"labels":           types.MapType{ElemType: types.StringType},
 		"name":             types.StringType,
+		"slug":             types.StringType,
 	}
 }
 
@@ -412,6 +431,7 @@ func NetworkListDataSourceSchema() schema1.Schema {
 						Computed:            true,
 						MarkdownDescription: "Full resource name.",
 					},
+					"slug": schema1.StringAttribute{Computed: true},
 				}},
 			},
 			"tenant_id": schema1.StringAttribute{
@@ -455,6 +475,11 @@ func networkItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Network, 
 		} else {
 			item.Config = jsontypes.NewNormalizedValue(string(b))
 		}
+	}
+	if e.Slug == "" {
+		item.Slug = types.StringNull()
+	} else {
+		item.Slug = types.StringValue(e.Slug)
 	}
 	id, err := crud.IDFromName(e.Name)
 	if err != nil {

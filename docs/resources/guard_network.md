@@ -36,6 +36,7 @@ resource "authwise_guard_network" "office" {
 - `config` (String) `config` as a JSON object.
 - `display_name` (String)
 - `labels` (Map of String)
+- `slug` (String)
 
 ### Read-Only
 

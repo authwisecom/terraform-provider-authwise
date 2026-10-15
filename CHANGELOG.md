@@ -1,3 +1,35 @@
+## 0.16.0 (Unreleased)
+
+NOTES:
+
+* **apis v0.34.0.** A role other than `guardcontrol.user` or a grant at a
+  network needs guard-control with role grants (guard-control#59). A lookup
+  by slug needs guard-control with the directory (guard-control#57). Against
+  an older guard-control, these fail with Unimplemented. Existing enrolment
+  grants keep the enrolment calls and need nothing newer: their state gains
+  `role = "guardcontrol.user"` on refresh, without replacing them.
+
+FEATURES:
+
+* **`authwise_guard_enrolment_grant` gains `role` and `network_id` (#42):**
+  `role` is `guardcontrol.user` (the default: may enrol),
+  `guardcontrol.tenantAdmin`, `guardcontrol.networkAdmin` or
+  `guardcontrol.viewer`, and is written through guard-control's `GrantRole`.
+  A role is bound at the Guard tenant, or at the network `network_id`
+  names. `networkAdmin` requires a network and `tenantAdmin` refuses one;
+  both are checked at plan. The administrative roles carry the home's
+  step-up condition, which is reported as `condition_id`. Import still
+  takes `<gt-id>/<binding>`, and the role and network are read back.
+* **`authwise_guard_tenant` by `slug` (#42):** the data source takes `slug`
+  or `name`, exactly one. A slug is resolved through guard-control's
+  unauthenticated `ResolveTenant`, then the tenant is read by name as
+  before, so configurations need not hard-code a `gt-…`. The slug is only an
+  alias: pass `guard_tenant_id` to other resources.
+* **apis v0.34.0 fields:** Guard tenants report `slug`, `product_client_id`,
+  and `users.administers`, `users.console_client_id` and
+  `users.step_up_condition_id`. `authwise_guard_network` takes an optional
+  `slug`.
+
 ## 0.15.0 (October 14, 2026)
 
 NOTES:

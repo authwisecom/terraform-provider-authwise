@@ -116,11 +116,21 @@ func (r *guardResource) Schema(ctx context.Context, req resource.SchemaRequest, 
 		a.Validators = []validator.String{guardTenantReference}
 		resp.Schema.Attributes[tenantIDAttribute] = a
 	}
+	if _, optional := r.inner.(optionalNetworkResource); optional {
+		return
+	}
 	if a, ok := resp.Schema.Attributes[networkIDAttribute].(schema.StringAttribute); ok {
 		a.Required, a.Optional = true, false
 		a.MarkdownDescription = "The network's id, `authwise_guard_network.<name>.guard_network_id`. Changing it replaces the resource."
 		resp.Schema.Attributes[networkIDAttribute] = a
 	}
+}
+
+// optionalNetworkResource is a Guard resource whose network_id is its own
+// optional argument, not a parent that the provider has no default for:
+// guardResource leaves it as the resource declares it.
+type optionalNetworkResource interface {
+	networkIDIsOptional()
 }
 
 func (r *guardResource) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {

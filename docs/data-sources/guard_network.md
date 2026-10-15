@@ -26,4 +26,5 @@ A Guard network: a WireGuard mesh in a tenant. `cidr` is its address space insid
 - `display_name` (String)
 - `guard_network_id` (String) Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.
 - `labels` (Map of String)
+- `slug` (String)
 - `tenant_id` (String)

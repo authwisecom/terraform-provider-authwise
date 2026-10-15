@@ -3,19 +3,22 @@
 page_title: "authwise_guard_enrolment_grant Resource - Authwise"
 subcategory: "Guard"
 description: |-
-  Lets one user or group of a Guard tenant's users-link tenant enrol devices: a guardcontrol.user binding at the Guard tenant, written on the users-link home through guard-control, which fixes the role and the resource.
-  One way, not both. This is the same binding an authwise_access_binding with role guardcontrol.user in the Guard audience would write. Declare a grant one way only, or the two will fight.
+  Binds one Guard role to a user or group of a Guard tenant's users-link tenant, on the users-link home, through guard-control. By default the role is guardcontrol.user at the Guard tenant: the subject may enrol devices. guardcontrol.tenantAdmin (at the Guard tenant), guardcontrol.networkAdmin (at a network, network_id) and guardcontrol.viewer (either) let the subject administer the Guard tenant, or part of it, from the users-link home.
+  One way, not both. This is the same binding an authwise_access_binding with that role in the Guard audience would write. Declare a grant one way only, or the two will fight.
   Who may apply it. Each call is admitted at guard-control, then by the home on the same bearer, so the provider's credential must administer the users-link tenant. A tenant administrator's credential works against a home on identity server 1.46.0 or later (kit#770); on older homes, apply with an operator credential or one holding access.bindingAdmin at the tenant. A Guard administrator who does not administer the users-link tenant (the MSP shape) is refused with PermissionDenied.
+  Versions. A role other than guardcontrol.user, or a grant at a network, needs guard-control with role grants (guard-control#59); an older one refuses it with Unimplemented. guardcontrol.tenantAdmin and guardcontrol.networkAdmin carry the home's step-up condition (condition_id), and are refused while the home advertises none.
   Revoking does not deprovision. Destroying a grant stops new enrolments; a device already enrolled keeps working until it is revoked by hand or by the deprovisioning sweep (authwise_guard_deprovisioning).
 ---
 
 # authwise_guard_enrolment_grant (Resource)
 
-Lets one user or group of a Guard tenant's users-link tenant enrol devices: a `guardcontrol.user` binding at the Guard tenant, written on the users-link home through guard-control, which fixes the role and the resource.
+Binds one Guard role to a user or group of a Guard tenant's users-link tenant, on the users-link home, through guard-control. By default the role is `guardcontrol.user` at the Guard tenant: the subject may enrol devices. `guardcontrol.tenantAdmin` (at the Guard tenant), `guardcontrol.networkAdmin` (at a network, `network_id`) and `guardcontrol.viewer` (either) let the subject administer the Guard tenant, or part of it, from the users-link home.
 
-**One way, not both.** This is the same binding an `authwise_access_binding` with role `guardcontrol.user` in the Guard audience would write. Declare a grant one way only, or the two will fight.
+**One way, not both.** This is the same binding an `authwise_access_binding` with that role in the Guard audience would write. Declare a grant one way only, or the two will fight.
 
 **Who may apply it.** Each call is admitted at guard-control, then by the home on the same bearer, so the provider's credential must administer the users-link tenant. A tenant administrator's credential works against a home on identity server 1.46.0 or later (kit#770); on older homes, apply with an operator credential or one holding `access.bindingAdmin` at the tenant. A Guard administrator who does not administer the users-link tenant (the MSP shape) is refused with PermissionDenied.
+
+**Versions.** A role other than `guardcontrol.user`, or a grant at a network, needs guard-control with role grants (guard-control#59); an older one refuses it with Unimplemented. `guardcontrol.tenantAdmin` and `guardcontrol.networkAdmin` carry the home's step-up condition (`condition_id`), and are refused while the home advertises none.
 
 **Revoking does not deprovision.** Destroying a grant stops new enrolments; a device already enrolled keeps working until it is revoked by hand or by the deprovisioning sweep (`authwise_guard_deprovisioning`).
 
@@ -36,6 +39,24 @@ resource "authwise_guard_enrolment_grant" "ada" {
   subject_type = "user"
   subject_id   = "u-01"
 }
+
+# A group of the users-link tenant administers the Guard tenant from its own
+# home. The home must advertise a step-up condition for administrative roles.
+resource "authwise_guard_enrolment_grant" "it_admins" {
+  tenant_id    = "gt-01"
+  role         = "guardcontrol.tenantAdmin"
+  subject_type = "group"
+  subject_id   = "g-02"
+}
+
+# One person administers one network.
+resource "authwise_guard_enrolment_grant" "office_admin" {
+  tenant_id    = "gt-01"
+  network_id   = "n-01"
+  role         = "guardcontrol.networkAdmin"
+  subject_type = "user"
+  subject_id   = "u-02"
+}
 ```
 
 <!-- schema generated by tfplugindocs -->
@@ -47,9 +68,15 @@ resource "authwise_guard_enrolment_grant" "ada" {
 - `subject_type` (String) `user` or `group`. Changing it replaces the grant.
 - `tenant_id` (String) The Guard tenant's id (`gt-…`), as awtenant reports it or `authwise_guard_tenants` lists it; the provider's `tenant_id` is not used. Changing it replaces the resource.
 
+### Optional
+
+- `network_id` (String) A network of the Guard tenant (`n-…`) to bind the role at, instead of the Guard tenant itself. Required for `guardcontrol.networkAdmin`; not allowed for `guardcontrol.tenantAdmin`. Changing it replaces the grant.
+- `role` (String) `guardcontrol.user` (the default: may enrol), `guardcontrol.tenantAdmin`, `guardcontrol.networkAdmin` or `guardcontrol.viewer`. Changing it replaces the grant.
+
 ### Read-Only
 
 - `binding` (String) The binding's name at the users-link home; serves as the Terraform ID.
+- `condition_id` (String) The access condition the binding carries: the home's step-up condition on an administrative role; empty on the others.
 - `display_name` (String) The subject's display name at the home; empty when the home no longer has it in the Guard tenant's realms.
 - `email` (String) The user's email at the home; empty for a group.
 
@@ -61,6 +88,8 @@ The [`terraform import` command](https://developer.hashicorp.com/terraform/cli/c
 
 ```shell
 # Import by the Guard tenant's id and the binding's name at the home,
-# joined by a slash. Only a grant at the Guard tenant itself can be imported.
+# joined by a slash. The role and the network are read from guard-control.
+# Against a guard-control without role grants (guard-control#59), only an
+# enrolment grant at the Guard tenant itself can be imported.
 terraform import authwise_guard_enrolment_grant.ada gt-01/audiences/a-01/access-bindings/ab-01
 ```

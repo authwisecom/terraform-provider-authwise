@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	guardpb "git.authwise.com/authwise/apis/authwise/guardcontrol/v1alpha1"
@@ -13,6 +14,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -30,7 +32,21 @@ const (
 	enrolmentSubjectUser   = "user"
 	enrolmentSubjectGroup  = "group"
 	enrolmentAnchorTenant  = "guardcontrol.tenant"
+	enrolmentAnchorNetwork = "guardcontrol.network"
 	enrolmentGrantTypeName = "guard_enrolment_grant"
+
+	networksCollection = "networks"
+)
+
+// The roles Guard binds in its audience at the users-link home
+// (guard-control#59). guardcontrol.user is enrolment; the others are
+// administration, and tenantAdmin is bound only at the Guard tenant,
+// networkAdmin only at a network.
+const (
+	guardRoleUser         = "guardcontrol.user"
+	guardRoleTenantAdmin  = "guardcontrol.tenantAdmin"
+	guardRoleNetworkAdmin = "guardcontrol.networkAdmin"
+	guardRoleViewer       = "guardcontrol.viewer"
 )
 
 var (
@@ -40,13 +56,17 @@ var (
 	_ resource.ResourceWithValidateConfig = &guardEnrolmentGrantResource{}
 )
 
-// guardEnrolmentGrantResource is authwise_guard_enrolment_grant: one user or
-// group of a Guard tenant's users link that may enrol (guard-control#55).
-// The grant is a guardcontrol.user binding on the users-link home, written
-// through guard-control, which fixes the role and the resource; so the
-// subject is all the resource takes. Its identity is the home's binding
-// name. guard-control has no Get for one grant: Read finds it in
-// ListEnrolmentGrants, which is unpaged.
+// guardEnrolmentGrantResource is authwise_guard_enrolment_grant: one Guard
+// role bound to a user or group of a Guard tenant's users link, on the
+// users-link home, through guard-control. Its identity is the home's
+// binding name. guard-control has no Get for one grant: Read finds it in an
+// unpaged list.
+//
+// The default, guardcontrol.user at the Guard tenant, is an enrolment
+// grant (guard-control#55) and keeps the enrolment calls, which a
+// guard-control without #59 also serves. Any other role, or any role at a
+// network, is a role grant (guard-control#59: GrantRole, RevokeRole,
+// ListRoleGrants).
 type guardEnrolmentGrantResource struct {
 	client guardpb.GuardTenantAdminServiceClient
 }
@@ -54,6 +74,9 @@ type guardEnrolmentGrantResource struct {
 type guardEnrolmentGrantModel struct {
 	Binding     types.String `tfsdk:"binding"`
 	TenantID    types.String `tfsdk:"tenant_id"`
+	NetworkID   types.String `tfsdk:"network_id"`
+	Role        types.String `tfsdk:"role"`
+	ConditionID types.String `tfsdk:"condition_id"`
 	SubjectType types.String `tfsdk:"subject_type"`
 	SubjectID   types.String `tfsdk:"subject_id"`
 	DisplayName types.String `tfsdk:"display_name"`
@@ -73,12 +96,15 @@ func (r *guardEnrolmentGrantResource) Schema(_ context.Context, _ resource.Schem
 	replace := []planmodifier.String{stringplanmodifier.RequiresReplace()}
 
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Lets one user or group of a Guard tenant's users-link tenant enrol devices: a `guardcontrol.user` binding at the Guard tenant, " +
-			"written on the users-link home through guard-control, which fixes the role and the resource.\n\n" +
-			"**One way, not both.** This is the same binding an `authwise_access_binding` with role `guardcontrol.user` in the Guard audience would write. Declare a grant one way only, or the two will fight.\n\n" +
+		MarkdownDescription: "Binds one Guard role to a user or group of a Guard tenant's users-link tenant, on the users-link home, through guard-control. " +
+			"By default the role is `guardcontrol.user` at the Guard tenant: the subject may enrol devices. " +
+			"`guardcontrol.tenantAdmin` (at the Guard tenant), `guardcontrol.networkAdmin` (at a network, `network_id`) and `guardcontrol.viewer` (either) let the subject administer the Guard tenant, or part of it, from the users-link home.\n\n" +
+			"**One way, not both.** This is the same binding an `authwise_access_binding` with that role in the Guard audience would write. Declare a grant one way only, or the two will fight.\n\n" +
 			"**Who may apply it.** Each call is admitted at guard-control, then by the home on the same bearer, so the provider's credential must administer the users-link tenant. " +
 			"A tenant administrator's credential works against a home on identity server 1.46.0 or later (kit#770); on older homes, apply with an operator credential or one holding `access.bindingAdmin` at the tenant. " +
 			"A Guard administrator who does not administer the users-link tenant (the MSP shape) is refused with PermissionDenied.\n\n" +
+			"**Versions.** A role other than `guardcontrol.user`, or a grant at a network, needs guard-control with role grants (guard-control#59); an older one refuses it with Unimplemented. " +
+			"`guardcontrol.tenantAdmin` and `guardcontrol.networkAdmin` carry the home's step-up condition (`condition_id`), and are refused while the home advertises none.\n\n" +
 			"**Revoking does not deprovision.** Destroying a grant stops new enrolments; a device already enrolled keeps working until it is revoked by hand or by the deprovisioning sweep (`authwise_guard_deprovisioning`).",
 		Attributes: map[string]schema.Attribute{
 			"binding": schema.StringAttribute{
@@ -89,6 +115,28 @@ func (r *guardEnrolmentGrantResource) Schema(_ context.Context, _ resource.Schem
 			tenantIDAttribute: schema.StringAttribute{
 				Required:      true,
 				PlanModifiers: replace,
+			},
+			networkIDAttribute: schema.StringAttribute{
+				Optional: true,
+				MarkdownDescription: "A network of the Guard tenant (`n-…`) to bind the role at, instead of the Guard tenant itself. " +
+					"Required for `guardcontrol.networkAdmin`; not allowed for `guardcontrol.tenantAdmin`. Changing it replaces the grant.",
+				PlanModifiers: replace,
+			},
+			"role": schema.StringAttribute{
+				Optional: true,
+				Computed: true,
+				Default:  stringdefault.StaticString(guardRoleUser),
+				MarkdownDescription: "`guardcontrol.user` (the default: may enrol), `guardcontrol.tenantAdmin`, `guardcontrol.networkAdmin` or `guardcontrol.viewer`. " +
+					"Changing it replaces the grant.",
+				// A grant from before role existed has none in state; it is
+				// the default, so filling it in replaces nothing.
+				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplaceIf(roleChanged,
+					"Changing the role replaces the grant.", "Changing the role replaces the grant.")},
+				Validators: []validator.String{stringvalidator.OneOf(guardRoleUser, guardRoleTenantAdmin, guardRoleNetworkAdmin, guardRoleViewer)},
+			},
+			"condition_id": schema.StringAttribute{
+				Computed:            true,
+				MarkdownDescription: "The access condition the binding carries: the home's step-up condition on an administrative role; empty on the others.",
 			},
 			"subject_type": schema.StringAttribute{
 				Required:            true,
@@ -114,17 +162,28 @@ func (r *guardEnrolmentGrantResource) Schema(_ context.Context, _ resource.Schem
 	}
 }
 
+// networkIDIsOptional keeps guardResource from making network_id required:
+// a grant without one is bound at the Guard tenant.
+func (r *guardEnrolmentGrantResource) networkIDIsOptional() {}
+
 func (r *guardEnrolmentGrantResource) Configure(_ context.Context, req resource.ConfigureRequest, _ *resource.ConfigureResponse) {
 	r.client = guardTenantAdminClientFrom(req.ProviderData)
 }
 
-// ValidateConfig refuses a subject id of the other type at plan; the home
-// would refuse it at apply.
+// ValidateConfig refuses at plan what guard-control or the home would
+// refuse at apply: a role at the wrong kind of target, and a subject id of
+// the other type.
 func (r *guardEnrolmentGrantResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
 
 	var m guardEnrolmentGrantModel
 	resp.Diagnostics.Append(req.Config.Get(ctx, &m)...)
-	if resp.Diagnostics.HasError() || m.SubjectType.IsUnknown() || m.SubjectID.IsUnknown() {
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	m.validateTarget(&resp.Diagnostics)
+
+	if m.SubjectType.IsUnknown() || m.SubjectID.IsUnknown() {
 		return
 	}
 
@@ -132,6 +191,24 @@ func (r *guardEnrolmentGrantResource) ValidateConfig(ctx context.Context, req re
 	if want != "" && !strings.HasPrefix(m.SubjectID.ValueString(), want) {
 		resp.Diagnostics.AddAttributeError(path.Root("subject_id"), "subject_id does not match subject_type",
 			"a "+m.SubjectType.ValueString()+" grant names a "+want+"… id, got "+m.SubjectID.ValueString())
+	}
+}
+
+// validateTarget refuses tenantAdmin at a network and networkAdmin at the
+// Guard tenant.
+func (m *guardEnrolmentGrantModel) validateTarget(diags *diag.Diagnostics) {
+
+	if m.Role.IsUnknown() || m.NetworkID.IsUnknown() {
+		return
+	}
+
+	switch {
+	case m.Role.ValueString() == guardRoleNetworkAdmin && m.NetworkID.IsNull():
+		diags.AddAttributeError(path.Root(networkIDAttribute), "guardcontrol.networkAdmin is bound at a network",
+			"set network_id to the network the role administers")
+	case m.Role.ValueString() == guardRoleTenantAdmin && !m.NetworkID.IsNull():
+		diags.AddAttributeError(path.Root(networkIDAttribute), "guardcontrol.tenantAdmin is bound at the Guard tenant",
+			"remove network_id, or use guardcontrol.networkAdmin to administer one network")
 	}
 }
 
@@ -155,19 +232,34 @@ func (r *guardEnrolmentGrantResource) Create(ctx context.Context, req resource.C
 		return
 	}
 
-	out, err := r.client.GrantEnrolment(ctx, &guardpb.GrantEnrolmentRequest{
-		Name: guardTenantName(plan.TenantID.ValueString()),
-		Subject: &guardpb.EnrolmentSubject{
-			Type: plan.SubjectType.ValueString(),
-			Id:   plan.SubjectID.ValueString(),
-		},
-	})
-	if err != nil {
-		addGuardPeopleError(&resp.Diagnostics, "granting enrolment failed", err)
-		return
+	subject := &guardpb.EnrolmentSubject{
+		Type: plan.SubjectType.ValueString(),
+		Id:   plan.SubjectID.ValueString(),
 	}
 
-	plan.fromProto(out)
+	if plan.isEnrolment() {
+		out, err := r.client.GrantEnrolment(ctx, &guardpb.GrantEnrolmentRequest{
+			Name:    guardTenantName(plan.TenantID.ValueString()),
+			Subject: subject,
+		})
+		if err != nil {
+			addGuardPeopleError(&resp.Diagnostics, "granting enrolment failed", err)
+			return
+		}
+		plan.fromProto(out)
+	} else {
+		out, err := r.client.GrantRole(ctx, &guardpb.GrantRoleRequest{
+			Name:    plan.target(),
+			Subject: subject,
+			Role:    plan.Role.ValueString(),
+		})
+		if err != nil {
+			addGuardPeopleError(&resp.Diagnostics, "granting "+plan.Role.ValueString()+" failed", err)
+			return
+		}
+		plan.fromRoleProto(out)
+	}
+
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
@@ -183,39 +275,93 @@ func (r *guardEnrolmentGrantResource) Read(ctx context.Context, req resource.Rea
 		return
 	}
 
+	var found bool
+	var err error
+	read := "enrolment grants"
+	if state.isEnrolment() {
+		found, err = r.readEnrolment(ctx, &state)
+	} else {
+		read = "role grants"
+		found, err = r.readRole(ctx, &state)
+		// An import has no role yet: from a guard-control without role
+		// grants, it can only be an enrolment grant.
+		if state.Role.IsNull() && status.Code(err) == codes.Unimplemented {
+			read = "enrolment grants"
+			found, err = r.readEnrolment(ctx, &state)
+		}
+	}
+
+	switch {
+	case aip.IsNotFound(err) || (err == nil && !found):
+		resp.State.RemoveResource(ctx)
+	case err != nil:
+		addGuardPeopleError(&resp.Diagnostics, "reading "+read+" failed", err)
+	default:
+		resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
+	}
+}
+
+// readEnrolment finds the grant in ListEnrolmentGrants and fills state from
+// it, reporting whether it was there.
+func (r *guardEnrolmentGrantResource) readEnrolment(ctx context.Context, state *guardEnrolmentGrantModel) (bool, error) {
+
 	out, err := r.client.ListEnrolmentGrants(ctx, &guardpb.ListEnrolmentGrantsRequest{Name: guardTenantName(state.TenantID.ValueString())})
 	if err != nil {
-		if aip.IsNotFound(err) {
-			resp.State.RemoveResource(ctx)
-			return
-		}
-		addGuardPeopleError(&resp.Diagnostics, "reading enrolment grants failed", err)
-		return
+		return false, err
 	}
 
 	for _, g := range out.GetGrants() {
 		if g.GetBinding() != state.Binding.ValueString() {
 			continue
 		}
-		// Only an import can land here: this resource writes grants at
-		// the tenant, never at a network.
+		// Only an import can land here: without role grants, this
+		// resource writes enrolment grants at the tenant, never at a
+		// network.
 		if g.GetResourceType() != enrolmentAnchorTenant {
-			resp.Diagnostics.AddError("the grant is anchored at a network",
-				"binding "+g.GetBinding()+" grants enrolment at "+g.GetResourceType()+"/"+g.GetResourceId()+
-					"; authwise_guard_enrolment_grant manages grants at the Guard tenant only. Manage it as an authwise_access_binding instead.")
-			return
+			return false, fmt.Errorf("binding %s grants enrolment at %s/%s; this guard-control has no role grants (guard-control#59), "+
+				"so authwise_guard_enrolment_grant manages grants at the Guard tenant only. Manage it as an authwise_access_binding instead",
+				g.GetBinding(), g.GetResourceType(), g.GetResourceId())
 		}
 		state.fromProto(g)
-		resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
-		return
+		return true, nil
 	}
-
-	resp.State.RemoveResource(ctx)
+	return false, nil
 }
 
-// Update is never called: every argument replaces the grant.
-func (r *guardEnrolmentGrantResource) Update(_ context.Context, _ resource.UpdateRequest, resp *resource.UpdateResponse) {
-	resp.Diagnostics.AddError("enrolment grants cannot be updated", "every argument of authwise_guard_enrolment_grant replaces it")
+// readRole finds the grant in ListRoleGrants and fills state from it,
+// reporting whether it was there.
+func (r *guardEnrolmentGrantResource) readRole(ctx context.Context, state *guardEnrolmentGrantModel) (bool, error) {
+
+	out, err := r.client.ListRoleGrants(ctx, &guardpb.ListRoleGrantsRequest{Name: guardTenantName(state.TenantID.ValueString())})
+	if err != nil {
+		return false, err
+	}
+
+	for _, g := range out.GetGrants() {
+		if g.GetBinding() == state.Binding.ValueString() {
+			state.fromRoleProto(g)
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+// Update only fills in what a grant from before role and network_id were
+// arguments lacks in state: every other change replaces the grant.
+func (r *guardEnrolmentGrantResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+
+	var plan guardEnrolmentGrantModel
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+}
+
+// roleChanged replaces the grant when its role changes, but not when a
+// state from before role existed gets its default.
+func roleChanged(_ context.Context, req planmodifier.StringRequest, resp *stringplanmodifier.RequiresReplaceIfFuncResponse) {
+	resp.RequiresReplace = !req.StateValue.IsNull() && !req.PlanValue.Equal(req.StateValue)
 }
 
 // Delete revokes the grant; NotFound counts as already revoked.
@@ -231,12 +377,20 @@ func (r *guardEnrolmentGrantResource) Delete(ctx context.Context, req resource.D
 		return
 	}
 
-	_, err := r.client.RevokeEnrolment(ctx, &guardpb.RevokeEnrolmentRequest{
-		Name:    guardTenantName(state.TenantID.ValueString()),
-		Binding: state.Binding.ValueString(),
-	})
+	var err error
+	if state.isEnrolment() {
+		_, err = r.client.RevokeEnrolment(ctx, &guardpb.RevokeEnrolmentRequest{
+			Name:    guardTenantName(state.TenantID.ValueString()),
+			Binding: state.Binding.ValueString(),
+		})
+	} else {
+		_, err = r.client.RevokeRole(ctx, &guardpb.RevokeRoleRequest{
+			Name:    state.target(),
+			Binding: state.Binding.ValueString(),
+		})
+	}
 	if err != nil && !aip.IsNotFound(err) {
-		addGuardPeopleError(&resp.Diagnostics, "revoking enrolment failed", err)
+		addGuardPeopleError(&resp.Diagnostics, "revoking the grant failed", err)
 	}
 }
 
@@ -255,8 +409,41 @@ func (r *guardEnrolmentGrantResource) ImportState(ctx context.Context, req resou
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("binding"), binding)...)
 }
 
+// isEnrolment is whether the grant is an enrolment grant: guardcontrol.user
+// at the Guard tenant, made and revoked with the enrolment calls. A state
+// with no role (an import) is not, until Read finds its role.
+func (m *guardEnrolmentGrantModel) isEnrolment() bool {
+	return m.Role.ValueString() == guardRoleUser && m.NetworkID.IsNull()
+}
+
+// target is the resource name the role is bound at: the Guard tenant or one
+// of its networks.
+func (m *guardEnrolmentGrantModel) target() string {
+	name := guardTenantName(m.TenantID.ValueString())
+	if !m.NetworkID.IsNull() {
+		name += "/" + networksCollection + "/" + m.NetworkID.ValueString()
+	}
+	return name
+}
+
+func (m *guardEnrolmentGrantModel) fromRoleProto(g *guardpb.RoleGrant) {
+	m.Binding = types.StringValue(g.GetBinding())
+	m.Role = types.StringValue(g.GetRole())
+	m.NetworkID = types.StringNull()
+	if g.GetResourceType() == enrolmentAnchorNetwork {
+		m.NetworkID = types.StringValue(g.GetResourceId())
+	}
+	m.ConditionID = types.StringValue(g.GetConditionId())
+	m.SubjectType = types.StringValue(g.GetSubject().GetType())
+	m.SubjectID = types.StringValue(g.GetSubject().GetId())
+	m.DisplayName = types.StringValue(g.GetDisplayName())
+	m.Email = types.StringValue(g.GetEmail())
+}
+
 func (m *guardEnrolmentGrantModel) fromProto(g *guardpb.EnrolmentGrant) {
 	m.Binding = types.StringValue(g.GetBinding())
+	m.Role = types.StringValue(guardRoleUser)
+	m.ConditionID = types.StringValue("")
 	m.SubjectType = types.StringValue(g.GetSubject().GetType())
 	m.SubjectID = types.StringValue(g.GetSubject().GetId())
 	m.DisplayName = types.StringValue(g.GetDisplayName())

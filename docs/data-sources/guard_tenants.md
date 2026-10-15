@@ -31,6 +31,8 @@ Read-Only:
 - `labels` (Map of String)
 - `name` (String) Full resource name.
 - `parent_tenant_id` (String)
+- `product_client_id` (String)
+- `slug` (String)
 - `status` (String)
 - `users` (Attributes) (see [below for nested schema](#nestedatt--guard_tenants--users))
 
@@ -40,6 +42,9 @@ Read-Only:
 Read-Only:
 
 - `access_endpoint` (String)
+- `administers` (Boolean)
 - `audience` (String)
+- `console_client_id` (String)
 - `issuer` (String)
+- `step_up_condition_id` (String)
 - `tenant_id` (String)
