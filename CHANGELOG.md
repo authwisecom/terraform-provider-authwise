@@ -1,13 +1,18 @@
-## 0.16.0 (Unreleased)
+## 0.16.0 (October 14, 2026)
 
 NOTES:
 
-* **apis v0.34.0.** A role other than `guardcontrol.user` or a grant at a
-  network needs guard-control with role grants (guard-control#59). A lookup
-  by slug needs guard-control with the directory (guard-control#57). Against
-  an older guard-control, these fail with Unimplemented. Existing enrolment
-  grants keep the enrolment calls and need nothing newer: their state gains
-  `role = "guardcontrol.user"` on refresh, without replacing them.
+* **apis v0.34.0, guard-control v0.17.0, kit v1.47.0.** A role other than
+  `guardcontrol.user`, a grant at a network, and a lookup by slug need
+  guard-control v0.17.0 (guard-control#57, #59). Against an older
+  guard-control, these fail with Unimplemented. A central administrator's
+  credential writes role grants with its own bearer. A users-link home
+  administrator's credential is written as the tenant's product principal,
+  which needs a kit release carrying kit#776 (none yet; v1.47.0 does not).
+  Existing enrolment grants keep the enrolment calls and need nothing
+  newer: their state gains `role = "guardcontrol.user"` on refresh,
+  without replacing them. The rest of the provider still works with
+  guard-control v0.16.0 and kit v1.46.0.
 
 FEATURES:
 
