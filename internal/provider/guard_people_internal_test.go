@@ -161,11 +161,11 @@ func TestEnrolmentGrantRead(t *testing.T) {
 	}{
 		"found": {grants: []*guardpb.EnrolmentGrant{
 			{Binding: "other"},
-			{Binding: grantBinding, Subject: &guardpb.EnrolmentSubject{Type: "user", Id: "u-1"}, ResourceType: enrolmentAnchorTenant, Email: "ada@example.com"},
+			{Binding: grantBinding, Subject: &guardpb.EnrolmentSubject{Type: enrolmentSubjectUser, Id: "u-1"}, ResourceType: enrolmentAnchorTenant, Email: "ada@example.com"},
 		}},
 		"gone": {grants: []*guardpb.EnrolmentGrant{{Binding: "other"}}, removed: true},
 		"at a network": {grants: []*guardpb.EnrolmentGrant{
-			{Binding: grantBinding, Subject: &guardpb.EnrolmentSubject{Type: "user", Id: "u-1"}, ResourceType: "guardcontrol.network", ResourceId: "n-1"},
+			{Binding: grantBinding, Subject: &guardpb.EnrolmentSubject{Type: enrolmentSubjectUser, Id: "u-1"}, ResourceType: "guardcontrol.network", ResourceId: "n-1"},
 		}, fails: true},
 	}
 
@@ -286,7 +286,7 @@ func TestRoleGrantCreateSendsRoleAtTarget(t *testing.T) {
 
 func TestRoleGrantRead(t *testing.T) {
 
-	found := &guardpb.RoleGrant{Binding: grantBinding, Subject: &guardpb.EnrolmentSubject{Type: "user", Id: "u-1"},
+	found := &guardpb.RoleGrant{Binding: grantBinding, Subject: &guardpb.EnrolmentSubject{Type: enrolmentSubjectUser, Id: "u-1"},
 		Role: guardRoleNetworkAdmin, ResourceType: enrolmentAnchorNetwork, ResourceId: "n-1", Email: "ada@example.com"}
 
 	cases := map[string]struct {
@@ -305,7 +305,7 @@ func TestRoleGrantRead(t *testing.T) {
 		// ...or, from a guard-control without them, from the enrolment grants.
 		"imported, no role grants": {state: importedModel(), stub: &stubTenantAdmin{
 			roleListErr: status.Error(codes.Unimplemented, "unknown method"),
-			grants:      []*guardpb.EnrolmentGrant{{Binding: grantBinding, Subject: &guardpb.EnrolmentSubject{Type: "user", Id: "u-1"}, ResourceType: enrolmentAnchorTenant}},
+			grants:      []*guardpb.EnrolmentGrant{{Binding: grantBinding, Subject: &guardpb.EnrolmentSubject{Type: enrolmentSubjectUser, Id: "u-1"}, ResourceType: enrolmentAnchorTenant}},
 		}, role: guardRoleUser},
 		// A role grant in state is not quietly read as an enrolment grant.
 		"no role grants": {state: networkAdminModel(grantBinding), stub: &stubTenantAdmin{roleListErr: status.Error(codes.Unimplemented, "unknown method")}, fails: true},
