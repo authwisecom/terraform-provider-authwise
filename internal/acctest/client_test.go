@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/plancheck"
 )
 
 const clientAddr = "authwise_client.app"
@@ -161,5 +162,46 @@ resource "authwise_client_secret" "app" {
 `,
 			ExpectError: regexp.MustCompile(`(?s)is\s+public\s+\(token_endpoint_auth_method\s+none\)`),
 		}},
+	})
+}
+
+// TestAccClient_ConfigAnyStableSpelling pins how a config data source spells
+// `any`. protojson varies its whitespace with the binary, and Terraform
+// compares the configured string with state as written, so a spelling that
+// moved between builds showed as a whitespace-only diff after an upgrade.
+// A test binary only ever sees one of protojson's spellings, so this pins
+// the spelling rather than reproducing the flip.
+func TestAccClient_ConfigAnyStableSpelling(t *testing.T) {
+
+	h := newHarness(t)
+
+	config := h.providerConfig() + `
+data "authwise_interactive_client_config" "c" {
+  allowed_redirect_uris = ["https://a.example/cb", "https://b.example/cb"]
+}
+
+resource "authwise_client" "app" {
+  display_name = "App"
+  grant_types  = ["authorization_code"]
+  config       = data.authwise_interactive_client_config.c.any
+}
+`
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: protoFactories(),
+		Steps: []resource.TestStep{
+			{
+				Config: config,
+				Check: resource.TestCheckResourceAttr("data.authwise_interactive_client_config.c", "any",
+					`{"@type":"type.googleapis.com/authwise.types.core.v1alpha1.InteractiveClientConfig",`+
+						`"allowedRedirectUris":["https://a.example/cb","https://b.example/cb"]}`),
+			},
+			{
+				Config: config,
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{plancheck.ExpectEmptyPlan()},
+				},
+			},
+		},
 	})
 }

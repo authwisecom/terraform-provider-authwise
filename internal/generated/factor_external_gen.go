@@ -5,6 +5,7 @@ package generated
 import (
 	"context"
 	v1alpha1 "git.authwise.com/authwise/apis/authwise/types/core/v1alpha1"
+	tf "github.com/activatedio/tfinfra/pkg/tf"
 	jsontypes "github.com/hashicorp/terraform-plugin-framework-jsontypes/jsontypes"
 	datasource "github.com/hashicorp/terraform-plugin-framework/datasource"
 	schema "github.com/hashicorp/terraform-plugin-framework/datasource/schema"
@@ -97,7 +98,7 @@ func (d *factorExternalDataSource) Read(ctx context.Context, req datasource.Read
 		resp.Diagnostics.AddError("cannot pack factor_external", err.Error())
 		return
 	}
-	b, err := protojson.Marshal(a)
+	b, err := tf.ProtoJSON(a)
 	if err != nil {
 		resp.Diagnostics.AddError("cannot encode factor_external", err.Error())
 		return

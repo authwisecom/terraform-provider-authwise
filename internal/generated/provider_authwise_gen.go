@@ -5,12 +5,12 @@ package generated
 import (
 	"context"
 	v1alpha1 "git.authwise.com/authwise/apis/authwise/types/core/v1alpha1"
+	tf "github.com/activatedio/tfinfra/pkg/tf"
 	jsontypes "github.com/hashicorp/terraform-plugin-framework-jsontypes/jsontypes"
 	datasource "github.com/hashicorp/terraform-plugin-framework/datasource"
 	schema "github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	diag "github.com/hashicorp/terraform-plugin-framework/diag"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
-	protojson "google.golang.org/protobuf/encoding/protojson"
 	anypb "google.golang.org/protobuf/types/known/anypb"
 )
 
@@ -88,7 +88,7 @@ func (d *providerAuthwiseDataSource) Read(ctx context.Context, req datasource.Re
 		resp.Diagnostics.AddError("cannot pack provider_authwise", err.Error())
 		return
 	}
-	b, err := protojson.Marshal(a)
+	b, err := tf.ProtoJSON(a)
 	if err != nil {
 		resp.Diagnostics.AddError("cannot encode provider_authwise", err.Error())
 		return

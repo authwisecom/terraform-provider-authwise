@@ -14,7 +14,6 @@ import (
 	path "github.com/hashicorp/terraform-plugin-framework/path"
 	validator "github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
-	protojson "google.golang.org/protobuf/encoding/protojson"
 	anypb "google.golang.org/protobuf/types/known/anypb"
 )
 
@@ -111,7 +110,7 @@ func (d *providerMagicLinkDataSource) Read(ctx context.Context, req datasource.R
 		resp.Diagnostics.AddError("cannot pack provider_magic_link", err.Error())
 		return
 	}
-	b, err := protojson.Marshal(a)
+	b, err := tf.ProtoJSON(a)
 	if err != nil {
 		resp.Diagnostics.AddError("cannot encode provider_magic_link", err.Error())
 		return

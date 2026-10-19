@@ -126,12 +126,14 @@ func (m *NetworkModel) ToProto(ctx context.Context) (*v1alpha1.Network, diag.Dia
 	return out, diags
 }
 
-// FromProto populates the model from its proto message. Scope identifier attributes and input-only attributes are left untouched.
+// FromProto populates the model from its proto message. Input-only attributes, and scope identifier attributes the entity does not carry, are left untouched.
 func (m *NetworkModel) FromProto(ctx context.Context, e *v1alpha1.Network) diag.Diagnostics {
 	var diags diag.Diagnostics
 	m.Name = types.StringValue(e.Name)
 	if len(e.Labels) == 0 {
-		m.Labels = types.MapNull(types.StringType)
+		if !tf.KeepEmpty(m.Labels) {
+			m.Labels = types.MapNull(types.StringType)
+		}
 	} else {
 		v, d := types.MapValueFrom(ctx, types.StringType, e.Labels)
 		diags.Append(d...)
@@ -150,7 +152,7 @@ func (m *NetworkModel) FromProto(ctx context.Context, e *v1alpha1.Network) diag.
 	if e.Config == nil {
 		m.Config = jsontypes.NewNormalizedNull()
 	} else {
-		b, err := protojson.Marshal(e.Config)
+		b, err := tf.ProtoJSON(e.Config)
 		if err != nil {
 			diags.AddError("cannot encode config", err.Error())
 		} else {
@@ -450,7 +452,9 @@ func networkItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Network, 
 	var item NetworkItemModel
 	item.Name = types.StringValue(e.Name)
 	if len(e.Labels) == 0 {
-		item.Labels = types.MapNull(types.StringType)
+		if !tf.KeepEmpty(item.Labels) {
+			item.Labels = types.MapNull(types.StringType)
+		}
 	} else {
 		v, d := types.MapValueFrom(ctx, types.StringType, e.Labels)
 		diags.Append(d...)
@@ -469,7 +473,7 @@ func networkItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Network, 
 	if e.Config == nil {
 		item.Config = jsontypes.NewNormalizedNull()
 	} else {
-		b, err := protojson.Marshal(e.Config)
+		b, err := tf.ProtoJSON(e.Config)
 		if err != nil {
 			diags.AddError("cannot encode config", err.Error())
 		} else {

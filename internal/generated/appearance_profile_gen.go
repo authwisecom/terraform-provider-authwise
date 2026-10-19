@@ -154,12 +154,14 @@ func (m *AppearanceProfileModel) ToProto(ctx context.Context) (*v1alpha1.Appeara
 	return out, diags
 }
 
-// FromProto populates the model from its proto message. Scope identifier attributes and input-only attributes are left untouched.
+// FromProto populates the model from its proto message. Input-only attributes, and scope identifier attributes the entity does not carry, are left untouched.
 func (m *AppearanceProfileModel) FromProto(ctx context.Context, e *v1alpha1.AppearanceProfile) diag.Diagnostics {
 	var diags diag.Diagnostics
 	m.Name = types.StringValue(e.Name)
 	if len(e.Labels) == 0 {
-		m.Labels = types.MapNull(types.StringType)
+		if !tf.KeepEmpty(m.Labels) {
+			m.Labels = types.MapNull(types.StringType)
+		}
 	} else {
 		v, d := types.MapValueFrom(ctx, types.StringType, e.Labels)
 		diags.Append(d...)
@@ -178,7 +180,7 @@ func (m *AppearanceProfileModel) FromProto(ctx context.Context, e *v1alpha1.Appe
 	if e.StylesheetAttributes == nil {
 		m.StylesheetAttributes = jsontypes.NewNormalizedNull()
 	} else {
-		b, err := protojson.Marshal(e.StylesheetAttributes)
+		b, err := tf.ProtoJSON(e.StylesheetAttributes)
 		if err != nil {
 			diags.AddError("cannot encode stylesheet_attributes", err.Error())
 		} else {
@@ -188,7 +190,7 @@ func (m *AppearanceProfileModel) FromProto(ctx context.Context, e *v1alpha1.Appe
 	if e.Content == nil {
 		m.Content = jsontypes.NewNormalizedNull()
 	} else {
-		b, err := protojson.Marshal(e.Content)
+		b, err := tf.ProtoJSON(e.Content)
 		if err != nil {
 			diags.AddError("cannot encode content", err.Error())
 		} else {
@@ -509,7 +511,9 @@ func appearanceProfileItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1
 	var item AppearanceProfileItemModel
 	item.Name = types.StringValue(e.Name)
 	if len(e.Labels) == 0 {
-		item.Labels = types.MapNull(types.StringType)
+		if !tf.KeepEmpty(item.Labels) {
+			item.Labels = types.MapNull(types.StringType)
+		}
 	} else {
 		v, d := types.MapValueFrom(ctx, types.StringType, e.Labels)
 		diags.Append(d...)
@@ -528,7 +532,7 @@ func appearanceProfileItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1
 	if e.StylesheetAttributes == nil {
 		item.StylesheetAttributes = jsontypes.NewNormalizedNull()
 	} else {
-		b, err := protojson.Marshal(e.StylesheetAttributes)
+		b, err := tf.ProtoJSON(e.StylesheetAttributes)
 		if err != nil {
 			diags.AddError("cannot encode stylesheet_attributes", err.Error())
 		} else {
@@ -538,7 +542,7 @@ func appearanceProfileItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1
 	if e.Content == nil {
 		item.Content = jsontypes.NewNormalizedNull()
 	} else {
-		b, err := protojson.Marshal(e.Content)
+		b, err := tf.ProtoJSON(e.Content)
 		if err != nil {
 			diags.AddError("cannot encode content", err.Error())
 		} else {

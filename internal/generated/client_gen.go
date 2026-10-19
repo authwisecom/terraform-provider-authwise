@@ -232,12 +232,14 @@ func (m *ClientModel) ToProto(ctx context.Context) (*v1alpha1.Client, diag.Diagn
 	return out, diags
 }
 
-// FromProto populates the model from its proto message. Scope identifier attributes and input-only attributes are left untouched.
+// FromProto populates the model from its proto message. Input-only attributes, and scope identifier attributes the entity does not carry, are left untouched.
 func (m *ClientModel) FromProto(ctx context.Context, e *v1alpha1.Client) diag.Diagnostics {
 	var diags diag.Diagnostics
 	m.Name = types.StringValue(e.Name)
 	if len(e.Labels) == 0 {
-		m.Labels = types.MapNull(types.StringType)
+		if !tf.KeepEmpty(m.Labels) {
+			m.Labels = types.MapNull(types.StringType)
+		}
 	} else {
 		v, d := types.MapValueFrom(ctx, types.StringType, e.Labels)
 		diags.Append(d...)
@@ -264,7 +266,9 @@ func (m *ClientModel) FromProto(ctx context.Context, e *v1alpha1.Client) diag.Di
 		m.LoginUrl = types.StringValue(e.LoginUrl)
 	}
 	if len(e.PostLogoutRedirectUris) == 0 {
-		m.PostLogoutRedirectUris = types.ListNull(types.StringType)
+		if !tf.KeepEmpty(m.PostLogoutRedirectUris) {
+			m.PostLogoutRedirectUris = types.ListNull(types.StringType)
+		}
 	} else {
 		v, d := types.ListValueFrom(ctx, types.StringType, e.PostLogoutRedirectUris)
 		diags.Append(d...)
@@ -278,7 +282,7 @@ func (m *ClientModel) FromProto(ctx context.Context, e *v1alpha1.Client) diag.Di
 	if e.Config == nil {
 		m.Config = jsontypes.NewNormalizedNull()
 	} else {
-		b, err := protojson.Marshal(e.Config)
+		b, err := tf.ProtoJSON(e.Config)
 		if err != nil {
 			diags.AddError("cannot encode config", err.Error())
 		} else {
@@ -286,7 +290,9 @@ func (m *ClientModel) FromProto(ctx context.Context, e *v1alpha1.Client) diag.Di
 		}
 	}
 	if len(e.GrantTypes) == 0 {
-		m.GrantTypes = types.ListNull(types.StringType)
+		if !tf.KeepEmpty(m.GrantTypes) {
+			m.GrantTypes = types.ListNull(types.StringType)
+		}
 	} else {
 		v, d := types.ListValueFrom(ctx, types.StringType, e.GrantTypes)
 		diags.Append(d...)
@@ -679,7 +685,9 @@ func clientItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Client, *C
 	var item ClientItemModel
 	item.Name = types.StringValue(e.Name)
 	if len(e.Labels) == 0 {
-		item.Labels = types.MapNull(types.StringType)
+		if !tf.KeepEmpty(item.Labels) {
+			item.Labels = types.MapNull(types.StringType)
+		}
 	} else {
 		v, d := types.MapValueFrom(ctx, types.StringType, e.Labels)
 		diags.Append(d...)
@@ -706,7 +714,9 @@ func clientItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Client, *C
 		item.LoginUrl = types.StringValue(e.LoginUrl)
 	}
 	if len(e.PostLogoutRedirectUris) == 0 {
-		item.PostLogoutRedirectUris = types.ListNull(types.StringType)
+		if !tf.KeepEmpty(item.PostLogoutRedirectUris) {
+			item.PostLogoutRedirectUris = types.ListNull(types.StringType)
+		}
 	} else {
 		v, d := types.ListValueFrom(ctx, types.StringType, e.PostLogoutRedirectUris)
 		diags.Append(d...)
@@ -720,7 +730,7 @@ func clientItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Client, *C
 	if e.Config == nil {
 		item.Config = jsontypes.NewNormalizedNull()
 	} else {
-		b, err := protojson.Marshal(e.Config)
+		b, err := tf.ProtoJSON(e.Config)
 		if err != nil {
 			diags.AddError("cannot encode config", err.Error())
 		} else {
@@ -728,7 +738,9 @@ func clientItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Client, *C
 		}
 	}
 	if len(e.GrantTypes) == 0 {
-		item.GrantTypes = types.ListNull(types.StringType)
+		if !tf.KeepEmpty(item.GrantTypes) {
+			item.GrantTypes = types.ListNull(types.StringType)
+		}
 	} else {
 		v, d := types.ListValueFrom(ctx, types.StringType, e.GrantTypes)
 		diags.Append(d...)

@@ -210,12 +210,14 @@ func (m *EndpointModel) ToProto(ctx context.Context) (*v1alpha1.Endpoint, diag.D
 	return out, diags
 }
 
-// FromProto populates the model from its proto message. Scope identifier attributes and input-only attributes are left untouched.
+// FromProto populates the model from its proto message. Input-only attributes, and scope identifier attributes the entity does not carry, are left untouched.
 func (m *EndpointModel) FromProto(ctx context.Context, e *v1alpha1.Endpoint) diag.Diagnostics {
 	var diags diag.Diagnostics
 	m.Name = types.StringValue(e.Name)
 	if len(e.Labels) == 0 {
-		m.Labels = types.MapNull(types.StringType)
+		if !tf.KeepEmpty(m.Labels) {
+			m.Labels = types.MapNull(types.StringType)
+		}
 	} else {
 		v, d := types.MapValueFrom(ctx, types.StringType, e.Labels)
 		diags.Append(d...)
@@ -236,7 +238,7 @@ func (m *EndpointModel) FromProto(ctx context.Context, e *v1alpha1.Endpoint) dia
 	if e.Auth == nil {
 		m.Auth = jsontypes.NewNormalizedNull()
 	} else {
-		b, err := protojson.Marshal(e.Auth)
+		b, err := tf.ProtoJSON(e.Auth)
 		if err != nil {
 			diags.AddError("cannot encode auth", err.Error())
 		} else {
@@ -596,7 +598,9 @@ func endpointItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Endpoint
 	var item EndpointItemModel
 	item.Name = types.StringValue(e.Name)
 	if len(e.Labels) == 0 {
-		item.Labels = types.MapNull(types.StringType)
+		if !tf.KeepEmpty(item.Labels) {
+			item.Labels = types.MapNull(types.StringType)
+		}
 	} else {
 		v, d := types.MapValueFrom(ctx, types.StringType, e.Labels)
 		diags.Append(d...)
@@ -617,7 +621,7 @@ func endpointItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Endpoint
 	if e.Auth == nil {
 		item.Auth = jsontypes.NewNormalizedNull()
 	} else {
-		b, err := protojson.Marshal(e.Auth)
+		b, err := tf.ProtoJSON(e.Auth)
 		if err != nil {
 			diags.AddError("cannot encode auth", err.Error())
 		} else {

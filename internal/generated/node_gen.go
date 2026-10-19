@@ -217,12 +217,14 @@ func (m *NodeModel) ToProto(ctx context.Context) (*v1alpha1.Node, diag.Diagnosti
 	return out, diags
 }
 
-// FromProto populates the model from its proto message. Scope identifier attributes and input-only attributes are left untouched.
+// FromProto populates the model from its proto message. Input-only attributes, and scope identifier attributes the entity does not carry, are left untouched.
 func (m *NodeModel) FromProto(ctx context.Context, e *v1alpha1.Node) diag.Diagnostics {
 	var diags diag.Diagnostics
 	m.Name = types.StringValue(e.Name)
 	if len(e.Labels) == 0 {
-		m.Labels = types.MapNull(types.StringType)
+		if !tf.KeepEmpty(m.Labels) {
+			m.Labels = types.MapNull(types.StringType)
+		}
 	} else {
 		v, d := types.MapValueFrom(ctx, types.StringType, e.Labels)
 		diags.Append(d...)
@@ -249,7 +251,9 @@ func (m *NodeModel) FromProto(ctx context.Context, e *v1alpha1.Node) diag.Diagno
 		m.Endpoint = types.StringValue(e.Endpoint)
 	}
 	if len(e.AllowedIps) == 0 {
-		m.AllowedIps = types.ListNull(types.StringType)
+		if !tf.KeepEmpty(m.AllowedIps) {
+			m.AllowedIps = types.ListNull(types.StringType)
+		}
 	} else {
 		v, d := types.ListValueFrom(ctx, types.StringType, e.AllowedIps)
 		diags.Append(d...)
@@ -258,7 +262,7 @@ func (m *NodeModel) FromProto(ctx context.Context, e *v1alpha1.Node) diag.Diagno
 	if e.Config == nil {
 		m.Config = jsontypes.NewNormalizedNull()
 	} else {
-		b, err := protojson.Marshal(e.Config)
+		b, err := tf.ProtoJSON(e.Config)
 		if err != nil {
 			diags.AddError("cannot encode config", err.Error())
 		} else {
@@ -276,7 +280,9 @@ func (m *NodeModel) FromProto(ctx context.Context, e *v1alpha1.Node) diag.Diagno
 		m.State = types.StringValue(e.State)
 	}
 	if len(e.Roles) == 0 {
-		m.Roles = types.ListNull(types.StringType)
+		if !tf.KeepEmpty(m.Roles) {
+			m.Roles = types.ListNull(types.StringType)
+		}
 	} else {
 		v, d := types.ListValueFrom(ctx, types.StringType, e.Roles)
 		diags.Append(d...)
@@ -648,7 +654,9 @@ func nodeItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Node, *NodeM
 	var item NodeItemModel
 	item.Name = types.StringValue(e.Name)
 	if len(e.Labels) == 0 {
-		item.Labels = types.MapNull(types.StringType)
+		if !tf.KeepEmpty(item.Labels) {
+			item.Labels = types.MapNull(types.StringType)
+		}
 	} else {
 		v, d := types.MapValueFrom(ctx, types.StringType, e.Labels)
 		diags.Append(d...)
@@ -675,7 +683,9 @@ func nodeItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Node, *NodeM
 		item.Endpoint = types.StringValue(e.Endpoint)
 	}
 	if len(e.AllowedIps) == 0 {
-		item.AllowedIps = types.ListNull(types.StringType)
+		if !tf.KeepEmpty(item.AllowedIps) {
+			item.AllowedIps = types.ListNull(types.StringType)
+		}
 	} else {
 		v, d := types.ListValueFrom(ctx, types.StringType, e.AllowedIps)
 		diags.Append(d...)
@@ -684,7 +694,7 @@ func nodeItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Node, *NodeM
 	if e.Config == nil {
 		item.Config = jsontypes.NewNormalizedNull()
 	} else {
-		b, err := protojson.Marshal(e.Config)
+		b, err := tf.ProtoJSON(e.Config)
 		if err != nil {
 			diags.AddError("cannot encode config", err.Error())
 		} else {
@@ -702,7 +712,9 @@ func nodeItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Node, *NodeM
 		item.State = types.StringValue(e.State)
 	}
 	if len(e.Roles) == 0 {
-		item.Roles = types.ListNull(types.StringType)
+		if !tf.KeepEmpty(item.Roles) {
+			item.Roles = types.ListNull(types.StringType)
+		}
 	} else {
 		v, d := types.ListValueFrom(ctx, types.StringType, e.Roles)
 		diags.Append(d...)

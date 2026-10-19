@@ -194,12 +194,14 @@ func (m *ThemeModel) ToProto(ctx context.Context) (*v1alpha1.Theme, diag.Diagnos
 	return out, diags
 }
 
-// FromProto populates the model from its proto message. Scope identifier attributes and input-only attributes are left untouched.
+// FromProto populates the model from its proto message. Input-only attributes, and scope identifier attributes the entity does not carry, are left untouched.
 func (m *ThemeModel) FromProto(ctx context.Context, e *v1alpha1.Theme) diag.Diagnostics {
 	var diags diag.Diagnostics
 	m.Name = types.StringValue(e.Name)
 	if len(e.Labels) == 0 {
-		m.Labels = types.MapNull(types.StringType)
+		if !tf.KeepEmpty(m.Labels) {
+			m.Labels = types.MapNull(types.StringType)
+		}
 	} else {
 		v, d := types.MapValueFrom(ctx, types.StringType, e.Labels)
 		diags.Append(d...)
@@ -218,7 +220,7 @@ func (m *ThemeModel) FromProto(ctx context.Context, e *v1alpha1.Theme) diag.Diag
 	if e.StylesheetAttributes == nil {
 		m.StylesheetAttributes = jsontypes.NewNormalizedNull()
 	} else {
-		b, err := protojson.Marshal(e.StylesheetAttributes)
+		b, err := tf.ProtoJSON(e.StylesheetAttributes)
 		if err != nil {
 			diags.AddError("cannot encode stylesheet_attributes", err.Error())
 		} else {
@@ -233,7 +235,7 @@ func (m *ThemeModel) FromProto(ctx context.Context, e *v1alpha1.Theme) diag.Diag
 	if e.Content == nil {
 		m.Content = jsontypes.NewNormalizedNull()
 	} else {
-		b, err := protojson.Marshal(e.Content)
+		b, err := tf.ProtoJSON(e.Content)
 		if err != nil {
 			diags.AddError("cannot encode content", err.Error())
 		} else {
@@ -248,7 +250,7 @@ func (m *ThemeModel) FromProto(ctx context.Context, e *v1alpha1.Theme) diag.Diag
 	if e.PlaceholderStylesheetAttributes == nil {
 		m.PlaceholderStylesheetAttributes = jsontypes.NewNormalizedNull()
 	} else {
-		b, err := protojson.Marshal(e.PlaceholderStylesheetAttributes)
+		b, err := tf.ProtoJSON(e.PlaceholderStylesheetAttributes)
 		if err != nil {
 			diags.AddError("cannot encode placeholder_stylesheet_attributes", err.Error())
 		} else {
@@ -258,7 +260,7 @@ func (m *ThemeModel) FromProto(ctx context.Context, e *v1alpha1.Theme) diag.Diag
 	if e.PlaceholderContent == nil {
 		m.PlaceholderContent = jsontypes.NewNormalizedNull()
 	} else {
-		b, err := protojson.Marshal(e.PlaceholderContent)
+		b, err := tf.ProtoJSON(e.PlaceholderContent)
 		if err != nil {
 			diags.AddError("cannot encode placeholder_content", err.Error())
 		} else {
@@ -617,7 +619,9 @@ func themeItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Theme, *The
 	var item ThemeItemModel
 	item.Name = types.StringValue(e.Name)
 	if len(e.Labels) == 0 {
-		item.Labels = types.MapNull(types.StringType)
+		if !tf.KeepEmpty(item.Labels) {
+			item.Labels = types.MapNull(types.StringType)
+		}
 	} else {
 		v, d := types.MapValueFrom(ctx, types.StringType, e.Labels)
 		diags.Append(d...)
@@ -636,7 +640,7 @@ func themeItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Theme, *The
 	if e.StylesheetAttributes == nil {
 		item.StylesheetAttributes = jsontypes.NewNormalizedNull()
 	} else {
-		b, err := protojson.Marshal(e.StylesheetAttributes)
+		b, err := tf.ProtoJSON(e.StylesheetAttributes)
 		if err != nil {
 			diags.AddError("cannot encode stylesheet_attributes", err.Error())
 		} else {
@@ -651,7 +655,7 @@ func themeItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Theme, *The
 	if e.Content == nil {
 		item.Content = jsontypes.NewNormalizedNull()
 	} else {
-		b, err := protojson.Marshal(e.Content)
+		b, err := tf.ProtoJSON(e.Content)
 		if err != nil {
 			diags.AddError("cannot encode content", err.Error())
 		} else {
@@ -666,7 +670,7 @@ func themeItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Theme, *The
 	if e.PlaceholderStylesheetAttributes == nil {
 		item.PlaceholderStylesheetAttributes = jsontypes.NewNormalizedNull()
 	} else {
-		b, err := protojson.Marshal(e.PlaceholderStylesheetAttributes)
+		b, err := tf.ProtoJSON(e.PlaceholderStylesheetAttributes)
 		if err != nil {
 			diags.AddError("cannot encode placeholder_stylesheet_attributes", err.Error())
 		} else {
@@ -676,7 +680,7 @@ func themeItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Theme, *The
 	if e.PlaceholderContent == nil {
 		item.PlaceholderContent = jsontypes.NewNormalizedNull()
 	} else {
-		b, err := protojson.Marshal(e.PlaceholderContent)
+		b, err := tf.ProtoJSON(e.PlaceholderContent)
 		if err != nil {
 			diags.AddError("cannot encode placeholder_content", err.Error())
 		} else {

@@ -315,12 +315,14 @@ func (m *UserModel) ToProto(ctx context.Context) (*v1alpha1.User, diag.Diagnosti
 	return out, diags
 }
 
-// FromProto populates the model from its proto message. Scope identifier attributes and input-only attributes are left untouched.
+// FromProto populates the model from its proto message. Input-only attributes, and scope identifier attributes the entity does not carry, are left untouched.
 func (m *UserModel) FromProto(ctx context.Context, e *v1alpha1.User) diag.Diagnostics {
 	var diags diag.Diagnostics
 	m.Name = types.StringValue(e.Name)
 	if len(e.Labels) == 0 {
-		m.Labels = types.MapNull(types.StringType)
+		if !tf.KeepEmpty(m.Labels) {
+			m.Labels = types.MapNull(types.StringType)
+		}
 	} else {
 		v, d := types.MapValueFrom(ctx, types.StringType, e.Labels)
 		diags.Append(d...)
@@ -406,7 +408,7 @@ func (m *UserModel) FromProto(ctx context.Context, e *v1alpha1.User) diag.Diagno
 	if e.Metadata == nil {
 		m.Metadata = jsontypes.NewNormalizedNull()
 	} else {
-		b, err := protojson.Marshal(e.Metadata)
+		b, err := tf.ProtoJSON(e.Metadata)
 		if err != nil {
 			diags.AddError("cannot encode metadata", err.Error())
 		} else {
@@ -416,7 +418,7 @@ func (m *UserModel) FromProto(ctx context.Context, e *v1alpha1.User) diag.Diagno
 	if e.ExtraFields == nil {
 		m.ExtraFields = jsontypes.NewNormalizedNull()
 	} else {
-		b, err := protojson.Marshal(e.ExtraFields)
+		b, err := tf.ProtoJSON(e.ExtraFields)
 		if err != nil {
 			diags.AddError("cannot encode extra_fields", err.Error())
 		} else {
@@ -870,7 +872,9 @@ func userItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.User, *UserM
 	var item UserItemModel
 	item.Name = types.StringValue(e.Name)
 	if len(e.Labels) == 0 {
-		item.Labels = types.MapNull(types.StringType)
+		if !tf.KeepEmpty(item.Labels) {
+			item.Labels = types.MapNull(types.StringType)
+		}
 	} else {
 		v, d := types.MapValueFrom(ctx, types.StringType, e.Labels)
 		diags.Append(d...)
@@ -956,7 +960,7 @@ func userItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.User, *UserM
 	if e.Metadata == nil {
 		item.Metadata = jsontypes.NewNormalizedNull()
 	} else {
-		b, err := protojson.Marshal(e.Metadata)
+		b, err := tf.ProtoJSON(e.Metadata)
 		if err != nil {
 			diags.AddError("cannot encode metadata", err.Error())
 		} else {
@@ -966,7 +970,7 @@ func userItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.User, *UserM
 	if e.ExtraFields == nil {
 		item.ExtraFields = jsontypes.NewNormalizedNull()
 	} else {
-		b, err := protojson.Marshal(e.ExtraFields)
+		b, err := tf.ProtoJSON(e.ExtraFields)
 		if err != nil {
 			diags.AddError("cannot encode extra_fields", err.Error())
 		} else {
