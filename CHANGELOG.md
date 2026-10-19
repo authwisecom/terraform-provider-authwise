@@ -1,4 +1,9 @@
-## 0.16.1 (Unreleased)
+## 0.16.1 (October 18, 2026)
+
+NOTES:
+
+* **apis v0.34.0, guard-control v0.17.0, kit v1.47.0.** No new server
+  requirement: the same releases as 0.16.0.
 
 BUG FIXES:
 
