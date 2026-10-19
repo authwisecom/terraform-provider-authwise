@@ -1,3 +1,27 @@
+## 0.16.2 (October 18, 2026)
+
+NOTES:
+
+* **tfinfra v0.0.19; apis v0.34.0, guard-control v0.17.0, kit v1.47.0.**
+  No new server requirement. State written by 0.16.0 or earlier shows the
+  whitespace diff below once more. Applying it sends nothing to the
+  server, because the update mask leaves out a config that compares equal,
+  and the next plan is clean.
+
+BUG FIXES:
+
+* **Whitespace-only diffs on `config` after upgrading:** the config data
+  sources' `any` (and every Any- or Struct-typed attribute read from the
+  server) came from protojson, which varies its whitespace on purpose,
+  seeded from a hash of the provider binary. Each build could spell the
+  same value differently: 0.14.0 to 0.16.0 put a space after the commas,
+  and 0.16.1 did not. Terraform compares the configured string with state
+  as written, so `config = data.authwise_*_config.x.any` planned
+  `jsonencode( # whitespace changes )` after an upgrade. The encoding is
+  now compact in every build (tfinfra v0.0.19).
+* **A list or map written empty reads back empty:** `labels = {}` or an
+  empty list was read back as null (tfinfra v0.0.17).
+
 ## 0.16.1 (October 18, 2026)
 
 NOTES:
