@@ -1,3 +1,16 @@
+## 0.16.1 (Unreleased)
+
+BUG FIXES:
+
+* **`authwise_secret` plans without the material when it isn't sent:** a
+  null `payload_wo` with `payload_wo_version` set failed every plan with
+  "payload_wo_version without payload_wo", even when the plan would send
+  nothing. A workspace that fed `payload_wo` from an ephemeral variable,
+  set only to create or rotate, could not plan without the secret on disk.
+  The check now runs at plan against state: `payload_wo` is required only
+  when creating an inline secret or when `payload_wo_version` changes, and
+  may be null otherwise.
+
 ## 0.16.0 (October 14, 2026)
 
 NOTES:

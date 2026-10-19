@@ -633,6 +633,64 @@ resource "authwise_secret" "s" {
 	})
 }
 
+// TestAccSecret_PayloadOnlyWhenSent pins that payload_wo is needed only by an
+// apply that sends it, so a configuration can feed it from an ephemeral
+// variable that is set for creates and rotations and null otherwise.
+func TestAccSecret_PayloadOnlyWhenSent(t *testing.T) {
+
+	h := newHarness(t)
+
+	// material is the variable's value as HCL: null when unset.
+	secret := func(material, version string) string {
+		return h.providerConfig() + `
+variable "material" {
+  type      = string
+  sensitive = true
+  ephemeral = true
+  default   = ` + material + `
+}
+
+resource "authwise_secret" "s" {
+  payload_wo         = var.material
+  payload_wo_version = ` + version + `
+}
+`
+	}
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: protoFactories(),
+		Steps: []resource.TestStep{
+			{
+				// A create sends the material, so it needs it.
+				Config:      secret("null", "1"),
+				ExpectError: regexp.MustCompile(`payload_wo is required`),
+			},
+			{
+				Config: secret(`"v1-material"`, "1"),
+				Check: checkServer(func() error {
+					if got := h.fake.secretMaterial(h.fake.onlySecretName()); fmt.Sprint(got) != "[v1-material]" {
+						return fmt.Errorf("server material = %v, want [v1-material]", got)
+					}
+					return nil
+				}),
+			},
+			{
+				// Nothing to send, so nothing is needed.
+				Config: secret("null", "1"),
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{plancheck.ExpectEmptyPlan()},
+				},
+			},
+			{
+				// A rotation sends the material, so it needs it.
+				Config:      secret("null", "2"),
+				ExpectError: regexp.MustCompile(`payload_wo is required to rotate`),
+			},
+		},
+		CheckDestroy: noneLeft(h),
+	})
+}
+
 func TestAccSecret_ExternalRefusesPayload(t *testing.T) {
 
 	h := newHarness(t)

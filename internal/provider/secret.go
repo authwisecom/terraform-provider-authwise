@@ -99,7 +99,8 @@ func (r *secretResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 		MarkdownDescription: "A tenant secret: a credential other objects name by reference (`client_secret_ref`, an endpoint's `auth`) instead of holding it.\n\n" +
 			"**Where the material lives.** An inline secret's material goes in through `payload_wo`, a write-only argument (Terraform 1.11 or later): " +
 			"kit seals it in the request that carries it, and neither kit nor Terraform keeps a readable copy. It is not in the plan, not in state, and no API call returns it. " +
-			"To rotate, change the material and bump `payload_wo_version`; the apply sends it as a new version. Changing `payload_wo` alone does nothing, because Terraform has nothing to compare it with.\n\n" +
+			"To rotate, change the material and bump `payload_wo_version`; the apply sends it as a new version. Changing `payload_wo` alone does nothing, because Terraform has nothing to compare it with. " +
+			"`payload_wo` is only needed by an apply that sends it, so outside a create or a rotation it may be null, for example an ephemeral variable left unset.\n\n" +
 			"**Deletion.** kit refuses to delete a secret while anything references it. Reference it by expression (`authwise_secret.x.name`) so Terraform orders the referrer's change or destruction first.",
 		Attributes: map[string]schema.Attribute{
 			"name": schema.StringAttribute{
@@ -135,7 +136,7 @@ func (r *secretResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 				Optional:            true,
 				Sensitive:           true,
 				WriteOnly:           true,
-				MarkdownDescription: "The material, write-only: required for an inline secret on create, refused for an external one. Sent on create and whenever `payload_wo_version` changes; never stored.",
+				MarkdownDescription: "The material, write-only: required for an inline secret on create and whenever `payload_wo_version` changes, which is when it is sent; refused for an external one. It may be left unset otherwise, for example as a null ephemeral variable. Never stored.",
 			},
 			"payload_wo_version": schema.Int64Attribute{
 				Optional:            true,
@@ -161,9 +162,9 @@ func (r *secretResource) Configure(_ context.Context, req resource.ConfigureRequ
 	}
 }
 
-// ValidateConfig refuses the combinations kit would refuse at apply, so they
-// fail at plan: material for an external secret, and a version with no
-// material to send.
+// ValidateConfig refuses material for an external secret, which kit would
+// refuse at apply. Whether a missing payload_wo matters depends on state, so
+// ModifyPlan checks that.
 func (r *secretResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
 
 	var m secretModel
@@ -176,17 +177,35 @@ func (r *secretResource) ValidateConfig(ctx context.Context, req resource.Valida
 		resp.Diagnostics.AddAttributeError(path.Root("payload_wo"), "external secrets take no material",
 			"kit reads an external secret's material from its store at use; remove payload_wo, or remove external to keep the material in kit.")
 	}
-	if !m.PayloadWOVersion.IsNull() && m.PayloadWO.IsNull() {
-		resp.Diagnostics.AddAttributeError(path.Root("payload_wo_version"), "payload_wo_version without payload_wo",
-			"payload_wo_version exists to send payload_wo again; set the material it should send.")
-	}
 }
 
-// ModifyPlan marks version and updated_at unknown when a rotation is planned,
-// since the apply bumps both.
+// ModifyPlan refuses a plan that would send material it doesn't have, and
+// marks version and updated_at unknown when a rotation is planned, since the
+// apply bumps both.
+//
+// payload_wo is only needed when the apply sends it: on creating an inline
+// secret, and on a rotation. Otherwise it may be null, so a configuration can
+// feed it from an ephemeral variable that is set only for those applies.
+// Write-only values are never in the plan, so it is read from config.
 func (r *secretResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
 
-	if req.State.Raw.IsNull() || req.Plan.Raw.IsNull() {
+	if req.Plan.Raw.IsNull() {
+		return
+	}
+
+	var payload types.String
+	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("payload_wo"), &payload)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	if req.State.Raw.IsNull() {
+		var external types.Object
+		resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("external"), &external)...)
+		if !resp.Diagnostics.HasError() && external.IsNull() && payload.IsNull() {
+			resp.Diagnostics.AddAttributeError(path.Root("payload_wo"), "payload_wo is required",
+				"an inline secret is created with its material; set payload_wo (Terraform 1.11 or later), or set external to keep it in a store.")
+		}
 		return
 	}
 
@@ -194,6 +213,12 @@ func (r *secretResource) ModifyPlan(ctx context.Context, req resource.ModifyPlan
 	resp.Diagnostics.Append(req.Plan.GetAttribute(ctx, path.Root("payload_wo_version"), &planned)...)
 	resp.Diagnostics.Append(req.State.GetAttribute(ctx, path.Root("payload_wo_version"), &prior)...)
 	if resp.Diagnostics.HasError() || planned.Equal(prior) {
+		return
+	}
+
+	if payload.IsNull() {
+		resp.Diagnostics.AddAttributeError(path.Root("payload_wo"), "payload_wo is required to rotate",
+			"payload_wo_version changed, which sends payload_wo as a new version; set the material it should send.")
 		return
 	}
 

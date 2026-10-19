@@ -4,7 +4,7 @@ page_title: "authwise_secret Resource - Authwise"
 subcategory: "Identity"
 description: |-
   A tenant secret: a credential other objects name by reference (client_secret_ref, an endpoint's auth) instead of holding it.
-  Where the material lives. An inline secret's material goes in through payload_wo, a write-only argument (Terraform 1.11 or later): kit seals it in the request that carries it, and neither kit nor Terraform keeps a readable copy. It is not in the plan, not in state, and no API call returns it. To rotate, change the material and bump payload_wo_version; the apply sends it as a new version. Changing payload_wo alone does nothing, because Terraform has nothing to compare it with.
+  Where the material lives. An inline secret's material goes in through payload_wo, a write-only argument (Terraform 1.11 or later): kit seals it in the request that carries it, and neither kit nor Terraform keeps a readable copy. It is not in the plan, not in state, and no API call returns it. To rotate, change the material and bump payload_wo_version; the apply sends it as a new version. Changing payload_wo alone does nothing, because Terraform has nothing to compare it with. payload_wo is only needed by an apply that sends it, so outside a create or a rotation it may be null, for example an ephemeral variable left unset.
   Deletion. kit refuses to delete a secret while anything references it. Reference it by expression (authwise_secret.x.name) so Terraform orders the referrer's change or destruction first.
 ---
 
@@ -12,7 +12,7 @@ description: |-
 
 A tenant secret: a credential other objects name by reference (`client_secret_ref`, an endpoint's `auth`) instead of holding it.
 
-**Where the material lives.** An inline secret's material goes in through `payload_wo`, a write-only argument (Terraform 1.11 or later): kit seals it in the request that carries it, and neither kit nor Terraform keeps a readable copy. It is not in the plan, not in state, and no API call returns it. To rotate, change the material and bump `payload_wo_version`; the apply sends it as a new version. Changing `payload_wo` alone does nothing, because Terraform has nothing to compare it with.
+**Where the material lives.** An inline secret's material goes in through `payload_wo`, a write-only argument (Terraform 1.11 or later): kit seals it in the request that carries it, and neither kit nor Terraform keeps a readable copy. It is not in the plan, not in state, and no API call returns it. To rotate, change the material and bump `payload_wo_version`; the apply sends it as a new version. Changing `payload_wo` alone does nothing, because Terraform has nothing to compare it with. `payload_wo` is only needed by an apply that sends it, so outside a create or a rotation it may be null, for example an ephemeral variable left unset.
 
 **Deletion.** kit refuses to delete a secret while anything references it. Reference it by expression (`authwise_secret.x.name`) so Terraform orders the referrer's change or destruction first.
 
@@ -29,7 +29,7 @@ A tenant secret: a credential other objects name by reference (`client_secret_re
 - `display_name` (String)
 - `external` (Attributes) Keep the material in an operator-declared store instead of kit's database: kit reads it at use and never holds it. Unset means inline. Fixed at creation — changing it replaces the secret. kit refuses external secrets until kit#372 ships. (see [below for nested schema](#nestedatt--external))
 - `labels` (Map of String)
-- `payload_wo` (String, Sensitive, [Write-only](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments)) The material, write-only: required for an inline secret on create, refused for an external one. Sent on create and whenever `payload_wo_version` changes; never stored.
+- `payload_wo` (String, Sensitive, [Write-only](https://developer.hashicorp.com/terraform/language/resources/ephemeral#write-only-arguments)) The material, write-only: required for an inline secret on create and whenever `payload_wo_version` changes, which is when it is sent; refused for an external one. It may be left unset otherwise, for example as a null ephemeral variable. Never stored.
 - `payload_wo_version` (Number) Change this to send the current `payload_wo` as a new version of the secret (kit's `:addVersion`).
 - `tenant_id` (String) Parent identifier `tenant_id`; overrides the provider default. Changing it replaces the resource.
 
