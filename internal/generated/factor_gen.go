@@ -59,9 +59,10 @@ func FactorResourceSchema() schema.Schema {
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"realm_id": schema.StringAttribute{
-				MarkdownDescription: "Parent identifier `realm_id`; overrides the provider default. Changing it replaces the resource.",
+				Computed:            true,
+				MarkdownDescription: "Parent identifier `realm_id`; overrides the provider default, and reads back from the name. Changing a configured one replaces the resource.",
 				Optional:            true,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				PlanModifiers:       []planmodifier.String{tf.RequiresReplaceIfConfigured(), stringplanmodifier.UseStateForUnknown()},
 				Validators:          []validator.String{tf.ReferenceID("r", "realm", "authwise_realm.<name>.realm_id")},
 			},
 			"status": schema.StringAttribute{
@@ -70,9 +71,10 @@ func FactorResourceSchema() schema.Schema {
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"tenant_id": schema.StringAttribute{
-				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default. Changing it replaces the resource.",
+				Computed:            true,
+				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default, and reads back from the name. Changing a configured one replaces the resource.",
 				Optional:            true,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				PlanModifiers:       []planmodifier.String{tf.RequiresReplaceIfConfigured(), stringplanmodifier.UseStateForUnknown()},
 				Validators:          []validator.String{tf.ReferenceID("t", "tenant", "")},
 			},
 		},
@@ -254,12 +256,13 @@ func newFactorCrud(providerData any) (*tf.Crud[*v1alpha1.Factor, *FactorModel], 
 				})
 			},
 		},
-		Collection:  "factors",
-		Defaults:    pd.Defaults,
-		IDAttribute: "factor_id",
-		NewModel:    NewFactorModel,
-		Scope:       tf.NewScope("tenants", "realms"),
-		TypeName:    "factor",
+		Collection:       "factors",
+		Defaults:         pd.Defaults,
+		IDAttribute:      "factor_id",
+		NewModel:         NewFactorModel,
+		ParentAttributes: []string{"tenant_id", "realm_id"},
+		Scope:            tf.NewScope("tenants", "realms"),
+		TypeName:         "factor",
 	}), diags
 }
 

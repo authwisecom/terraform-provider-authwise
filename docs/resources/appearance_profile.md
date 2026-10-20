@@ -20,10 +20,10 @@ An issuer's appearance profile: the stylesheet and content its login pages use. 
 - `content` (String) `content` as a JSON object.
 - `display_name` (String)
 - `is_default` (Boolean) Whether this profile is its issuer's default, and so the issuer's appearance. Set it to `true` on the one profile that should be the default, and leave it out on the others. The issuer's first profile becomes the default whatever this says. To move the default, set it on the new profile and remove it from the old one.
-- `issuer_id` (String) Parent identifier `issuer_id`; overrides the provider default. Changing it replaces the resource.
+- `issuer_id` (String) Parent identifier `issuer_id`; overrides the provider default, and reads back from the name. Changing a configured one replaces the resource.
 - `labels` (Map of String)
 - `stylesheet_attributes` (String) `stylesheet_attributes` as a JSON object.
-- `tenant_id` (String) Parent identifier `tenant_id`; overrides the provider default. Changing it replaces the resource.
+- `tenant_id` (String) Parent identifier `tenant_id`; overrides the provider default, and reads back from the name. Changing a configured one replaces the resource.
 - `theme_id` (String)
 
 ### Read-Only

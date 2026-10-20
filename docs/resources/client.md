@@ -43,13 +43,13 @@ resource "authwise_client" "console" {
 - `display_name` (String)
 - `expires_at` (String) `expires_at` as an RFC 3339 timestamp.
 - `grant_types` (List of String)
-- `issuer_id` (String) Parent identifier `issuer_id`; overrides the provider default. Changing it replaces the resource.
+- `issuer_id` (String) Parent identifier `issuer_id`; overrides the provider default, and reads back from the name. Changing a configured one replaces the resource.
 - `kind` (String)
 - `labels` (Map of String)
 - `login_url` (String)
 - `post_logout_redirect_uris` (List of String)
 - `status` (String)
-- `tenant_id` (String) Parent identifier `tenant_id`; overrides the provider default. Changing it replaces the resource.
+- `tenant_id` (String) Parent identifier `tenant_id`; overrides the provider default, and reads back from the name. Changing a configured one replaces the resource.
 - `token_endpoint_auth_method` (String)
 
 ### Read-Only

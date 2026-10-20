@@ -24,9 +24,9 @@ A second step a realm offers, such as TOTP, WebAuthn or Duo. `config` comes from
 
 - `config` (String) `config` as protojson-encoded google.protobuf.Any (JSON object with `@type`); reference a generated config data source's `any` output for the type-safe form.
 - `labels` (Map of String)
-- `realm_id` (String) Parent identifier `realm_id`; overrides the provider default. Changing it replaces the resource.
+- `realm_id` (String) Parent identifier `realm_id`; overrides the provider default, and reads back from the name. Changing a configured one replaces the resource.
 - `status` (String)
-- `tenant_id` (String) Parent identifier `tenant_id`; overrides the provider default. Changing it replaces the resource.
+- `tenant_id` (String) Parent identifier `tenant_id`; overrides the provider default, and reads back from the name. Changing a configured one replaces the resource.
 
 ### Read-Only
 

@@ -31,9 +31,9 @@ A user in a realm.
 - `picture` (String)
 - `preferred_username` (String)
 - `profile` (String)
-- `realm_id` (String) Parent identifier `realm_id`; overrides the provider default. Changing it replaces the resource.
+- `realm_id` (String) Parent identifier `realm_id`; overrides the provider default, and reads back from the name. Changing a configured one replaces the resource.
 - `status` (String)
-- `tenant_id` (String) Parent identifier `tenant_id`; overrides the provider default. Changing it replaces the resource.
+- `tenant_id` (String) Parent identifier `tenant_id`; overrides the provider default, and reads back from the name. Changing a configured one replaces the resource.
 - `website` (String)
 - `zoneinfo` (String)
 

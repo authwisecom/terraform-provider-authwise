@@ -31,9 +31,10 @@ func ClientSecretResourceSchema() schema.Schema {
 	return schema.Schema{
 		Attributes: map[string]schema.Attribute{
 			"client_id": schema.StringAttribute{
-				MarkdownDescription: "Parent identifier `client_id`; overrides the provider default. Changing it replaces the resource.",
+				Computed:            true,
+				MarkdownDescription: "Parent identifier `client_id`; overrides the provider default, and reads back from the name. Changing a configured one replaces the resource.",
 				Optional:            true,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				PlanModifiers:       []planmodifier.String{tf.RequiresReplaceIfConfigured(), stringplanmodifier.UseStateForUnknown()},
 				Validators:          []validator.String{tf.ReferenceID("c", "client", "authwise_client.<name>.client_id")},
 			},
 			"client_secret_id": schema.StringAttribute{
@@ -52,9 +53,10 @@ func ClientSecretResourceSchema() schema.Schema {
 				PlanModifiers: []planmodifier.Bool{boolplanmodifier.UseStateForUnknown()},
 			},
 			"issuer_id": schema.StringAttribute{
-				MarkdownDescription: "Parent identifier `issuer_id`; overrides the provider default. Changing it replaces the resource.",
+				Computed:            true,
+				MarkdownDescription: "Parent identifier `issuer_id`; overrides the provider default, and reads back from the name. Changing a configured one replaces the resource.",
 				Optional:            true,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				PlanModifiers:       []planmodifier.String{tf.RequiresReplaceIfConfigured(), stringplanmodifier.UseStateForUnknown()},
 				Validators:          []validator.String{tf.ReferenceID("i", "issuer", "authwise_issuer.<name>.issuer_id")},
 			},
 			"keepers": schema.MapAttribute{
@@ -75,9 +77,10 @@ func ClientSecretResourceSchema() schema.Schema {
 				Sensitive:           true,
 			},
 			"tenant_id": schema.StringAttribute{
-				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default. Changing it replaces the resource.",
+				Computed:            true,
+				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default, and reads back from the name. Changing a configured one replaces the resource.",
 				Optional:            true,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				PlanModifiers:       []planmodifier.String{tf.RequiresReplaceIfConfigured(), stringplanmodifier.UseStateForUnknown()},
 				Validators:          []validator.String{tf.ReferenceID("t", "tenant", "")},
 			},
 		},
@@ -225,12 +228,13 @@ func newClientSecretCrud(providerData any) (*tf.Crud[*v1alpha1.ClientSecret, *Cl
 				})
 			},
 		},
-		Collection:  "client-secrets",
-		Defaults:    pd.Defaults,
-		IDAttribute: "client_secret_id",
-		NewModel:    NewClientSecretModel,
-		Scope:       tf.NewScope("tenants", "issuers", "clients"),
-		TypeName:    "client_secret",
+		Collection:       "client-secrets",
+		Defaults:         pd.Defaults,
+		IDAttribute:      "client_secret_id",
+		NewModel:         NewClientSecretModel,
+		ParentAttributes: []string{"tenant_id", "issuer_id", "client_id"},
+		Scope:            tf.NewScope("tenants", "issuers", "clients"),
+		TypeName:         "client_secret",
 	}), diags
 }
 

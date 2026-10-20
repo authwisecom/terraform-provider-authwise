@@ -91,9 +91,10 @@ func NodeResourceSchema() schema.Schema {
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"network_id": schema.StringAttribute{
-				MarkdownDescription: "Parent identifier `network_id`; overrides the provider default. Changing it replaces the resource.",
+				Computed:            true,
+				MarkdownDescription: "Parent identifier `network_id`; overrides the provider default, and reads back from the name. Changing a configured one replaces the resource.",
 				Optional:            true,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				PlanModifiers:       []planmodifier.String{tf.RequiresReplaceIfConfigured(), stringplanmodifier.UseStateForUnknown()},
 				Validators:          []validator.String{tf.ReferenceID("n", "guard_network", "authwise_guard_network.<name>.guard_network_id")},
 			},
 			"owner_id": schema.StringAttribute{
@@ -115,9 +116,10 @@ func NodeResourceSchema() schema.Schema {
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"tenant_id": schema.StringAttribute{
-				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default. Changing it replaces the resource.",
+				Computed:            true,
+				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default, and reads back from the name. Changing a configured one replaces the resource.",
 				Optional:            true,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				PlanModifiers:       []planmodifier.String{tf.RequiresReplaceIfConfigured(), stringplanmodifier.UseStateForUnknown()},
 				Validators:          []validator.String{tf.ReferenceID("t", "tenant", "")},
 			},
 		},
@@ -400,12 +402,13 @@ func newNodeCrud(providerData any) (*tf.Crud[*v1alpha1.Node, *NodeModel], diag.D
 				})
 			},
 		},
-		Collection:  "nodes",
-		Defaults:    pd.Defaults,
-		IDAttribute: "guard_node_id",
-		NewModel:    NewNodeModel,
-		Scope:       tf.NewScope("tenants", "networks"),
-		TypeName:    "guard_node",
+		Collection:       "nodes",
+		Defaults:         pd.Defaults,
+		IDAttribute:      "guard_node_id",
+		NewModel:         NewNodeModel,
+		ParentAttributes: []string{"tenant_id", "network_id"},
+		Scope:            tf.NewScope("tenants", "networks"),
+		TypeName:         "guard_node",
 	}), diags
 }
 

@@ -58,9 +58,10 @@ func AssetResourceSchema() schema.Schema {
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"tenant_id": schema.StringAttribute{
-				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default. Changing it replaces the resource.",
+				Computed:            true,
+				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default, and reads back from the name. Changing a configured one replaces the resource.",
 				Optional:            true,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				PlanModifiers:       []planmodifier.String{tf.RequiresReplaceIfConfigured(), stringplanmodifier.UseStateForUnknown()},
 				Validators:          []validator.String{tf.ReferenceID("t", "tenant", "")},
 			},
 		},
@@ -220,12 +221,13 @@ func newAssetCrud(providerData any) (*tf.Crud[*v1alpha1.Asset, *AssetModel], dia
 				})
 			},
 		},
-		Collection:  "assets",
-		Defaults:    pd.Defaults,
-		IDAttribute: "asset_id",
-		NewModel:    NewAssetModel,
-		Scope:       tf.NewScope("tenants"),
-		TypeName:    "asset",
+		Collection:       "assets",
+		Defaults:         pd.Defaults,
+		IDAttribute:      "asset_id",
+		NewModel:         NewAssetModel,
+		ParentAttributes: []string{"tenant_id"},
+		Scope:            tf.NewScope("tenants"),
+		TypeName:         "asset",
 	}), diags
 }
 

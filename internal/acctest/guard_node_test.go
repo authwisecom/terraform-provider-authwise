@@ -190,7 +190,7 @@ resource "authwise_guard_node_grants" "web" {
 				ImportState:                          true,
 				ImportStateVerify:                    true,
 				ImportStateVerifyIdentifierAttribute: "name",
-				ImportStateVerifyIgnore:              []string{"auth_code", "tenant_id", "network_id"},
+				ImportStateVerifyIgnore:              []string{"auth_code"},
 				ImportStateIdFunc:                    importByName(guardDBAddr),
 			},
 			{

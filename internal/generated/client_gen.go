@@ -81,9 +81,10 @@ func ClientResourceSchema() schema.Schema {
 				PlanModifiers: []planmodifier.List{listplanmodifier.UseStateForUnknown()},
 			},
 			"issuer_id": schema.StringAttribute{
-				MarkdownDescription: "Parent identifier `issuer_id`; overrides the provider default. Changing it replaces the resource.",
+				Computed:            true,
+				MarkdownDescription: "Parent identifier `issuer_id`; overrides the provider default, and reads back from the name. Changing a configured one replaces the resource.",
 				Optional:            true,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				PlanModifiers:       []planmodifier.String{tf.RequiresReplaceIfConfigured(), stringplanmodifier.UseStateForUnknown()},
 				Validators:          []validator.String{tf.ReferenceID("i", "issuer", "authwise_issuer.<name>.issuer_id")},
 			},
 			"kind": schema.StringAttribute{
@@ -125,9 +126,10 @@ func ClientResourceSchema() schema.Schema {
 				Validators:    []validator.String{stringvalidator.OneOf("CLIENT_STATUS_UNSPECIFIED", "CLIENT_STATUS_ACTIVE", "CLIENT_STATUS_DISABLED", "CLIENT_STATUS_QUARANTINED")},
 			},
 			"tenant_id": schema.StringAttribute{
-				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default. Changing it replaces the resource.",
+				Computed:            true,
+				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default, and reads back from the name. Changing a configured one replaces the resource.",
 				Optional:            true,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				PlanModifiers:       []planmodifier.String{tf.RequiresReplaceIfConfigured(), stringplanmodifier.UseStateForUnknown()},
 				Validators:          []validator.String{tf.ReferenceID("t", "tenant", "")},
 			},
 			"token_endpoint_auth_method": schema.StringAttribute{
@@ -433,12 +435,13 @@ func newClientCrud(providerData any) (*tf.Crud[*v1alpha1.Client, *ClientModel], 
 				})
 			},
 		},
-		Collection:  "clients",
-		Defaults:    pd.Defaults,
-		IDAttribute: "client_id",
-		NewModel:    NewClientModel,
-		Scope:       tf.NewScope("tenants", "issuers"),
-		TypeName:    "client",
+		Collection:       "clients",
+		Defaults:         pd.Defaults,
+		IDAttribute:      "client_id",
+		NewModel:         NewClientModel,
+		ParentAttributes: []string{"tenant_id", "issuer_id"},
+		Scope:            tf.NewScope("tenants", "issuers"),
+		TypeName:         "client",
 	}), diags
 }
 

@@ -32,14 +32,14 @@ resource "authwise_access_resource_type" "guardcontrol_tenant" {
 
 ### Optional
 
-- `audience_id` (String) Parent identifier `audience_id`; overrides the provider default. Changing it replaces the resource.
+- `audience_id` (String) Parent identifier `audience_id`; overrides the provider default, and reads back from the name. Changing a configured one replaces the resource.
 - `description` (String)
 - `endpoint_name` (String)
 - `expansion_mode` (String)
-- `issuer_id` (String) Parent identifier `issuer_id`; overrides the provider default. Changing it replaces the resource.
+- `issuer_id` (String) Parent identifier `issuer_id`; overrides the provider default, and reads back from the name. Changing a configured one replaces the resource.
 - `materialize_lookup_resources` (Boolean)
 - `parent_type` (String)
-- `tenant_id` (String) Parent identifier `tenant_id`; overrides the provider default. Changing it replaces the resource.
+- `tenant_id` (String) Parent identifier `tenant_id`; overrides the provider default, and reads back from the name. Changing a configured one replaces the resource.
 
 ### Read-Only
 

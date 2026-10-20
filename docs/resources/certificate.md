@@ -27,7 +27,7 @@ A certificate and, when kit minted it, its private key. The trust anchor SAML co
 - `labels` (Map of String)
 - `status` (String)
 - `subject_common_name` (String) `subject_common_name` is input only: the API consumes it and never returns it, so it is never refreshed from the server and an imported resource has no value for it.
-- `tenant_id` (String) Parent identifier `tenant_id`; overrides the provider default. Changing it replaces the resource.
+- `tenant_id` (String) Parent identifier `tenant_id`; overrides the provider default, and reads back from the name. Changing a configured one replaces the resource.
 - `validity_days` (Number) `validity_days` is input only: the API consumes it and never returns it, so it is never refreshed from the server and an imported resource has no value for it.
 
 ### Read-Only

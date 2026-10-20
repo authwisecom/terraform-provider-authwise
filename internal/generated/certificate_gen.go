@@ -106,9 +106,10 @@ func CertificateResourceSchema() schema.Schema {
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"tenant_id": schema.StringAttribute{
-				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default. Changing it replaces the resource.",
+				Computed:            true,
+				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default, and reads back from the name. Changing a configured one replaces the resource.",
 				Optional:            true,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				PlanModifiers:       []planmodifier.String{tf.RequiresReplaceIfConfigured(), stringplanmodifier.UseStateForUnknown()},
 				Validators:          []validator.String{tf.ReferenceID("t", "tenant", "")},
 			},
 			"use": schema.StringAttribute{
@@ -365,12 +366,13 @@ func newCertificateCrud(providerData any) (*tf.Crud[*v1alpha1.Certificate, *Cert
 				})
 			},
 		},
-		Collection:  "certificates",
-		Defaults:    pd.Defaults,
-		IDAttribute: "certificate_id",
-		NewModel:    NewCertificateModel,
-		Scope:       tf.NewScope("tenants"),
-		TypeName:    "certificate",
+		Collection:       "certificates",
+		Defaults:         pd.Defaults,
+		IDAttribute:      "certificate_id",
+		NewModel:         NewCertificateModel,
+		ParentAttributes: []string{"tenant_id"},
+		Scope:            tf.NewScope("tenants"),
+		TypeName:         "certificate",
 	}), diags
 }
 

@@ -1,3 +1,28 @@
+## 0.16.3 (Unreleased)
+
+NOTES:
+
+* **tfinfra v0.0.20.** No new server requirement. Parent identifiers
+  (`tenant_id`, `realm_id`, `issuer_id`, `audience_id`, `network_id`, …)
+  now read back from the resource's name, and are filled into existing
+  state on the next refresh. A parent the configuration omits shows the
+  provider default instead of null. Removing a configured parent from the
+  configuration, or changing the provider default, keeps the resource where
+  it is rather than replacing it. Workspaces that worked around #43 with
+  `lifecycle { ignore_changes = [tenant_id] }` (or `[realm_id]`) can drop
+  the block.
+
+BUG FIXES:
+
+* **An import no longer forces replacement (#43):** importing a resource
+  whose configuration sets its parent, such as `authwise_guard_network`
+  with `tenant_id` or `authwise_factor` with `realm_id`, left the parent
+  null in state. The first plan then replaced the resource
+  (`+ tenant_id = "gt-…" # forces replacement`). The parents now land in
+  state on import and on every read, and the plan after an import is
+  empty. Changing a configured parent still replaces the resource
+  (tfinfra v0.0.20).
+
 ## 0.16.2 (October 18, 2026)
 
 NOTES:

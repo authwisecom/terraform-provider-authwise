@@ -41,7 +41,7 @@ data "authwise_realm_config" "employees" {
 - `config` (String) `config` as the protojson encoding of RealmConfig.
 - `display_name` (String)
 - `labels` (Map of String)
-- `tenant_id` (String) Parent identifier `tenant_id`; overrides the provider default. Changing it replaces the resource.
+- `tenant_id` (String) Parent identifier `tenant_id`; overrides the provider default, and reads back from the name. Changing a configured one replaces the resource.
 
 ### Read-Only
 

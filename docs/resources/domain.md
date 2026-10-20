@@ -23,7 +23,7 @@ A domain the tenant serves logins on. The id is the domain name itself.
 
 - `config` (String) `config` as the protojson encoding of DomainConfig.
 - `labels` (Map of String)
-- `tenant_id` (String) Parent identifier `tenant_id`; overrides the provider default. Changing it replaces the resource.
+- `tenant_id` (String) Parent identifier `tenant_id`; overrides the provider default, and reads back from the name. Changing a configured one replaces the resource.
 
 ### Read-Only
 

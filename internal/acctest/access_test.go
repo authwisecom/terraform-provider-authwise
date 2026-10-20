@@ -411,7 +411,6 @@ resource "authwise_access_resource_type" "network" {
 				ImportState:                          true,
 				ImportStateVerify:                    true,
 				ImportStateVerifyIdentifierAttribute: "name",
-				ImportStateVerifyIgnore:              []string{"tenant_id", "issuer_id", "audience_id"},
 				ImportStateIdFunc:                    importByName(addr),
 			},
 			{

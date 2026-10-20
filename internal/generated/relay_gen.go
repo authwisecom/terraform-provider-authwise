@@ -71,9 +71,10 @@ func RelayResourceSchema() schema.Schema {
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"network_id": schema.StringAttribute{
-				MarkdownDescription: "Parent identifier `network_id`; overrides the provider default. Changing it replaces the resource.",
+				Computed:            true,
+				MarkdownDescription: "Parent identifier `network_id`; overrides the provider default, and reads back from the name. Changing a configured one replaces the resource.",
 				Optional:            true,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				PlanModifiers:       []planmodifier.String{tf.RequiresReplaceIfConfigured(), stringplanmodifier.UseStateForUnknown()},
 				Validators:          []validator.String{tf.ReferenceID("n", "guard_network", "authwise_guard_network.<name>.guard_network_id")},
 			},
 			"priority": schema.Int64Attribute{
@@ -87,9 +88,10 @@ func RelayResourceSchema() schema.Schema {
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"tenant_id": schema.StringAttribute{
-				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default. Changing it replaces the resource.",
+				Computed:            true,
+				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default, and reads back from the name. Changing a configured one replaces the resource.",
 				Optional:            true,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				PlanModifiers:       []planmodifier.String{tf.RequiresReplaceIfConfigured(), stringplanmodifier.UseStateForUnknown()},
 				Validators:          []validator.String{tf.ReferenceID("t", "tenant", "")},
 			},
 			"url": schema.StringAttribute{Required: true},
@@ -309,12 +311,13 @@ func newRelayCrud(providerData any) (*tf.Crud[*v1alpha1.Relay, *RelayModel], dia
 				})
 			},
 		},
-		Collection:  "relays",
-		Defaults:    pd.Defaults,
-		IDAttribute: "guard_relay_id",
-		NewModel:    NewRelayModel,
-		Scope:       tf.NewScope("tenants", "networks"),
-		TypeName:    "guard_relay",
+		Collection:       "relays",
+		Defaults:         pd.Defaults,
+		IDAttribute:      "guard_relay_id",
+		NewModel:         NewRelayModel,
+		ParentAttributes: []string{"tenant_id", "network_id"},
+		Scope:            tf.NewScope("tenants", "networks"),
+		TypeName:         "guard_relay",
 	}), diags
 }
 

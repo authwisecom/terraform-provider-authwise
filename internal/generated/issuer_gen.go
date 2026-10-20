@@ -63,9 +63,10 @@ func IssuerResourceSchema() schema.Schema {
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"tenant_id": schema.StringAttribute{
-				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default. Changing it replaces the resource.",
+				Computed:            true,
+				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default, and reads back from the name. Changing a configured one replaces the resource.",
 				Optional:            true,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				PlanModifiers:       []planmodifier.String{tf.RequiresReplaceIfConfigured(), stringplanmodifier.UseStateForUnknown()},
 				Validators:          []validator.String{tf.ReferenceID("t", "tenant", "")},
 			},
 		},
@@ -239,12 +240,13 @@ func newIssuerCrud(providerData any) (*tf.Crud[*v1alpha1.Issuer, *IssuerModel], 
 				})
 			},
 		},
-		Collection:  "issuers",
-		Defaults:    pd.Defaults,
-		IDAttribute: "issuer_id",
-		NewModel:    NewIssuerModel,
-		Scope:       tf.NewScope("tenants"),
-		TypeName:    "issuer",
+		Collection:       "issuers",
+		Defaults:         pd.Defaults,
+		IDAttribute:      "issuer_id",
+		NewModel:         NewIssuerModel,
+		ParentAttributes: []string{"tenant_id"},
+		Scope:            tf.NewScope("tenants"),
+		TypeName:         "issuer",
 	}), diags
 }
 

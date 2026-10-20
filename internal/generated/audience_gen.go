@@ -53,9 +53,10 @@ func AudienceResourceSchema() schema.Schema {
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"issuer_id": schema.StringAttribute{
-				MarkdownDescription: "Parent identifier `issuer_id`; overrides the provider default. Changing it replaces the resource.",
+				Computed:            true,
+				MarkdownDescription: "Parent identifier `issuer_id`; overrides the provider default, and reads back from the name. Changing a configured one replaces the resource.",
 				Optional:            true,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				PlanModifiers:       []planmodifier.String{tf.RequiresReplaceIfConfigured(), stringplanmodifier.UseStateForUnknown()},
 				Validators:          []validator.String{tf.ReferenceID("i", "issuer", "authwise_issuer.<name>.issuer_id")},
 			},
 			"labels": schema.MapAttribute{
@@ -70,9 +71,10 @@ func AudienceResourceSchema() schema.Schema {
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"tenant_id": schema.StringAttribute{
-				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default. Changing it replaces the resource.",
+				Computed:            true,
+				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default, and reads back from the name. Changing a configured one replaces the resource.",
 				Optional:            true,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				PlanModifiers:       []planmodifier.String{tf.RequiresReplaceIfConfigured(), stringplanmodifier.UseStateForUnknown()},
 				Validators:          []validator.String{tf.ReferenceID("t", "tenant", "")},
 			},
 		},
@@ -251,12 +253,13 @@ func newAudienceCrud(providerData any) (*tf.Crud[*v1alpha1.Audience, *AudienceMo
 				})
 			},
 		},
-		Collection:  "audiences",
-		Defaults:    pd.Defaults,
-		IDAttribute: "audience_id",
-		NewModel:    NewAudienceModel,
-		Scope:       tf.NewScope("tenants", "issuers"),
-		TypeName:    "audience",
+		Collection:       "audiences",
+		Defaults:         pd.Defaults,
+		IDAttribute:      "audience_id",
+		NewModel:         NewAudienceModel,
+		ParentAttributes: []string{"tenant_id", "issuer_id"},
+		Scope:            tf.NewScope("tenants", "issuers"),
+		TypeName:         "audience",
 	}), diags
 }
 

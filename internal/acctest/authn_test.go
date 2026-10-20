@@ -119,8 +119,6 @@ resource "authwise_factor" "totp" {
 				},
 				ImportStateVerify:                    true,
 				ImportStateVerifyIdentifierAttribute: "name",
-				// Scope identifiers are inputs the import ID does not carry.
-				ImportStateVerifyIgnore: []string{"realm_id"},
 			},
 		},
 		CheckDestroy: noneLeft(h),

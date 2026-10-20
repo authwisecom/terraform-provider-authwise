@@ -27,9 +27,10 @@ func ScopeResourceSchema() schema.Schema {
 	return schema.Schema{
 		Attributes: map[string]schema.Attribute{
 			"audience_id": schema.StringAttribute{
-				MarkdownDescription: "Parent identifier `audience_id`; overrides the provider default. Changing it replaces the resource.",
+				Computed:            true,
+				MarkdownDescription: "Parent identifier `audience_id`; overrides the provider default, and reads back from the name. Changing a configured one replaces the resource.",
 				Optional:            true,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				PlanModifiers:       []planmodifier.String{tf.RequiresReplaceIfConfigured(), stringplanmodifier.UseStateForUnknown()},
 				Validators:          []validator.String{tf.ReferenceID("a", "audience", "authwise_audience.<name>.audience_id")},
 			},
 			"auto": schema.BoolAttribute{
@@ -38,9 +39,10 @@ func ScopeResourceSchema() schema.Schema {
 				PlanModifiers: []planmodifier.Bool{boolplanmodifier.UseStateForUnknown()},
 			},
 			"issuer_id": schema.StringAttribute{
-				MarkdownDescription: "Parent identifier `issuer_id`; overrides the provider default. Changing it replaces the resource.",
+				Computed:            true,
+				MarkdownDescription: "Parent identifier `issuer_id`; overrides the provider default, and reads back from the name. Changing a configured one replaces the resource.",
 				Optional:            true,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				PlanModifiers:       []planmodifier.String{tf.RequiresReplaceIfConfigured(), stringplanmodifier.UseStateForUnknown()},
 				Validators:          []validator.String{tf.ReferenceID("i", "issuer", "authwise_issuer.<name>.issuer_id")},
 			},
 			"kind": schema.StringAttribute{
@@ -59,9 +61,10 @@ func ScopeResourceSchema() schema.Schema {
 				Required:            true,
 			},
 			"tenant_id": schema.StringAttribute{
-				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default. Changing it replaces the resource.",
+				Computed:            true,
+				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default, and reads back from the name. Changing a configured one replaces the resource.",
 				Optional:            true,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				PlanModifiers:       []planmodifier.String{tf.RequiresReplaceIfConfigured(), stringplanmodifier.UseStateForUnknown()},
 				Validators:          []validator.String{tf.ReferenceID("t", "tenant", "")},
 			},
 		},
@@ -198,12 +201,13 @@ func newScopeCrud(providerData any) (*tf.Crud[*v1alpha1.Scope, *ScopeModel], dia
 				})
 			},
 		},
-		Collection:  "scopes",
-		Defaults:    pd.Defaults,
-		IDAttribute: "scope_id",
-		NewModel:    NewScopeModel,
-		Scope:       tf.NewScope("tenants", "issuers", "audiences"),
-		TypeName:    "scope",
+		Collection:       "scopes",
+		Defaults:         pd.Defaults,
+		IDAttribute:      "scope_id",
+		NewModel:         NewScopeModel,
+		ParentAttributes: []string{"tenant_id", "issuer_id", "audience_id"},
+		Scope:            tf.NewScope("tenants", "issuers", "audiences"),
+		TypeName:         "scope",
 	}), diags
 }
 

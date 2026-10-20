@@ -87,9 +87,10 @@ func InviteResourceSchema() schema.Schema {
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"network_id": schema.StringAttribute{
-				MarkdownDescription: "Parent identifier `network_id`; overrides the provider default. Changing it replaces the resource.",
+				Computed:            true,
+				MarkdownDescription: "Parent identifier `network_id`; overrides the provider default, and reads back from the name. Changing a configured one replaces the resource.",
 				Optional:            true,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				PlanModifiers:       []planmodifier.String{tf.RequiresReplaceIfConfigured(), stringplanmodifier.UseStateForUnknown()},
 				Validators:          []validator.String{tf.ReferenceID("n", "guard_network", "authwise_guard_network.<name>.guard_network_id")},
 			},
 			"state": schema.StringAttribute{
@@ -97,9 +98,10 @@ func InviteResourceSchema() schema.Schema {
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"tenant_id": schema.StringAttribute{
-				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default. Changing it replaces the resource.",
+				Computed:            true,
+				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default, and reads back from the name. Changing a configured one replaces the resource.",
 				Optional:            true,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				PlanModifiers:       []planmodifier.String{tf.RequiresReplaceIfConfigured(), stringplanmodifier.UseStateForUnknown()},
 				Validators:          []validator.String{tf.ReferenceID("t", "tenant", "")},
 			},
 			"url": schema.StringAttribute{
@@ -341,12 +343,13 @@ func newInviteCrud(providerData any) (*tf.Crud[*v1alpha1.Invite, *InviteModel], 
 				return out.Invites, out.NextPageToken, nil
 			},
 		},
-		Collection:  "invites",
-		Defaults:    pd.Defaults,
-		IDAttribute: "guard_invite_id",
-		NewModel:    NewInviteModel,
-		Scope:       tf.NewScope("tenants", "networks"),
-		TypeName:    "guard_invite",
+		Collection:       "invites",
+		Defaults:         pd.Defaults,
+		IDAttribute:      "guard_invite_id",
+		NewModel:         NewInviteModel,
+		ParentAttributes: []string{"tenant_id", "network_id"},
+		Scope:            tf.NewScope("tenants", "networks"),
+		TypeName:         "guard_invite",
 	}), diags
 }
 

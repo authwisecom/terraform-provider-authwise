@@ -27,7 +27,7 @@ A tenant theme: the stylesheet and content the hosted login pages render with.
 - `stylesheet` (String)
 - `stylesheet_attributes` (String) `stylesheet_attributes` as a JSON object.
 - `stylesheet_attributes_schema` (String)
-- `tenant_id` (String) Parent identifier `tenant_id`; overrides the provider default. Changing it replaces the resource.
+- `tenant_id` (String) Parent identifier `tenant_id`; overrides the provider default, and reads back from the name. Changing a configured one replaces the resource.
 
 ### Read-Only
 

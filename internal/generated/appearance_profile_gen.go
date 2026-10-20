@@ -54,9 +54,10 @@ func AppearanceProfileResourceSchema() schema.Schema {
 				PlanModifiers: []planmodifier.Bool{boolplanmodifier.UseStateForUnknown()},
 			},
 			"issuer_id": schema.StringAttribute{
-				MarkdownDescription: "Parent identifier `issuer_id`; overrides the provider default. Changing it replaces the resource.",
+				Computed:            true,
+				MarkdownDescription: "Parent identifier `issuer_id`; overrides the provider default, and reads back from the name. Changing a configured one replaces the resource.",
 				Optional:            true,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				PlanModifiers:       []planmodifier.String{tf.RequiresReplaceIfConfigured(), stringplanmodifier.UseStateForUnknown()},
 				Validators:          []validator.String{tf.ReferenceID("i", "issuer", "authwise_issuer.<name>.issuer_id")},
 			},
 			"labels": schema.MapAttribute{
@@ -78,9 +79,10 @@ func AppearanceProfileResourceSchema() schema.Schema {
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"tenant_id": schema.StringAttribute{
-				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default. Changing it replaces the resource.",
+				Computed:            true,
+				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default, and reads back from the name. Changing a configured one replaces the resource.",
 				Optional:            true,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				PlanModifiers:       []planmodifier.String{tf.RequiresReplaceIfConfigured(), stringplanmodifier.UseStateForUnknown()},
 				Validators:          []validator.String{tf.ReferenceID("t", "tenant", "")},
 			},
 			"theme_id": schema.StringAttribute{
@@ -297,12 +299,13 @@ func newAppearanceProfileCrud(providerData any) (*tf.Crud[*v1alpha1.AppearancePr
 				})
 			},
 		},
-		Collection:  "appearance-profiles",
-		Defaults:    pd.Defaults,
-		IDAttribute: "appearance_profile_id",
-		NewModel:    NewAppearanceProfileModel,
-		Scope:       tf.NewScope("tenants", "issuers"),
-		TypeName:    "appearance_profile",
+		Collection:       "appearance-profiles",
+		Defaults:         pd.Defaults,
+		IDAttribute:      "appearance_profile_id",
+		NewModel:         NewAppearanceProfileModel,
+		ParentAttributes: []string{"tenant_id", "issuer_id"},
+		Scope:            tf.NewScope("tenants", "issuers"),
+		TypeName:         "appearance_profile",
 	}), diags
 }
 

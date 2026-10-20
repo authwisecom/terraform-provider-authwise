@@ -143,9 +143,10 @@ func UserResourceSchema() schema.Schema {
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"realm_id": schema.StringAttribute{
-				MarkdownDescription: "Parent identifier `realm_id`; overrides the provider default. Changing it replaces the resource.",
+				Computed:            true,
+				MarkdownDescription: "Parent identifier `realm_id`; overrides the provider default, and reads back from the name. Changing a configured one replaces the resource.",
 				Optional:            true,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				PlanModifiers:       []planmodifier.String{tf.RequiresReplaceIfConfigured(), stringplanmodifier.UseStateForUnknown()},
 				Validators:          []validator.String{tf.ReferenceID("r", "realm", "authwise_realm.<name>.realm_id")},
 			},
 			"status": schema.StringAttribute{
@@ -154,9 +155,10 @@ func UserResourceSchema() schema.Schema {
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"tenant_id": schema.StringAttribute{
-				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default. Changing it replaces the resource.",
+				Computed:            true,
+				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default, and reads back from the name. Changing a configured one replaces the resource.",
 				Optional:            true,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				PlanModifiers:       []planmodifier.String{tf.RequiresReplaceIfConfigured(), stringplanmodifier.UseStateForUnknown()},
 				Validators:          []validator.String{tf.ReferenceID("t", "tenant", "")},
 			},
 			"updated_at": schema.StringAttribute{
@@ -582,12 +584,13 @@ func newUserCrud(providerData any) (*tf.Crud[*v1alpha1.User, *UserModel], diag.D
 				})
 			},
 		},
-		Collection:  "users",
-		Defaults:    pd.Defaults,
-		IDAttribute: "user_id",
-		NewModel:    NewUserModel,
-		Scope:       tf.NewScope("tenants", "realms"),
-		TypeName:    "user",
+		Collection:       "users",
+		Defaults:         pd.Defaults,
+		IDAttribute:      "user_id",
+		NewModel:         NewUserModel,
+		ParentAttributes: []string{"tenant_id", "realm_id"},
+		Scope:            tf.NewScope("tenants", "realms"),
+		TypeName:         "user",
 	}), diags
 }
 

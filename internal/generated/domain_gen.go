@@ -53,9 +53,10 @@ func DomainResourceSchema() schema.Schema {
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"tenant_id": schema.StringAttribute{
-				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default. Changing it replaces the resource.",
+				Computed:            true,
+				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default, and reads back from the name. Changing a configured one replaces the resource.",
 				Optional:            true,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				PlanModifiers:       []planmodifier.String{tf.RequiresReplaceIfConfigured(), stringplanmodifier.UseStateForUnknown()},
 				Validators:          []validator.String{tf.ReferenceID("t", "tenant", "")},
 			},
 		},
@@ -208,12 +209,13 @@ func newDomainCrud(providerData any) (*tf.Crud[*v1alpha1.Domain, *DomainModel], 
 				})
 			},
 		},
-		Collection:  "domains",
-		Defaults:    pd.Defaults,
-		IDAttribute: "domain_id",
-		NewModel:    NewDomainModel,
-		Scope:       tf.NewScope("tenants"),
-		TypeName:    "domain",
+		Collection:       "domains",
+		Defaults:         pd.Defaults,
+		IDAttribute:      "domain_id",
+		NewModel:         NewDomainModel,
+		ParentAttributes: []string{"tenant_id"},
+		Scope:            tf.NewScope("tenants"),
+		TypeName:         "domain",
 	}), diags
 }
 

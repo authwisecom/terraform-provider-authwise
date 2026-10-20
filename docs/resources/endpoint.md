@@ -222,7 +222,7 @@ with an empty body.
 - `endpoint_type` (String)
 - `insecure` (Boolean)
 - `labels` (Map of String)
-- `tenant_id` (String) Parent identifier `tenant_id`; overrides the provider default. Changing it replaces the resource.
+- `tenant_id` (String) Parent identifier `tenant_id`; overrides the provider default, and reads back from the name. Changing a configured one replaces the resource.
 - `timeout` (String) `timeout` as a duration: `"5s"`, `"1.5s"`, `"500ms"`, `"1m30s"`.
 - `tls` (Attributes) (see [below for nested schema](#nestedatt--tls))
 

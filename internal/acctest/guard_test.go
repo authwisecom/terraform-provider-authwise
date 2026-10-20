@@ -216,7 +216,6 @@ resource "authwise_guard_resource_nodes" "wiki" {
 				ImportState:                          true,
 				ImportStateVerify:                    true,
 				ImportStateVerifyIdentifierAttribute: "name",
-				ImportStateVerifyIgnore:              []string{"tenant_id"},
 				ImportStateIdFunc:                    importByName(guardNetworkAddr),
 			},
 			{
@@ -224,7 +223,6 @@ resource "authwise_guard_resource_nodes" "wiki" {
 				ImportState:                          true,
 				ImportStateVerify:                    true,
 				ImportStateVerifyIdentifierAttribute: "name",
-				ImportStateVerifyIgnore:              []string{"tenant_id", "network_id"},
 				ImportStateIdFunc:                    importByName(guardRelayAddr),
 			},
 			{
@@ -232,7 +230,6 @@ resource "authwise_guard_resource_nodes" "wiki" {
 				ImportState:                          true,
 				ImportStateVerify:                    true,
 				ImportStateVerifyIdentifierAttribute: "name",
-				ImportStateVerifyIgnore:              []string{"tenant_id", "network_id"},
 				ImportStateIdFunc:                    importByName(guardResourceAddr),
 			},
 			{
@@ -241,7 +238,7 @@ resource "authwise_guard_resource_nodes" "wiki" {
 				ImportState:                          true,
 				ImportStateVerify:                    true,
 				ImportStateVerifyIdentifierAttribute: "name",
-				ImportStateVerifyIgnore:              []string{"code", "url", "tenant_id", "network_id"},
+				ImportStateVerifyIgnore:              []string{"code", "url"},
 				ImportStateIdFunc:                    importByName(guardInviteAddr),
 			},
 			{

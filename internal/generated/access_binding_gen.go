@@ -34,9 +34,10 @@ func AccessBindingResourceSchema() schema.Schema {
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"audience_id": schema.StringAttribute{
-				MarkdownDescription: "Parent identifier `audience_id`; overrides the provider default. Changing it replaces the resource.",
+				Computed:            true,
+				MarkdownDescription: "Parent identifier `audience_id`; overrides the provider default, and reads back from the name. Changing a configured one replaces the resource.",
 				Optional:            true,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				PlanModifiers:       []planmodifier.String{tf.RequiresReplaceIfConfigured(), stringplanmodifier.UseStateForUnknown()},
 				Validators:          []validator.String{tf.ReferenceID("a", "audience", "authwise_audience.<name>.audience_id")},
 			},
 			"condition_id": schema.StringAttribute{
@@ -56,9 +57,10 @@ func AccessBindingResourceSchema() schema.Schema {
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"issuer_id": schema.StringAttribute{
-				MarkdownDescription: "Parent identifier `issuer_id`; overrides the provider default. Changing it replaces the resource.",
+				Computed:            true,
+				MarkdownDescription: "Parent identifier `issuer_id`; overrides the provider default, and reads back from the name. Changing a configured one replaces the resource.",
 				Optional:            true,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				PlanModifiers:       []planmodifier.String{tf.RequiresReplaceIfConfigured(), stringplanmodifier.UseStateForUnknown()},
 				Validators:          []validator.String{tf.ReferenceID("i", "issuer", "authwise_issuer.<name>.issuer_id")},
 			},
 			"name": schema.StringAttribute{
@@ -80,9 +82,10 @@ func AccessBindingResourceSchema() schema.Schema {
 			"subject_id":   schema.StringAttribute{Required: true},
 			"subject_type": schema.StringAttribute{Required: true},
 			"tenant_id": schema.StringAttribute{
-				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default. Changing it replaces the resource.",
+				Computed:            true,
+				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default, and reads back from the name. Changing a configured one replaces the resource.",
 				Optional:            true,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				PlanModifiers:       []planmodifier.String{tf.RequiresReplaceIfConfigured(), stringplanmodifier.UseStateForUnknown()},
 				Validators:          []validator.String{tf.ReferenceID("t", "tenant", "")},
 			},
 		},
@@ -280,12 +283,13 @@ func newAccessBindingCrud(providerData any) (*tf.Crud[*v1alpha1.AccessBinding, *
 				})
 			},
 		},
-		Collection:  "access-bindings",
-		Defaults:    pd.Defaults,
-		IDAttribute: "access_binding_id",
-		NewModel:    NewAccessBindingModel,
-		Scope:       tf.NewScope("tenants", "issuers", "audiences"),
-		TypeName:    "access_binding",
+		Collection:       "access-bindings",
+		Defaults:         pd.Defaults,
+		IDAttribute:      "access_binding_id",
+		NewModel:         NewAccessBindingModel,
+		ParentAttributes: []string{"tenant_id", "issuer_id", "audience_id"},
+		Scope:            tf.NewScope("tenants", "issuers", "audiences"),
+		TypeName:         "access_binding",
 	}), diags
 }
 

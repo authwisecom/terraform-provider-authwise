@@ -107,11 +107,12 @@ func (r *guardResource) Metadata(ctx context.Context, req resource.MetadataReque
 // Schema makes tenant_id and network_id required where a resource has
 // them. tenant_id is a Guard tenant's id (`gt-…`), which the provider's
 // tenant_id, a kit tenant's, is not; and the provider has no network
-// default.
+// default. A required attribute cannot also be computed, which a generated
+// parent identifier is so that it can inherit the provider default.
 func (r *guardResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	r.inner.Schema(ctx, req, resp)
 	if a, ok := resp.Schema.Attributes[tenantIDAttribute].(schema.StringAttribute); ok {
-		a.Required, a.Optional = true, false
+		a.Required, a.Optional, a.Computed = true, false, false
 		a.MarkdownDescription = guardTenantIDDescription + " Changing it replaces the resource."
 		a.Validators = []validator.String{guardTenantReference}
 		resp.Schema.Attributes[tenantIDAttribute] = a
@@ -120,7 +121,7 @@ func (r *guardResource) Schema(ctx context.Context, req resource.SchemaRequest, 
 		return
 	}
 	if a, ok := resp.Schema.Attributes[networkIDAttribute].(schema.StringAttribute); ok {
-		a.Required, a.Optional = true, false
+		a.Required, a.Optional, a.Computed = true, false, false
 		a.MarkdownDescription = "The network's id, `authwise_guard_network.<name>.guard_network_id`. Changing it replaces the resource."
 		resp.Schema.Attributes[networkIDAttribute] = a
 	}

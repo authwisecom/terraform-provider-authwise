@@ -17,12 +17,12 @@ A condition in an audience's Access catalog, which a binding can require.
 
 ### Optional
 
-- `audience_id` (String) Parent identifier `audience_id`; overrides the provider default. Changing it replaces the resource.
+- `audience_id` (String) Parent identifier `audience_id`; overrides the provider default, and reads back from the name. Changing a configured one replaces the resource.
 - `description` (String)
 - `display_name` (String)
 - `expression` (String)
-- `issuer_id` (String) Parent identifier `issuer_id`; overrides the provider default. Changing it replaces the resource.
-- `tenant_id` (String) Parent identifier `tenant_id`; overrides the provider default. Changing it replaces the resource.
+- `issuer_id` (String) Parent identifier `issuer_id`; overrides the provider default, and reads back from the name. Changing a configured one replaces the resource.
+- `tenant_id` (String) Parent identifier `tenant_id`; overrides the provider default, and reads back from the name. Changing a configured one replaces the resource.
 
 ### Read-Only
 
