@@ -1,8 +1,9 @@
-## 0.16.3 (Unreleased)
+## 0.16.3 (October 20, 2026)
 
 NOTES:
 
-* **tfinfra v0.0.20.** No new server requirement. Parent identifiers
+* **tfinfra v0.0.20; apis v0.34.0, guard-control v0.17.0, kit v1.47.0.**
+  No new server requirement. Parent identifiers
   (`tenant_id`, `realm_id`, `issuer_id`, `audience_id`, `network_id`, …)
   now read back from the resource's name, and are filled into existing
   state on the next refresh. A parent the configuration omits shows the
