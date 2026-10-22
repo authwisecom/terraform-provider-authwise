@@ -7,6 +7,8 @@ import (
 	"strings"
 	"time"
 
+	identitypb "git.authwise.com/authwise/apis/authwise/identity/v1alpha1"
+	corepb "git.authwise.com/authwise/apis/authwise/types/core/v1alpha1"
 	"github.com/activatedio/tfinfra/pkg/aip"
 	tfruntime "github.com/activatedio/tfinfra/pkg/tf"
 	"github.com/hashicorp/terraform-plugin-framework-timeouts/resource/timeouts"
@@ -29,7 +31,7 @@ import (
 
 const (
 	issuerDomainTypeName   = "issuer_domain"
-	issuerDomainCollection = "domains"
+	issuerDomainCollection = "issuer-domains"
 
 	// issuerDomainsClientKey is the provider data key of the issuerDomainAPI.
 	issuerDomainsClientKey = "issuerDomains"
@@ -76,10 +78,9 @@ var issuerDomainScope = aip.NewScope("tenants", "issuers")
 // in plan.
 var hostnamePattern = regexp.MustCompile(`^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]([a-z0-9-]{0,61}[a-z0-9])?$`)
 
-// issuerDomain is kit's IssuerDomain as this resource uses it. The resource
-// is written against issuerDomainAPI rather than the apis types so it could
-// be built before kit#795's apis release; the adapter over the identity
-// client is the only code that sees the proto.
+// issuerDomain is kit's IssuerDomain as this resource uses it: the enums as
+// their names without the prefix. issuerDomainClient is the only code that
+// sees the proto, so the waits are tested against a plain fake.
 type issuerDomain struct {
 	Name           string
 	Hostname       string
@@ -147,7 +148,6 @@ func issuerDomainRecordAttrTypes() map[string]attr.Type {
 	}
 }
 
-//nolint:unused // registered in Resources with the identity adapter, once kit#795's apis release lands (#44)
 func newIssuerDomainResource() resource.Resource {
 	return &issuerDomainResource{poll: issuerDomainPollInterval}
 }
@@ -181,7 +181,7 @@ func (r *issuerDomainResource) Schema(ctx context.Context, _ resource.SchemaRequ
 		Attributes: map[string]schema.Attribute{
 			tfruntime.NameAttribute: schema.StringAttribute{
 				Computed:            true,
-				MarkdownDescription: "Full resource name (`tenants/{t}/issuers/{i}/domains/{d}`); serves as the Terraform ID.",
+				MarkdownDescription: "Full resource name (`tenants/{t}/issuers/{i}/issuer-domains/{d}`); serves as the Terraform ID.",
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"issuer_domain_id": schema.StringAttribute{
@@ -502,6 +502,67 @@ func issuerDomainCreateError(err error) (summary, detail string) {
 	}
 
 	return summary, strings.TrimSpace(detail + " " + err.Error())
+}
+
+// issuerDomainClient is issuerDomainAPI over kit's identity service.
+type issuerDomainClient struct {
+	client identitypb.AuthwiseIdentityServiceClient
+}
+
+func (c issuerDomainClient) CreateIssuerDomain(ctx context.Context, parent, hostname string) (*issuerDomain, error) {
+	out, err := c.client.CreateIssuerDomain(ctx, &identitypb.CreateIssuerDomainRequest{
+		Parent:       parent,
+		IssuerDomain: &corepb.IssuerDomain{Hostname: hostname},
+	})
+	if err != nil {
+		return nil, err
+	}
+	return issuerDomainFromProto(out), nil
+}
+
+func (c issuerDomainClient) GetIssuerDomain(ctx context.Context, name string) (*issuerDomain, error) {
+	out, err := c.client.GetIssuerDomain(ctx, &identitypb.GetIssuerDomainRequest{Name: name})
+	if err != nil {
+		return nil, err
+	}
+	return issuerDomainFromProto(out), nil
+}
+
+func (c issuerDomainClient) DeleteIssuerDomain(ctx context.Context, name string) error {
+	_, err := c.client.DeleteIssuerDomain(ctx, &identitypb.DeleteIssuerDomainRequest{Name: name})
+	return err
+}
+
+// enumName is an enum value's name without its prefix; "" when unspecified.
+func enumName(name, prefix string) string {
+	name = strings.TrimPrefix(name, prefix)
+	if name == "UNSPECIFIED" {
+		return ""
+	}
+	return name
+}
+
+func issuerDomainFromProto(e *corepb.IssuerDomain) *issuerDomain {
+
+	d := &issuerDomain{
+		Name:     e.GetName(),
+		Hostname: e.GetHostname(),
+		State:    enumName(e.GetState().String(), "ISSUER_DOMAIN_STATE_"),
+	}
+	if f := e.GetFailure(); f != nil {
+		d.FailureCode = enumName(f.GetCode().String(), "ISSUER_DOMAIN_FAILURE_CODE_")
+		d.FailureMessage = f.GetMessage()
+		d.FailureRecord = f.GetRecord()
+	}
+	if ts := e.GetCertificateExpiresAt(); ts != nil {
+		t := ts.AsTime()
+		d.CertificateExpiresAt = &t
+	}
+	for _, r := range e.GetDnsRecords() {
+		d.DNSRecords = append(d.DNSRecords, issuerDomainRecord{Name: r.GetName(), Type: r.GetType(), Value: r.GetValue(), Purpose: r.GetPurpose()})
+	}
+
+	return d
 }
 
 func hasRecords(d *issuerDomain) bool { return len(d.DNSRecords) > 0 }

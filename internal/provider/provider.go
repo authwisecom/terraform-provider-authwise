@@ -252,6 +252,8 @@ func (p *AuthwiseProvider) Configure(ctx context.Context, req provider.Configure
 			// A Guard tenant by slug (#42).
 			guardDirectoryClientKey: guardpb.NewGuardDirectoryServiceClient(guardConn),
 			guardConfiguredKey:      guardConfigured,
+			// Custom domains wait on the controller (#44).
+			issuerDomainsClientKey: issuerDomainClient{identitypb.NewAuthwiseIdentityServiceClient(conn)},
 		},
 		Defaults: defaults,
 	}
@@ -282,6 +284,7 @@ func (p *AuthwiseProvider) Resources(ctx context.Context) []func() resource.Reso
 		newTenantConfigResource,
 		newGuardEnrolmentGrantResource,
 		newGuardDeprovisioningResource,
+		newIssuerDomainResource,
 	))
 }
 

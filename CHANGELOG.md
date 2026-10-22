@@ -1,5 +1,10 @@
 ## 0.17.0 (Unreleased)
 
+NOTES:
+
+* **apis v0.38.0.** `authwise_issuer_domain` needs kit with custom domains
+  (kit#795); the other resources need nothing new.
+
 FEATURES:
 
 * **New resource `authwise_issuer_domain` (#44):** a hostname of yours,
@@ -12,7 +17,7 @@ FEATURES:
   `failure_record` and `certificate_expires_at` read back. Create's
   refusals name their reason (`HOSTNAME_CLAIMED`, `HOSTNAME_APEX`,
   `HOSTNAME_IS_ISSUER`, `PLAN_REQUIRED`). Needs kit with custom domains
-  (kit#795); Business plan or above.
+  (kit#795).
 
 ## 0.16.3 (October 20, 2026)
 

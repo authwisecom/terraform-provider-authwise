@@ -69,6 +69,12 @@ type fakeIdentityServer struct {
 	contact map[string]string
 	seq     int
 
+	// issuerDomains and their reads since create or delete: the
+	// controller reports the records on the first read, ACTIVE on the
+	// second, and a DELETING row is gone on the second read.
+	issuerDomains     map[string]*corepb.IssuerDomain
+	issuerDomainReads map[string]int
+
 	// blobs holds each asset's content as uploaded, apart from the row,
 	// the way kit keeps it in a bucket. uploads counts completed
 	// UploadAsset streams.
@@ -100,26 +106,28 @@ type fakeIdentityServer struct {
 
 func newFakeIdentityServer() *fakeIdentityServer {
 	return &fakeIdentityServer{
-		realms:        map[string]*corepb.Realm{},
-		issuers:       map[string]*corepb.Issuer{},
-		domains:       map[string]*corepb.Domain{},
-		scopes:        map[string]*corepb.Scope{},
-		profiles:      map[string]*corepb.AppearanceProfile{},
-		scopePerms:    map[string]map[string]bool{},
-		audiences:     map[string]*corepb.Audience{},
-		clients:       map[string]*corepb.Client{},
-		clientSecrets: map[string]*corepb.ClientSecret{},
-		providers:     map[string]*corepb.Provider{},
-		certs:         map[string]*corepb.Certificate{},
-		endpoints:     map[string]*corepb.Endpoint{},
-		factors:       map[string]*corepb.Factor{},
-		secrets:       map[string]*corepb.Secret{},
-		assets:        map[string]*corepb.Asset{},
-		users:         map[string]*corepb.User{},
-		contact:       map[string]string{},
-		blobs:         map[string][]byte{},
-		material:      map[string][]string{},
-		pinned:        map[string]bool{},
+		realms:            map[string]*corepb.Realm{},
+		issuers:           map[string]*corepb.Issuer{},
+		domains:           map[string]*corepb.Domain{},
+		scopes:            map[string]*corepb.Scope{},
+		profiles:          map[string]*corepb.AppearanceProfile{},
+		scopePerms:        map[string]map[string]bool{},
+		audiences:         map[string]*corepb.Audience{},
+		clients:           map[string]*corepb.Client{},
+		clientSecrets:     map[string]*corepb.ClientSecret{},
+		providers:         map[string]*corepb.Provider{},
+		certs:             map[string]*corepb.Certificate{},
+		endpoints:         map[string]*corepb.Endpoint{},
+		factors:           map[string]*corepb.Factor{},
+		secrets:           map[string]*corepb.Secret{},
+		assets:            map[string]*corepb.Asset{},
+		users:             map[string]*corepb.User{},
+		issuerDomains:     map[string]*corepb.IssuerDomain{},
+		issuerDomainReads: map[string]int{},
+		contact:           map[string]string{},
+		blobs:             map[string][]byte{},
+		material:          map[string][]string{},
+		pinned:            map[string]bool{},
 	}
 }
 

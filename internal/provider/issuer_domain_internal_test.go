@@ -52,7 +52,7 @@ func (f *fakeIssuerDomains) CreateIssuerDomain(_ context.Context, parent, hostna
 		}
 	}
 	f.seq++
-	d := &issuerDomain{Name: fmt.Sprintf("%s/domains/d-%d", parent, f.seq), Hostname: hostname, State: issuerDomainPendingDNS}
+	d := &issuerDomain{Name: fmt.Sprintf("%s/issuer-domains/d-%d", parent, f.seq), Hostname: hostname, State: issuerDomainPendingDNS}
 	f.domains[d.Name] = d
 	cp := *d
 	return &cp, nil
@@ -193,7 +193,7 @@ func TestIssuerDomainLifecycle(t *testing.T) {
 				// them in the same apply.
 				Config: issuerDomainConfig(false),
 				ConfigStateChecks: []statecheck.StateCheck{
-					statecheck.ExpectKnownValue(issuerDomainAddr, tfjsonpath.New("name"), knownvalue.StringExact("tenants/t-1/issuers/i-1/domains/d-1")),
+					statecheck.ExpectKnownValue(issuerDomainAddr, tfjsonpath.New("name"), knownvalue.StringExact("tenants/t-1/issuers/i-1/issuer-domains/d-1")),
 					statecheck.ExpectKnownValue(issuerDomainAddr, tfjsonpath.New("issuer_domain_id"), knownvalue.StringExact("d-1")),
 					statecheck.ExpectKnownValue(issuerDomainAddr, tfjsonpath.New("tenant_id"), knownvalue.StringExact("t-1")),
 					statecheck.ExpectKnownValue(issuerDomainAddr, tfjsonpath.New("state"), knownvalue.StringExact(issuerDomainPendingDNS)),
@@ -211,7 +211,7 @@ func TestIssuerDomainLifecycle(t *testing.T) {
 				ConfigStateChecks: []statecheck.StateCheck{
 					statecheck.ExpectKnownValue(issuerDomainAddr, tfjsonpath.New("state"), knownvalue.StringExact(issuerDomainActive)),
 					statecheck.ExpectKnownValue(issuerDomainAddr, tfjsonpath.New("certificate_expires_at"), knownvalue.StringExact("2027-01-19T00:00:00Z")),
-					statecheck.ExpectKnownValue(issuerDomainAddr, tfjsonpath.New("name"), knownvalue.StringExact("tenants/t-1/issuers/i-1/domains/d-1")),
+					statecheck.ExpectKnownValue(issuerDomainAddr, tfjsonpath.New("name"), knownvalue.StringExact("tenants/t-1/issuers/i-1/issuer-domains/d-1")),
 				},
 			},
 			{
@@ -239,7 +239,7 @@ func TestIssuerDomainImportPlansNoChange(t *testing.T) {
 				ResourceName:    issuerDomainAddr,
 				ImportState:     true,
 				ImportStateKind: tfresource.ImportBlockWithID,
-				ImportStateId:   "tenants/t-1/issuers/i-1/domains/d-1",
+				ImportStateId:   "tenants/t-1/issuers/i-1/issuer-domains/d-1",
 				Config:          config,
 			},
 		},
