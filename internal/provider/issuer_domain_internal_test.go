@@ -52,7 +52,7 @@ func (f *fakeIssuerDomains) CreateIssuerDomain(_ context.Context, parent, hostna
 		}
 	}
 	f.seq++
-	d := &issuerDomain{Name: fmt.Sprintf("%s/issuer-domains/d-%d", parent, f.seq), Hostname: hostname, State: issuerDomainPendingDNS}
+	d := &issuerDomain{Name: fmt.Sprintf("%s/issuer-domains/d-%d", parent, f.seq), Hostname: hostname, State: issuerDomainPendingDNS, TrafficTarget: "acme.id.authwise.test"}
 	f.domains[d.Name] = d
 	cp := *d
 	return &cp, nil
@@ -198,6 +198,7 @@ func TestIssuerDomainLifecycle(t *testing.T) {
 					statecheck.ExpectKnownValue(issuerDomainAddr, tfjsonpath.New("tenant_id"), knownvalue.StringExact("t-1")),
 					statecheck.ExpectKnownValue(issuerDomainAddr, tfjsonpath.New("state"), knownvalue.StringExact(issuerDomainPendingDNS)),
 					statecheck.ExpectKnownValue(issuerDomainAddr, tfjsonpath.New("dns_records"), knownvalue.ListSizeExact(2)),
+					statecheck.ExpectKnownValue(issuerDomainAddr, tfjsonpath.New("traffic_target"), knownvalue.StringExact("acme.id.authwise.test")),
 					statecheck.ExpectKnownValue(issuerDomainAddr, tfjsonpath.New("certificate_expires_at"), knownvalue.StringExact("")),
 					statecheck.ExpectKnownValue(`terraform_data.record["challenge"]`,
 						tfjsonpath.New("output").AtMapKey("name"), knownvalue.StringExact("_acme-challenge.login.acme.com")),

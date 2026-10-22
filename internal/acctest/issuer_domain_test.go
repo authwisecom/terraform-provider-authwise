@@ -33,9 +33,10 @@ func (f *fakeIdentityServer) CreateIssuerDomain(ctx context.Context, in *identit
 
 	f.seq++
 	d := &corepb.IssuerDomain{
-		Name:     fmt.Sprintf("%s/issuer-domains/d-%d", in.GetParent(), f.seq),
-		Hostname: hostname,
-		State:    corepb.IssuerDomainState_ISSUER_DOMAIN_STATE_PENDING_DNS,
+		Name:          fmt.Sprintf("%s/issuer-domains/d-%d", in.GetParent(), f.seq),
+		Hostname:      hostname,
+		State:         corepb.IssuerDomainState_ISSUER_DOMAIN_STATE_PENDING_DNS,
+		TrafficTarget: "acme.id.authwise.test",
 	}
 	f.issuerDomains[d.GetName()] = d
 	return proto.Clone(d).(*corepb.IssuerDomain), nil
@@ -121,6 +122,7 @@ resource "authwise_issuer_domain" "login" {
 					resource.TestCheckResourceAttr(addr, "state", "PENDING_DNS"),
 					resource.TestCheckResourceAttr(addr, "failure_code", ""),
 					resource.TestCheckResourceAttr(addr, "dns_records.#", "2"),
+					resource.TestCheckResourceAttr(addr, "traffic_target", "acme.id.authwise.test"),
 					resource.TestCheckResourceAttr(addr, "dns_records.1.purpose", "challenge"),
 					resource.TestCheckResourceAttr(addr, "dns_records.1.name", "_acme-challenge.login.acme.com"),
 				),

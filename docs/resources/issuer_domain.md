@@ -138,6 +138,7 @@ hostname is already an Authwise issuer host) or `PLAN_REQUIRED`.
 - `issuer_domain_id` (String) Server-assigned resource id — the last segment of `name`.
 - `name` (String) Full resource name (`tenants/{t}/issuers/{i}/issuer-domains/{d}`); serves as the Terraform ID.
 - `state` (String) `PENDING_DNS` (waiting for the challenge record), `VERIFYING` (issuing the certificate), `PROVISIONING` (attaching it; the hostname routes), `ACTIVE`, `DEGRADED` (serving, but the challenge record is gone and renewal will fail), `FAILED` (see `failure_code`) or `DELETING`.
+- `traffic_target` (String) The issuer's own Authwise host, such as `example.id.authwise.com`: the value of the `traffic` record.
 
 <a id="nestedblock--timeouts"></a>
 ### Nested Schema for `timeouts`

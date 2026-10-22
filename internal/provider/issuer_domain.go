@@ -85,6 +85,7 @@ type issuerDomain struct {
 	Name           string
 	Hostname       string
 	State          string
+	TrafficTarget  string
 	DNSRecords     []issuerDomainRecord
 	FailureCode    string
 	FailureMessage string
@@ -131,6 +132,7 @@ type issuerDomainModel struct {
 	Hostname             types.String   `tfsdk:"hostname"`
 	WaitForActive        types.Bool     `tfsdk:"wait_for_active"`
 	DNSRecords           types.List     `tfsdk:"dns_records"`
+	TrafficTarget        types.String   `tfsdk:"traffic_target"`
 	State                types.String   `tfsdk:"state"`
 	FailureCode          types.String   `tfsdk:"failure_code"`
 	FailureMessage       types.String   `tfsdk:"failure_message"`
@@ -220,6 +222,11 @@ func (r *issuerDomainResource) Schema(ctx context.Context, _ resource.SchemaRequ
 						recordPurposeAttribute:  computed("`traffic` or `challenge`."),
 					},
 				},
+			},
+			"traffic_target": schema.StringAttribute{
+				Computed:            true,
+				MarkdownDescription: "The issuer's own Authwise host, such as `example.id.authwise.com`: the value of the `traffic` record.",
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"state": computed("`PENDING_DNS` (waiting for the challenge record), `VERIFYING` (issuing the certificate), `PROVISIONING` (attaching it; the hostname routes), `ACTIVE`, " +
 				"`DEGRADED` (serving, but the challenge record is gone and renewal will fail), `FAILED` (see `failure_code`) or `DELETING`."),
@@ -545,9 +552,10 @@ func enumName(name, prefix string) string {
 func issuerDomainFromProto(e *corepb.IssuerDomain) *issuerDomain {
 
 	d := &issuerDomain{
-		Name:     e.GetName(),
-		Hostname: e.GetHostname(),
-		State:    enumName(e.GetState().String(), "ISSUER_DOMAIN_STATE_"),
+		Name:          e.GetName(),
+		Hostname:      e.GetHostname(),
+		State:         enumName(e.GetState().String(), "ISSUER_DOMAIN_STATE_"),
+		TrafficTarget: e.GetTrafficTarget(),
 	}
 	if f := e.GetFailure(); f != nil {
 		d.FailureCode = enumName(f.GetCode().String(), "ISSUER_DOMAIN_FAILURE_CODE_")
@@ -629,6 +637,7 @@ func (m *issuerDomainModel) fromDomain(d *issuerDomain) diag.Diagnostics {
 	m.IssuerID = types.StringValue(ids[issuerIDAttribute])
 	m.Hostname = types.StringValue(d.Hostname)
 	m.State = types.StringValue(d.State)
+	m.TrafficTarget = types.StringValue(d.TrafficTarget)
 	m.FailureCode = types.StringValue(d.FailureCode)
 	m.FailureMessage = types.StringValue(d.FailureMessage)
 	m.FailureRecord = types.StringValue(d.FailureRecord)

@@ -1,9 +1,9 @@
-## 0.17.0 (Unreleased)
+## 0.17.0 (October 21, 2026)
 
 NOTES:
 
-* **apis v0.38.0.** `authwise_issuer_domain` needs kit with custom domains
-  (kit#795); the other resources need nothing new.
+* **apis v0.39.0, kit v1.53.0.** `authwise_issuer_domain` needs kit
+  v1.53.0 or later; the other resources need nothing new.
 
 FEATURES:
 
@@ -13,11 +13,11 @@ FEATURES:
   `dns_records` (one `traffic` and one `challenge` record) are known, so
   DNS resources keyed on `purpose` take them in the same apply.
   `wait_for_active` waits for the certificate; destroy waits until the
-  hostname is released. `state`, `failure_code`, `failure_message`,
-  `failure_record` and `certificate_expires_at` read back. Create's
+  hostname is released. `traffic_target`, `state`, `failure_code`,
+  `failure_message`, `failure_record` and `certificate_expires_at` read
+  back. Create's
   refusals name their reason (`HOSTNAME_CLAIMED`, `HOSTNAME_APEX`,
-  `HOSTNAME_IS_ISSUER`, `PLAN_REQUIRED`). Needs kit with custom domains
-  (kit#795).
+  `HOSTNAME_IS_ISSUER`, `PLAN_REQUIRED`). Needs kit v1.53.0.
 
 ## 0.16.3 (October 20, 2026)
 
