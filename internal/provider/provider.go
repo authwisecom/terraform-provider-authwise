@@ -239,7 +239,7 @@ func (p *AuthwiseProvider) Configure(ctx context.Context, req provider.Configure
 
 	providerData := &tfruntime.ProviderData{
 		Clients: map[string]any{
-			"identity": userContactClient{newAppearanceDefaultClient(identitypb.NewAuthwiseIdentityServiceClient(conn))},
+			"identity": userContactClient{issuerDeleteClient{newAppearanceDefaultClient(identitypb.NewAuthwiseIdentityServiceClient(conn))}},
 			"access":   accesspb.NewAuthwiseAccessServiceClient(conn),
 			// The public tenancy service, on kit's endpoint: service
 			// accounts (#37).

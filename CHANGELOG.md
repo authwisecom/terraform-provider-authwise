@@ -12,6 +12,10 @@ BUG FIXES:
   install with no domain controller refuses create (kit#798), and the
   diagnostic now says why. `PLAN_REQUIRED` names the plan as "Business"
   rather than kit's enum spelling.
+* **`authwise_issuer` names the `ISSUER_HAS_DOMAINS` refusal:** kit
+  refuses to delete an issuer that still has custom domains (kit#796), and
+  the destroy diagnostic now names the count and a hostname and says to
+  destroy the domains first.
 
 ## 0.17.0 (October 21, 2026)
 
