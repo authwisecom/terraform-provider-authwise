@@ -1,5 +1,11 @@
 ## 0.17.1 (Unreleased)
 
+NOTES:
+
+* The `authwise_issuer_domain` doc says how a destroy orders a domain
+  before its issuer, which the kit release after v1.53.0 requires
+  (`ISSUER_HAS_DOMAINS`, kit#796).
+
 BUG FIXES:
 
 * **`authwise_issuer_domain` names the `DOMAINS_UNAVAILABLE` refusal:** an
