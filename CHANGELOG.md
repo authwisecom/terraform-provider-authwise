@@ -1,10 +1,12 @@
-## 0.17.1 (Unreleased)
+## 0.17.1 (October 22, 2026)
 
 NOTES:
 
+* **kit v1.53.1; apis v0.39.0 unchanged.** The two refusals below come
+  from kit v1.53.1; against v1.53.0 nothing changes.
 * The `authwise_issuer_domain` doc says how a destroy orders a domain
-  before its issuer, which the kit release after v1.53.0 requires
-  (`ISSUER_HAS_DOMAINS`, kit#796).
+  before its issuer, which kit v1.53.1 requires (`ISSUER_HAS_DOMAINS`,
+  kit#796).
 
 BUG FIXES:
 

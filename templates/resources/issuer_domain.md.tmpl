@@ -63,7 +63,7 @@ edge entries and released the hostname, up to `timeouts.delete` (30
 minutes). Until then the hostname cannot be claimed again, by a replacement
 or by anyone else.
 
-From the kit release after v1.53.0 (kit#796), an issuer with any domain on
+From kit v1.53.1 (kit#796), an issuer with any domain on
 it, including one still being deleted, cannot be deleted
 (`ISSUER_HAS_DOMAINS`). Set `issuer_id` from the issuer resource, as in the
 example, and Terraform destroys the domain, and waits for it to be gone,
@@ -96,8 +96,7 @@ Create is refused with an error reason in the diagnostic:
 still being deleted holds it), `HOSTNAME_APEX`, `HOSTNAME_IS_ISSUER` (the
 hostname is already an Authwise issuer host), `PLAN_REQUIRED`, or
 `DOMAINS_UNAVAILABLE` (the install has no domain controller, so no domain
-on it would get a certificate; from the kit release after v1.53.0,
-kit#798).
+on it would get a certificate; from kit v1.53.1, kit#798).
 
 {{ .SchemaMarkdown | trimspace }}
 
