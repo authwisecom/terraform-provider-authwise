@@ -1,0 +1,96 @@
+---
+page_title: "{{.Name}} {{.Type}} - {{.RenderedProviderName}}"
+subcategory: ""
+description: |-
+{{ .Description | plainmarkdown | trimspace | prefixlines "  " }}
+---
+
+# authwise_issuer_domain (Resource)
+
+A hostname of yours, such as `login.acme.com`, that serves an issuer.
+Authwise obtains the certificate and renews it on its own edge. You add two
+DNS records and nothing else.
+
+- **Each host is its own issuer URL.** Tokens minted at `login.acme.com`
+  carry `iss = https://login.acme.com`. The issuer's own host keeps
+  working, with its own `iss`, so relying parties that cached discovery do
+  not break. Neither host redirects to the other.
+- **Passkeys do not follow.** A passkey is bound to the host it was
+  enrolled at, so passkeys enrolled at the issuer's own host do not work at
+  the custom domain. Add the domain before rolling out passkeys, or have
+  people enrol again.
+- **Business plan or above.** Below it, create is refused with
+  `PLAN_REQUIRED`.
+
+## Example Usage
+
+{{ tffile .ExampleFile }}
+
+## The rules
+
+1. **Challenge first, traffic after `ACTIVE`.** The certificate is issued
+   once the certificate authority sees the `challenge` record, before any
+   request reaches the custom domain. If the `traffic` record goes in only
+   when `state` is `ACTIVE`, nobody ever sees a TLS error. Creating both at
+   once, as the example does, works too; the hostname then fails TLS for
+   the few minutes until the certificate exists.
+2. **DNS-only records.** On Cloudflare, `proxied = false` (the grey cloud).
+   A proxied record puts Cloudflare in front of Authwise. That is not
+   supported: the issuer would not see the real host, and the certificate
+   authority would not see the challenge record.
+3. **Keep the challenge record for as long as the domain exists.** Renewal
+   depends on it. If it goes, the domain moves to `DEGRADED` with
+   `failure_record = "challenge"`. It keeps serving until the current
+   certificate expires, and tenant administrators get mail at 30, 14 and 7
+   days before that.
+4. **A subdomain, not an apex.** A CNAME cannot sit at a zone apex, and
+   create refuses one with `HOSTNAME_APEX`.
+
+## Waiting
+
+Create returns once `dns_records` is known, usually within thirty seconds,
+so DNS resources can take the records in the same apply. It does not wait
+for the certificate unless `wait_for_active = true`. Then create, or the
+update that sets it, waits until `state` is `ACTIVE`, up to
+`timeouts.create` (or `timeouts.update`), 30 minutes by default. Set it only
+when the challenge record is already in place or created without waiting on
+this resource; otherwise the wait cannot finish within the same apply.
+
+A `FAILED` domain ends the wait with `failure_code` and `failure_message`.
+
+Destroying the domain waits until Authwise has removed its certificate and
+edge entries and released the hostname, up to `timeouts.delete` (30
+minutes). Until then the hostname cannot be claimed again, by a replacement
+or by anyone else.
+
+## States
+
+| `state` | Meaning | What to do |
+|---|---|---|
+| `PENDING_DNS` | Waiting for the challenge record. | Add it, DNS-only. A claim never verified expires after 7 days. |
+| `VERIFYING` | The certificate authority is checking it. | Wait. |
+| `PROVISIONING` | The certificate is being issued. | Wait. |
+| `ACTIVE` | Serving with its own certificate. | Add the traffic record if you have not. |
+| `DEGRADED` | Serving, but renewal will fail. | Restore the record named in `failure_record`. |
+| `FAILED` | Issuance stopped. | Fix the cause in `failure_code`, below. |
+| `DELETING` | Being removed. | Wait; the hostname is released when it is gone. |
+
+| `failure_code` | Cause |
+|---|---|
+| `DNS_NOT_FOUND` | The record in `failure_record` does not resolve. |
+| `CAA` | A CAA record on the hostname or a parent excludes the certificate authority. Allow `pki.goog` and `letsencrypt.org`, or remove the CAA record. |
+| `CONFIG` | A record resolves to something else, or is proxied. |
+| `RATE_LIMITED` | The certificate authority's rate limit. Authwise retries. |
+| `PROBE_FAILED` | The hostname did not answer as the issuer: the traffic record points elsewhere. |
+| `PROVIDER_ERROR` | On Authwise's side. Contact support if it persists. |
+
+Create is refused with an error reason in the diagnostic:
+`HOSTNAME_CLAIMED` (another issuer, another tenant, or a domain of yours
+still being deleted holds it), `HOSTNAME_APEX`, `HOSTNAME_IS_ISSUER` (the
+hostname is already an Authwise issuer host) or `PLAN_REQUIRED`.
+
+{{ .SchemaMarkdown | trimspace }}
+
+## Import
+
+{{ codefile "shell" .ImportFile }}

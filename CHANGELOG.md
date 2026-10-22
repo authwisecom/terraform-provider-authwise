@@ -1,3 +1,19 @@
+## 0.17.0 (Unreleased)
+
+FEATURES:
+
+* **New resource `authwise_issuer_domain` (#44):** a hostname of yours,
+  such as `login.acme.com`, that serves an issuer, with the certificate
+  obtained and renewed by Authwise. Create returns once the computed
+  `dns_records` (one `traffic` and one `challenge` record) are known, so
+  DNS resources keyed on `purpose` take them in the same apply.
+  `wait_for_active` waits for the certificate; destroy waits until the
+  hostname is released. `state`, `failure_code`, `failure_message`,
+  `failure_record` and `certificate_expires_at` read back. Create's
+  refusals name their reason (`HOSTNAME_CLAIMED`, `HOSTNAME_APEX`,
+  `HOSTNAME_IS_ISSUER`, `PLAN_REQUIRED`). Needs kit with custom domains
+  (kit#795); Business plan or above.
+
 ## 0.16.3 (October 20, 2026)
 
 NOTES:
