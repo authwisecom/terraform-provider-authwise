@@ -307,13 +307,22 @@ func TestIssuerDomainDeleteTimesOutWhileDeleting(t *testing.T) {
 func TestIssuerDomainCreateErrorNamesReason(t *testing.T) {
 
 	st, err := status.New(codes.FailedPrecondition, "plan gate").WithDetails(&errdetails.ErrorInfo{
-		Domain: authwiseErrorDomain, Reason: "PLAN_REQUIRED", Metadata: map[string]string{"plan": "Business"},
+		Domain: authwiseErrorDomain, Reason: "PLAN_REQUIRED", Metadata: map[string]string{"plan": "BUSINESS"},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	summary, detail := issuerDomainCreateError(st.Err())
 	if summary != "create issuer domain refused: PLAN_REQUIRED" || !strings.Contains(detail, "the Business plan or above") {
+		t.Fatalf("got %q / %q", summary, detail)
+	}
+
+	st, err = status.New(codes.FailedPrecondition, "no controller").WithDetails(&errdetails.ErrorInfo{Domain: authwiseErrorDomain, Reason: "DOMAINS_UNAVAILABLE"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	summary, detail = issuerDomainCreateError(st.Err())
+	if summary != "create issuer domain refused: DOMAINS_UNAVAILABLE" || !strings.Contains(detail, "no domain controller") {
 		t.Fatalf("got %q / %q", summary, detail)
 	}
 

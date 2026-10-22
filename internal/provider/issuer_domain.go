@@ -476,6 +476,16 @@ func (r *issuerDomainResource) ImportState(ctx context.Context, req resource.Imp
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root(tfruntime.NameAttribute), req.ID)...)
 }
 
+// issuerDomainRefusals is the remedy for each ErrorInfo reason create is
+// refused with.
+var issuerDomainRefusals = map[string]string{
+	"HOSTNAME_CLAIMED":    "The hostname is already claimed in this Authwise install, by another issuer or tenant, or by a domain of yours that is still being deleted (a deleted domain releases its hostname only once its certificate and edge entries are gone).",
+	"HOSTNAME_APEX":       "The hostname is a zone apex, and a CNAME cannot sit at an apex. Use a subdomain such as login.<your domain>, or your DNS provider's CNAME flattening on a subdomain you point at it.",
+	"HOSTNAME_IS_ISSUER":  "The hostname is an Authwise issuer host already; an issuer answers at its own host without a domain.",
+	"PLAN_REQUIRED":       "Custom domains need a higher plan.",
+	"DOMAINS_UNAVAILABLE": "This Authwise install has no domain controller, so a domain added to it would never get a certificate. Custom domains are not available on it.",
+}
+
 // issuerDomainCreateError words kit's refusal of CreateIssuerDomain by its
 // ErrorInfo reason (domain authwise.io), which is the contract; the status
 // message is prose and may change.
@@ -494,18 +504,10 @@ func issuerDomainCreateError(err error) (summary, detail string) {
 	}
 	summary = "create issuer domain refused: " + info.GetReason()
 
-	switch info.GetReason() {
-	case "HOSTNAME_CLAIMED":
-		detail = "The hostname is already claimed in this Authwise install, by another issuer or tenant, or by a domain of yours that is still being deleted (a deleted domain releases its hostname only once its certificate and edge entries are gone)."
-	case "HOSTNAME_APEX":
-		detail = "The hostname is a zone apex, and a CNAME cannot sit at an apex. Use a subdomain such as login.<your domain>, or your DNS provider's CNAME flattening on a subdomain you point at it."
-	case "HOSTNAME_IS_ISSUER":
-		detail = "The hostname is an Authwise issuer host already; an issuer answers at its own host without a domain."
-	case "PLAN_REQUIRED":
-		detail = "Custom domains need a higher plan."
-		if plan := info.GetMetadata()["plan"]; plan != "" {
-			detail = fmt.Sprintf("Custom domains need the %s plan or above.", plan)
-		}
+	detail = issuerDomainRefusals[info.GetReason()]
+	if plan := info.GetMetadata()["plan"]; info.GetReason() == "PLAN_REQUIRED" && plan != "" {
+		// kit sends the enum name, BUSINESS.
+		detail = fmt.Sprintf("Custom domains need the %s%s plan or above.", plan[:1], strings.ToLower(plan[1:]))
 	}
 
 	return summary, strings.TrimSpace(detail + " " + err.Error())

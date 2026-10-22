@@ -1,3 +1,12 @@
+## 0.17.1 (Unreleased)
+
+BUG FIXES:
+
+* **`authwise_issuer_domain` names the `DOMAINS_UNAVAILABLE` refusal:** an
+  install with no domain controller refuses create (kit#798), and the
+  diagnostic now says why. `PLAN_REQUIRED` names the plan as "Business"
+  rather than kit's enum spelling.
+
 ## 0.17.0 (October 21, 2026)
 
 NOTES:
