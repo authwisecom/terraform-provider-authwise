@@ -221,7 +221,7 @@ func (r *issuerDomainResource) Schema(ctx context.Context, _ resource.SchemaRequ
 					},
 				},
 			},
-			"state": computed("`PENDING_DNS` (waiting for the challenge record), `VERIFYING`, `PROVISIONING` (issuing the certificate), `ACTIVE`, " +
+			"state": computed("`PENDING_DNS` (waiting for the challenge record), `VERIFYING` (issuing the certificate), `PROVISIONING` (attaching it; the hostname routes), `ACTIVE`, " +
 				"`DEGRADED` (serving, but the challenge record is gone and renewal will fail), `FAILED` (see `failure_code`) or `DELETING`."),
 			"failure_code": computed("Why the domain is `FAILED` or `DEGRADED`; empty otherwise. One of `DNS_NOT_FOUND` (a record is missing), `CAA` (a CAA record excludes the certificate authority), " +
 				"`CONFIG` (a record exists with the wrong content, or is proxied), `RATE_LIMITED` (the certificate authority's limit; it retries), `PROBE_FAILED` (the hostname did not answer as the issuer) or `PROVIDER_ERROR` (Authwise's side)."),
@@ -542,10 +542,10 @@ func (r *issuerDomainResource) waitFor(ctx context.Context, d *issuerDomain, don
 // issuerDomainHint says what a stalled state is waiting on.
 func issuerDomainHint(d *issuerDomain) string {
 	switch d.State {
-	case issuerDomainPendingDNS, issuerDomainVerifying:
+	case issuerDomainPendingDNS:
 		return "The certificate authority has not seen the challenge record yet: check that it exists, is DNS-only, and has propagated."
-	case issuerDomainProvisioning:
-		return "The certificate is being issued; this can take several more minutes."
+	case issuerDomainVerifying, issuerDomainProvisioning:
+		return "The certificate is being issued and attached; this can take several more minutes."
 	case "":
 		return "The domain controller has not picked the domain up yet."
 	}

@@ -68,8 +68,8 @@ or by anyone else.
 | `state` | Meaning | What to do |
 |---|---|---|
 | `PENDING_DNS` | Waiting for the challenge record. | Add it, DNS-only. A claim never verified expires after 7 days. |
-| `VERIFYING` | The certificate authority is checking it. | Wait. |
-| `PROVISIONING` | The certificate is being issued. | Wait. |
+| `VERIFYING` | The certificate authority found the challenge record and is issuing the certificate. | Wait. |
+| `PROVISIONING` | The certificate is issued and being attached to the hostname. | Wait. |
 | `ACTIVE` | Serving with its own certificate. | Add the traffic record if you have not. |
 | `DEGRADED` | Serving, but renewal will fail. | Restore the record named in `failure_record`. |
 | `FAILED` | Issuance stopped. | Fix the cause in `failure_code`, below. |
