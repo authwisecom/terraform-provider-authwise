@@ -1,4 +1,9 @@
-## 0.18.0 (Unreleased)
+## 0.18.0 (October 23, 2026)
+
+NOTES:
+
+* **apis v0.39.0, kit v1.53.1, unchanged from 0.17.1.** The new resource
+  needs nothing new on the server.
 
 BREAKING CHANGES:
 
