@@ -31,9 +31,11 @@ DNS records and nothing else.
 1. **Challenge first, traffic after `ACTIVE`.** The certificate is issued
    once the certificate authority sees the `challenge` record, before any
    request reaches the custom domain. If the `traffic` record goes in only
-   when `state` is `ACTIVE`, nobody ever sees a TLS error. Creating both at
-   once, as the example does, works too; the hostname then fails TLS for
-   the few minutes until the certificate exists.
+   when `state` is `ACTIVE`, nobody ever sees a TLS error. The example does
+   this in one apply: `authwise_issuer_domain_activation` sits between the
+   two records and waits for `ACTIVE`. Creating both records at once also
+   works; the hostname then fails TLS for the few minutes until the
+   certificate exists.
 2. **DNS-only records.** On Cloudflare, `proxied = false` (the grey cloud).
    A proxied record puts Cloudflare in front of Authwise. That is not
    supported: the issuer would not see the real host, and the certificate
@@ -50,13 +52,17 @@ DNS records and nothing else.
 
 Create returns once `dns_records` is known, usually within thirty seconds,
 so DNS resources can take the records in the same apply. It does not wait
-for the certificate unless `wait_for_active = true`. Then create, or the
-update that sets it, waits until `state` is `ACTIVE`, up to
-`timeouts.create` (or `timeouts.update`), 30 minutes by default. Set it only
-when the challenge record is already in place or created without waiting on
-this resource; otherwise the wait cannot finish within the same apply.
+for the certificate: it can't, because the certificate needs the challenge
+record, and that record needs the domain.
 
-A `FAILED` domain ends the wait with `failure_code` and `failure_message`.
+`authwise_issuer_domain_activation` waits instead. Make it depend on the challenge record, and the traffic record on
+it. Its create waits until `state` is `ACTIVE`, up to `timeouts.create` (30
+minutes by default). A `FAILED` domain ends the wait with `failure_code` and
+`failure_message`, and the traffic record is not created.
+
+In 0.17, `wait_for_active = true` on this resource did the waiting. It is
+gone from 0.18.0: remove it from the configuration and add the activation
+if you used it. State written by 0.17 needs nothing.
 
 Destroying the domain waits until Authwise has removed its certificate and
 edge entries and released the hostname, up to `timeouts.delete` (30
@@ -103,8 +109,3 @@ on it would get a certificate; from kit v1.53.1, kit#798).
 ## Import
 
 {{ codefile "shell" .ImportFile }}
-
-`wait_for_active` and `timeouts` are configuration only, so an import reads
-them as their defaults. When the configuration sets `wait_for_active =
-true`, the first plan after an import shows it as an in-place update, which
-only reads the domain back.

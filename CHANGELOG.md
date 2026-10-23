@@ -1,3 +1,22 @@
+## 0.18.0 (Unreleased)
+
+BREAKING CHANGES:
+
+* **`authwise_issuer_domain` drops `wait_for_active`.** It could not finish
+  in the apply that creates the challenge record, which needs the domain
+  first. Remove it from the configuration and use
+  `authwise_issuer_domain_activation` (below). State written by 0.17 needs
+  nothing.
+
+FEATURES:
+
+* **New resource `authwise_issuer_domain_activation`:** waits until an
+  issuer domain is `ACTIVE`. Put it between the challenge record
+  (`depends_on`) and the traffic record (which depends on it), and one
+  apply creates the domain and the challenge record, waits for the
+  certificate, then points traffic, with no window of TLS errors. It owns
+  nothing in Authwise; destroying it only forgets it.
+
 ## 0.17.1 (October 22, 2026)
 
 NOTES:

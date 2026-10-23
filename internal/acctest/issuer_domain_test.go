@@ -8,6 +8,7 @@ import (
 	identitypb "git.authwise.com/authwise/apis/authwise/identity/v1alpha1"
 	corepb "git.authwise.com/authwise/apis/authwise/types/core/v1alpha1"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/plancheck"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc/codes"
@@ -87,21 +88,24 @@ func (f *fakeIdentityServer) DeleteIssuerDomain(ctx context.Context, in *identit
 }
 
 // TestAccIssuerDomain_Lifecycle drives authwise_issuer_domain over the
-// identity service (#44): Create returns with the records, wait_for_active
+// identity service (#44): Create returns with the records, the activation
 // reads the state through the enum, and destroy waits out DELETING.
 func TestAccIssuerDomain_Lifecycle(t *testing.T) {
 
 	h := newHarness(t)
 	const addr = "authwise_issuer_domain.login"
+	const activation = "authwise_issuer_domain_activation.login"
 
-	config := func(wait bool) string {
-		return h.providerConfig() + fmt.Sprintf(`
+	domain := h.providerConfig() + `
 resource "authwise_issuer_domain" "login" {
-  hostname        = "login.acme.com"
-  wait_for_active = %t
+  hostname = "login.acme.com"
 }
-`, wait)
-	}
+`
+	activated := domain + `
+resource "authwise_issuer_domain_activation" "login" {
+  issuer_domain = authwise_issuer_domain.login.name
+}
+`
 
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: protoFactories(),
@@ -115,7 +119,7 @@ resource "authwise_issuer_domain" "login" {
 		},
 		Steps: []resource.TestStep{
 			{
-				Config: config(false),
+				Config: domain,
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(addr, "name", "tenants/t-1/issuers/i-1/issuer-domains/d-1"),
 					resource.TestCheckResourceAttr(addr, "issuer_id", "i-1"),
@@ -128,18 +132,56 @@ resource "authwise_issuer_domain" "login" {
 				),
 			},
 			{
-				Config: config(true),
+				Config: activated,
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr(addr, "state", "ACTIVE"),
-					resource.TestCheckResourceAttr(addr, "certificate_expires_at", "2026-12-14T00:00:00Z"),
+					resource.TestCheckResourceAttr(activation, "state", "ACTIVE"),
+					resource.TestCheckResourceAttr(activation, "hostname", "login.acme.com"),
+					resource.TestCheckResourceAttr(activation, "certificate_expires_at", "2026-12-14T00:00:00Z"),
 				),
 			},
-			{
-				// wait_for_active is configuration only, so the import is
-				// checked against the default.
-				Config: config(false),
-			},
 			importPlansNoChange(addr),
+			{
+				// The activation imports by the domain's name, its only argument.
+				ResourceName:    activation,
+				ImportState:     true,
+				ImportStateKind: resource.ImportBlockWithID,
+				ImportStateIdFunc: func(s *terraform.State) (string, error) {
+					return s.RootModule().Resources[activation].Primary.Attributes["issuer_domain"], nil
+				},
+			},
+		},
+	})
+}
+
+// TestAccIssuerDomain_UpgradeFrom017 applies with the released 0.17.1, whose
+// schema has wait_for_active, then plans with this build: the framework
+// ignores the attribute the schema no longer has, and nothing changes.
+func TestAccIssuerDomain_UpgradeFrom017(t *testing.T) {
+
+	h := newHarness(t)
+	config := func(extra string) string {
+		return h.providerConfig() + `
+resource "authwise_issuer_domain" "login" {
+  hostname = "login.acme.com"
+` + extra + `}
+`
+	}
+
+	resource.Test(t, resource.TestCase{
+		Steps: []resource.TestStep{
+			{
+				ExternalProviders: map[string]resource.ExternalProvider{
+					"authwise": {Source: "authwisecom/authwise", VersionConstraint: "0.17.1"},
+				},
+				Config: config("  wait_for_active = true\n"),
+			},
+			{
+				ProtoV6ProviderFactories: protoFactories(),
+				Config:                   config(""),
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{plancheck.ExpectEmptyPlan()},
+				},
+			},
 		},
 	})
 }

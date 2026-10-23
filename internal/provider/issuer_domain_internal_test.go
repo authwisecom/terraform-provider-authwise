@@ -19,6 +19,7 @@ import (
 	tfresource "github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/knownvalue"
 	"github.com/hashicorp/terraform-plugin-testing/statecheck"
+	"github.com/hashicorp/terraform-plugin-testing/terraform"
 	"github.com/hashicorp/terraform-plugin-testing/tfjsonpath"
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc/codes"
@@ -106,7 +107,7 @@ func (f *fakeIssuerDomains) count() int {
 	return len(f.domains)
 }
 
-// issuerDomainTestProvider serves authwise_issuer_domain alone over the fake,
+// issuerDomainTestProvider serves authwise_issuer_domain and its activation over the fake,
 // with the tenant as a provider default as the real provider takes it.
 type issuerDomainTestProvider struct{ fake *fakeIssuerDomains }
 
@@ -125,9 +126,11 @@ func (p *issuerDomainTestProvider) Configure(_ context.Context, _ provider.Confi
 }
 
 func (p *issuerDomainTestProvider) Resources(context.Context) []func() resource.Resource {
-	return []func() resource.Resource{func() resource.Resource {
-		return &issuerDomainResource{poll: time.Millisecond}
-	}}
+	poller := issuerDomainPoller{poll: time.Millisecond}
+	return []func() resource.Resource{
+		func() resource.Resource { return &issuerDomainResource{issuerDomainPoller: poller} },
+		func() resource.Resource { return &issuerDomainActivationResource{poller} },
+	}
 }
 
 func (p *issuerDomainTestProvider) DataSources(context.Context) []func() datasource.DataSource {
@@ -142,27 +145,43 @@ func (p *issuerDomainTestProvider) factories() map[string]func() (tfprotov6.Prov
 	}
 }
 
-// issuerDomainConfig is the documented pattern: DNS records keyed on purpose,
-// which is known at plan, with the apply-time values in the map values.
-// terraform_data stands in for the DNS provider's record resource.
-func issuerDomainConfig(waitForActive bool) string {
-	return fmt.Sprintf(`
+// issuerDomainConfig is the documented one-apply pattern: the challenge
+// record, the activation waiting on it, and the traffic record waiting on
+// the activation. terraform_data stands in for the DNS provider's record
+// resource; the traffic record carries the activation's state, which shows
+// it was created only once the domain was ACTIVE.
+const issuerDomainConfig = `
 resource "authwise_issuer_domain" "login" {
-  issuer_id       = "i-1"
-  hostname        = "login.acme.com"
-  wait_for_active = %t
+  issuer_id = "i-1"
+  hostname  = "login.acme.com"
 }
 
-resource "terraform_data" "record" {
-  for_each = toset(["traffic", "challenge"])
+locals {
+  records = { for r in authwise_issuer_domain.login.dns_records : r.purpose => r }
+}
+
+resource "terraform_data" "challenge" {
   input = {
-    name    = one([for r in authwise_issuer_domain.login.dns_records : r.name if r.purpose == each.key])
-    type    = one([for r in authwise_issuer_domain.login.dns_records : r.type if r.purpose == each.key])
-    content = one([for r in authwise_issuer_domain.login.dns_records : r.value if r.purpose == each.key])
+    name    = local.records["challenge"].name
+    content = local.records["challenge"].value
   }
 }
-`, waitForActive)
+
+resource "authwise_issuer_domain_activation" "login" {
+  issuer_domain = authwise_issuer_domain.login.name
+  depends_on    = [terraform_data.challenge]
 }
+
+resource "terraform_data" "traffic" {
+  input = {
+    name    = local.records["traffic"].name
+    content = local.records["traffic"].value
+    after   = authwise_issuer_domain_activation.login.state
+  }
+}
+`
+
+const issuerDomainActivationAddr = "authwise_issuer_domain_activation.login"
 
 const issuerDomainAddr = "authwise_issuer_domain.login"
 
@@ -178,55 +197,41 @@ func TestIssuerDomainLifecycle(t *testing.T) {
 	fake := newFakeIssuerDomains()
 	p := &issuerDomainTestProvider{fake: fake}
 
-	// Destroy waits out the two-phase delete, so the fake is empty after.
-	defer func() {
-		if n := fake.count(); n != 0 {
-			t.Errorf("destroy returned with %d domains still on the server", n)
-		}
-	}()
-
 	tfresource.UnitTest(t, tfresource.TestCase{
 		ProtoV6ProviderFactories: p.factories(),
-		Steps: []tfresource.TestStep{
-			{
-				// Create returns with the records, and the DNS resources take
-				// them in the same apply.
-				Config: issuerDomainConfig(false),
-				ConfigStateChecks: []statecheck.StateCheck{
-					statecheck.ExpectKnownValue(issuerDomainAddr, tfjsonpath.New("name"), knownvalue.StringExact("tenants/t-1/issuers/i-1/issuer-domains/d-1")),
-					statecheck.ExpectKnownValue(issuerDomainAddr, tfjsonpath.New("issuer_domain_id"), knownvalue.StringExact("d-1")),
-					statecheck.ExpectKnownValue(issuerDomainAddr, tfjsonpath.New("tenant_id"), knownvalue.StringExact("t-1")),
-					statecheck.ExpectKnownValue(issuerDomainAddr, tfjsonpath.New("state"), knownvalue.StringExact(issuerDomainPendingDNS)),
-					statecheck.ExpectKnownValue(issuerDomainAddr, tfjsonpath.New("dns_records"), knownvalue.ListSizeExact(2)),
-					statecheck.ExpectKnownValue(issuerDomainAddr, tfjsonpath.New("traffic_target"), knownvalue.StringExact("acme.id.authwise.test")),
-					statecheck.ExpectKnownValue(issuerDomainAddr, tfjsonpath.New("certificate_expires_at"), knownvalue.StringExact("")),
-					statecheck.ExpectKnownValue(`terraform_data.record["challenge"]`,
-						tfjsonpath.New("output").AtMapKey("name"), knownvalue.StringExact("_acme-challenge.login.acme.com")),
-					statecheck.ExpectKnownValue(`terraform_data.record["traffic"]`,
-						tfjsonpath.New("output").AtMapKey("content"), knownvalue.StringExact("acme.id.authwise.com")),
-				},
-			},
-			{
-				// Setting wait_for_active is an in-place update that waits.
-				Config: issuerDomainConfig(true),
-				ConfigStateChecks: []statecheck.StateCheck{
-					statecheck.ExpectKnownValue(issuerDomainAddr, tfjsonpath.New("state"), knownvalue.StringExact(issuerDomainActive)),
-					statecheck.ExpectKnownValue(issuerDomainAddr, tfjsonpath.New("certificate_expires_at"), knownvalue.StringExact("2027-01-19T00:00:00Z")),
-					statecheck.ExpectKnownValue(issuerDomainAddr, tfjsonpath.New("name"), knownvalue.StringExact("tenants/t-1/issuers/i-1/issuer-domains/d-1")),
-				},
-			},
-			{
-				// The record resources go before the case ends: the test
-				// framework's teardown cannot shim for_each instances.
-				Config: issuerDomainOnlyConfig,
-			},
+		CheckDestroy: func(*terraform.State) error {
+			// Destroy waits out the two-phase delete.
+			if n := fake.count(); n != 0 {
+				return fmt.Errorf("destroy returned with %d domains still on the server", n)
+			}
+			return nil
 		},
+		Steps: []tfresource.TestStep{{
+			// One apply: the domain returns with its records, the challenge
+			// record takes them, the activation waits for ACTIVE, and only
+			// then is the traffic record created.
+			Config: issuerDomainConfig,
+			ConfigStateChecks: []statecheck.StateCheck{
+				statecheck.ExpectKnownValue(issuerDomainAddr, tfjsonpath.New("name"), knownvalue.StringExact("tenants/t-1/issuers/i-1/issuer-domains/d-1")),
+				statecheck.ExpectKnownValue(issuerDomainAddr, tfjsonpath.New("issuer_domain_id"), knownvalue.StringExact("d-1")),
+				statecheck.ExpectKnownValue(issuerDomainAddr, tfjsonpath.New("tenant_id"), knownvalue.StringExact("t-1")),
+				statecheck.ExpectKnownValue(issuerDomainAddr, tfjsonpath.New("dns_records"), knownvalue.ListSizeExact(2)),
+				statecheck.ExpectKnownValue(issuerDomainAddr, tfjsonpath.New("traffic_target"), knownvalue.StringExact("acme.id.authwise.test")),
+				statecheck.ExpectKnownValue("terraform_data.challenge",
+					tfjsonpath.New("output").AtMapKey("name"), knownvalue.StringExact("_acme-challenge.login.acme.com")),
+				statecheck.ExpectKnownValue(issuerDomainActivationAddr, tfjsonpath.New("state"), knownvalue.StringExact(issuerDomainActive)),
+				statecheck.ExpectKnownValue(issuerDomainActivationAddr, tfjsonpath.New("hostname"), knownvalue.StringExact("login.acme.com")),
+				statecheck.ExpectKnownValue(issuerDomainActivationAddr, tfjsonpath.New("certificate_expires_at"), knownvalue.StringExact("2027-01-19T00:00:00Z")),
+				statecheck.ExpectKnownValue("terraform_data.traffic",
+					tfjsonpath.New("output").AtMapKey("after"), knownvalue.StringExact(issuerDomainActive)),
+				statecheck.ExpectKnownValue("terraform_data.traffic",
+					tfjsonpath.New("output").AtMapKey("content"), knownvalue.StringExact("acme.id.authwise.com")),
+			},
+		}},
 	})
 }
 
-// TestIssuerDomainImportPlansNoChange imports by name (#43). The domain is
-// alone here: the test framework's import step cannot shim for_each
-// instances either.
+// TestIssuerDomainImportPlansNoChange imports by name (#43).
 func TestIssuerDomainImportPlansNoChange(t *testing.T) {
 
 	p := &issuerDomainTestProvider{fake: newFakeIssuerDomains()}
@@ -247,6 +252,29 @@ func TestIssuerDomainImportPlansNoChange(t *testing.T) {
 	})
 }
 
+// TestIssuerDomainActivationImportPlansNoChange imports the activation by
+// the domain's name, after the domain is ACTIVE.
+func TestIssuerDomainActivationImportPlansNoChange(t *testing.T) {
+
+	p := &issuerDomainTestProvider{fake: newFakeIssuerDomains()}
+
+	tfresource.UnitTest(t, tfresource.TestCase{
+		ProtoV6ProviderFactories: p.factories(),
+		Steps: []tfresource.TestStep{
+			{Config: issuerDomainConfig},
+			{
+				ResourceName:    issuerDomainActivationAddr,
+				ImportState:     true,
+				ImportStateKind: tfresource.ImportBlockWithID,
+				ImportStateId:   "tenants/t-1/issuers/i-1/issuer-domains/d-1",
+				Config:          issuerDomainConfig,
+			},
+		},
+	})
+}
+
+// TestIssuerDomainFailedSaysWhy: a FAILED domain ends the activation's wait
+// with its reason, and the traffic record is never created.
 func TestIssuerDomainFailedSaysWhy(t *testing.T) {
 
 	fake := newFakeIssuerDomains()
@@ -256,7 +284,7 @@ func TestIssuerDomainFailedSaysWhy(t *testing.T) {
 	tfresource.UnitTest(t, tfresource.TestCase{
 		ProtoV6ProviderFactories: p.factories(),
 		Steps: []tfresource.TestStep{{
-			Config:      issuerDomainConfig(true),
+			Config:      issuerDomainConfig,
 			ExpectError: regexp.MustCompile(`(?s)login\.acme\.com: a CAA record.*\(CAA\)`),
 		}},
 	})
@@ -285,7 +313,7 @@ func TestIssuerDomainDeleteTimesOutWhileDeleting(t *testing.T) {
 
 	fake := newFakeIssuerDomains()
 	fake.goneAfter = 1 << 30
-	r := &issuerDomainResource{client: fake, poll: time.Millisecond}
+	r := issuerDomainPoller{client: fake, poll: time.Millisecond}
 
 	d, err := fake.CreateIssuerDomain(t.Context(), "tenants/t-1/issuers/i-1", "login.acme.com")
 	if err != nil {

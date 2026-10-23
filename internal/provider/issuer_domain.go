@@ -18,7 +18,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
@@ -72,6 +71,9 @@ const (
 
 var issuerDomainScope = aip.NewScope("tenants", "issuers")
 
+// issuerDomainNamePattern is an issuer domain's full resource name.
+var issuerDomainNamePattern = regexp.MustCompile(`^tenants/[^/]+/issuers/[^/]+/issuer-domains/[^/]+$`)
+
 // hostnamePattern is a lower-case FQDN of two or more labels, without a
 // trailing dot. kit is the authority (it refuses an apex, a claimed name and
 // anything below the plan gate); this only catches a URL or a stray capital
@@ -118,8 +120,14 @@ var (
 // domain controller: kit returns the row at once, and the DNS records, the
 // certificate and the release of a deleted hostname arrive later.
 type issuerDomainResource struct {
-	client   issuerDomainAPI
+	issuerDomainPoller
 	defaults map[string]string
+}
+
+// issuerDomainPoller reads a domain until the controller has moved it on.
+// authwise_issuer_domain and authwise_issuer_domain_activation share it.
+type issuerDomainPoller struct {
+	client issuerDomainAPI
 	// poll is the interval between reads while waiting.
 	poll time.Duration
 }
@@ -130,7 +138,6 @@ type issuerDomainModel struct {
 	TenantID             types.String   `tfsdk:"tenant_id"`
 	IssuerID             types.String   `tfsdk:"issuer_id"`
 	Hostname             types.String   `tfsdk:"hostname"`
-	WaitForActive        types.Bool     `tfsdk:"wait_for_active"`
 	DNSRecords           types.List     `tfsdk:"dns_records"`
 	TrafficTarget        types.String   `tfsdk:"traffic_target"`
 	State                types.String   `tfsdk:"state"`
@@ -151,7 +158,7 @@ func issuerDomainRecordAttrTypes() map[string]attr.Type {
 }
 
 func newIssuerDomainResource() resource.Resource {
-	return &issuerDomainResource{poll: issuerDomainPollInterval}
+	return &issuerDomainResource{issuerDomainPoller: issuerDomainPoller{poll: issuerDomainPollInterval}}
 }
 
 func (r *issuerDomainResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -177,8 +184,8 @@ func (r *issuerDomainResource) Schema(ctx context.Context, _ resource.SchemaRequ
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "A hostname of yours that serves an issuer, such as `login.acme.com`. Authwise obtains and renews its certificate; you add two DNS records, " +
 			"read from `dns_records`. The issuer keeps answering at its own host as well, and each host is its own issuer URL (`iss`).\n\n" +
-			"Create returns once the records are known, so DNS resources can take them in the same apply. Add the challenge record first and point traffic only once `state` is `ACTIVE`; " +
-			"the certificate then exists before any request arrives. Both records must be DNS-only (on Cloudflare, `proxied = false`), and the challenge record stays for as long as the domain does: renewal depends on it.\n\n" +
+			"Create returns once the records are known, so DNS resources can take them in the same apply. Add the challenge record first and point traffic only once `state` is `ACTIVE`, " +
+			"so the certificate exists before any request arrives: `authwise_issuer_domain_activation` waits for that between the two records, in one apply. Both records must be DNS-only (on Cloudflare, `proxied = false`), and the challenge record stays for as long as the domain does: renewal depends on it.\n\n" +
 			"Destroying the domain waits until Authwise has released the hostname, which takes the cloud side's teardown.",
 		Attributes: map[string]schema.Attribute{
 			tfruntime.NameAttribute: schema.StringAttribute{
@@ -201,13 +208,6 @@ func (r *issuerDomainResource) Schema(ctx context.Context, _ resource.SchemaRequ
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 				Validators: []validator.String{stringvalidator.RegexMatches(hostnamePattern,
 					"must be a lower-case fully qualified hostname such as login.acme.com, without a scheme, path or trailing dot")},
-			},
-			"wait_for_active": schema.BoolAttribute{
-				Optional: true,
-				Computed: true,
-				Default:  booldefault.StaticBool(false),
-				MarkdownDescription: "When `true`, create (and an update that sets it) waits until `state` is `ACTIVE`, up to the `create` (or `update`) timeout, default 30 minutes. " +
-					"The certificate is issued only after the challenge record resolves, so set it only where that record already exists or is made outside this apply's dependency on the domain. Default `false`.",
 			},
 			"dns_records": schema.ListNestedAttribute{
 				Computed: true,
@@ -243,30 +243,38 @@ func (r *issuerDomainResource) Schema(ctx context.Context, _ resource.SchemaRequ
 }
 
 func (r *issuerDomainResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
+	if pd := r.configure(req, &resp.Diagnostics); pd != nil {
+		r.defaults = pd.Defaults
+	}
+}
+
+// configure takes the issuerDomainAPI from the provider's data, and returns
+// that data; nil when there is none yet or it is not the provider's.
+func (p *issuerDomainPoller) configure(req resource.ConfigureRequest, diags *diag.Diagnostics) *tfruntime.ProviderData {
 
 	if req.ProviderData == nil {
-		return
+		return nil
 	}
 
 	pd, ok := req.ProviderData.(*tfruntime.ProviderData)
 	if !ok {
-		resp.Diagnostics.AddError("unexpected provider data", fmt.Sprintf("expected *tf.ProviderData, got %T", req.ProviderData))
-		return
+		diags.AddError("unexpected provider data", fmt.Sprintf("expected *tf.ProviderData, got %T", req.ProviderData))
+		return nil
 	}
 
 	client, ok := pd.Clients[issuerDomainsClientKey].(issuerDomainAPI)
 	if !ok {
-		resp.Diagnostics.AddError("missing client", `provider data key "issuerDomains" is not an issuerDomainAPI`)
-		return
+		diags.AddError("missing client", `provider data key "issuerDomains" is not an issuerDomainAPI`)
+		return nil
 	}
 
-	r.client = client
-	r.defaults = pd.Defaults
+	p.client = client
+	return pd
 }
 
-func (r *issuerDomainResource) configured(diags *diag.Diagnostics) bool {
-	if r.client == nil {
-		diags.AddError("authwise_issuer_domain is not configured", "Configure was not called with the provider's data")
+func (p *issuerDomainPoller) configured(diags *diag.Diagnostics) bool {
+	if p.client == nil {
+		diags.AddError("the issuer domain resource is not configured", "Configure was not called with the provider's data")
 		return false
 	}
 	return true
@@ -321,13 +329,7 @@ func (r *issuerDomainResource) Create(ctx context.Context, req resource.CreateRe
 
 	recordsCtx, cancelRecords := context.WithTimeout(ctx, issuerDomainRecordsWait)
 	defer cancelRecords()
-	if out = r.waitFor(recordsCtx, out, hasRecords, "its DNS records", &resp.Diagnostics); resp.Diagnostics.HasError() {
-		return
-	}
-
-	if plan.WaitForActive.ValueBool() {
-		out = r.waitFor(ctx, out, isActive, "state ACTIVE", &resp.Diagnostics)
-	}
+	out = r.waitFor(recordsCtx, out, hasRecords, "its DNS records", &resp.Diagnostics)
 }
 
 func (r *issuerDomainResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
@@ -360,17 +362,12 @@ func (r *issuerDomainResource) Read(ctx context.Context, req resource.ReadReques
 		return
 	}
 
-	// An import has no configuration-only values yet.
-	if state.WaitForActive.IsNull() {
-		state.WaitForActive = types.BoolValue(false)
-	}
-
 	resp.Diagnostics.Append(state.fromDomain(out)...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
-// Update has nothing to send: hostname and the parents replace the domain.
-// It reads the domain back, and waits for ACTIVE when wait_for_active is set.
+// Update has nothing to send: hostname and the parents replace the domain,
+// and only timeouts is left to change. It reads the domain back.
 func (r *issuerDomainResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 
 	if !r.configured(&resp.Diagnostics) {
@@ -396,10 +393,6 @@ func (r *issuerDomainResource) Update(ctx context.Context, req resource.UpdateRe
 	if err != nil {
 		resp.Diagnostics.AddError("read issuer domain failed", err.Error())
 		return
-	}
-
-	if plan.WaitForActive.ValueBool() {
-		out = r.waitFor(ctx, out, isActive, "state ACTIVE", &resp.Diagnostics)
 	}
 
 	resp.Diagnostics.Append(plan.fromDomain(out)...)
@@ -443,10 +436,10 @@ func (r *issuerDomainResource) Delete(ctx context.Context, req resource.DeleteRe
 }
 
 // waitGone reads the domain until kit has removed it or ctx ends.
-func (r *issuerDomainResource) waitGone(ctx context.Context, name string, timeout time.Duration, diags *diag.Diagnostics) {
+func (p *issuerDomainPoller) waitGone(ctx context.Context, name string, timeout time.Duration, diags *diag.Diagnostics) {
 
 	for {
-		_, err := r.client.GetIssuerDomain(ctx, name)
+		_, err := p.client.GetIssuerDomain(ctx, name)
 		if aip.IsNotFound(err) {
 			return
 		}
@@ -460,7 +453,7 @@ func (r *issuerDomainResource) waitGone(ctx context.Context, name string, timeou
 				fmt.Sprintf("%s is DELETING after %s: Authwise is removing its certificate and edge entries, and the hostname cannot be claimed again until that finishes. "+
 					"It will finish on its own; raise timeouts.delete to wait longer.", name, timeout))
 			return
-		case <-time.After(r.poll):
+		case <-time.After(p.poll):
 		}
 	}
 }
@@ -581,7 +574,7 @@ func isActive(d *issuerDomain) bool { return d.State == issuerDomainActive }
 
 // waitFor reads the domain until done holds or ctx ends, and returns the
 // last domain read. A FAILED domain ends the wait with its reason.
-func (r *issuerDomainResource) waitFor(ctx context.Context, d *issuerDomain, done func(*issuerDomain) bool, what string, diags *diag.Diagnostics) *issuerDomain {
+func (p *issuerDomainPoller) waitFor(ctx context.Context, d *issuerDomain, done func(*issuerDomain) bool, what string, diags *diag.Diagnostics) *issuerDomain {
 
 	for {
 		if done(d) {
@@ -596,9 +589,9 @@ func (r *issuerDomainResource) waitFor(ctx context.Context, d *issuerDomain, don
 			diags.AddError("timed out waiting for the issuer domain",
 				fmt.Sprintf("%s did not reach %s; it is %s. %s", d.Hostname, what, d.State, issuerDomainHint(d)))
 			return d
-		case <-time.After(r.poll):
+		case <-time.After(p.poll):
 		}
-		next, err := r.client.GetIssuerDomain(ctx, d.Name)
+		next, err := p.client.GetIssuerDomain(ctx, d.Name)
 		if err != nil {
 			if ctx.Err() != nil {
 				continue
