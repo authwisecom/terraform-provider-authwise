@@ -45,8 +45,9 @@ DNS records and nothing else.
 3. **Keep the challenge record for as long as the domain exists.** Renewal
    depends on it. If it goes, the domain moves to `DEGRADED` with
    `failure_record = "challenge"`. It keeps serving until the current
-   certificate expires, and tenant administrators get mail at 30, 14 and 7
-   days before that.
+   certificate expires. Tenant administrators get mail when the domain
+   becomes `DEGRADED`, and again 14 and 7 days before the certificate
+   expires if it still is.
 4. **A subdomain, not an apex.** A CNAME cannot sit at a zone apex, and
    create refuses one with `HOSTNAME_APEX`.
 
