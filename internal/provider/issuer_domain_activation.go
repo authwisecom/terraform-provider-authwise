@@ -29,10 +29,13 @@ var (
 )
 
 // issuerDomainActivationResource is authwise_issuer_domain_activation: the
-// point in an apply where an issuer domain is ACTIVE. It sits between the
-// challenge record (depends_on) and the traffic record (which depends on it),
-// so one apply follows "challenge first, traffic after Active". It owns
-// nothing on the server: create waits, destroy forgets.
+// point in an apply where an issuer domain routes: PROVISIONING (certificate
+// issued, edge entry attached) or ACTIVE. It sits between the challenge
+// record (depends_on) and the traffic record (which depends on it). It does
+// not wait for ACTIVE: kit routes a host from PROVISIONING
+// (CUSTOM_DOMAINS §5.3, §5.5.1), and ACTIVE needs the controller's probe of
+// public DNS, which needs the traffic record, so waiting for it would never
+// end (#46). It owns nothing on the server: create waits, destroy forgets.
 type issuerDomainActivationResource struct {
 	issuerDomainPoller
 }
@@ -60,9 +63,11 @@ func (r *issuerDomainActivationResource) Schema(ctx context.Context, _ resource.
 	}
 
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Waits until an `authwise_issuer_domain` is `ACTIVE`: its certificate is issued and attached. Put it between the domain's two DNS records, " +
-			"with `depends_on` naming the challenge record, and make the traffic record depend on it. One apply then creates the domain and the challenge record, " +
-			"waits for the certificate, and only then points traffic at the hostname, so no request ever meets a missing certificate.\n\n" +
+		MarkdownDescription: "Waits until an `authwise_issuer_domain` routes: `PROVISIONING` or `ACTIVE`, its certificate issued and attached to the hostname. " +
+			"Put it between the domain's two DNS records, with `depends_on` naming the challenge record, and make the traffic record depend on it. One apply then creates " +
+			"the domain and the challenge record, waits for the certificate, and only then points traffic at the hostname, so no request ever meets a missing certificate.\n\n" +
+			"It does not wait for `ACTIVE`. Authwise confirms `ACTIVE` by finding the traffic record in public DNS, so the domain reaches it on the controller's next " +
+			"check once the traffic record has propagated, after this resource is created. `state` says which of the two it saw.\n\n" +
 			"It manages nothing in Authwise. Destroying it only removes it from state; a domain that leaves `ACTIVE` later (`DEGRADED`) is not replaced.",
 		Attributes: map[string]schema.Attribute{
 			issuerDomainAttribute: schema.StringAttribute{
@@ -73,7 +78,7 @@ func (r *issuerDomainActivationResource) Schema(ctx context.Context, _ resource.
 					"must be an issuer domain's name, tenants/{t}/issuers/{i}/issuer-domains/{d}: use authwise_issuer_domain.<name>.name")},
 			},
 			"hostname":               computed("The domain's hostname."),
-			"state":                  computed("The domain's state as last read: `ACTIVE` once created, and whatever it is now after a refresh."),
+			"state":                  computed("The domain's state as last read: `PROVISIONING` or `ACTIVE` once created, and whatever it is now after a refresh."),
 			"certificate_expires_at": computed("When the domain's current certificate expires, RFC 3339."),
 		},
 		Blocks: map[string]schema.Block{
@@ -86,7 +91,7 @@ func (r *issuerDomainActivationResource) Configure(_ context.Context, req resour
 	r.configure(req, &resp.Diagnostics)
 }
 
-// Create waits for ACTIVE. A failed wait saves nothing, so the next apply
+// Create waits for PROVISIONING or ACTIVE. A failed wait saves nothing, so the next apply
 // waits again rather than carrying on as if the domain were serving.
 func (r *issuerDomainActivationResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 
@@ -113,7 +118,7 @@ func (r *issuerDomainActivationResource) Create(ctx context.Context, req resourc
 		resp.Diagnostics.AddAttributeError(path.Root(issuerDomainAttribute), "read issuer domain failed", err.Error())
 		return
 	}
-	if out = r.waitFor(ctx, out, isActive, "state ACTIVE", &resp.Diagnostics); resp.Diagnostics.HasError() {
+	if out = r.waitFor(ctx, out, routes, "state PROVISIONING or ACTIVE", &resp.Diagnostics); resp.Diagnostics.HasError() {
 		return
 	}
 
@@ -183,6 +188,12 @@ func (r *issuerDomainActivationResource) ImportState(ctx context.Context, req re
 	}
 
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root(issuerDomainAttribute), req.ID)...)
+}
+
+// routes holds once kit routes the hostname to the issuer: the certificate is
+// issued and attached, so a traffic record can go in.
+func routes(d *issuerDomain) bool {
+	return d.State == issuerDomainProvisioning || d.State == issuerDomainActive
 }
 
 func (m *issuerDomainActivationModel) fromDomain(d *issuerDomain) {

@@ -1,5 +1,5 @@
 # login.acme.com serves the issuer, with its DNS records on Cloudflare, in
-# one apply that follows "challenge first, traffic after ACTIVE": the
+# one apply that follows "challenge first, traffic after PROVISIONING": the
 # challenge record, then the activation waiting for the certificate, then
 # the traffic record.
 resource "authwise_issuer_domain" "login" {

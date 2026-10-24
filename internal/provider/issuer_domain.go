@@ -184,7 +184,7 @@ func (r *issuerDomainResource) Schema(ctx context.Context, _ resource.SchemaRequ
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "A hostname of yours that serves an issuer, such as `login.acme.com`. Authwise obtains and renews its certificate; you add two DNS records, " +
 			"read from `dns_records`. The issuer keeps answering at its own host as well, and each host is its own issuer URL (`iss`).\n\n" +
-			"Create returns once the records are known, so DNS resources can take them in the same apply. Add the challenge record first and point traffic only once `state` is `ACTIVE`, " +
+			"Create returns once the records are known, so DNS resources can take them in the same apply. Add the challenge record first and point traffic only once `state` is `PROVISIONING` or `ACTIVE`, " +
 			"so the certificate exists before any request arrives: `authwise_issuer_domain_activation` waits for that between the two records, in one apply. Both records must be DNS-only (on Cloudflare, `proxied = false`), and the challenge record stays for as long as the domain does: renewal depends on it.\n\n" +
 			"Destroying the domain waits until Authwise has released the hostname, which takes the cloud side's teardown.",
 		Attributes: map[string]schema.Attribute{
@@ -569,8 +569,6 @@ func issuerDomainFromProto(e *corepb.IssuerDomain) *issuerDomain {
 }
 
 func hasRecords(d *issuerDomain) bool { return len(d.DNSRecords) > 0 }
-
-func isActive(d *issuerDomain) bool { return d.State == issuerDomainActive }
 
 // waitFor reads the domain until done holds or ctx ends, and returns the
 // last domain read. A FAILED domain ends the wait with its reason.

@@ -3,7 +3,7 @@ page_title: "authwise_issuer_domain Resource - Authwise"
 subcategory: "Identity"
 description: |-
   A hostname of yours that serves an issuer, such as login.acme.com. Authwise obtains and renews its certificate; you add two DNS records, read from dns_records. The issuer keeps answering at its own host as well, and each host is its own issuer URL (iss).
-  Create returns once the records are known, so DNS resources can take them in the same apply. Add the challenge record first and point traffic only once state is ACTIVE, so the certificate exists before any request arrives: authwise_issuer_domain_activation waits for that between the two records, in one apply. Both records must be DNS-only (on Cloudflare, proxied = false), and the challenge record stays for as long as the domain does: renewal depends on it.
+  Create returns once the records are known, so DNS resources can take them in the same apply. Add the challenge record first and point traffic only once state is PROVISIONING or ACTIVE, so the certificate exists before any request arrives: authwise_issuer_domain_activation waits for that between the two records, in one apply. Both records must be DNS-only (on Cloudflare, proxied = false), and the challenge record stays for as long as the domain does: renewal depends on it.
   Destroying the domain waits until Authwise has released the hostname, which takes the cloud side's teardown.
 ---
 
@@ -28,7 +28,7 @@ DNS records and nothing else.
 
 ```terraform
 # login.acme.com serves the issuer, with its DNS records on Cloudflare, in
-# one apply that follows "challenge first, traffic after ACTIVE": the
+# one apply that follows "challenge first, traffic after PROVISIONING": the
 # challenge record, then the activation waiting for the certificate, then
 # the traffic record.
 resource "authwise_issuer_domain" "login" {
@@ -70,12 +70,14 @@ resource "cloudflare_record" "login_traffic" {
 
 ## The rules
 
-1. **Challenge first, traffic after `ACTIVE`.** The certificate is issued
-   once the certificate authority sees the `challenge` record, before any
-   request reaches the custom domain. If the `traffic` record goes in only
-   when `state` is `ACTIVE`, nobody ever sees a TLS error. The example does
-   this in one apply: `authwise_issuer_domain_activation` sits between the
-   two records and waits for `ACTIVE`. Creating both records at once also
+1. **Challenge first, traffic after `PROVISIONING`.** The certificate is
+   issued once the certificate authority sees the `challenge` record, before
+   any request reaches the custom domain. From `PROVISIONING` the hostname
+   routes with its certificate, so if the `traffic` record goes in only then,
+   nobody ever sees a TLS error. `ACTIVE` follows once Authwise finds the
+   `traffic` record in public DNS. The example does this in one apply:
+   `authwise_issuer_domain_activation` sits between the two records and waits
+   for `PROVISIONING` or `ACTIVE`. Creating both records at once also
    works; the hostname then fails TLS for the few minutes until the
    certificate exists.
 2. **DNS-only records.** On Cloudflare, `proxied = false` (the grey cloud).
@@ -98,8 +100,11 @@ for the certificate: it can't, because the certificate needs the challenge
 record, and that record needs the domain.
 
 `authwise_issuer_domain_activation` waits instead. Make it depend on the challenge record, and the traffic record on
-it. Its create waits until `state` is `ACTIVE`, up to `timeouts.create` (30
-minutes by default). A `FAILED` domain ends the wait with `failure_code` and
+it. Its create waits until `state` is `PROVISIONING` or `ACTIVE`, up to
+`timeouts.create` (30 minutes by default). It does not wait for `ACTIVE`:
+Authwise confirms that by finding the traffic record in public DNS, so it
+follows on the controller's next check once that record has propagated.
+0.18.0 waited for `ACTIVE`, which never came. A `FAILED` domain ends the wait with `failure_code` and
 `failure_message`, and the traffic record is not created.
 
 In 0.17, `wait_for_active = true` on this resource did the waiting. It is
@@ -124,8 +129,8 @@ naming the issuer.
 |---|---|---|
 | `PENDING_DNS` | Waiting for the challenge record. | Add it, DNS-only. A claim never verified lapses, and its hostname is freed after about a week. |
 | `VERIFYING` | The certificate authority found the challenge record and is issuing the certificate. | Wait. |
-| `PROVISIONING` | The certificate is issued and being attached to the hostname. | Wait. |
-| `ACTIVE` | Serving with its own certificate. | Add the traffic record if you have not. |
+| `PROVISIONING` | The certificate is issued and attached; the hostname routes. | Add the traffic record if you have not; `ACTIVE` follows once it resolves. |
+| `ACTIVE` | Serving with its own certificate, and the traffic record resolves. | Nothing. |
 | `DEGRADED` | Serving, but renewal will fail. | Restore the record named in `failure_record`. |
 | `FAILED` | Issuance stopped. | Fix the cause in `failure_code`, below. |
 | `DELETING` | Being removed. | Wait; the hostname is released when it is gone. |

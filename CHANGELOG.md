@@ -1,3 +1,23 @@
+## 0.18.1 (October 23, 2026)
+
+NOTES:
+
+* **apis v0.39.0, kit v1.53.1, unchanged from 0.18.0.**
+
+BUG FIXES:
+
+* **`authwise_issuer_domain_activation` no longer waits forever (#46).**
+  0.18.0 waited for `ACTIVE`, but a domain reaches `ACTIVE` only once
+  Authwise finds the traffic record in public DNS, and that record waits
+  on the activation, so the apply timed out. Create now returns at
+  `PROVISIONING` or `ACTIVE`: from `PROVISIONING` the certificate is
+  issued and attached and the hostname routes, so the traffic record can
+  go in with no window of TLS errors. `state` says which it saw; `ACTIVE`
+  follows on the controller's next check once the traffic record has
+  propagated. A `FAILED` domain still fails the apply, and the timeouts
+  are unchanged. An apply that timed out under 0.18.0 saved no
+  activation; run it again with 0.18.1.
+
 ## 0.18.0 (October 23, 2026)
 
 NOTES:

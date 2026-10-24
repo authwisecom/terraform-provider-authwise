@@ -29,6 +29,8 @@ import (
 // fakeIssuerDomains plays kit and the domain controller: a created domain
 // has no records until reads have passed recordsAfter, and turns ACTIVE
 // after activeAfter; a deleted one stays DELETING for goneAfter reads.
+// With holdProvisioning it stops at PROVISIONING instead, as a real one
+// does until the controller finds the traffic record in public DNS.
 type fakeIssuerDomains struct {
 	mu      sync.Mutex
 	domains map[string]*issuerDomain
@@ -38,6 +40,8 @@ type fakeIssuerDomains struct {
 	recordsAfter, activeAfter, goneAfter int
 	// fail, when set, is the code a domain fails with instead of issuing.
 	fail string
+	// holdProvisioning keeps an issued domain at PROVISIONING.
+	holdProvisioning bool
 }
 
 func newFakeIssuerDomains() *fakeIssuerDomains {
@@ -84,6 +88,9 @@ func (f *fakeIssuerDomains) GetIssuerDomain(_ context.Context, name string) (*is
 	case n >= f.activeAfter && d.State != issuerDomainActive:
 		exp := time.Date(2027, 1, 19, 0, 0, 0, 0, time.UTC)
 		d.State, d.CertificateExpiresAt = issuerDomainActive, &exp
+		if f.holdProvisioning {
+			d.State = issuerDomainProvisioning
+		}
 	}
 	cp := *d
 	return &cp, nil
@@ -149,7 +156,7 @@ func (p *issuerDomainTestProvider) factories() map[string]func() (tfprotov6.Prov
 // record, the activation waiting on it, and the traffic record waiting on
 // the activation. terraform_data stands in for the DNS provider's record
 // resource; the traffic record carries the activation's state, which shows
-// it was created only once the domain was ACTIVE.
+// it was created only once the domain routed.
 const issuerDomainConfig = `
 resource "authwise_issuer_domain" "login" {
   issuer_id = "i-1"
@@ -208,7 +215,7 @@ func TestIssuerDomainLifecycle(t *testing.T) {
 		},
 		Steps: []tfresource.TestStep{{
 			// One apply: the domain returns with its records, the challenge
-			// record takes them, the activation waits for ACTIVE, and only
+			// record takes them, the activation waits for the domain to route, and only
 			// then is the traffic record created.
 			Config: issuerDomainConfig,
 			ConfigStateChecks: []statecheck.StateCheck{
@@ -273,6 +280,28 @@ func TestIssuerDomainActivationImportPlansNoChange(t *testing.T) {
 	})
 }
 
+// TestIssuerDomainActivationReturnsAtProvisioning: a domain routes from
+// PROVISIONING, and reaches ACTIVE only once the controller finds the
+// traffic record, so the activation must not wait past PROVISIONING (#46).
+func TestIssuerDomainActivationReturnsAtProvisioning(t *testing.T) {
+
+	fake := newFakeIssuerDomains()
+	fake.holdProvisioning = true
+	p := &issuerDomainTestProvider{fake: fake}
+
+	tfresource.UnitTest(t, tfresource.TestCase{
+		ProtoV6ProviderFactories: p.factories(),
+		Steps: []tfresource.TestStep{{
+			Config: issuerDomainConfig,
+			ConfigStateChecks: []statecheck.StateCheck{
+				statecheck.ExpectKnownValue(issuerDomainActivationAddr, tfjsonpath.New("state"), knownvalue.StringExact(issuerDomainProvisioning)),
+				statecheck.ExpectKnownValue("terraform_data.traffic",
+					tfjsonpath.New("output").AtMapKey("after"), knownvalue.StringExact(issuerDomainProvisioning)),
+			},
+		}},
+	})
+}
+
 // TestIssuerDomainFailedSaysWhy: a FAILED domain ends the activation's wait
 // with its reason, and the traffic record is never created.
 func TestIssuerDomainFailedSaysWhy(t *testing.T) {
@@ -326,7 +355,7 @@ func TestIssuerDomainDeleteTimesOutWhileDeleting(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), 20*time.Millisecond)
 	defer cancel()
 	var diags diag.Diagnostics
-	got := r.waitFor(ctx, d, isActive, "state ACTIVE", &diags)
+	got := r.waitFor(ctx, d, routes, "state PROVISIONING or ACTIVE", &diags)
 	if !diags.HasError() || got.State != issuerDomainDeleting {
 		t.Fatalf("expected a timeout on a DELETING domain, got %v (%s)", diags, got.State)
 	}

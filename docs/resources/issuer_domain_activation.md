@@ -3,13 +3,16 @@
 page_title: "authwise_issuer_domain_activation Resource - Authwise"
 subcategory: "Identity"
 description: |-
-  Waits until an authwise_issuer_domain is ACTIVE: its certificate is issued and attached. Put it between the domain's two DNS records, with depends_on naming the challenge record, and make the traffic record depend on it. One apply then creates the domain and the challenge record, waits for the certificate, and only then points traffic at the hostname, so no request ever meets a missing certificate.
+  Waits until an authwise_issuer_domain routes: PROVISIONING or ACTIVE, its certificate issued and attached to the hostname. Put it between the domain's two DNS records, with depends_on naming the challenge record, and make the traffic record depend on it. One apply then creates the domain and the challenge record, waits for the certificate, and only then points traffic at the hostname, so no request ever meets a missing certificate.
+  It does not wait for ACTIVE. Authwise confirms ACTIVE by finding the traffic record in public DNS, so the domain reaches it on the controller's next check once the traffic record has propagated, after this resource is created. state says which of the two it saw.
   It manages nothing in Authwise. Destroying it only removes it from state; a domain that leaves ACTIVE later (DEGRADED) is not replaced.
 ---
 
 # authwise_issuer_domain_activation (Resource)
 
-Waits until an `authwise_issuer_domain` is `ACTIVE`: its certificate is issued and attached. Put it between the domain's two DNS records, with `depends_on` naming the challenge record, and make the traffic record depend on it. One apply then creates the domain and the challenge record, waits for the certificate, and only then points traffic at the hostname, so no request ever meets a missing certificate.
+Waits until an `authwise_issuer_domain` routes: `PROVISIONING` or `ACTIVE`, its certificate issued and attached to the hostname. Put it between the domain's two DNS records, with `depends_on` naming the challenge record, and make the traffic record depend on it. One apply then creates the domain and the challenge record, waits for the certificate, and only then points traffic at the hostname, so no request ever meets a missing certificate.
+
+It does not wait for `ACTIVE`. Authwise confirms `ACTIVE` by finding the traffic record in public DNS, so the domain reaches it on the controller's next check once the traffic record has propagated, after this resource is created. `state` says which of the two it saw.
 
 It manages nothing in Authwise. Destroying it only removes it from state; a domain that leaves `ACTIVE` later (`DEGRADED`) is not replaced.
 
@@ -17,7 +20,7 @@ It manages nothing in Authwise. Destroying it only removes it from state; a doma
 
 ```terraform
 # login.acme.com serves the issuer, with its DNS records on Cloudflare, in
-# one apply that follows "challenge first, traffic after ACTIVE": the
+# one apply that follows "challenge first, traffic after PROVISIONING": the
 # challenge record, then the activation waiting for the certificate, then
 # the traffic record.
 resource "authwise_issuer_domain" "login" {
@@ -72,7 +75,7 @@ resource "cloudflare_record" "login_traffic" {
 
 - `certificate_expires_at` (String) When the domain's current certificate expires, RFC 3339.
 - `hostname` (String) The domain's hostname.
-- `state` (String) The domain's state as last read: `ACTIVE` once created, and whatever it is now after a refresh.
+- `state` (String) The domain's state as last read: `PROVISIONING` or `ACTIVE` once created, and whatever it is now after a refresh.
 
 <a id="nestedblock--timeouts"></a>
 ### Nested Schema for `timeouts`
