@@ -26,9 +26,13 @@ data "authwise_issuer_config" "this" {
   }
 }
 
+resource "authwise_domain" "this" {
+  hostname = "login.example.com"
+}
+
 resource "authwise_issuer" "this" {
-  domain_name = "login.example.com"
-  config      = data.authwise_issuer_config.this.json
+  domain_id = authwise_domain.this.domain_id
+  config    = data.authwise_issuer_config.this.json
 }
 ```
 

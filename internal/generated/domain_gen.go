@@ -9,6 +9,7 @@ import (
 	v1alpha1 "git.authwise.com/authwise/apis/authwise/types/core/v1alpha1"
 	tf "github.com/activatedio/tfinfra/pkg/tf"
 	jsontypes "github.com/hashicorp/terraform-plugin-framework-jsontypes/jsontypes"
+	stringvalidator "github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	attr "github.com/hashicorp/terraform-plugin-framework/attr"
 	datasource "github.com/hashicorp/terraform-plugin-framework/datasource"
 	schema1 "github.com/hashicorp/terraform-plugin-framework/datasource/schema"
@@ -16,19 +17,39 @@ import (
 	path "github.com/hashicorp/terraform-plugin-framework/path"
 	resource "github.com/hashicorp/terraform-plugin-framework/resource"
 	schema "github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	listplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	mapplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
+	objectplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/objectplanmodifier"
 	planmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	stringplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	validator "github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
+	basetypes "github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	protojson "google.golang.org/protobuf/encoding/protojson"
 	fieldmaskpb "google.golang.org/protobuf/types/known/fieldmaskpb"
+	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
+	"time"
 )
 
 // DomainResourceSchema returns the Terraform schema for the Domain resource.
 func DomainResourceSchema() schema.Schema {
 	return schema.Schema{
 		Attributes: map[string]schema.Attribute{
+			"activated_at": schema.StringAttribute{
+				Computed:            true,
+				MarkdownDescription: "`activated_at` as an RFC 3339 timestamp.",
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
+			"certificate_expires_at": schema.StringAttribute{
+				Computed:            true,
+				MarkdownDescription: "`certificate_expires_at` as an RFC 3339 timestamp.",
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
+			"claim_expires_at": schema.StringAttribute{
+				Computed:            true,
+				MarkdownDescription: "`claim_expires_at` as an RFC 3339 timestamp.",
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
 			"config": schema.StringAttribute{
 				Computed:            true,
 				CustomType:          jsontypes.NormalizedType{},
@@ -36,10 +57,66 @@ func DomainResourceSchema() schema.Schema {
 				Optional:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
+			"created_at": schema.StringAttribute{
+				Computed:            true,
+				MarkdownDescription: "`created_at` as an RFC 3339 timestamp.",
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
+			"dns_records": schema.ListNestedAttribute{
+				Computed: true,
+				NestedObject: schema.NestedAttributeObject{Attributes: map[string]schema.Attribute{
+					"name": schema.StringAttribute{
+						Computed: true,
+						Optional: true,
+					},
+					"purpose": schema.StringAttribute{
+						Computed: true,
+						Optional: true,
+					},
+					"type": schema.StringAttribute{
+						Computed: true,
+						Optional: true,
+					},
+					"value": schema.StringAttribute{
+						Computed: true,
+						Optional: true,
+					},
+				}},
+				PlanModifiers: []planmodifier.List{listplanmodifier.UseStateForUnknown()},
+			},
 			"domain_id": schema.StringAttribute{
-				MarkdownDescription: "Caller-assigned resource id — the last segment of `name`, which the server composes from the parent and this id. Changing it replaces the resource.",
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
-				Required:            true,
+				Computed:            true,
+				MarkdownDescription: "Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.",
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
+			"failure": schema.SingleNestedAttribute{
+				Attributes: map[string]schema.Attribute{
+					"code": schema.StringAttribute{
+						Computed:   true,
+						Optional:   true,
+						Validators: []validator.String{stringvalidator.OneOf("ISSUER_DOMAIN_FAILURE_CODE_UNSPECIFIED", "ISSUER_DOMAIN_FAILURE_CODE_DNS_NOT_FOUND", "ISSUER_DOMAIN_FAILURE_CODE_CAA", "ISSUER_DOMAIN_FAILURE_CODE_CONFIG", "ISSUER_DOMAIN_FAILURE_CODE_RATE_LIMITED", "ISSUER_DOMAIN_FAILURE_CODE_PROBE_FAILED", "ISSUER_DOMAIN_FAILURE_CODE_PROVIDER_ERROR")},
+					},
+					"message": schema.StringAttribute{
+						Computed: true,
+						Optional: true,
+					},
+					"record": schema.StringAttribute{
+						Computed: true,
+						Optional: true,
+					},
+				},
+				Computed:      true,
+				PlanModifiers: []planmodifier.Object{objectplanmodifier.UseStateForUnknown()},
+			},
+			"hostname": schema.StringAttribute{
+				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Required:      true,
+			},
+			"issuer_id": schema.StringAttribute{
+				Computed:      true,
+				Optional:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace(), stringplanmodifier.UseStateForUnknown()},
+				Validators:    []validator.String{tf.ReferenceID("i", "issuer", "authwise_issuer.<name>.issuer_id")},
 			},
 			"labels": schema.MapAttribute{
 				Computed:      true,
@@ -52,6 +129,11 @@ func DomainResourceSchema() schema.Schema {
 				MarkdownDescription: "Full resource name; serves as the Terraform ID.",
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
+			"state": schema.StringAttribute{
+				Computed:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+				Validators:    []validator.String{stringvalidator.OneOf("ISSUER_DOMAIN_STATE_UNSPECIFIED", "ISSUER_DOMAIN_STATE_PENDING_DNS", "ISSUER_DOMAIN_STATE_VERIFYING", "ISSUER_DOMAIN_STATE_PROVISIONING", "ISSUER_DOMAIN_STATE_ACTIVE", "ISSUER_DOMAIN_STATE_DEGRADED", "ISSUER_DOMAIN_STATE_FAILED", "ISSUER_DOMAIN_STATE_DELETING", "ISSUER_DOMAIN_STATE_DELETED")},
+			},
 			"tenant_id": schema.StringAttribute{
 				Computed:            true,
 				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default, and reads back from the name. Changing a configured one replaces the resource.",
@@ -59,28 +141,86 @@ func DomainResourceSchema() schema.Schema {
 				PlanModifiers:       []planmodifier.String{tf.RequiresReplaceIfConfigured(), stringplanmodifier.UseStateForUnknown()},
 				Validators:          []validator.String{tf.ReferenceID("t", "tenant", "")},
 			},
+			"traffic_target": schema.StringAttribute{
+				Computed:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
 		},
-		MarkdownDescription: "A domain the tenant serves logins on. The id is the domain name itself.",
+		MarkdownDescription: "A hostname the tenant serves logins on: native (no `issuer_id`), the host an issuer names, or custom (`issuer_id` set), a hostname of yours serving that issuer.",
+	}
+}
+
+// DomainDnsRecordsModel is the Terraform model for Domain's "dns_records" nested attribute.
+type DomainDnsRecordsModel struct {
+	Name    types.String `tfsdk:"name"`
+	Type    types.String `tfsdk:"type"`
+	Value   types.String `tfsdk:"value"`
+	Purpose types.String `tfsdk:"purpose"`
+}
+
+// DomainDnsRecordsAttrTypes returns the attribute types of the "dns_records" nested attribute.
+func DomainDnsRecordsAttrTypes() map[string]attr.Type {
+	return map[string]attr.Type{
+		"name":    types.StringType,
+		"purpose": types.StringType,
+		"type":    types.StringType,
+		"value":   types.StringType,
+	}
+}
+
+// DomainFailureModel is the Terraform model for Domain's "failure" nested attribute.
+type DomainFailureModel struct {
+	Code    types.String `tfsdk:"code"`
+	Message types.String `tfsdk:"message"`
+	Record  types.String `tfsdk:"record"`
+}
+
+// DomainFailureAttrTypes returns the attribute types of the "failure" nested attribute.
+func DomainFailureAttrTypes() map[string]attr.Type {
+	return map[string]attr.Type{
+		"code":    types.StringType,
+		"message": types.StringType,
+		"record":  types.StringType,
 	}
 }
 
 // DomainModel is the Terraform plan/state model for Domain.
 type DomainModel struct {
-	Name     types.String         `tfsdk:"name"`
-	DomainId types.String         `tfsdk:"domain_id"`
-	TenantId types.String         `tfsdk:"tenant_id"`
-	Labels   types.Map            `tfsdk:"labels"`
-	Config   jsontypes.Normalized `tfsdk:"config"`
+	Name                 types.String         `tfsdk:"name"`
+	DomainId             types.String         `tfsdk:"domain_id"`
+	TenantId             types.String         `tfsdk:"tenant_id"`
+	Labels               types.Map            `tfsdk:"labels"`
+	Config               jsontypes.Normalized `tfsdk:"config"`
+	Hostname             types.String         `tfsdk:"hostname"`
+	IssuerId             types.String         `tfsdk:"issuer_id"`
+	State                types.String         `tfsdk:"state"`
+	DnsRecords           types.List           `tfsdk:"dns_records"`
+	Failure              types.Object         `tfsdk:"failure"`
+	CertificateExpiresAt types.String         `tfsdk:"certificate_expires_at"`
+	ActivatedAt          types.String         `tfsdk:"activated_at"`
+	ClaimExpiresAt       types.String         `tfsdk:"claim_expires_at"`
+	CreatedAt            types.String         `tfsdk:"created_at"`
+	TrafficTarget        types.String         `tfsdk:"traffic_target"`
 }
 
 // NewDomainModel returns a model with every attribute set to its typed null; collection types cannot be zero-valued.
 func NewDomainModel() *DomainModel {
 	return &DomainModel{
-		Config:   jsontypes.NewNormalizedNull(),
-		DomainId: types.StringNull(),
-		Labels:   types.MapNull(types.StringType),
-		Name:     types.StringNull(),
-		TenantId: types.StringNull(),
+		ActivatedAt:          types.StringNull(),
+		CertificateExpiresAt: types.StringNull(),
+		ClaimExpiresAt:       types.StringNull(),
+		Config:               jsontypes.NewNormalizedNull(),
+		CreatedAt:            types.StringNull(),
+		DnsRecords:           types.ListNull(types.ObjectType{AttrTypes: DomainDnsRecordsAttrTypes()}),
+		DomainId:             types.StringNull(),
+		Failure:              types.ObjectNull(DomainFailureAttrTypes()),
+		Hostname:             types.StringNull(),
+		IssuerId:             types.StringNull(),
+		Labels:               types.MapNull(types.StringType),
+		Name:                 types.StringNull(),
+		State:                types.StringNull(),
+		TenantId:             types.StringNull(),
+		TrafficTarget:        types.StringNull(),
 	}
 }
 
@@ -100,6 +240,67 @@ func (m *DomainModel) ToProto(ctx context.Context) (*v1alpha1.Domain, diag.Diagn
 			out.Config = v
 		}
 	}
+	out.Hostname = m.Hostname.ValueString()
+	out.IssuerId = m.IssuerId.ValueString()
+	if !m.State.IsNull() && !m.State.IsUnknown() {
+		out.State = v1alpha1.IssuerDomainState(v1alpha1.IssuerDomainState_value[m.State.ValueString()])
+	}
+	if !m.DnsRecords.IsNull() && !m.DnsRecords.IsUnknown() {
+		var items []DomainDnsRecordsModel
+		diags.Append(m.DnsRecords.ElementsAs(ctx, &items, false)...)
+		for _, n := range items {
+			v := &v1alpha1.IssuerDomainDnsRecord{}
+			v.Name = n.Name.ValueString()
+			v.Type = n.Type.ValueString()
+			v.Value = n.Value.ValueString()
+			v.Purpose = n.Purpose.ValueString()
+			out.DnsRecords = append(out.DnsRecords, v)
+		}
+	}
+	if !m.Failure.IsNull() && !m.Failure.IsUnknown() {
+		var n DomainFailureModel
+		diags.Append(m.Failure.As(ctx, &n, basetypes.ObjectAsOptions{})...)
+		v := &v1alpha1.IssuerDomainFailure{}
+		if !n.Code.IsNull() && !n.Code.IsUnknown() {
+			v.Code = v1alpha1.IssuerDomainFailureCode(v1alpha1.IssuerDomainFailureCode_value[n.Code.ValueString()])
+		}
+		v.Message = n.Message.ValueString()
+		v.Record = n.Record.ValueString()
+		out.Failure = v
+	}
+	if !m.CertificateExpiresAt.IsNull() && !m.CertificateExpiresAt.IsUnknown() {
+		t, err := time.Parse(time.RFC3339, m.CertificateExpiresAt.ValueString())
+		if err != nil {
+			diags.AddAttributeError(path.Root("certificate_expires_at"), "invalid RFC 3339 timestamp", err.Error())
+		} else {
+			out.CertificateExpiresAt = timestamppb.New(t)
+		}
+	}
+	if !m.ActivatedAt.IsNull() && !m.ActivatedAt.IsUnknown() {
+		t, err := time.Parse(time.RFC3339, m.ActivatedAt.ValueString())
+		if err != nil {
+			diags.AddAttributeError(path.Root("activated_at"), "invalid RFC 3339 timestamp", err.Error())
+		} else {
+			out.ActivatedAt = timestamppb.New(t)
+		}
+	}
+	if !m.ClaimExpiresAt.IsNull() && !m.ClaimExpiresAt.IsUnknown() {
+		t, err := time.Parse(time.RFC3339, m.ClaimExpiresAt.ValueString())
+		if err != nil {
+			diags.AddAttributeError(path.Root("claim_expires_at"), "invalid RFC 3339 timestamp", err.Error())
+		} else {
+			out.ClaimExpiresAt = timestamppb.New(t)
+		}
+	}
+	if !m.CreatedAt.IsNull() && !m.CreatedAt.IsUnknown() {
+		t, err := time.Parse(time.RFC3339, m.CreatedAt.ValueString())
+		if err != nil {
+			diags.AddAttributeError(path.Root("created_at"), "invalid RFC 3339 timestamp", err.Error())
+		} else {
+			out.CreatedAt = timestamppb.New(t)
+		}
+	}
+	out.TrafficTarget = m.TrafficTarget.ValueString()
 	return out, diags
 }
 
@@ -126,6 +327,97 @@ func (m *DomainModel) FromProto(ctx context.Context, e *v1alpha1.Domain) diag.Di
 			m.Config = jsontypes.NewNormalizedValue(string(b))
 		}
 	}
+	m.Hostname = types.StringValue(e.Hostname)
+	if e.IssuerId == "" {
+		m.IssuerId = types.StringNull()
+	} else {
+		m.IssuerId = types.StringValue(e.IssuerId)
+	}
+	m.State = tf.EnumValue(m.State, int32(e.State), e.State.String())
+	if len(e.DnsRecords) == 0 {
+		if !tf.KeepEmpty(m.DnsRecords) {
+			m.DnsRecords = types.ListNull(types.ObjectType{AttrTypes: DomainDnsRecordsAttrTypes()})
+		}
+	} else {
+		var prior []DomainDnsRecordsModel
+		if !m.DnsRecords.IsNull() && !m.DnsRecords.IsUnknown() {
+			diags.Append(m.DnsRecords.ElementsAs(ctx, &prior, false)...)
+		}
+		items := make([]DomainDnsRecordsModel, len(e.DnsRecords))
+		for i, el := range e.DnsRecords {
+			var n DomainDnsRecordsModel
+			if i < len(prior) {
+				n = prior[i]
+			}
+			n.Name = types.StringValue(el.Name)
+			if el.Type == "" {
+				n.Type = types.StringNull()
+			} else {
+				n.Type = types.StringValue(el.Type)
+			}
+			if el.Value == "" {
+				n.Value = types.StringNull()
+			} else {
+				n.Value = types.StringValue(el.Value)
+			}
+			if el.Purpose == "" {
+				n.Purpose = types.StringNull()
+			} else {
+				n.Purpose = types.StringValue(el.Purpose)
+			}
+			items[i] = n
+		}
+		list, d := types.ListValueFrom(ctx, types.ObjectType{AttrTypes: DomainDnsRecordsAttrTypes()}, items)
+		diags.Append(d...)
+		m.DnsRecords = list
+	}
+	if e.Failure == nil {
+		m.Failure = types.ObjectNull(DomainFailureAttrTypes())
+	} else {
+		var n DomainFailureModel
+		if !m.Failure.IsNull() && !m.Failure.IsUnknown() {
+			diags.Append(m.Failure.As(ctx, &n, basetypes.ObjectAsOptions{})...)
+		}
+		n.Code = tf.EnumValue(n.Code, int32(e.Failure.Code), e.Failure.Code.String())
+		if e.Failure.Message == "" {
+			n.Message = types.StringNull()
+		} else {
+			n.Message = types.StringValue(e.Failure.Message)
+		}
+		if e.Failure.Record == "" {
+			n.Record = types.StringNull()
+		} else {
+			n.Record = types.StringValue(e.Failure.Record)
+		}
+		obj, d := types.ObjectValueFrom(ctx, DomainFailureAttrTypes(), n)
+		diags.Append(d...)
+		m.Failure = obj
+	}
+	if e.CertificateExpiresAt == nil {
+		m.CertificateExpiresAt = types.StringNull()
+	} else {
+		m.CertificateExpiresAt = types.StringValue(e.CertificateExpiresAt.AsTime().Format(time.RFC3339))
+	}
+	if e.ActivatedAt == nil {
+		m.ActivatedAt = types.StringNull()
+	} else {
+		m.ActivatedAt = types.StringValue(e.ActivatedAt.AsTime().Format(time.RFC3339))
+	}
+	if e.ClaimExpiresAt == nil {
+		m.ClaimExpiresAt = types.StringNull()
+	} else {
+		m.ClaimExpiresAt = types.StringValue(e.ClaimExpiresAt.AsTime().Format(time.RFC3339))
+	}
+	if e.CreatedAt == nil {
+		m.CreatedAt = types.StringNull()
+	} else {
+		m.CreatedAt = types.StringValue(e.CreatedAt.AsTime().Format(time.RFC3339))
+	}
+	if e.TrafficTarget == "" {
+		m.TrafficTarget = types.StringNull()
+	} else {
+		m.TrafficTarget = types.StringValue(e.TrafficTarget)
+	}
 	return diags
 }
 
@@ -150,6 +442,12 @@ func (m *DomainModel) UpdateMask(ctx context.Context, prior *DomainModel) []stri
 			paths = append(paths, "config")
 		}
 	}
+	if !m.Hostname.Equal(prior.Hostname) {
+		paths = append(paths, "hostname")
+	}
+	if !m.IssuerId.Equal(prior.IssuerId) {
+		paths = append(paths, "issuer_id")
+	}
 	return paths
 }
 
@@ -170,7 +468,6 @@ func newDomainCrud(providerData any) (*tf.Crud[*v1alpha1.Domain, *DomainModel], 
 		return nil, diags
 	}
 	return tf.NewCrud(tf.CrudParams[*v1alpha1.Domain, *DomainModel]{
-		CallerNamed: true,
 		Client: tf.CrudClient[*v1alpha1.Domain]{
 			Create: func(ctx context.Context, parent string, entity *v1alpha1.Domain) (*v1alpha1.Domain, error) {
 				return client.CreateDomain(ctx, &v1alpha11.CreateDomainRequest{
@@ -279,14 +576,37 @@ func (r *domainResource) ImportState(ctx context.Context, req resource.ImportSta
 func DomainDataSourceSchema() schema1.Schema {
 	return schema1.Schema{
 		Attributes: map[string]schema1.Attribute{
+			"activated_at":           schema1.StringAttribute{Computed: true},
+			"certificate_expires_at": schema1.StringAttribute{Computed: true},
+			"claim_expires_at":       schema1.StringAttribute{Computed: true},
 			"config": schema1.StringAttribute{
 				Computed:   true,
 				CustomType: jsontypes.NormalizedType{},
 			},
+			"created_at": schema1.StringAttribute{Computed: true},
+			"dns_records": schema1.ListNestedAttribute{
+				Computed: true,
+				NestedObject: schema1.NestedAttributeObject{Attributes: map[string]schema1.Attribute{
+					"name":    schema1.StringAttribute{Computed: true},
+					"purpose": schema1.StringAttribute{Computed: true},
+					"type":    schema1.StringAttribute{Computed: true},
+					"value":   schema1.StringAttribute{Computed: true},
+				}},
+			},
 			"domain_id": schema1.StringAttribute{
 				Computed:            true,
-				MarkdownDescription: "Caller-assigned resource id — the last segment of `name`.",
+				MarkdownDescription: "Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.",
 			},
+			"failure": schema1.SingleNestedAttribute{
+				Attributes: map[string]schema1.Attribute{
+					"code":    schema1.StringAttribute{Computed: true},
+					"message": schema1.StringAttribute{Computed: true},
+					"record":  schema1.StringAttribute{Computed: true},
+				},
+				Computed: true,
+			},
+			"hostname":  schema1.StringAttribute{Computed: true},
+			"issuer_id": schema1.StringAttribute{Computed: true},
 			"labels": schema1.MapAttribute{
 				Computed:    true,
 				ElementType: types.StringType,
@@ -295,9 +615,11 @@ func DomainDataSourceSchema() schema1.Schema {
 				MarkdownDescription: "Full resource name of the object to read.",
 				Required:            true,
 			},
-			"tenant_id": schema1.StringAttribute{Computed: true},
+			"state":          schema1.StringAttribute{Computed: true},
+			"tenant_id":      schema1.StringAttribute{Computed: true},
+			"traffic_target": schema1.StringAttribute{Computed: true},
 		},
-		MarkdownDescription: "A domain the tenant serves logins on. The id is the domain name itself. This data source reads one by its full resource name.",
+		MarkdownDescription: "A hostname the tenant serves logins on: native (no `issuer_id`), the host an issuer names, or custom (`issuer_id` set), a hostname of yours serving that issuer. This data source reads one by its full resource name.",
 	}
 }
 
@@ -331,19 +653,39 @@ func (d *domainDataSource) Read(ctx context.Context, req datasource.ReadRequest,
 
 // DomainItemModel is one element of the domains data source's "domains" list.
 type DomainItemModel struct {
-	DomainId types.String         `tfsdk:"domain_id"`
-	Name     types.String         `tfsdk:"name"`
-	Labels   types.Map            `tfsdk:"labels"`
-	Config   jsontypes.Normalized `tfsdk:"config"`
+	DomainId             types.String         `tfsdk:"domain_id"`
+	Name                 types.String         `tfsdk:"name"`
+	Labels               types.Map            `tfsdk:"labels"`
+	Config               jsontypes.Normalized `tfsdk:"config"`
+	Hostname             types.String         `tfsdk:"hostname"`
+	IssuerId             types.String         `tfsdk:"issuer_id"`
+	State                types.String         `tfsdk:"state"`
+	DnsRecords           types.List           `tfsdk:"dns_records"`
+	Failure              types.Object         `tfsdk:"failure"`
+	CertificateExpiresAt types.String         `tfsdk:"certificate_expires_at"`
+	ActivatedAt          types.String         `tfsdk:"activated_at"`
+	ClaimExpiresAt       types.String         `tfsdk:"claim_expires_at"`
+	CreatedAt            types.String         `tfsdk:"created_at"`
+	TrafficTarget        types.String         `tfsdk:"traffic_target"`
 }
 
 // DomainItemAttrTypes returns the attribute types of one domains list element.
 func DomainItemAttrTypes() map[string]attr.Type {
 	return map[string]attr.Type{
-		"config":    jsontypes.NormalizedType{},
-		"domain_id": types.StringType,
-		"labels":    types.MapType{ElemType: types.StringType},
-		"name":      types.StringType,
+		"activated_at":           types.StringType,
+		"certificate_expires_at": types.StringType,
+		"claim_expires_at":       types.StringType,
+		"config":                 jsontypes.NormalizedType{},
+		"created_at":             types.StringType,
+		"dns_records":            types.ListType{ElemType: types.ObjectType{AttrTypes: DomainDnsRecordsAttrTypes()}},
+		"domain_id":              types.StringType,
+		"failure":                types.ObjectType{AttrTypes: DomainFailureAttrTypes()},
+		"hostname":               types.StringType,
+		"issuer_id":              types.StringType,
+		"labels":                 types.MapType{ElemType: types.StringType},
+		"name":                   types.StringType,
+		"state":                  types.StringType,
+		"traffic_target":         types.StringType,
 	}
 }
 
@@ -361,14 +703,37 @@ func DomainListDataSourceSchema() schema1.Schema {
 				Computed:            true,
 				MarkdownDescription: "Every domain under the parent, in the order the API lists them.",
 				NestedObject: schema1.NestedAttributeObject{Attributes: map[string]schema1.Attribute{
+					"activated_at":           schema1.StringAttribute{Computed: true},
+					"certificate_expires_at": schema1.StringAttribute{Computed: true},
+					"claim_expires_at":       schema1.StringAttribute{Computed: true},
 					"config": schema1.StringAttribute{
 						Computed:   true,
 						CustomType: jsontypes.NormalizedType{},
 					},
+					"created_at": schema1.StringAttribute{Computed: true},
+					"dns_records": schema1.ListNestedAttribute{
+						Computed: true,
+						NestedObject: schema1.NestedAttributeObject{Attributes: map[string]schema1.Attribute{
+							"name":    schema1.StringAttribute{Computed: true},
+							"purpose": schema1.StringAttribute{Computed: true},
+							"type":    schema1.StringAttribute{Computed: true},
+							"value":   schema1.StringAttribute{Computed: true},
+						}},
+					},
 					"domain_id": schema1.StringAttribute{
 						Computed:            true,
-						MarkdownDescription: "Caller-assigned resource id — the last segment of `name`.",
+						MarkdownDescription: "Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.",
 					},
+					"failure": schema1.SingleNestedAttribute{
+						Attributes: map[string]schema1.Attribute{
+							"code":    schema1.StringAttribute{Computed: true},
+							"message": schema1.StringAttribute{Computed: true},
+							"record":  schema1.StringAttribute{Computed: true},
+						},
+						Computed: true,
+					},
+					"hostname":  schema1.StringAttribute{Computed: true},
+					"issuer_id": schema1.StringAttribute{Computed: true},
 					"labels": schema1.MapAttribute{
 						Computed:    true,
 						ElementType: types.StringType,
@@ -377,6 +742,8 @@ func DomainListDataSourceSchema() schema1.Schema {
 						Computed:            true,
 						MarkdownDescription: "Full resource name.",
 					},
+					"state":          schema1.StringAttribute{Computed: true},
+					"traffic_target": schema1.StringAttribute{Computed: true},
 				}},
 			},
 			"tenant_id": schema1.StringAttribute{
@@ -385,7 +752,7 @@ func DomainListDataSourceSchema() schema1.Schema {
 				Validators:          []validator.String{tf.ReferenceID("t", "tenant", "")},
 			},
 		},
-		MarkdownDescription: "A domain the tenant serves logins on. The id is the domain name itself. This data source lists every one under a parent.",
+		MarkdownDescription: "A hostname the tenant serves logins on: native (no `issuer_id`), the host an issuer names, or custom (`issuer_id` set), a hostname of yours serving that issuer. This data source lists every one under a parent.",
 	}
 }
 
@@ -412,6 +779,97 @@ func domainItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Domain, *D
 		} else {
 			item.Config = jsontypes.NewNormalizedValue(string(b))
 		}
+	}
+	item.Hostname = types.StringValue(e.Hostname)
+	if e.IssuerId == "" {
+		item.IssuerId = types.StringNull()
+	} else {
+		item.IssuerId = types.StringValue(e.IssuerId)
+	}
+	item.State = tf.EnumValue(item.State, int32(e.State), e.State.String())
+	if len(e.DnsRecords) == 0 {
+		if !tf.KeepEmpty(item.DnsRecords) {
+			item.DnsRecords = types.ListNull(types.ObjectType{AttrTypes: DomainDnsRecordsAttrTypes()})
+		}
+	} else {
+		var prior []DomainDnsRecordsModel
+		if !item.DnsRecords.IsNull() && !item.DnsRecords.IsUnknown() {
+			diags.Append(item.DnsRecords.ElementsAs(ctx, &prior, false)...)
+		}
+		items := make([]DomainDnsRecordsModel, len(e.DnsRecords))
+		for i, el := range e.DnsRecords {
+			var n DomainDnsRecordsModel
+			if i < len(prior) {
+				n = prior[i]
+			}
+			n.Name = types.StringValue(el.Name)
+			if el.Type == "" {
+				n.Type = types.StringNull()
+			} else {
+				n.Type = types.StringValue(el.Type)
+			}
+			if el.Value == "" {
+				n.Value = types.StringNull()
+			} else {
+				n.Value = types.StringValue(el.Value)
+			}
+			if el.Purpose == "" {
+				n.Purpose = types.StringNull()
+			} else {
+				n.Purpose = types.StringValue(el.Purpose)
+			}
+			items[i] = n
+		}
+		list, d := types.ListValueFrom(ctx, types.ObjectType{AttrTypes: DomainDnsRecordsAttrTypes()}, items)
+		diags.Append(d...)
+		item.DnsRecords = list
+	}
+	if e.Failure == nil {
+		item.Failure = types.ObjectNull(DomainFailureAttrTypes())
+	} else {
+		var n DomainFailureModel
+		if !item.Failure.IsNull() && !item.Failure.IsUnknown() {
+			diags.Append(item.Failure.As(ctx, &n, basetypes.ObjectAsOptions{})...)
+		}
+		n.Code = tf.EnumValue(n.Code, int32(e.Failure.Code), e.Failure.Code.String())
+		if e.Failure.Message == "" {
+			n.Message = types.StringNull()
+		} else {
+			n.Message = types.StringValue(e.Failure.Message)
+		}
+		if e.Failure.Record == "" {
+			n.Record = types.StringNull()
+		} else {
+			n.Record = types.StringValue(e.Failure.Record)
+		}
+		obj, d := types.ObjectValueFrom(ctx, DomainFailureAttrTypes(), n)
+		diags.Append(d...)
+		item.Failure = obj
+	}
+	if e.CertificateExpiresAt == nil {
+		item.CertificateExpiresAt = types.StringNull()
+	} else {
+		item.CertificateExpiresAt = types.StringValue(e.CertificateExpiresAt.AsTime().Format(time.RFC3339))
+	}
+	if e.ActivatedAt == nil {
+		item.ActivatedAt = types.StringNull()
+	} else {
+		item.ActivatedAt = types.StringValue(e.ActivatedAt.AsTime().Format(time.RFC3339))
+	}
+	if e.ClaimExpiresAt == nil {
+		item.ClaimExpiresAt = types.StringNull()
+	} else {
+		item.ClaimExpiresAt = types.StringValue(e.ClaimExpiresAt.AsTime().Format(time.RFC3339))
+	}
+	if e.CreatedAt == nil {
+		item.CreatedAt = types.StringNull()
+	} else {
+		item.CreatedAt = types.StringValue(e.CreatedAt.AsTime().Format(time.RFC3339))
+	}
+	if e.TrafficTarget == "" {
+		item.TrafficTarget = types.StringNull()
+	} else {
+		item.TrafficTarget = types.StringValue(e.TrafficTarget)
 	}
 	id, err := crud.IDFromName(e.Name)
 	if err != nil {

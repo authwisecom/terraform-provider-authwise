@@ -67,8 +67,12 @@ func TestAccEndpoint_Check(t *testing.T) {
 	_ = down.Close()
 
 	config := h.providerConfig() + fmt.Sprintf(`
+resource "authwise_domain" "internal" {
+  hostname = "auth.example.com"
+}
+
 resource "authwise_issuer" "internal" {
-  domain_name = "auth.example.com"
+  domain_id = authwise_domain.internal.domain_id
 }
 
 resource "authwise_endpoint" "up" {

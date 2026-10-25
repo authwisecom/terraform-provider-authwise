@@ -400,9 +400,8 @@ func domainSchema(ctx context.Context) schema.Schema {
 		// 1 is kit#808's shape: the AWID as domain_id and the hostname
 		// beside it. 0 keyed the domain by its hostname, in domain_id.
 		Version: 1,
-		MarkdownDescription: "A hostname the tenant serves logins on, of one of two kinds.\n\n" +
-			"- **Native** (no `issuer_id`): an Authwise host such as `acme.id.authwise.com`. An issuer names it as its host (`authwise_issuer.domain_id`).\n" +
-			"- **Custom** (`issuer_id` set): a hostname of yours that serves that issuer, such as `login.acme.com`. Authwise obtains and renews its certificate; you add two DNS records, " +
+		MarkdownDescription: "A hostname the tenant serves logins on. A native host (no `issuer_id`) is an Authwise host such as `acme.id.authwise.com`, which an issuer names as its host (`authwise_issuer.domain_id`). " +
+			"A custom host (`issuer_id` set) is a hostname of yours that serves that issuer, such as `login.acme.com`: Authwise obtains and renews its certificate, and you add two DNS records, " +
 			"read from `dns_records`. The issuer keeps answering at its own host as well, and each host is its own issuer URL (`iss`).\n\n" +
 			"For a custom host, create returns once the records are known, so DNS resources can take them in the same apply. Add the challenge record first and point traffic only once `state` is `PROVISIONING` or `ACTIVE`, " +
 			"so the certificate exists before any request arrives: `authwise_domain_activation` waits for that between the two records, in one apply. Both records must be DNS-only (on Cloudflare, `proxied = false`), and the challenge record stays for as long as the domain does: renewal depends on it. " +

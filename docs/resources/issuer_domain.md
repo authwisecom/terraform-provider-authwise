@@ -2,12 +2,20 @@
 page_title: "authwise_issuer_domain Resource - Authwise"
 subcategory: "Identity"
 description: |-
+  Deprecated: use authwise_domain with issuer_id (kit#808); a moved block carries the state.
   A hostname of yours that serves an issuer, such as login.acme.com. Authwise obtains and renews its certificate; you add two DNS records, read from dns_records. The issuer keeps answering at its own host as well, and each host is its own issuer URL (iss).
   Create returns once the records are known, so DNS resources can take them in the same apply. Add the challenge record first and point traffic only once state is PROVISIONING or ACTIVE, so the certificate exists before any request arrives: authwise_issuer_domain_activation waits for that between the two records, in one apply. Both records must be DNS-only (on Cloudflare, proxied = false), and the challenge record stays for as long as the domain does: renewal depends on it.
   Destroying the domain waits until Authwise has released the hostname, which takes the cloud side's teardown.
 ---
 
 # authwise_issuer_domain (Resource)
+
+~> **Deprecated in 0.19.0.** A custom host is an `authwise_domain` with
+`issuer_id` since kit merged issuer domains into domains (kit#808), and the
+same row in Authwise. Move to it with a `moved` block, which keeps the
+domain and its certificate:
+[Upgrading from 0.18](domain#authwise_issuer_domain-and-authwise_issuer_domain_activation).
+This resource goes once kit removes the API it calls (kit#810).
 
 A hostname of yours, such as `login.acme.com`, that serves an issuer.
 Authwise obtains the certificate and renews it on its own edge. You add two

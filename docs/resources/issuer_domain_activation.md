@@ -3,14 +3,17 @@
 page_title: "authwise_issuer_domain_activation Resource - Authwise"
 subcategory: "Identity"
 description: |-
-  Waits until an authwise_issuer_domain routes: PROVISIONING or ACTIVE, its certificate issued and attached to the hostname. Put it between the domain's two DNS records, with depends_on naming the challenge record, and make the traffic record depend on it. One apply then creates the domain and the challenge record, waits for the certificate, and only then points traffic at the hostname, so no request ever meets a missing certificate.
+  Deprecated: use authwise_domain_activation (kit#808); a moved block carries the state.
+  Waits until a custom host (authwise_issuer_domain) routes: PROVISIONING or ACTIVE, its certificate issued and attached to the hostname. Put it between the domain's two DNS records, with depends_on naming the challenge record, and make the traffic record depend on it. One apply then creates the domain and the challenge record, waits for the certificate, and only then points traffic at the hostname, so no request ever meets a missing certificate.
   It does not wait for ACTIVE. Authwise confirms ACTIVE by finding the traffic record in public DNS, so the domain reaches it on the controller's next check once the traffic record has propagated, after this resource is created. state says which of the two it saw.
   It manages nothing in Authwise. Destroying it only removes it from state; a domain that leaves ACTIVE later (DEGRADED) is not replaced.
 ---
 
 # authwise_issuer_domain_activation (Resource)
 
-Waits until an `authwise_issuer_domain` routes: `PROVISIONING` or `ACTIVE`, its certificate issued and attached to the hostname. Put it between the domain's two DNS records, with `depends_on` naming the challenge record, and make the traffic record depend on it. One apply then creates the domain and the challenge record, waits for the certificate, and only then points traffic at the hostname, so no request ever meets a missing certificate.
+**Deprecated:** use `authwise_domain_activation` (kit#808); a `moved` block carries the state.
+
+Waits until a custom host (`authwise_issuer_domain`) routes: `PROVISIONING` or `ACTIVE`, its certificate issued and attached to the hostname. Put it between the domain's two DNS records, with `depends_on` naming the challenge record, and make the traffic record depend on it. One apply then creates the domain and the challenge record, waits for the certificate, and only then points traffic at the hostname, so no request ever meets a missing certificate.
 
 It does not wait for `ACTIVE`. Authwise confirms `ACTIVE` by finding the traffic record in public DNS, so the domain reaches it on the controller's next check once the traffic record has propagated, after this resource is created. `state` says which of the two it saw.
 

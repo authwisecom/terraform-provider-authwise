@@ -370,8 +370,15 @@ func (f *fakeIdentityServer) CreateIssuer(ctx context.Context, in *identitypb.Cr
 	if err := f.admitSelectorLocked(in.GetParent(), in.GetIssuer().GetConfig().GetMultiRealmProviderSelector()); err != nil {
 		return nil, err
 	}
+	// The issuer's host is a domain of its tenant, by id (kit#808); its
+	// hostname reads back in domain_name.
+	d, ok := f.domains[in.GetParent()+"/domains/"+in.GetIssuer().GetDomainId()]
+	if !ok {
+		return nil, status.Errorf(codes.InvalidArgument, "domain_id: no domain %q in %s", in.GetIssuer().GetDomainId(), in.GetParent())
+	}
 	i := proto.Clone(in.GetIssuer()).(*corepb.Issuer)
 	i.Name = in.GetParent() + "/issuers/" + f.nextID("i")
+	i.DomainName = d.GetHostname()
 	f.issuers[i.GetName()] = i
 	return proto.Clone(i).(*corepb.Issuer), nil
 }
@@ -388,8 +395,6 @@ func (f *fakeIdentityServer) PatchIssuer(ctx context.Context, in *identitypb.Pat
 		switch path {
 		case "labels":
 			existing.Labels = in.GetIssuer().GetLabels()
-		case "domain_name":
-			existing.DomainName = in.GetIssuer().GetDomainName()
 		case "path":
 			existing.Path = in.GetIssuer().GetPath()
 		case "config":

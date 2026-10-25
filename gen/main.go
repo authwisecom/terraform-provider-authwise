@@ -63,6 +63,7 @@ var (
 	refAppearanceProfile = gentf.Reference{Target: "appearance_profile", Prefix: "ap"}
 	refTheme             = gentf.Reference{Target: "theme", Prefix: "th"}
 	refAccessCondition   = gentf.Reference{Target: "access_condition", Prefix: "axc"}
+	refDomain            = gentf.Reference{Target: "domain", Prefix: "d"}
 
 	// The parent attributes: every resource's and every plural data
 	// source's.
@@ -241,10 +242,24 @@ func main() {
 		ScopeReferences:  scopeReferences,
 		Entries: []gentf.Entry{
 			// Tenant-scoped.
+			// A hostname the tenant serves, native or custom (issuer_id
+			// set), keyed by an AWID since kit#808. The resource is
+			// hand-written in internal/provider (the custom host's waits);
+			// the data sources are these.
 			crud[corepb.Domain](scopeTenant,
-				withDescription("A domain the tenant serves logins on. The id is the domain name itself."), callerNamed, withJSON("config")),
+				withDescription("A hostname the tenant serves logins on: native (no `issuer_id`), the host an issuer names, or custom (`issuer_id` set), a hostname of yours serving that issuer."),
+				withRequired("hostname"), withImmutable("hostname", "issuer_id"),
+				withComputed("state", "dns_records", "failure", "certificate_expires_at", "activated_at", "claim_expires_at", "created_at", "traffic_target"),
+				withJSON("config"),
+				withReferences(map[string]gentf.Reference{"issuer_id": scopeReferences["issuer_id"]})),
+			// domain_id names the issuer's native host (kit#808, D12);
+			// domain_name is its hostname, read back. kit still takes
+			// domain_name on create until kit#810, but the provider sends
+			// domain_id only.
 			crud[corepb.Issuer](scopeTenant,
-				withDescription("An OAuth 2.0 / OpenID Connect issuer: the login a set of clients shares, with its domain, token lifetimes and which realm or realms people sign in to (`config`). Its appearance is whichever of its profiles is the default (`authwise_appearance_profile.is_default`)."), withJSON("config")),
+				withDescription("An OAuth 2.0 / OpenID Connect issuer: the login a set of clients shares, with its domain, token lifetimes and which realm or realms people sign in to (`config`). Its appearance is whichever of its profiles is the default (`authwise_appearance_profile.is_default`)."), withJSON("config"),
+				withRequired("domain_id"), withImmutable("domain_id"), withComputed("domain_name"),
+				withReferences(map[string]gentf.Reference{"domain_id": refDomain})),
 			crud[corepb.Realm](scopeTenant,
 				withDescription("A realm: a population of users with its own providers, factors and authentication policy."), withJSON("config")),
 			crud[corepb.Theme](scopeTenant,

@@ -1,3 +1,51 @@
+## 0.19.0 (Unreleased)
+
+NOTES:
+
+* **apis APISVER, kit KITVER or later required.** kit merged issuer
+  domains into domains (kit#808): every domain now has an id (`d-…`), an
+  issuer names its host by that id, and a custom host is a domain with an
+  issuer. Upgrade kit first. Keep a copy of the state before the first
+  apply with 0.19.0 (`terraform state pull`): 0.18 cannot read the state
+  0.19.0 writes. The `authwise_domain` page has the upgrade steps.
+
+BREAKING CHANGES:
+
+* **`authwise_domain.domain_id` is the domain's id, assigned by Authwise;
+  the hostname moves to `hostname` (#47).** Replace `domain_id = "<host>"`
+  with `hostname = "<host>"`. Existing state upgrades itself: the refresh
+  finds each domain by its hostname and records its id, and the plan
+  shows no changes. `config` is removed (it had no settings). Import takes
+  `tenants/{t}/domains/{d}`, or the hostname in place of the id.
+* **`authwise_issuer.domain_id` replaces `domain_name` as the issuer's
+  host (#47).** Set `domain_id = authwise_domain.<name>.domain_id`;
+  `domain_name` is now read-only and holds the hostname. Kit fills in the
+  id for existing issuers, so the plan shows no changes. If it plans to
+  replace an issuer, do not apply: kit is older than KITVER.
+
+FEATURES:
+
+* **`authwise_domain` takes a custom host (#47).** With `issuer_id` set it
+  is a hostname of yours serving that issuer, with everything
+  `authwise_issuer_domain` had: `dns_records`, `state`, the `failure_*`
+  attributes, `traffic_target`, `certificate_expires_at`, the wait for the
+  DNS records on create and for the hostname's release on destroy, and
+  timeouts. It adds `activated_at` and `labels`.
+* **New resource `authwise_domain_activation` (#47):**
+  `authwise_issuer_domain_activation` for an `authwise_domain`. It takes
+  the domain's `name` in `domain`, waits for `PROVISIONING` or `ACTIVE` in
+  the same way, and refuses a native host, which has nothing to wait for.
+
+DEPRECATIONS:
+
+* **`authwise_issuer_domain` and `authwise_issuer_domain_activation` (#47).**
+  They still work, through kit's deprecated issuer-domains API, and go
+  once kit removes it (kit#810). Move with `moved` blocks to
+  `authwise_domain` and `authwise_domain_activation` (Terraform 1.8 or
+  later): the domain keeps its id and certificate, and the plan shows no
+  changes. On older Terraform, `terraform state rm` and import by the same
+  id.
+
 ## 0.18.1 (October 23, 2026)
 
 NOTES:

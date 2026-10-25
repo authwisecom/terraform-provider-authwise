@@ -34,9 +34,13 @@ locals {
   partner   = authwise_realm.partner.name
 }
 
+resource "authwise_domain" "login" {
+  hostname = "login.example.com"
+}
+
 resource "authwise_issuer" "login" {
-  domain_name = "login.example.com"
-  config      = jsonencode({ multiRealmProviderSelector = ` + selector + ` })
+  domain_id = authwise_domain.login.domain_id
+  config    = jsonencode({ multiRealmProviderSelector = ` + selector + ` })
 }
 `
 }

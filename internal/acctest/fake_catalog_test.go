@@ -3,7 +3,9 @@ package acctest_test
 import (
 	"context"
 	"fmt"
+	"maps"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 
@@ -35,7 +37,9 @@ func checkParent(kind string, re *regexp.Regexp, parent string) error {
 	return nil
 }
 
-// --- Domain (tenant-scoped, caller-named: the id is the domain name) ---
+// --- Domain (tenant-scoped, keyed by an AWID since kit#808; the hostname is
+// unique install-wide). Only native hosts here: the custom host's lifecycle
+// is the issuer-domains fake's, and the provider's unit tests'. ---
 
 func (f *fakeIdentityServer) GetDomain(ctx context.Context, in *identitypb.GetDomainRequest) (*corepb.Domain, error) {
 	f.mu.Lock()
@@ -48,6 +52,19 @@ func (f *fakeIdentityServer) GetDomain(ctx context.Context, in *identitypb.GetDo
 	return proto.Clone(d).(*corepb.Domain), nil
 }
 
+func (f *fakeIdentityServer) ListDomains(ctx context.Context, in *identitypb.ListDomainsRequest) (*identitypb.ListDomainsResponse, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.recordAuth(ctx)
+	out := &identitypb.ListDomainsResponse{}
+	for _, name := range slices.Sorted(maps.Keys(f.domains)) {
+		if strings.HasPrefix(name, in.GetParent()+"/domains/") {
+			out.Domains = append(out.Domains, proto.Clone(f.domains[name]).(*corepb.Domain))
+		}
+	}
+	return out, nil
+}
+
 func (f *fakeIdentityServer) CreateDomain(ctx context.Context, in *identitypb.CreateDomainRequest) (*corepb.Domain, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -55,16 +72,21 @@ func (f *fakeIdentityServer) CreateDomain(ctx context.Context, in *identitypb.Cr
 	if err := checkParent("domain", tenantParent, in.GetParent()); err != nil {
 		return nil, err
 	}
-	name, err := callerName(in.GetParent(), "domains", in.GetDomain().GetName())
-	if err != nil {
-		return nil, err
+	hostname := in.GetDomain().GetHostname()
+	if hostname == "" {
+		return nil, status.Error(codes.InvalidArgument, "hostname is required")
 	}
-	if _, exists := f.domains[name]; exists {
-		return nil, status.Errorf(codes.AlreadyExists, "domain %q already exists", name)
+	if in.GetDomain().GetIssuerId() != "" {
+		return nil, status.Error(codes.Unimplemented, "the fake serves native domains only")
+	}
+	for _, d := range f.domains {
+		if d.GetHostname() == hostname {
+			return nil, status.Errorf(codes.AlreadyExists, "hostname %q is claimed", hostname)
+		}
 	}
 	d := proto.Clone(in.GetDomain()).(*corepb.Domain)
-	d.Name = name
-	f.domains[name] = d
+	d.Name = in.GetParent() + "/domains/" + f.nextID("d")
+	f.domains[d.GetName()] = d
 	return proto.Clone(d).(*corepb.Domain), nil
 }
 
@@ -95,6 +117,11 @@ func (f *fakeIdentityServer) DeleteDomain(ctx context.Context, in *identitypb.De
 	f.recordAuth(ctx)
 	if _, ok := f.domains[in.GetName()]; !ok {
 		return nil, status.Errorf(codes.NotFound, "domain %q not found", in.GetName())
+	}
+	for _, i := range f.issuers {
+		if tenantOf(i.GetName())+"/domains/"+i.GetDomainId() == in.GetName() {
+			return nil, status.Errorf(codes.FailedPrecondition, "domain %q is the host of issuer %q (DOMAIN_HAS_ISSUERS)", in.GetName(), i.GetName())
+		}
 	}
 	delete(f.domains, in.GetName())
 	return &emptypb.Empty{}, nil

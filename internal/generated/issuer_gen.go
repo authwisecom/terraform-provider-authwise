@@ -36,9 +36,13 @@ func IssuerResourceSchema() schema.Schema {
 				Optional:            true,
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
+			"domain_id": schema.StringAttribute{
+				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
+				Required:      true,
+				Validators:    []validator.String{tf.ReferenceID("d", "domain", "authwise_domain.<name>.domain_id")},
+			},
 			"domain_name": schema.StringAttribute{
 				Computed:      true,
-				Optional:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"issuer_id": schema.StringAttribute{
@@ -83,12 +87,14 @@ type IssuerModel struct {
 	DomainName types.String         `tfsdk:"domain_name"`
 	Path       types.String         `tfsdk:"path"`
 	Config     jsontypes.Normalized `tfsdk:"config"`
+	DomainId   types.String         `tfsdk:"domain_id"`
 }
 
 // NewIssuerModel returns a model with every attribute set to its typed null; collection types cannot be zero-valued.
 func NewIssuerModel() *IssuerModel {
 	return &IssuerModel{
 		Config:     jsontypes.NewNormalizedNull(),
+		DomainId:   types.StringNull(),
 		DomainName: types.StringNull(),
 		IssuerId:   types.StringNull(),
 		Labels:     types.MapNull(types.StringType),
@@ -116,6 +122,7 @@ func (m *IssuerModel) ToProto(ctx context.Context) (*v1alpha1.Issuer, diag.Diagn
 			out.Config = v
 		}
 	}
+	out.DomainId = m.DomainId.ValueString()
 	return out, diags
 }
 
@@ -152,6 +159,7 @@ func (m *IssuerModel) FromProto(ctx context.Context, e *v1alpha1.Issuer) diag.Di
 			m.Config = jsontypes.NewNormalizedValue(string(b))
 		}
 	}
+	m.DomainId = types.StringValue(e.DomainId)
 	return diags
 }
 
@@ -171,9 +179,6 @@ func (m *IssuerModel) UpdateMask(ctx context.Context, prior *IssuerModel) []stri
 	if !m.Labels.Equal(prior.Labels) {
 		paths = append(paths, "labels")
 	}
-	if !m.DomainName.Equal(prior.DomainName) {
-		paths = append(paths, "domain_name")
-	}
 	if !m.Path.Equal(prior.Path) {
 		paths = append(paths, "path")
 	}
@@ -181,6 +186,9 @@ func (m *IssuerModel) UpdateMask(ctx context.Context, prior *IssuerModel) []stri
 		if eq, _ := m.Config.StringSemanticEquals(ctx, prior.Config); !eq {
 			paths = append(paths, "config")
 		}
+	}
+	if !m.DomainId.Equal(prior.DomainId) {
+		paths = append(paths, "domain_id")
 	}
 	return paths
 }
@@ -314,6 +322,7 @@ func IssuerDataSourceSchema() schema1.Schema {
 				Computed:   true,
 				CustomType: jsontypes.NormalizedType{},
 			},
+			"domain_id":   schema1.StringAttribute{Computed: true},
 			"domain_name": schema1.StringAttribute{Computed: true},
 			"issuer_id": schema1.StringAttribute{
 				Computed:            true,
@@ -370,12 +379,14 @@ type IssuerItemModel struct {
 	DomainName types.String         `tfsdk:"domain_name"`
 	Path       types.String         `tfsdk:"path"`
 	Config     jsontypes.Normalized `tfsdk:"config"`
+	DomainId   types.String         `tfsdk:"domain_id"`
 }
 
 // IssuerItemAttrTypes returns the attribute types of one issuers list element.
 func IssuerItemAttrTypes() map[string]attr.Type {
 	return map[string]attr.Type{
 		"config":      jsontypes.NormalizedType{},
+		"domain_id":   types.StringType,
 		"domain_name": types.StringType,
 		"issuer_id":   types.StringType,
 		"labels":      types.MapType{ElemType: types.StringType},
@@ -402,6 +413,7 @@ func IssuerListDataSourceSchema() schema1.Schema {
 						Computed:   true,
 						CustomType: jsontypes.NormalizedType{},
 					},
+					"domain_id":   schema1.StringAttribute{Computed: true},
 					"domain_name": schema1.StringAttribute{Computed: true},
 					"issuer_id": schema1.StringAttribute{
 						Computed:            true,
@@ -462,6 +474,7 @@ func issuerItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Issuer, *I
 			item.Config = jsontypes.NewNormalizedValue(string(b))
 		}
 	}
+	item.DomainId = types.StringValue(e.DomainId)
 	id, err := crud.IDFromName(e.Name)
 	if err != nil {
 		diags.AddError("unexpected issuer name", err.Error())

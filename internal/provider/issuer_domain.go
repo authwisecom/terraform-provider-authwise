@@ -369,26 +369,8 @@ func (c issuerDomainClient) DeleteIssuerDomain(ctx context.Context, name string)
 }
 
 func issuerDomainFromProto(e *corepb.IssuerDomain) *domain {
-
-	d := &domain{
-		Name:          e.GetName(),
-		Hostname:      e.GetHostname(),
-		State:         enumName(e.GetState().String(), "ISSUER_DOMAIN_STATE_"),
-		TrafficTarget: e.GetTrafficTarget(),
-	}
-	if f := e.GetFailure(); f != nil {
-		d.FailureCode = enumName(f.GetCode().String(), "ISSUER_DOMAIN_FAILURE_CODE_")
-		d.FailureMessage = f.GetMessage()
-		d.FailureRecord = f.GetRecord()
-	}
-	if ts := e.GetCertificateExpiresAt(); ts != nil {
-		t := ts.AsTime()
-		d.CertificateExpiresAt = &t
-	}
-	for _, r := range e.GetDnsRecords() {
-		d.DNSRecords = append(d.DNSRecords, domainRecord{Name: r.GetName(), Type: r.GetType(), Value: r.GetValue(), Purpose: r.GetPurpose()})
-	}
-
+	d := &domain{Name: e.GetName(), Hostname: e.GetHostname(), TrafficTarget: e.GetTrafficTarget()}
+	d.setLifecycle(e.GetState(), e.GetFailure(), e.GetCertificateExpiresAt(), e.GetDnsRecords())
 	return d
 }
 

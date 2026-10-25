@@ -1,7 +1,8 @@
 // Domain, Scope and AppearanceProfile (#15): the keying and collections the
-// provider took from kit's http annotations — caller-named domain and scope
-// ids, and appearance profiles under the issuer in "appearance-profiles" —
-// exercised end to end, import included.
+// provider took from kit's http annotations — a domain keyed by its AWID
+// with the hostname beside it (#47, kit#808), caller-named scope ids, and
+// appearance profiles under the issuer in "appearance-profiles" — exercised
+// end to end, import included.
 package acctest_test
 
 import (
@@ -20,15 +21,19 @@ func importByName(addr string) resource.ImportStateIdFunc {
 	}
 }
 
-func TestAccDomain_CallerNamed(t *testing.T) {
+func TestAccDomain_Native(t *testing.T) {
 
 	h := newHarness(t)
 
 	domain := func(team string) string {
 		return h.providerConfig() + fmt.Sprintf(`
 resource "authwise_domain" "login" {
-  domain_id = "login.example.com"
-  labels    = { team = %q }
+  hostname = "login.example.com"
+  labels   = { team = %q }
+}
+
+resource "authwise_issuer" "login" {
+  domain_id = authwise_domain.login.domain_id
 }
 `, team)
 	}
@@ -39,8 +44,13 @@ resource "authwise_domain" "login" {
 			{
 				Config: domain("identity"),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("authwise_domain.login", "name", "tenants/t-1/domains/login.example.com"),
-					resource.TestCheckResourceAttr("authwise_domain.login", "domain_id", "login.example.com"),
+					resource.TestMatchResourceAttr("authwise_domain.login", "name", regexp.MustCompile(`^tenants/t-1/domains/d-\d+$`)),
+					resource.TestMatchResourceAttr("authwise_domain.login", "domain_id", regexp.MustCompile(`^d-\d+$`)),
+					resource.TestCheckResourceAttr("authwise_domain.login", "hostname", "login.example.com"),
+					resource.TestCheckNoResourceAttr("authwise_domain.login", "issuer_id"),
+					resource.TestCheckResourceAttr("authwise_domain.login", "state", ""),
+					resource.TestCheckResourceAttrPair("authwise_issuer.login", "domain_id", "authwise_domain.login", "domain_id"),
+					resource.TestCheckResourceAttr("authwise_issuer.login", "domain_name", "login.example.com"),
 				),
 			},
 			{
@@ -48,20 +58,28 @@ resource "authwise_domain" "login" {
 				Check: checkServer(func() error {
 					h.fake.mu.Lock()
 					defer h.fake.mu.Unlock()
-					if got := h.fake.domains["tenants/t-1/domains/login.example.com"].GetLabels()["team"]; got != "platform" {
-						return fmt.Errorf("labels.team = %q", got)
+					for _, d := range h.fake.domains {
+						if got := d.GetLabels()["team"]; got != "platform" {
+							return fmt.Errorf("labels.team = %q", got)
+						}
 					}
 					return nil
 				}),
 			},
 			{
-				// Import fills domain_id from the name's last segment; without
-				// it the required attribute would force a replace.
-				ResourceName:                         "authwise_domain.login",
-				ImportState:                          true,
-				ImportStateIdFunc:                    importByName("authwise_domain.login"),
-				ImportStateVerify:                    true,
-				ImportStateVerifyIdentifierAttribute: "name",
+				ResourceName:      "authwise_domain.login",
+				ImportState:       true,
+				ImportStateKind:   resource.ImportBlockWithID,
+				ImportStateIdFunc: importByName("authwise_domain.login"),
+				Config:            domain("platform"),
+			},
+			{
+				// The hostname in place of the id, as 0.18's state named it.
+				ResourceName:    "authwise_domain.login",
+				ImportState:     true,
+				ImportStateKind: resource.ImportBlockWithID,
+				ImportStateId:   "tenants/t-1/domains/login.example.com",
+				Config:          domain("platform"),
 			},
 		},
 		CheckDestroy: func(_ *terraform.State) error {

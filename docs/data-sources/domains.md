@@ -3,12 +3,12 @@
 page_title: "authwise_domains Data Source - Authwise"
 subcategory: "Identity"
 description: |-
-  A domain the tenant serves logins on. The id is the domain name itself. This data source lists every one under a parent.
+  A hostname the tenant serves logins on: native (no issuer_id), the host an issuer names, or custom (issuer_id set), a hostname of yours serving that issuer. This data source lists every one under a parent.
 ---
 
 # authwise_domains (Data Source)
 
-A domain the tenant serves logins on. The id is the domain name itself. This data source lists every one under a parent.
+A hostname the tenant serves logins on: native (no `issuer_id`), the host an issuer names, or custom (`issuer_id` set), a hostname of yours serving that issuer. This data source lists every one under a parent.
 
 
 
@@ -28,7 +28,37 @@ A domain the tenant serves logins on. The id is the domain name itself. This dat
 
 Read-Only:
 
+- `activated_at` (String)
+- `certificate_expires_at` (String)
+- `claim_expires_at` (String)
 - `config` (String)
-- `domain_id` (String) Caller-assigned resource id — the last segment of `name`.
+- `created_at` (String)
+- `dns_records` (Attributes List) (see [below for nested schema](#nestedatt--domains--dns_records))
+- `domain_id` (String) Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.
+- `failure` (Attributes) (see [below for nested schema](#nestedatt--domains--failure))
+- `hostname` (String)
+- `issuer_id` (String)
 - `labels` (Map of String)
 - `name` (String) Full resource name.
+- `state` (String)
+- `traffic_target` (String)
+
+<a id="nestedatt--domains--dns_records"></a>
+### Nested Schema for `domains.dns_records`
+
+Read-Only:
+
+- `name` (String)
+- `purpose` (String)
+- `type` (String)
+- `value` (String)
+
+
+<a id="nestedatt--domains--failure"></a>
+### Nested Schema for `domains.failure`
+
+Read-Only:
+
+- `code` (String)
+- `message` (String)
+- `record` (String)

@@ -252,7 +252,9 @@ func (p *AuthwiseProvider) Configure(ctx context.Context, req provider.Configure
 			// A Guard tenant by slug (#42).
 			guardDirectoryClientKey: guardpb.NewGuardDirectoryServiceClient(guardConn),
 			guardConfiguredKey:      guardConfigured,
-			// Custom domains wait on the controller (#44).
+			// A custom host waits on the controller (#44, #47); the
+			// issuer-domains client serves the deprecated aliases.
+			domainsClientKey:       domainClient{identitypb.NewAuthwiseIdentityServiceClient(conn)},
 			issuerDomainsClientKey: issuerDomainClient{identitypb.NewAuthwiseIdentityServiceClient(conn)},
 		},
 		Defaults: defaults,

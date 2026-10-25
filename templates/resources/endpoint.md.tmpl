@@ -50,9 +50,13 @@ data "authwise_endpoint_auth" "risk" {
 ### A token kit signs (gRPC)
 
 ```terraform
+resource "authwise_domain" "internal" {
+  hostname = "auth.example.com"
+}
+
 resource "authwise_issuer" "internal" {
-  domain_name = "auth.example.com"
-  path        = "/internal"
+  domain_id = authwise_domain.internal.domain_id
+  path      = "/internal"
 }
 
 resource "authwise_endpoint" "ledger" {
