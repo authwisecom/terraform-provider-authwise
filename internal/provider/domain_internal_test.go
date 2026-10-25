@@ -303,7 +303,7 @@ func TestDomainNativeLifecycle(t *testing.T) {
 			{
 				Config: nativeDomainConfig(`{ env = "test" }`),
 				ConfigStateChecks: []statecheck.StateCheck{
-					statecheck.ExpectKnownValue(nativeDomainAddr, tfjsonpath.New("name"), knownvalue.StringExact("tenants/t-1/domains/d-1")),
+					statecheck.ExpectKnownValue(nativeDomainAddr, tfjsonpath.New(tfruntime.NameAttribute), knownvalue.StringExact("tenants/t-1/domains/d-1")),
 					statecheck.ExpectKnownValue(nativeDomainAddr, tfjsonpath.New("domain_id"), knownvalue.StringExact("d-1")),
 					statecheck.ExpectKnownValue(nativeDomainAddr, tfjsonpath.New("hostname"), knownvalue.StringExact("acme.id.authwise.test")),
 					statecheck.ExpectKnownValue(nativeDomainAddr, tfjsonpath.New("issuer_id"), knownvalue.Null()),
@@ -343,7 +343,7 @@ func TestDomainCustomLifecycle(t *testing.T) {
 		Steps: []tfresource.TestStep{{
 			Config: customDomainConfig,
 			ConfigStateChecks: []statecheck.StateCheck{
-				statecheck.ExpectKnownValue(domainAddr, tfjsonpath.New("name"), knownvalue.StringExact("tenants/t-1/domains/d-1")),
+				statecheck.ExpectKnownValue(domainAddr, tfjsonpath.New(tfruntime.NameAttribute), knownvalue.StringExact("tenants/t-1/domains/d-1")),
 				statecheck.ExpectKnownValue(domainAddr, tfjsonpath.New("domain_id"), knownvalue.StringExact("d-1")),
 				statecheck.ExpectKnownValue(domainAddr, tfjsonpath.New("issuer_id"), knownvalue.StringExact("i-1")),
 				statecheck.ExpectKnownValue(domainAddr, tfjsonpath.New("dns_records"), knownvalue.ListSizeExact(2)),
@@ -496,7 +496,7 @@ moved {
 					plancheck.ExpectResourceAction("terraform_data.traffic", plancheck.ResourceActionNoop),
 				}},
 				ConfigStateChecks: []statecheck.StateCheck{
-					statecheck.ExpectKnownValue(domainAddr, tfjsonpath.New("name"), knownvalue.StringExact("tenants/t-1/domains/d-1")),
+					statecheck.ExpectKnownValue(domainAddr, tfjsonpath.New(tfruntime.NameAttribute), knownvalue.StringExact("tenants/t-1/domains/d-1")),
 					statecheck.ExpectKnownValue(domainAddr, tfjsonpath.New("issuer_id"), knownvalue.StringExact("i-1")),
 					statecheck.ExpectKnownValue(domainActivationAddr, tfjsonpath.New("domain"), knownvalue.StringExact("tenants/t-1/domains/d-1")),
 				},
@@ -516,11 +516,11 @@ func TestDomainUpgradeFromHostnameKeyed(t *testing.T) {
 
 	priorType := upgrader.PriorSchema.Type().TerraformType(ctx)
 	prior := tftypes.NewValue(priorType, map[string]tftypes.Value{
-		"name":      tftypes.NewValue(tftypes.String, "tenants/t-1/domains/acme.id.authwise.com"),
-		"domain_id": tftypes.NewValue(tftypes.String, "acme.id.authwise.com"),
-		"tenant_id": tftypes.NewValue(tftypes.String, "t-1"),
-		"labels":    tftypes.NewValue(tftypes.Map{ElementType: tftypes.String}, map[string]tftypes.Value{}),
-		"config":    tftypes.NewValue(tftypes.String, "{}"),
+		tfruntime.NameAttribute: tftypes.NewValue(tftypes.String, "tenants/t-1/domains/acme.id.authwise.com"),
+		"domain_id":             tftypes.NewValue(tftypes.String, "acme.id.authwise.com"),
+		"tenant_id":             tftypes.NewValue(tftypes.String, "t-1"),
+		"labels":                tftypes.NewValue(tftypes.Map{ElementType: tftypes.String}, map[string]tftypes.Value{}),
+		"config":                tftypes.NewValue(tftypes.String, "{}"),
 	})
 
 	target := domainSchema(ctx)

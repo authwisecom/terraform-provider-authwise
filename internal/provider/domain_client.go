@@ -63,7 +63,7 @@ func (c domainClient) UpdateDomainLabels(ctx context.Context, name string, label
 	out, err := c.client.PatchDomain(ctx, &identitypb.PatchDomainRequest{
 		Name:       name,
 		Domain:     &corepb.Domain{Labels: labels},
-		UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"labels"}},
+		UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{labelsAttribute}},
 	})
 	if err != nil {
 		return nil, err

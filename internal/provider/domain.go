@@ -437,7 +437,7 @@ func domainSchema(ctx context.Context) schema.Schema {
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 				Validators:    []validator.String{tfruntime.ReferenceID("i", "issuer", "authwise_issuer.<name>.issuer_id")},
 			},
-			"labels": schema.MapAttribute{
+			labelsAttribute: schema.MapAttribute{
 				Optional:      true,
 				Computed:      true,
 				ElementType:   types.StringType,
