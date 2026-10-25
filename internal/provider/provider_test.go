@@ -63,8 +63,9 @@ func TestProviderSurface(t *testing.T) {
 	// service_account_secret. #40 adds the hand-written tenant_config, and
 	// #41 the hand-written guard_enrolment_grant and guard_deprovisioning.
 	// #44 adds the hand-written issuer_domain, and
-	// issuer_domain_activation after it.
-	assert.Len(t, resourceTypes, 39)
+	// issuer_domain_activation after it. #47 hand-writes domain in the
+	// generated one's place and adds domain_activation.
+	assert.Len(t, resourceTypes, 40)
 	assert.False(t, resourceTypes["authwise_guard_tenant"], "a Guard tenant is awtenant's to create")
 	for _, want := range []string{
 		"authwise_guard_network",

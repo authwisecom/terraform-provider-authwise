@@ -274,6 +274,7 @@ func (p *AuthwiseProvider) Resources(ctx context.Context) []func() resource.Reso
 		guardInviteTypeName:       newGuardInviteResource,
 		guardNodeTypeName:         newGuardNodeResource,
 		guardTenantTypeName:       nil,
+		domainTypeName:            newDomainResource,
 	}),
 		newSecretResource,
 		newRealmAuthenticationPolicyResource,
@@ -284,6 +285,7 @@ func (p *AuthwiseProvider) Resources(ctx context.Context) []func() resource.Reso
 		newTenantConfigResource,
 		newGuardEnrolmentGrantResource,
 		newGuardDeprovisioningResource,
+		newDomainActivationResource,
 		newIssuerDomainResource,
 		newIssuerDomainActivationResource,
 	))

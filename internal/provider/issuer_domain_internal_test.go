@@ -5,17 +5,10 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
-	tfruntime "github.com/activatedio/tfinfra/pkg/tf"
-	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
-	"github.com/hashicorp/terraform-plugin-framework/provider"
-	"github.com/hashicorp/terraform-plugin-framework/providerserver"
-	"github.com/hashicorp/terraform-plugin-framework/resource"
-	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	tfresource "github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/knownvalue"
 	"github.com/hashicorp/terraform-plugin-testing/statecheck"
@@ -25,132 +18,6 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
-
-// fakeIssuerDomains plays kit and the domain controller: a created domain
-// has no records until reads have passed recordsAfter, and turns ACTIVE
-// after activeAfter; a deleted one stays DELETING for goneAfter reads.
-// With holdProvisioning it stops at PROVISIONING instead, as a real one
-// does until the controller finds the traffic record in public DNS.
-type fakeIssuerDomains struct {
-	mu      sync.Mutex
-	domains map[string]*issuerDomain
-	reads   map[string]int
-	seq     int
-
-	recordsAfter, activeAfter, goneAfter int
-	// fail, when set, is the code a domain fails with instead of issuing.
-	fail string
-	// holdProvisioning keeps an issued domain at PROVISIONING.
-	holdProvisioning bool
-}
-
-func newFakeIssuerDomains() *fakeIssuerDomains {
-	return &fakeIssuerDomains{domains: map[string]*issuerDomain{}, reads: map[string]int{}, recordsAfter: 2, activeAfter: 4, goneAfter: 2}
-}
-
-func (f *fakeIssuerDomains) CreateIssuerDomain(_ context.Context, parent, hostname string) (*issuerDomain, error) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	for _, d := range f.domains {
-		if d.Hostname == hostname {
-			return nil, status.Errorf(codes.AlreadyExists, "%s is already claimed", hostname)
-		}
-	}
-	f.seq++
-	d := &issuerDomain{Name: fmt.Sprintf("%s/issuer-domains/d-%d", parent, f.seq), Hostname: hostname, State: issuerDomainPendingDNS, TrafficTarget: "acme.id.authwise.test"}
-	f.domains[d.Name] = d
-	cp := *d
-	return &cp, nil
-}
-
-func (f *fakeIssuerDomains) GetIssuerDomain(_ context.Context, name string) (*issuerDomain, error) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	d, ok := f.domains[name]
-	if !ok {
-		return nil, status.Errorf(codes.NotFound, "%s not found", name)
-	}
-	f.reads[name]++
-	n := f.reads[name]
-	switch {
-	case d.State == issuerDomainDeleting:
-		if n >= f.goneAfter {
-			delete(f.domains, name)
-			return nil, status.Errorf(codes.NotFound, "%s not found", name)
-		}
-	case n >= f.recordsAfter && len(d.DNSRecords) == 0:
-		d.DNSRecords = []issuerDomainRecord{
-			{Name: d.Hostname, Type: "CNAME", Value: "acme.id.authwise.com", Purpose: "traffic"},
-			{Name: "_acme-challenge." + d.Hostname, Type: "CNAME", Value: "abc.authorize.certificatemanager.goog", Purpose: "challenge"},
-		}
-	case f.fail != "" && n >= f.activeAfter:
-		d.State, d.FailureCode, d.FailureMessage = issuerDomainFailed, f.fail, "a CAA record at acme.com excludes the certificate authority"
-	case n >= f.activeAfter && d.State != issuerDomainActive:
-		exp := time.Date(2027, 1, 19, 0, 0, 0, 0, time.UTC)
-		d.State, d.CertificateExpiresAt = issuerDomainActive, &exp
-		if f.holdProvisioning {
-			d.State = issuerDomainProvisioning
-		}
-	}
-	cp := *d
-	return &cp, nil
-}
-
-func (f *fakeIssuerDomains) DeleteIssuerDomain(_ context.Context, name string) error {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	d, ok := f.domains[name]
-	if !ok {
-		return status.Errorf(codes.NotFound, "%s not found", name)
-	}
-	d.State = issuerDomainDeleting
-	f.reads[name] = 0
-	return nil
-}
-
-func (f *fakeIssuerDomains) count() int {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	return len(f.domains)
-}
-
-// issuerDomainTestProvider serves authwise_issuer_domain and its activation over the fake,
-// with the tenant as a provider default as the real provider takes it.
-type issuerDomainTestProvider struct{ fake *fakeIssuerDomains }
-
-func (p *issuerDomainTestProvider) Metadata(_ context.Context, _ provider.MetadataRequest, resp *provider.MetadataResponse) {
-	resp.TypeName = providerTypeName
-}
-
-func (p *issuerDomainTestProvider) Schema(context.Context, provider.SchemaRequest, *provider.SchemaResponse) {
-}
-
-func (p *issuerDomainTestProvider) Configure(_ context.Context, _ provider.ConfigureRequest, resp *provider.ConfigureResponse) {
-	resp.ResourceData = &tfruntime.ProviderData{
-		Clients:  map[string]any{issuerDomainsClientKey: p.fake},
-		Defaults: map[string]string{tenantIDAttribute: "t-1"},
-	}
-}
-
-func (p *issuerDomainTestProvider) Resources(context.Context) []func() resource.Resource {
-	poller := issuerDomainPoller{poll: time.Millisecond}
-	return []func() resource.Resource{
-		func() resource.Resource { return &issuerDomainResource{issuerDomainPoller: poller} },
-		func() resource.Resource { return &issuerDomainActivationResource{poller} },
-	}
-}
-
-func (p *issuerDomainTestProvider) DataSources(context.Context) []func() datasource.DataSource {
-	return nil
-}
-
-var _ provider.Provider = &issuerDomainTestProvider{}
-
-func (p *issuerDomainTestProvider) factories() map[string]func() (tfprotov6.ProviderServer, error) {
-	return map[string]func() (tfprotov6.ProviderServer, error){
-		providerTypeName: providerserver.NewProtocol6WithError(p),
-	}
-}
 
 // issuerDomainConfig is the documented one-apply pattern: the challenge
 // record, the activation waiting on it, and the traffic record waiting on
@@ -201,8 +68,8 @@ resource "authwise_issuer_domain" "login" {
 
 func TestIssuerDomainLifecycle(t *testing.T) {
 
-	fake := newFakeIssuerDomains()
-	p := &issuerDomainTestProvider{fake: fake}
+	fake := newFakeDomains()
+	p := &domainTestProvider{fake: fake}
 
 	tfresource.UnitTest(t, tfresource.TestCase{
 		ProtoV6ProviderFactories: p.factories(),
@@ -226,11 +93,11 @@ func TestIssuerDomainLifecycle(t *testing.T) {
 				statecheck.ExpectKnownValue(issuerDomainAddr, tfjsonpath.New("traffic_target"), knownvalue.StringExact("acme.id.authwise.test")),
 				statecheck.ExpectKnownValue("terraform_data.challenge",
 					tfjsonpath.New("output").AtMapKey("name"), knownvalue.StringExact("_acme-challenge.login.acme.com")),
-				statecheck.ExpectKnownValue(issuerDomainActivationAddr, tfjsonpath.New("state"), knownvalue.StringExact(issuerDomainActive)),
+				statecheck.ExpectKnownValue(issuerDomainActivationAddr, tfjsonpath.New("state"), knownvalue.StringExact(domainActive)),
 				statecheck.ExpectKnownValue(issuerDomainActivationAddr, tfjsonpath.New("hostname"), knownvalue.StringExact("login.acme.com")),
 				statecheck.ExpectKnownValue(issuerDomainActivationAddr, tfjsonpath.New("certificate_expires_at"), knownvalue.StringExact("2027-01-19T00:00:00Z")),
 				statecheck.ExpectKnownValue("terraform_data.traffic",
-					tfjsonpath.New("output").AtMapKey("after"), knownvalue.StringExact(issuerDomainActive)),
+					tfjsonpath.New("output").AtMapKey("after"), knownvalue.StringExact(domainActive)),
 				statecheck.ExpectKnownValue("terraform_data.traffic",
 					tfjsonpath.New("output").AtMapKey("content"), knownvalue.StringExact("acme.id.authwise.com")),
 			},
@@ -241,7 +108,7 @@ func TestIssuerDomainLifecycle(t *testing.T) {
 // TestIssuerDomainImportPlansNoChange imports by name (#43).
 func TestIssuerDomainImportPlansNoChange(t *testing.T) {
 
-	p := &issuerDomainTestProvider{fake: newFakeIssuerDomains()}
+	p := &domainTestProvider{fake: newFakeDomains()}
 	config := issuerDomainOnlyConfig
 
 	tfresource.UnitTest(t, tfresource.TestCase{
@@ -263,7 +130,7 @@ func TestIssuerDomainImportPlansNoChange(t *testing.T) {
 // the domain's name, after the domain is ACTIVE.
 func TestIssuerDomainActivationImportPlansNoChange(t *testing.T) {
 
-	p := &issuerDomainTestProvider{fake: newFakeIssuerDomains()}
+	p := &domainTestProvider{fake: newFakeDomains()}
 
 	tfresource.UnitTest(t, tfresource.TestCase{
 		ProtoV6ProviderFactories: p.factories(),
@@ -285,18 +152,18 @@ func TestIssuerDomainActivationImportPlansNoChange(t *testing.T) {
 // traffic record, so the activation must not wait past PROVISIONING (#46).
 func TestIssuerDomainActivationReturnsAtProvisioning(t *testing.T) {
 
-	fake := newFakeIssuerDomains()
+	fake := newFakeDomains()
 	fake.holdProvisioning = true
-	p := &issuerDomainTestProvider{fake: fake}
+	p := &domainTestProvider{fake: fake}
 
 	tfresource.UnitTest(t, tfresource.TestCase{
 		ProtoV6ProviderFactories: p.factories(),
 		Steps: []tfresource.TestStep{{
 			Config: issuerDomainConfig,
 			ConfigStateChecks: []statecheck.StateCheck{
-				statecheck.ExpectKnownValue(issuerDomainActivationAddr, tfjsonpath.New("state"), knownvalue.StringExact(issuerDomainProvisioning)),
+				statecheck.ExpectKnownValue(issuerDomainActivationAddr, tfjsonpath.New("state"), knownvalue.StringExact(domainProvisioning)),
 				statecheck.ExpectKnownValue("terraform_data.traffic",
-					tfjsonpath.New("output").AtMapKey("after"), knownvalue.StringExact(issuerDomainProvisioning)),
+					tfjsonpath.New("output").AtMapKey("after"), knownvalue.StringExact(domainProvisioning)),
 			},
 		}},
 	})
@@ -306,9 +173,9 @@ func TestIssuerDomainActivationReturnsAtProvisioning(t *testing.T) {
 // with its reason, and the traffic record is never created.
 func TestIssuerDomainFailedSaysWhy(t *testing.T) {
 
-	fake := newFakeIssuerDomains()
+	fake := newFakeDomains()
 	fake.fail = "CAA"
-	p := &issuerDomainTestProvider{fake: fake}
+	p := &domainTestProvider{fake: fake}
 
 	tfresource.UnitTest(t, tfresource.TestCase{
 		ProtoV6ProviderFactories: p.factories(),
@@ -321,7 +188,7 @@ func TestIssuerDomainFailedSaysWhy(t *testing.T) {
 
 func TestIssuerDomainHostnameValidated(t *testing.T) {
 
-	p := &issuerDomainTestProvider{fake: newFakeIssuerDomains()}
+	p := &domainTestProvider{fake: newFakeDomains()}
 
 	tfresource.UnitTest(t, tfresource.TestCase{
 		ProtoV6ProviderFactories: p.factories(),
@@ -340,9 +207,9 @@ resource "authwise_issuer_domain" "login" {
 
 func TestIssuerDomainDeleteTimesOutWhileDeleting(t *testing.T) {
 
-	fake := newFakeIssuerDomains()
+	fake := newFakeDomains()
 	fake.goneAfter = 1 << 30
-	r := issuerDomainPoller{client: fake, poll: time.Millisecond}
+	r := domainPoller{get: fake.GetIssuerDomain, poll: time.Millisecond}
 
 	d, err := fake.CreateIssuerDomain(t.Context(), "tenants/t-1/issuers/i-1", "login.acme.com")
 	if err != nil {
@@ -356,7 +223,7 @@ func TestIssuerDomainDeleteTimesOutWhileDeleting(t *testing.T) {
 	defer cancel()
 	var diags diag.Diagnostics
 	got := r.waitFor(ctx, d, routes, "state PROVISIONING or ACTIVE", &diags)
-	if !diags.HasError() || got.State != issuerDomainDeleting {
+	if !diags.HasError() || got.State != domainDeleting {
 		t.Fatalf("expected a timeout on a DELETING domain, got %v (%s)", diags, got.State)
 	}
 }
@@ -369,8 +236,8 @@ func TestIssuerDomainCreateErrorNamesReason(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	summary, detail := issuerDomainCreateError(st.Err())
-	if summary != "create issuer domain refused: PLAN_REQUIRED" || !strings.Contains(detail, "the Business plan or above") {
+	summary, detail := domainCreateError(st.Err())
+	if summary != "create domain refused: PLAN_REQUIRED" || !strings.Contains(detail, "the Business plan or above") {
 		t.Fatalf("got %q / %q", summary, detail)
 	}
 
@@ -378,13 +245,13 @@ func TestIssuerDomainCreateErrorNamesReason(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	summary, detail = issuerDomainCreateError(st.Err())
-	if summary != "create issuer domain refused: DOMAINS_UNAVAILABLE" || !strings.Contains(detail, "no domain controller") {
+	summary, detail = domainCreateError(st.Err())
+	if summary != "create domain refused: DOMAINS_UNAVAILABLE" || !strings.Contains(detail, "no domain controller") {
 		t.Fatalf("got %q / %q", summary, detail)
 	}
 
-	summary, _ = issuerDomainCreateError(status.Error(codes.Internal, "boom"))
-	if summary != "create issuer domain failed" {
+	summary, _ = domainCreateError(status.Error(codes.Internal, "boom"))
+	if summary != "create domain failed" {
 		t.Fatalf("an error without ErrorInfo: got %q", summary)
 	}
 }

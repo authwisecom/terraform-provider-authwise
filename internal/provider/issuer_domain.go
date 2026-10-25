@@ -2,10 +2,7 @@ package provider
 
 import (
 	"context"
-	"fmt"
 	"regexp"
-	"strings"
-	"time"
 
 	identitypb "git.authwise.com/authwise/apis/authwise/identity/v1alpha1"
 	corepb "git.authwise.com/authwise/apis/authwise/types/core/v1alpha1"
@@ -13,7 +10,6 @@ import (
 	tfruntime "github.com/activatedio/tfinfra/pkg/tf"
 	"github.com/hashicorp/terraform-plugin-framework-timeouts/resource/timeouts"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
-	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -24,8 +20,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
-	"google.golang.org/genproto/googleapis/rpc/errdetails"
-	"google.golang.org/grpc/status"
 )
 
 const (
@@ -34,77 +28,22 @@ const (
 
 	// issuerDomainsClientKey is the provider data key of the issuerDomainAPI.
 	issuerDomainsClientKey = "issuerDomains"
-
-	issuerIDAttribute = "issuer_id"
-
-	// A DNS record's attributes.
-	recordTypeAttribute    = "type"
-	recordValueAttribute   = "value"
-	recordPurposeAttribute = "purpose"
-
-	// authwiseErrorDomain is the ErrorInfo domain of kit's refusals.
-	authwiseErrorDomain = "authwise.io"
 )
 
-// The states kit reports for an issuer domain (CUSTOM_DOMAINS §4.1), without
-// the enum prefix.
-const (
-	issuerDomainPendingDNS   = "PENDING_DNS"
-	issuerDomainVerifying    = "VERIFYING"
-	issuerDomainProvisioning = "PROVISIONING"
-	issuerDomainActive       = "ACTIVE"
-	issuerDomainDegraded     = "DEGRADED"
-	issuerDomainFailed       = "FAILED"
-	issuerDomainDeleting     = "DELETING"
-)
-
-const (
-	// issuerDomainRecordsWait bounds the wait for the DNS records: one
-	// controller round trip, typically under thirty seconds.
-	issuerDomainRecordsWait = 5 * time.Minute
-	// issuerDomainDefaultTimeout is the create, update and delete timeout
-	// when the configuration sets none. Certificate issuance and the cloud
-	// side's teardown are both minutes, not seconds.
-	issuerDomainDefaultTimeout = 30 * time.Minute
-	issuerDomainPollInterval   = 5 * time.Second
-)
+// issuerDomainDeprecation is the deprecated aliases' message (#47).
+const issuerDomainDeprecation = "kit merged issuer domains into domains (kit#808): use authwise_domain with issuer_id, and authwise_domain_activation. " +
+	"A moved block carries the state across without touching the domain. This resource goes once kit removes the issuer-domains API (kit#810)."
 
 var issuerDomainScope = aip.NewScope("tenants", "issuers")
 
 // issuerDomainNamePattern is an issuer domain's full resource name.
 var issuerDomainNamePattern = regexp.MustCompile(`^tenants/[^/]+/issuers/[^/]+/issuer-domains/[^/]+$`)
 
-// hostnamePattern is a lower-case FQDN of two or more labels, without a
-// trailing dot. kit is the authority (it refuses an apex, a claimed name and
-// anything below the plan gate); this only catches a URL or a stray capital
-// in plan.
-var hostnamePattern = regexp.MustCompile(`^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]([a-z0-9-]{0,61}[a-z0-9])?$`)
-
-// issuerDomain is kit's IssuerDomain as this resource uses it: the enums as
-// their names without the prefix. issuerDomainClient is the only code that
-// sees the proto, so the waits are tested against a plain fake.
-type issuerDomain struct {
-	Name           string
-	Hostname       string
-	State          string
-	TrafficTarget  string
-	DNSRecords     []issuerDomainRecord
-	FailureCode    string
-	FailureMessage string
-	// FailureRecord is the record purpose the failure is about, or "".
-	FailureRecord        string
-	CertificateExpiresAt *time.Time
-}
-
-type issuerDomainRecord struct {
-	Name, Type, Value, Purpose string
-}
-
 // issuerDomainAPI is the slice of the identity service the resource calls.
 // Errors are gRPC statuses, as the identity client's are.
 type issuerDomainAPI interface {
-	CreateIssuerDomain(ctx context.Context, parent, hostname string) (*issuerDomain, error)
-	GetIssuerDomain(ctx context.Context, name string) (*issuerDomain, error)
+	CreateIssuerDomain(ctx context.Context, parent, hostname string) (*domain, error)
+	GetIssuerDomain(ctx context.Context, name string) (*domain, error)
 	DeleteIssuerDomain(ctx context.Context, name string) error
 }
 
@@ -114,22 +53,13 @@ var (
 	_ resource.ResourceWithImportState = &issuerDomainResource{}
 )
 
-// issuerDomainResource is authwise_issuer_domain (#44): a hostname of the
-// customer's that serves an issuer, with the certificate obtained and renewed
-// on Authwise's edge. Hand-written because Create and Delete wait on the
-// domain controller: kit returns the row at once, and the DNS records, the
-// certificate and the release of a deleted hostname arrive later.
+// issuerDomainResource is authwise_issuer_domain (#44), deprecated (#47):
+// authwise_domain with issuer_id is the same row since kit#808, and kit
+// keeps the issuer-domains RPCs this calls for one release as aliases.
 type issuerDomainResource struct {
-	issuerDomainPoller
+	domainPoller
+	client   issuerDomainAPI
 	defaults map[string]string
-}
-
-// issuerDomainPoller reads a domain until the controller has moved it on.
-// authwise_issuer_domain and authwise_issuer_domain_activation share it.
-type issuerDomainPoller struct {
-	client issuerDomainAPI
-	// poll is the interval between reads while waiting.
-	poll time.Duration
 }
 
 type issuerDomainModel struct {
@@ -148,17 +78,8 @@ type issuerDomainModel struct {
 	Timeouts             timeouts.Value `tfsdk:"timeouts"`
 }
 
-func issuerDomainRecordAttrTypes() map[string]attr.Type {
-	return map[string]attr.Type{
-		tfruntime.NameAttribute: types.StringType,
-		recordTypeAttribute:     types.StringType,
-		recordValueAttribute:    types.StringType,
-		recordPurposeAttribute:  types.StringType,
-	}
-}
-
 func newIssuerDomainResource() resource.Resource {
-	return &issuerDomainResource{issuerDomainPoller: issuerDomainPoller{poll: issuerDomainPollInterval}}
+	return &issuerDomainResource{domainPoller: domainPoller{poll: domainPollInterval}}
 }
 
 func (r *issuerDomainResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -182,7 +103,9 @@ func (r *issuerDomainResource) Schema(ctx context.Context, _ resource.SchemaRequ
 	}
 
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "A hostname of yours that serves an issuer, such as `login.acme.com`. Authwise obtains and renews its certificate; you add two DNS records, " +
+		DeprecationMessage: issuerDomainDeprecation,
+		MarkdownDescription: "**Deprecated:** use `authwise_domain` with `issuer_id` (kit#808); a `moved` block carries the state.\n\n" +
+			"A hostname of yours that serves an issuer, such as `login.acme.com`. Authwise obtains and renews its certificate; you add two DNS records, " +
 			"read from `dns_records`. The issuer keeps answering at its own host as well, and each host is its own issuer URL (`iss`).\n\n" +
 			"Create returns once the records are known, so DNS resources can take them in the same apply. Add the challenge record first and point traffic only once `state` is `PROVISIONING` or `ACTIVE`, " +
 			"so the certificate exists before any request arrives: `authwise_issuer_domain_activation` waits for that between the two records, in one apply. Both records must be DNS-only (on Cloudflare, `proxied = false`), and the challenge record stays for as long as the domain does: renewal depends on it.\n\n" +
@@ -243,41 +166,11 @@ func (r *issuerDomainResource) Schema(ctx context.Context, _ resource.SchemaRequ
 }
 
 func (r *issuerDomainResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
-	if pd := r.configure(req, &resp.Diagnostics); pd != nil {
-		r.defaults = pd.Defaults
+	client, pd := providerClient[issuerDomainAPI](req, issuerDomainsClientKey, &resp.Diagnostics)
+	if pd == nil {
+		return
 	}
-}
-
-// configure takes the issuerDomainAPI from the provider's data, and returns
-// that data; nil when there is none yet or it is not the provider's.
-func (p *issuerDomainPoller) configure(req resource.ConfigureRequest, diags *diag.Diagnostics) *tfruntime.ProviderData {
-
-	if req.ProviderData == nil {
-		return nil
-	}
-
-	pd, ok := req.ProviderData.(*tfruntime.ProviderData)
-	if !ok {
-		diags.AddError("unexpected provider data", fmt.Sprintf("expected *tf.ProviderData, got %T", req.ProviderData))
-		return nil
-	}
-
-	client, ok := pd.Clients[issuerDomainsClientKey].(issuerDomainAPI)
-	if !ok {
-		diags.AddError("missing client", `provider data key "issuerDomains" is not an issuerDomainAPI`)
-		return nil
-	}
-
-	p.client = client
-	return pd
-}
-
-func (p *issuerDomainPoller) configured(diags *diag.Diagnostics) bool {
-	if p.client == nil {
-		diags.AddError("the issuer domain resource is not configured", "Configure was not called with the provider's data")
-		return false
-	}
-	return true
+	r.client, r.get, r.defaults = client, client.GetIssuerDomain, pd.Defaults
 }
 
 func (r *issuerDomainResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
@@ -292,7 +185,7 @@ func (r *issuerDomainResource) Create(ctx context.Context, req resource.CreateRe
 		return
 	}
 
-	timeout, d := plan.Timeouts.Create(ctx, issuerDomainDefaultTimeout)
+	timeout, d := plan.Timeouts.Create(ctx, domainDefaultTimeout)
 	resp.Diagnostics.Append(d...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -315,7 +208,7 @@ func (r *issuerDomainResource) Create(ctx context.Context, req resource.CreateRe
 
 	out, err := r.client.CreateIssuerDomain(ctx, parent, plan.Hostname.ValueString())
 	if err != nil {
-		summary, detail := issuerDomainCreateError(err)
+		summary, detail := domainCreateError(err)
 		resp.Diagnostics.AddAttributeError(path.Root("hostname"), summary, detail)
 		return
 	}
@@ -327,7 +220,7 @@ func (r *issuerDomainResource) Create(ctx context.Context, req resource.CreateRe
 		resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 	}()
 
-	recordsCtx, cancelRecords := context.WithTimeout(ctx, issuerDomainRecordsWait)
+	recordsCtx, cancelRecords := context.WithTimeout(ctx, domainRecordsWait)
 	defer cancelRecords()
 	out = r.waitFor(recordsCtx, out, hasRecords, "its DNS records", &resp.Diagnostics)
 }
@@ -356,7 +249,7 @@ func (r *issuerDomainResource) Read(ctx context.Context, req resource.ReadReques
 
 	// A domain someone else deleted is gone for Terraform's purposes: it
 	// no longer routes, and kit removes the row once the cloud side is.
-	if out.State == issuerDomainDeleting {
+	if out.State == domainDeleting {
 		tflog.Warn(ctx, "issuer domain is being deleted outside Terraform; removing it from state", map[string]any{tfruntime.NameAttribute: out.Name})
 		resp.State.RemoveResource(ctx)
 		return
@@ -381,7 +274,7 @@ func (r *issuerDomainResource) Update(ctx context.Context, req resource.UpdateRe
 		return
 	}
 
-	timeout, d := plan.Timeouts.Update(ctx, issuerDomainDefaultTimeout)
+	timeout, d := plan.Timeouts.Update(ctx, domainDefaultTimeout)
 	resp.Diagnostics.Append(d...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -414,7 +307,7 @@ func (r *issuerDomainResource) Delete(ctx context.Context, req resource.DeleteRe
 		return
 	}
 
-	timeout, d := state.Timeouts.Delete(ctx, issuerDomainDefaultTimeout)
+	timeout, d := state.Timeouts.Delete(ctx, domainDefaultTimeout)
 	resp.Diagnostics.Append(d...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -435,29 +328,6 @@ func (r *issuerDomainResource) Delete(ctx context.Context, req resource.DeleteRe
 	r.waitGone(ctx, name, timeout, &resp.Diagnostics)
 }
 
-// waitGone reads the domain until kit has removed it or ctx ends.
-func (p *issuerDomainPoller) waitGone(ctx context.Context, name string, timeout time.Duration, diags *diag.Diagnostics) {
-
-	for {
-		_, err := p.client.GetIssuerDomain(ctx, name)
-		if aip.IsNotFound(err) {
-			return
-		}
-		if err != nil && ctx.Err() == nil {
-			diags.AddError("read issuer domain failed", err.Error())
-			return
-		}
-		select {
-		case <-ctx.Done():
-			diags.AddError("issuer domain is still being deleted",
-				fmt.Sprintf("%s is DELETING after %s: Authwise is removing its certificate and edge entries, and the hostname cannot be claimed again until that finishes. "+
-					"It will finish on its own; raise timeouts.delete to wait longer.", name, timeout))
-			return
-		case <-time.After(p.poll):
-		}
-	}
-}
-
 // ImportState takes the full resource name; the parents read back from it.
 func (r *issuerDomainResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 
@@ -469,49 +339,12 @@ func (r *issuerDomainResource) ImportState(ctx context.Context, req resource.Imp
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root(tfruntime.NameAttribute), req.ID)...)
 }
 
-// issuerDomainRefusals is the remedy for each ErrorInfo reason create is
-// refused with.
-var issuerDomainRefusals = map[string]string{
-	"HOSTNAME_CLAIMED":    "The hostname is already claimed in this Authwise install, by another issuer or tenant, or by a domain of yours that is still being deleted (a deleted domain releases its hostname only once its certificate and edge entries are gone).",
-	"HOSTNAME_APEX":       "The hostname is a zone apex, and a CNAME cannot sit at an apex. Use a subdomain such as login.<your domain>, or your DNS provider's CNAME flattening on a subdomain you point at it.",
-	"HOSTNAME_IS_ISSUER":  "The hostname is an Authwise issuer host already; an issuer answers at its own host without a domain.",
-	"PLAN_REQUIRED":       "Custom domains need a higher plan.",
-	"DOMAINS_UNAVAILABLE": "This Authwise install has no domain controller, so a domain added to it would never get a certificate. Custom domains are not available on it.",
-}
-
-// issuerDomainCreateError words kit's refusal of CreateIssuerDomain by its
-// ErrorInfo reason (domain authwise.io), which is the contract; the status
-// message is prose and may change.
-func issuerDomainCreateError(err error) (summary, detail string) {
-
-	var info *errdetails.ErrorInfo
-	for _, d := range status.Convert(err).Details() {
-		if i, ok := d.(*errdetails.ErrorInfo); ok && i.GetDomain() == authwiseErrorDomain {
-			info = i
-		}
-	}
-
-	summary = "create issuer domain failed"
-	if info == nil {
-		return summary, err.Error()
-	}
-	summary = "create issuer domain refused: " + info.GetReason()
-
-	detail = issuerDomainRefusals[info.GetReason()]
-	if plan := info.GetMetadata()["plan"]; info.GetReason() == "PLAN_REQUIRED" && plan != "" {
-		// kit sends the enum name, BUSINESS.
-		detail = fmt.Sprintf("Custom domains need the %s%s plan or above.", plan[:1], strings.ToLower(plan[1:]))
-	}
-
-	return summary, strings.TrimSpace(detail + " " + err.Error())
-}
-
 // issuerDomainClient is issuerDomainAPI over kit's identity service.
 type issuerDomainClient struct {
 	client identitypb.AuthwiseIdentityServiceClient
 }
 
-func (c issuerDomainClient) CreateIssuerDomain(ctx context.Context, parent, hostname string) (*issuerDomain, error) {
+func (c issuerDomainClient) CreateIssuerDomain(ctx context.Context, parent, hostname string) (*domain, error) {
 	out, err := c.client.CreateIssuerDomain(ctx, &identitypb.CreateIssuerDomainRequest{
 		Parent:       parent,
 		IssuerDomain: &corepb.IssuerDomain{Hostname: hostname},
@@ -522,7 +355,7 @@ func (c issuerDomainClient) CreateIssuerDomain(ctx context.Context, parent, host
 	return issuerDomainFromProto(out), nil
 }
 
-func (c issuerDomainClient) GetIssuerDomain(ctx context.Context, name string) (*issuerDomain, error) {
+func (c issuerDomainClient) GetIssuerDomain(ctx context.Context, name string) (*domain, error) {
 	out, err := c.client.GetIssuerDomain(ctx, &identitypb.GetIssuerDomainRequest{Name: name})
 	if err != nil {
 		return nil, err
@@ -535,18 +368,9 @@ func (c issuerDomainClient) DeleteIssuerDomain(ctx context.Context, name string)
 	return err
 }
 
-// enumName is an enum value's name without its prefix; "" when unspecified.
-func enumName(name, prefix string) string {
-	name = strings.TrimPrefix(name, prefix)
-	if name == "UNSPECIFIED" {
-		return ""
-	}
-	return name
-}
+func issuerDomainFromProto(e *corepb.IssuerDomain) *domain {
 
-func issuerDomainFromProto(e *corepb.IssuerDomain) *issuerDomain {
-
-	d := &issuerDomain{
+	d := &domain{
 		Name:          e.GetName(),
 		Hostname:      e.GetHostname(),
 		State:         enumName(e.GetState().String(), "ISSUER_DOMAIN_STATE_"),
@@ -562,59 +386,13 @@ func issuerDomainFromProto(e *corepb.IssuerDomain) *issuerDomain {
 		d.CertificateExpiresAt = &t
 	}
 	for _, r := range e.GetDnsRecords() {
-		d.DNSRecords = append(d.DNSRecords, issuerDomainRecord{Name: r.GetName(), Type: r.GetType(), Value: r.GetValue(), Purpose: r.GetPurpose()})
+		d.DNSRecords = append(d.DNSRecords, domainRecord{Name: r.GetName(), Type: r.GetType(), Value: r.GetValue(), Purpose: r.GetPurpose()})
 	}
 
 	return d
 }
 
-func hasRecords(d *issuerDomain) bool { return len(d.DNSRecords) > 0 }
-
-// waitFor reads the domain until done holds or ctx ends, and returns the
-// last domain read. A FAILED domain ends the wait with its reason.
-func (p *issuerDomainPoller) waitFor(ctx context.Context, d *issuerDomain, done func(*issuerDomain) bool, what string, diags *diag.Diagnostics) *issuerDomain {
-
-	for {
-		if done(d) {
-			return d
-		}
-		if d.State == issuerDomainFailed {
-			diags.AddError("issuer domain failed", fmt.Sprintf("%s: %s (%s)", d.Hostname, d.FailureMessage, d.FailureCode))
-			return d
-		}
-		select {
-		case <-ctx.Done():
-			diags.AddError("timed out waiting for the issuer domain",
-				fmt.Sprintf("%s did not reach %s; it is %s. %s", d.Hostname, what, d.State, issuerDomainHint(d)))
-			return d
-		case <-time.After(p.poll):
-		}
-		next, err := p.client.GetIssuerDomain(ctx, d.Name)
-		if err != nil {
-			if ctx.Err() != nil {
-				continue
-			}
-			diags.AddError("read issuer domain failed", err.Error())
-			return d
-		}
-		d = next
-	}
-}
-
-// issuerDomainHint says what a stalled state is waiting on.
-func issuerDomainHint(d *issuerDomain) string {
-	switch d.State {
-	case issuerDomainPendingDNS:
-		return "The certificate authority has not seen the challenge record yet: check that it exists, is DNS-only, and has propagated."
-	case issuerDomainVerifying, issuerDomainProvisioning:
-		return "The certificate is being issued and attached; this can take several more minutes."
-	case "":
-		return "The domain controller has not picked the domain up yet."
-	}
-	return ""
-}
-
-func (m *issuerDomainModel) fromDomain(d *issuerDomain) diag.Diagnostics {
+func (m *issuerDomainModel) fromDomain(d *domain) diag.Diagnostics {
 
 	var diags diag.Diagnostics
 
@@ -634,24 +412,9 @@ func (m *issuerDomainModel) fromDomain(d *issuerDomain) diag.Diagnostics {
 	m.FailureCode = types.StringValue(d.FailureCode)
 	m.FailureMessage = types.StringValue(d.FailureMessage)
 	m.FailureRecord = types.StringValue(d.FailureRecord)
-	m.CertificateExpiresAt = types.StringValue("")
-	if d.CertificateExpiresAt != nil {
-		m.CertificateExpiresAt = types.StringValue(d.CertificateExpiresAt.UTC().Format(time.RFC3339))
-	}
+	m.CertificateExpiresAt = timestampValue(d.CertificateExpiresAt)
 
-	recordType := types.ObjectType{AttrTypes: issuerDomainRecordAttrTypes()}
-	records := make([]attr.Value, 0, len(d.DNSRecords))
-	for _, rec := range d.DNSRecords {
-		o, dd := types.ObjectValue(issuerDomainRecordAttrTypes(), map[string]attr.Value{
-			tfruntime.NameAttribute: types.StringValue(rec.Name),
-			recordTypeAttribute:     types.StringValue(rec.Type),
-			recordValueAttribute:    types.StringValue(rec.Value),
-			recordPurposeAttribute:  types.StringValue(rec.Purpose),
-		})
-		diags.Append(dd...)
-		records = append(records, o)
-	}
-	list, dd := types.ListValue(recordType, records)
+	list, dd := domainRecordsValue(d.DNSRecords)
 	diags.Append(dd...)
 	m.DNSRecords = list
 
