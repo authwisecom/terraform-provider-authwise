@@ -1,0 +1,221 @@
+---
+page_title: "{{.Name}} {{.Type}} - {{.RenderedProviderName}}"
+subcategory: ""
+description: |-
+{{ .Description | plainmarkdown | trimspace | prefixlines "  " }}
+---
+
+# authwise_domain (Resource)
+
+A hostname the tenant serves logins on. There are two kinds, told apart by
+`issuer_id`:
+
+- **Native** (no `issuer_id`): an Authwise host, such as
+  `acme.id.authwise.com`. An issuer names it as its host
+  (`authwise_issuer.domain_id`), so it exists before the issuer does.
+- **Custom** (`issuer_id` set): a hostname of yours, such as
+  `login.acme.com`, that serves that issuer. Authwise obtains the
+  certificate and renews it on its own edge. You add two DNS records and
+  nothing else.
+
+`domain_id` is the domain's id (`d-…`), assigned by Authwise. Before 0.19.0
+it was the hostname itself; see [Upgrading from 0.18](#upgrading-from-018).
+
+About custom hosts:
+
+- **Each host is its own issuer URL.** Tokens minted at `login.acme.com`
+  carry `iss = https://login.acme.com`. The issuer's own host keeps
+  working, with its own `iss`, so relying parties that cached discovery do
+  not break. Neither host redirects to the other.
+- **Passkeys do not follow.** A passkey is bound to the host it was
+  enrolled at, so passkeys enrolled at the issuer's own host do not work at
+  the custom domain. Add the domain before rolling out passkeys, or have
+  people enrol again.
+- **Business plan or above.** Where an installation enforces the plan,
+  create is refused below it with `PLAN_REQUIRED`.
+
+## Example Usage
+
+{{ tffile .ExampleFile }}
+
+## The rules for a custom host
+
+1. **Challenge first, traffic after `PROVISIONING`.** The certificate is
+   issued once the certificate authority sees the `challenge` record, before
+   any request reaches the custom domain. From `PROVISIONING` the hostname
+   routes with its certificate, so if the `traffic` record goes in only then,
+   nobody ever sees a TLS error. `ACTIVE` follows once Authwise finds the
+   `traffic` record in public DNS. The example does this in one apply:
+   `authwise_domain_activation` sits between the two records and waits for
+   `PROVISIONING` or `ACTIVE`. Creating both records at once also works;
+   the hostname then fails TLS for the few minutes until the certificate
+   exists.
+2. **DNS-only records.** On Cloudflare, `proxied = false` (the grey cloud).
+   A proxied record puts Cloudflare in front of Authwise. That is not
+   supported: the issuer would not see the real host, and the certificate
+   authority would not see the challenge record.
+3. **Keep the challenge record for as long as the domain exists.** Renewal
+   depends on it. If it goes, the domain moves to `DEGRADED` with
+   `failure_record = "challenge"`. It keeps serving until the current
+   certificate expires. Tenant administrators get mail when the domain
+   becomes `DEGRADED`, and again 14 and 7 days before the certificate
+   expires if it still is.
+4. **A subdomain, not an apex.** A CNAME cannot sit at a zone apex, and
+   create refuses one with `HOSTNAME_APEX`.
+
+## Waiting
+
+For a custom host, create returns once `dns_records` is known, usually
+within thirty seconds, so DNS resources can take the records in the same
+apply. It does not wait for the certificate: it can't, because the
+certificate needs the challenge record, and that record needs the domain.
+
+`authwise_domain_activation` waits instead. Make it depend on the challenge
+record, and the traffic record on it. Its create waits until `state` is
+`PROVISIONING` or `ACTIVE`, up to `timeouts.create` (30 minutes by
+default). A `FAILED` domain ends the wait with `failure_code` and
+`failure_message`, and the traffic record is not created.
+
+Destroying a custom host waits until Authwise has removed its certificate
+and edge entries and released the hostname, up to `timeouts.delete` (30
+minutes). Until then the hostname cannot be claimed again, by a replacement
+or by anyone else. A native host is deleted at once, and is refused while
+an issuer names it (`DOMAIN_HAS_ISSUERS`).
+
+An issuer with a custom host on it, including one still being deleted,
+cannot be deleted (`ISSUER_HAS_DOMAINS`). Set `issuer_id` from the issuer
+resource, as in the example, and Terraform destroys the domain, and waits
+for it to be gone, before it deletes the issuer. If `issuer_id` is a
+literal, add `depends_on` naming the issuer.
+
+## States
+
+A native host has no state: `state` is empty and `dns_records` is empty.
+
+| `state` | Meaning | What to do |
+|---|---|---|
+| `PENDING_DNS` | Waiting for the challenge record. | Add it, DNS-only. A claim never verified lapses, and its hostname is freed after about a week. |
+| `VERIFYING` | The certificate authority found the challenge record and is issuing the certificate. | Wait. |
+| `PROVISIONING` | The certificate is issued and attached; the hostname routes. | Add the traffic record if you have not; `ACTIVE` follows once it resolves. |
+| `ACTIVE` | Serving with its own certificate, and the traffic record resolves. | Nothing. |
+| `DEGRADED` | Serving, but renewal will fail. | Restore the record named in `failure_record`. |
+| `FAILED` | Issuance stopped. | Fix the cause in `failure_code`, below. |
+| `DELETING` | Being removed. | Wait; the hostname is released when it is gone. |
+
+| `failure_code` | Cause |
+|---|---|
+| `DNS_NOT_FOUND` | The record in `failure_record` does not resolve. |
+| `CAA` | A CAA record on the hostname or a parent excludes the certificate authority. Allow `pki.goog` and `letsencrypt.org`, or remove the CAA record. |
+| `CONFIG` | A record resolves to something else, or is proxied. |
+| `RATE_LIMITED` | The certificate authority's rate limit. Authwise retries. |
+| `PROBE_FAILED` | The hostname did not answer as the issuer: the traffic record points elsewhere. |
+| `PROVIDER_ERROR` | On Authwise's side. Contact support if it persists. |
+
+Create is refused with an error reason in the diagnostic:
+`HOSTNAME_CLAIMED` (another issuer, another tenant, or a domain still being
+deleted holds it), `HOSTNAME_APEX`, `HOSTNAME_IS_ISSUER` (the hostname is
+already an Authwise issuer host), `PLAN_REQUIRED`, or `DOMAINS_UNAVAILABLE`
+(the install has no domain controller, so no custom host on it would get a
+certificate).
+
+## Upgrading from 0.18
+
+0.19.0 needs kit KITVER or later, the release that gave every domain an id
+(kit#808). Upgrade kit first. Before the first apply with 0.19.0, keep a
+copy of the state (`terraform state pull > before-0.19.tfstate`): once
+0.19.0 has written it, 0.18 cannot read it.
+
+### `authwise_domain`
+
+In 0.18, `domain_id` was the hostname, and an issuer named its host by
+that hostname in `domain_name`. Change the configuration:
+
+```terraform
+# 0.18
+resource "authwise_domain" "main" {
+  domain_id = "acme.id.authwise.com"
+}
+
+resource "authwise_issuer" "main" {
+  domain_name = authwise_domain.main.domain_id
+}
+
+# 0.19
+resource "authwise_domain" "main" {
+  hostname = "acme.id.authwise.com"
+}
+
+resource "authwise_issuer" "main" {
+  domain_id = authwise_domain.main.domain_id
+}
+```
+
+Then run `terraform plan`. The state upgrades itself: the refresh finds
+each domain by its hostname and records its id, and the issuer reads the
+same id back from Authwise. **The plan should show no changes.** If it
+plans to replace an `authwise_issuer`, do not apply: kit is older than
+KITVER, or has not finished giving the issuer its domain's id. Check the
+kit version and plan again.
+
+`config` is gone from the resource: it had no settings. Remove it from the
+configuration if it is there.
+
+If the state cannot be upgraded in place, re-import instead, by id or by
+hostname:
+
+```shell
+terraform state rm authwise_domain.main
+terraform import authwise_domain.main tenants/t-01/domains/acme.id.authwise.com
+```
+
+### `authwise_issuer_domain` and `authwise_issuer_domain_activation`
+
+Both are deprecated: a custom host is an `authwise_domain` with
+`issuer_id`, and the same row in Authwise. Rename the resources in the
+configuration, `issuer_domain` to `domain` in the activation, and add
+`moved` blocks (Terraform 1.8 or later):
+
+```terraform
+resource "authwise_domain" "login" {
+  issuer_id = authwise_issuer.main.issuer_id
+  hostname  = "login.acme.com"
+}
+
+resource "authwise_domain_activation" "login" {
+  domain     = authwise_domain.login.name
+  depends_on = [cloudflare_record.login_challenge]
+}
+
+moved {
+  from = authwise_issuer_domain.login
+  to   = authwise_domain.login
+}
+
+moved {
+  from = authwise_issuer_domain_activation.login
+  to   = authwise_domain_activation.login
+}
+```
+
+The plan should show both as moved with no changes, and the DNS records
+unchanged: the domain keeps its id and its certificate. **Never let
+Terraform destroy and recreate a custom host to migrate it.** That deletes
+its certificate and edge entries and releases the hostname, and logins at
+it fail until a new certificate is issued.
+
+On Terraform older than 1.8, re-import instead:
+
+```shell
+terraform state rm authwise_issuer_domain.login authwise_issuer_domain_activation.login
+terraform import authwise_domain.login tenants/t-01/domains/d-01
+terraform import authwise_domain_activation.login tenants/t-01/domains/d-01
+```
+
+`d-01` is the old resource's `issuer_domain_id`: the id did not change.
+The deprecated resources go once kit removes the API they call (kit#810).
+
+{{ .SchemaMarkdown | trimspace }}
+
+## Import
+
+{{ codefile "shell" .ImportFile }}
