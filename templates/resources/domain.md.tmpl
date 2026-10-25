@@ -120,7 +120,7 @@ certificate).
 
 ## Upgrading from 0.18
 
-0.19.0 needs kit KITVER or later, the release that gave every domain an id
+0.19.0 needs [kit v1.56.0](https://gitlab.authwise.io/authwise/kit/-/releases/v1.56.0) or later (its API is [apis v0.40.0](https://git.authwise.com/authwise/apis/-/releases/v0.40.0)), the release that gave every domain an id
 (kit#808). Upgrade kit first. Before the first apply with 0.19.0, keep a
 copy of the state (`terraform state pull > before-0.19.tfstate`): once
 0.19.0 has written it, 0.18 cannot read it.
@@ -154,7 +154,7 @@ Then run `terraform plan`. The state upgrades itself: the refresh finds
 each domain by its hostname and records its id, and the issuer reads the
 same id back from Authwise. **The plan should show no changes.** If it
 plans to replace an `authwise_issuer`, do not apply: kit is older than
-KITVER, or has not finished giving the issuer its domain's id. Check the
+v1.56.0, or has not finished giving the issuer its domain's id. Check the
 kit version and plan again.
 
 `config` is gone from the resource: it had no settings. Remove it from the

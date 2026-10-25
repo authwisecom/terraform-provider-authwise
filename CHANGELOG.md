@@ -2,7 +2,7 @@
 
 NOTES:
 
-* **apis APISVER, kit KITVER or later required.** kit merged issuer
+* **Paired with [kit v1.56.0](https://gitlab.authwise.io/authwise/kit/-/releases/v1.56.0) and [apis v0.40.0](https://git.authwise.com/authwise/apis/-/releases/v0.40.0); kit v1.56.0 or later is required.** kit merged issuer
   domains into domains (kit#808): every domain now has an id (`d-…`), an
   issuer names its host by that id, and a custom host is a domain with an
   issuer. Upgrade kit first. Keep a copy of the state before the first
@@ -21,7 +21,7 @@ BREAKING CHANGES:
   host (#47).** Set `domain_id = authwise_domain.<name>.domain_id`;
   `domain_name` is now read-only and holds the hostname. Kit fills in the
   id for existing issuers, so the plan shows no changes. If it plans to
-  replace an issuer, do not apply: kit is older than KITVER.
+  replace an issuer, do not apply: kit is older than v1.56.0.
 
 FEATURES:
 
