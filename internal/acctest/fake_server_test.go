@@ -690,6 +690,20 @@ func admitProvider(p *corepb.Provider) error {
 		if a := ml.GetIdentifierAttribute(); a != "" && a != "email" {
 			return status.Errorf(codes.InvalidArgument, "identifier_attribute must be email, got %q", a)
 		}
+		// kit#831's bounds; 0 takes the default.
+		for _, l := range []struct {
+			field string
+			n     int32
+			max   int32
+		}{
+			{"per_identifier_per_hour", ml.GetRequestLimits().GetPerIdentifierPerHour(), 20},
+			{"per_ip_per_hour", ml.GetRequestLimits().GetPerIpPerHour(), 100},
+			{"per_realm_per_hour", ml.GetRequestLimits().GetPerRealmPerHour(), 10000},
+		} {
+			if l.n != 0 && (l.n < 1 || l.n > l.max) {
+				return status.Errorf(codes.InvalidArgument, "request_limits.%s must be 1 to %d, got %d", l.field, l.max, l.n)
+			}
+		}
 	}
 
 	return nil

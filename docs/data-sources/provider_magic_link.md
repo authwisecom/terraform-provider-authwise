@@ -3,12 +3,12 @@
 page_title: "authwise_provider_magic_link Data Source - Authwise"
 subcategory: "Sign-in providers"
 description: |-
-  A one-time link and code sent by email. Unset fields take kit's defaults: a 6-digit code, a 10-minute ttl, LINK_AND_CODE, SAME_BROWSER, SILENT. link_scope = "ANY_BROWSER" lets the link sign in whichever browser opens it, after the person confirms, at the price that whoever reads the mailbox can sign in anywhere, so pair it with a step-up rule (it needs LINK_AND_CODE). unknown_address = "TELL" tells a person whose address has no account so, where the realm would not create one, at the price of revealing which addresses have accounts at the request throttle's rate. Builds a ProviderMagicLink config and exposes its google.protobuf.Any encoding as any. Makes no API calls.
+  A one-time link and code sent by email. Unset fields take kit's defaults: a 6-digit code, a 10-minute ttl, LINK_AND_CODE, SAME_BROWSER, SILENT. link_scope = "ANY_BROWSER" lets the link sign in whichever browser opens it, after the person confirms, at the price that whoever reads the mailbox can sign in anywhere, so pair it with a step-up rule (it needs LINK_AND_CODE). unknown_address = "TELL" tells a person whose address has no account so, where the realm would not create one, at the price of revealing which addresses have accounts at the request throttle's rate. request_limits caps sign-in requests per hour per address (1 to 20, default 3), per IP (1 to 100, default 10) and per realm (1 to 10000, default 500); 0 or unset takes the default, there is no unlimited, and a higher cap lets more mail through to a person's inbox or to an attacker probing addresses. Builds a ProviderMagicLink config and exposes its google.protobuf.Any encoding as any. Makes no API calls.
 ---
 
 # authwise_provider_magic_link (Data Source)
 
-A one-time link and code sent by email. Unset fields take kit's defaults: a 6-digit code, a 10-minute ttl, `LINK_AND_CODE`, `SAME_BROWSER`, `SILENT`. `link_scope = "ANY_BROWSER"` lets the link sign in whichever browser opens it, after the person confirms, at the price that whoever reads the mailbox can sign in anywhere, so pair it with a step-up rule (it needs `LINK_AND_CODE`). `unknown_address = "TELL"` tells a person whose address has no account so, where the realm would not create one, at the price of revealing which addresses have accounts at the request throttle's rate. Builds a ProviderMagicLink config and exposes its google.protobuf.Any encoding as `any`. Makes no API calls.
+A one-time link and code sent by email. Unset fields take kit's defaults: a 6-digit code, a 10-minute ttl, `LINK_AND_CODE`, `SAME_BROWSER`, `SILENT`. `link_scope = "ANY_BROWSER"` lets the link sign in whichever browser opens it, after the person confirms, at the price that whoever reads the mailbox can sign in anywhere, so pair it with a step-up rule (it needs `LINK_AND_CODE`). `unknown_address = "TELL"` tells a person whose address has no account so, where the realm would not create one, at the price of revealing which addresses have accounts at the request throttle's rate. `request_limits` caps sign-in requests per hour per address (1 to 20, default 3), per IP (1 to 100, default 10) and per realm (1 to 10000, default 500); 0 or unset takes the default, there is no unlimited, and a higher cap lets more mail through to a person's inbox or to an attacker probing addresses. Builds a ProviderMagicLink config and exposes its google.protobuf.Any encoding as `any`. Makes no API calls.
 
 ## Example Usage
 
@@ -35,6 +35,13 @@ data "authwise_provider_magic_link" "email" {
   # any other. Each alternative trades something away.
   link_scope      = "ANY_BROWSER" # whoever reads the mailbox can sign in anywhere: add a step-up rule
   unknown_address = "TELL"        # says "no account", revealing which addresses have one
+
+  # TELL answers at the request throttle's rate, so keep the per-address
+  # and per-IP caps low. Unset limits take kit's defaults (3, 10, 500).
+  request_limits = {
+    per_identifier_per_hour = 2 # 1 to 20
+    per_ip_per_hour         = 5 # 1 to 100
+  }
 }
 
 resource "authwise_provider" "magic_link" {
@@ -54,9 +61,19 @@ resource "authwise_provider" "magic_link" {
 - `identifier_attribute` (String)
 - `link_scope` (String)
 - `mode` (String)
+- `request_limits` (Attributes) (see [below for nested schema](#nestedatt--request_limits))
 - `ttl` (String) `ttl` as a duration: `"5s"`, `"1.5s"`, `"500ms"`, `"1m30s"`.
 - `unknown_address` (String)
 
 ### Read-Only
 
 - `any` (String) protojson-encoded google.protobuf.Any (includes `@type`); reference this from Any-typed resource attributes.
+
+<a id="nestedatt--request_limits"></a>
+### Nested Schema for `request_limits`
+
+Optional:
+
+- `per_identifier_per_hour` (Number)
+- `per_ip_per_hour` (Number)
+- `per_realm_per_hour` (Number)

@@ -44,6 +44,16 @@ data "authwise_provider_magic_link" "email" {
   # self-signup would not create one, which reveals who has an account.
   link_scope      = "SAME_BROWSER" # or ANY_BROWSER
   unknown_address = "SILENT"       # or TELL
+
+  # Sign-in requests per hour, here at kit's defaults. Each is set alone
+  # or left out (0 takes the default); there is no unlimited. A higher cap
+  # lets more mail through, to a person's inbox or to someone probing
+  # addresses.
+  request_limits = {
+    per_identifier_per_hour = 3   # 1 to 20
+    per_ip_per_hour         = 10  # 1 to 100
+    per_realm_per_hour      = 500 # 1 to 10000
+  }
 }
 
 resource "authwise_provider" "magic_link" {

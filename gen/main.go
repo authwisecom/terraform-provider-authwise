@@ -482,7 +482,10 @@ func main() {
 			// link_scope and unknown_address (kit#817, kit#825; apis
 			// v0.41.0) each trade something away, and tfinfra has no
 			// per-attribute description for a config field, so the trade
-			// is said here, one sentence each.
+			// is said here, one sentence each. request_limits (kit#831,
+			// apis v0.43.0) has no plan-time range check: tfinfra emits
+			// validators only for enums, so kit refuses out of bounds at
+			// apply, as it does code_length.
 			{
 				Type: reflect.TypeFor[corepb.ProviderMagicLink](),
 				Implementations: []any{
@@ -490,7 +493,8 @@ func main() {
 						TypeName: "provider_magic_link",
 						Description: "A one-time link and code sent by email. Unset fields take kit's defaults: a 6-digit code, a 10-minute ttl, `LINK_AND_CODE`, `SAME_BROWSER`, `SILENT`. " +
 							"`link_scope = \"ANY_BROWSER\"` lets the link sign in whichever browser opens it, after the person confirms, at the price that whoever reads the mailbox can sign in anywhere, so pair it with a step-up rule (it needs `LINK_AND_CODE`). " +
-							"`unknown_address = \"TELL\"` tells a person whose address has no account so, where the realm would not create one, at the price of revealing which addresses have accounts at the request throttle's rate.",
+							"`unknown_address = \"TELL\"` tells a person whose address has no account so, where the realm would not create one, at the price of revealing which addresses have accounts at the request throttle's rate. " +
+							"`request_limits` caps sign-in requests per hour per address (1 to 20, default 3), per IP (1 to 100, default 10) and per realm (1 to 10000, default 500); 0 or unset takes the default, there is no unlimited, and a higher cap lets more mail through to a person's inbox or to an attacker probing addresses.",
 					},
 				},
 			},

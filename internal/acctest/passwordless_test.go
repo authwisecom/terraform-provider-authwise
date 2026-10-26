@@ -60,6 +60,7 @@ resource "authwise_provider" "ml" {
 				Config: magicLink("15m", "LINK_AND_CODE", `
   link_scope      = "ANY_BROWSER"
   unknown_address = "TELL"
+  request_limits  = { per_identifier_per_hour = 5 }
 `),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("data.authwise_provider_magic_link.ml", "ttl", "15m"),
@@ -76,14 +77,19 @@ resource "authwise_provider" "ml" {
 							ml.GetUnknownAddress() != corepb.ProviderMagicLink_TELL {
 							return fmt.Errorf("server config = %v", ml)
 						}
+						// One limit set alone; the others reach kit as 0, its default.
+						if l := ml.GetRequestLimits(); l.GetPerIdentifierPerHour() != 5 || l.GetPerIpPerHour() != 0 || l.GetPerRealmPerHour() != 0 {
+							return fmt.Errorf("request_limits = %v", l)
+						}
 						return nil
 					}),
 				),
 			},
 			{
 				// A change inside the config is an in-place update of the
-				// provider, not a replacement. link_scope and unknown_address
-				// left out reach kit unset, so kit's defaults apply.
+				// provider, not a replacement. link_scope, unknown_address and
+				// request_limits left out reach kit unset, so kit's defaults
+				// apply.
 				Config: magicLink("5m", "CODE_ONLY", ""),
 				Check: checkServer(func() error {
 					ml, err := serverConfig()
@@ -92,7 +98,8 @@ resource "authwise_provider" "ml" {
 					}
 					if ml.GetTtl().AsDuration() != 5*time.Minute || ml.GetMode() != corepb.ProviderMagicLink_CODE_ONLY ||
 						ml.GetLinkScope() != corepb.ProviderMagicLink_LINK_SCOPE_UNSPECIFIED ||
-						ml.GetUnknownAddress() != corepb.ProviderMagicLink_UNKNOWN_ADDRESS_UNSPECIFIED {
+						ml.GetUnknownAddress() != corepb.ProviderMagicLink_UNKNOWN_ADDRESS_UNSPECIFIED ||
+						ml.GetRequestLimits() != nil {
 						return fmt.Errorf("server config after update = %v", ml)
 					}
 					return nil
@@ -120,6 +127,10 @@ func TestAccProviderMagicLink_Refusals(t *testing.T) {
 		// The enums take kit's spelling, as mode does.
 		"link_scope in lower case":      {body: `link_scope = "any_browser"`, want: regexp.MustCompile(`value must be one of`)},
 		"unknown_address in lower case": {body: `unknown_address = "tell"`, want: regexp.MustCompile(`value must be one of`)},
+		// kit#831's bounds, refused at apply: there is no unlimited.
+		"per identifier over 20": {body: `request_limits = { per_identifier_per_hour = 21 }`, want: regexp.MustCompile(`per_identifier_per_hour\s+must\s+be\s+1\s+to\s+20`)},
+		"per ip negative":        {body: `request_limits = { per_ip_per_hour = -1 }`, want: regexp.MustCompile(`per_ip_per_hour\s+must\s+be\s+1\s+to\s+100`)},
+		"per realm over 10000":   {body: `request_limits = { per_realm_per_hour = 10001 }`, want: regexp.MustCompile(`per_realm_per_hour\s+must\s+be\s+1\s+to\s+10000`)},
 	}
 
 	for k, v := range cases {

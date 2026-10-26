@@ -23,9 +23,10 @@ Two realms, two passwordless primaries:
 | `identifier_attribute` | `email` | the only value kit supports |
 | `link_scope` | `SAME_BROWSER` | `ANY_BROWSER` lets the link sign in whichever browser opens it, after the person confirms; whoever reads the mailbox can then sign in anywhere, so pair it with a step-up rule. Needs `LINK_AND_CODE` |
 | `unknown_address` | `SILENT` | `TELL` says there is no account for the address, where self-signup would not create one; that reveals which addresses have accounts, at the request throttle's rate |
+| `request_limits` | 3 / 10 / 500 | sign-in requests per hour per address (1 to 20), per IP (1 to 100) and per realm (1 to 10000); each is set alone, 0 takes the default, and there is no unlimited. A higher cap lets more mail through, to a person's inbox or to someone probing addresses. kit refuses a value out of bounds at apply |
 
-`link_scope` and `unknown_address` need kit v1.59.0; an older kit ignores
-them and keeps the defaults.
+`link_scope` and `unknown_address` need kit v1.59.0, and `request_limits`
+needs kit v1.61.0; an older kit ignores them and keeps the defaults.
 
 ## Passkeys
 

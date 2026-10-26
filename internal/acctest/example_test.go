@@ -477,7 +477,9 @@ func TestAccPasswordlessExample(t *testing.T) {
 			ml := &corepb.ProviderMagicLink{}
 			if err := p.GetConfig().UnmarshalTo(ml); err != nil || ml.GetTtl().AsDuration() != 10*time.Minute ||
 				ml.GetLinkScope() != corepb.ProviderMagicLink_SAME_BROWSER ||
-				ml.GetUnknownAddress() != corepb.ProviderMagicLink_SILENT {
+				ml.GetUnknownAddress() != corepb.ProviderMagicLink_SILENT ||
+				ml.GetRequestLimits().GetPerIdentifierPerHour() != 3 || ml.GetRequestLimits().GetPerIpPerHour() != 10 ||
+				ml.GetRequestLimits().GetPerRealmPerHour() != 500 {
 				t.Errorf("magic link config = %v (%v)", ml, err)
 			}
 		}

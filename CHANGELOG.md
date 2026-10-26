@@ -2,9 +2,11 @@
 
 NOTES:
 
-* **Paired with [apis v0.42.0](https://git.authwise.com/authwise/apis/-/releases/v0.42.0).**
-  kit fills `account_client_id` from v1.61.0. An older kit never fills it,
-  so it stays null; nothing else changes.
+* **Paired with [apis v0.43.0](https://git.authwise.com/authwise/apis/-/releases/v0.43.0)
+  and kit v1.61.0.** kit fills `account_client_id` and honours
+  `request_limits` from v1.61.0. An older kit never fills
+  `account_client_id`, so it stays null, and ignores `request_limits`,
+  keeping its defaults.
 
 FEATURES:
 
@@ -16,6 +18,14 @@ FEATURES:
   it as null; read the `authwise_issuer` data source with `depends_on` on
   the audience to use it in that apply, as the issuer page shows.
   `config.account_client_id` remains an override that wins when set.
+* **`authwise_provider_magic_link` takes `request_limits` (#49,
+  kit#831).** It caps sign-in requests per hour: `per_identifier_per_hour`
+  (1 to 20, default 3), `per_ip_per_hour` (1 to 100, default 10) and
+  `per_realm_per_hour` (1 to 10000, default 500). Each field is set
+  alone; 0 or unset takes kit's default, and there is no unlimited. A
+  higher cap lets more mail through, to a person's inbox or to someone
+  probing addresses. kit refuses a value out of bounds at apply; the
+  provider has no plan-time range check, as with `code_length`.
 
 ## 0.20.0 (October 26, 2026)
 

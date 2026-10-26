@@ -20,6 +20,13 @@ data "authwise_provider_magic_link" "email" {
   # any other. Each alternative trades something away.
   link_scope      = "ANY_BROWSER" # whoever reads the mailbox can sign in anywhere: add a step-up rule
   unknown_address = "TELL"        # says "no account", revealing which addresses have one
+
+  # TELL answers at the request throttle's rate, so keep the per-address
+  # and per-IP caps low. Unset limits take kit's defaults (3, 10, 500).
+  request_limits = {
+    per_identifier_per_hour = 2 # 1 to 20
+    per_ip_per_hour         = 5 # 1 to 100
+  }
 }
 
 resource "authwise_provider" "magic_link" {

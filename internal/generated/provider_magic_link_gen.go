@@ -8,12 +8,14 @@ import (
 	tf "github.com/activatedio/tfinfra/pkg/tf"
 	jsontypes "github.com/hashicorp/terraform-plugin-framework-jsontypes/jsontypes"
 	stringvalidator "github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+	attr "github.com/hashicorp/terraform-plugin-framework/attr"
 	datasource "github.com/hashicorp/terraform-plugin-framework/datasource"
 	schema "github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	diag "github.com/hashicorp/terraform-plugin-framework/diag"
 	path "github.com/hashicorp/terraform-plugin-framework/path"
 	validator "github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
+	basetypes "github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	anypb "google.golang.org/protobuf/types/known/anypb"
 )
 
@@ -36,6 +38,14 @@ func ProviderMagicLinkDataSourceSchema() schema.Schema {
 				Optional:   true,
 				Validators: []validator.String{stringvalidator.OneOf("MODE_UNSPECIFIED", "LINK_AND_CODE", "CODE_ONLY")},
 			},
+			"request_limits": schema.SingleNestedAttribute{
+				Attributes: map[string]schema.Attribute{
+					"per_identifier_per_hour": schema.Int64Attribute{Optional: true},
+					"per_ip_per_hour":         schema.Int64Attribute{Optional: true},
+					"per_realm_per_hour":      schema.Int64Attribute{Optional: true},
+				},
+				Optional: true,
+			},
 			"ttl": schema.StringAttribute{
 				MarkdownDescription: "`ttl` as a duration: `\"5s\"`, `\"1.5s\"`, `\"500ms\"`, `\"1m30s\"`.",
 				Optional:            true,
@@ -45,7 +55,23 @@ func ProviderMagicLinkDataSourceSchema() schema.Schema {
 				Validators: []validator.String{stringvalidator.OneOf("UNKNOWN_ADDRESS_UNSPECIFIED", "SILENT", "TELL")},
 			},
 		},
-		MarkdownDescription: "A one-time link and code sent by email. Unset fields take kit's defaults: a 6-digit code, a 10-minute ttl, `LINK_AND_CODE`, `SAME_BROWSER`, `SILENT`. `link_scope = \"ANY_BROWSER\"` lets the link sign in whichever browser opens it, after the person confirms, at the price that whoever reads the mailbox can sign in anywhere, so pair it with a step-up rule (it needs `LINK_AND_CODE`). `unknown_address = \"TELL\"` tells a person whose address has no account so, where the realm would not create one, at the price of revealing which addresses have accounts at the request throttle's rate. Builds a ProviderMagicLink config and exposes its google.protobuf.Any encoding as `any`. Makes no API calls.",
+		MarkdownDescription: "A one-time link and code sent by email. Unset fields take kit's defaults: a 6-digit code, a 10-minute ttl, `LINK_AND_CODE`, `SAME_BROWSER`, `SILENT`. `link_scope = \"ANY_BROWSER\"` lets the link sign in whichever browser opens it, after the person confirms, at the price that whoever reads the mailbox can sign in anywhere, so pair it with a step-up rule (it needs `LINK_AND_CODE`). `unknown_address = \"TELL\"` tells a person whose address has no account so, where the realm would not create one, at the price of revealing which addresses have accounts at the request throttle's rate. `request_limits` caps sign-in requests per hour per address (1 to 20, default 3), per IP (1 to 100, default 10) and per realm (1 to 10000, default 500); 0 or unset takes the default, there is no unlimited, and a higher cap lets more mail through to a person's inbox or to an attacker probing addresses. Builds a ProviderMagicLink config and exposes its google.protobuf.Any encoding as `any`. Makes no API calls.",
+	}
+}
+
+// ProviderMagicLinkRequestLimitsModel is the Terraform model for ProviderMagicLink's "request_limits" nested attribute.
+type ProviderMagicLinkRequestLimitsModel struct {
+	PerIdentifierPerHour types.Int64 `tfsdk:"per_identifier_per_hour"`
+	PerIpPerHour         types.Int64 `tfsdk:"per_ip_per_hour"`
+	PerRealmPerHour      types.Int64 `tfsdk:"per_realm_per_hour"`
+}
+
+// ProviderMagicLinkRequestLimitsAttrTypes returns the attribute types of the "request_limits" nested attribute.
+func ProviderMagicLinkRequestLimitsAttrTypes() map[string]attr.Type {
+	return map[string]attr.Type{
+		"per_identifier_per_hour": types.Int64Type,
+		"per_ip_per_hour":         types.Int64Type,
+		"per_realm_per_hour":      types.Int64Type,
 	}
 }
 
@@ -57,6 +83,7 @@ type ProviderMagicLinkModel struct {
 	IdentifierAttribute types.String         `tfsdk:"identifier_attribute"`
 	LinkScope           types.String         `tfsdk:"link_scope"`
 	UnknownAddress      types.String         `tfsdk:"unknown_address"`
+	RequestLimits       types.Object         `tfsdk:"request_limits"`
 	Any                 jsontypes.Normalized `tfsdk:"any"`
 }
 
@@ -68,6 +95,7 @@ func NewProviderMagicLinkModel() *ProviderMagicLinkModel {
 		IdentifierAttribute: types.StringNull(),
 		LinkScope:           types.StringNull(),
 		Mode:                types.StringNull(),
+		RequestLimits:       types.ObjectNull(ProviderMagicLinkRequestLimitsAttrTypes()),
 		Ttl:                 types.StringNull(),
 		UnknownAddress:      types.StringNull(),
 	}
@@ -95,6 +123,15 @@ func (m *ProviderMagicLinkModel) ToProto(ctx context.Context) (*v1alpha1.Provide
 	}
 	if !m.UnknownAddress.IsNull() && !m.UnknownAddress.IsUnknown() {
 		out.UnknownAddress = v1alpha1.ProviderMagicLink_UnknownAddress(v1alpha1.ProviderMagicLink_UnknownAddress_value[m.UnknownAddress.ValueString()])
+	}
+	if !m.RequestLimits.IsNull() && !m.RequestLimits.IsUnknown() {
+		var n ProviderMagicLinkRequestLimitsModel
+		diags.Append(m.RequestLimits.As(ctx, &n, basetypes.ObjectAsOptions{})...)
+		v := &v1alpha1.ProviderMagicLink_RequestLimits{}
+		v.PerIdentifierPerHour = int32(n.PerIdentifierPerHour.ValueInt64())
+		v.PerIpPerHour = int32(n.PerIpPerHour.ValueInt64())
+		v.PerRealmPerHour = int32(n.PerRealmPerHour.ValueInt64())
+		out.RequestLimits = v
 	}
 	return out, diags
 }
