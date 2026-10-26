@@ -6,6 +6,12 @@ NOTES:
   The two new attributes take effect from kit v1.59.0. An older kit ignores
   them and keeps its defaults, so this release is safe ahead of the kit
   upgrade.
+* **A realm people are invited into should set
+  `provisioning = { invitations = true }` (kit#816).** A realm created
+  through the API has invitations off until its config turns them on.
+  From kit v1.59.1 an invite to such a realm is refused at send. The
+  passwordless example and the `authwise_provider_magic_link` example now
+  set it.
 
 FEATURES:
 

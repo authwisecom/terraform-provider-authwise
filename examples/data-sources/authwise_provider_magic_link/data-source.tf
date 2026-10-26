@@ -1,7 +1,10 @@
-# A realm whose people sign themselves up with a magic link.
+# A realm whose people sign themselves up with a magic link, or are
+# invited. Invitations are off on a realm created through the API until
+# its config turns them on, and from kit v1.59.1 an invite is refused.
 data "authwise_realm_config" "customers" {
   provisioning = {
     self_signup                = true
+    invitations                = true
     require_email_verification = true
   }
 }

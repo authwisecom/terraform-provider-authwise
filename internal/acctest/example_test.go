@@ -488,6 +488,15 @@ func TestAccPasswordlessExample(t *testing.T) {
 	if len(h.fake.factors) != 1 {
 		t.Errorf("%d factors, want the passkey realm's webauthn factor", len(h.fake.factors))
 	}
+	invitable := 0
+	for _, r := range h.fake.realms {
+		if r.GetConfig().GetProvisioning().GetInvitations() {
+			invitable++
+		}
+	}
+	if invitable != 1 {
+		t.Errorf("%d realms with invitations on, want the customer realm (kit#816)", invitable)
+	}
 }
 
 // TestAccIdentifierFirstExample applies examples/identifier-first verbatim

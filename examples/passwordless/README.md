@@ -6,7 +6,9 @@ Two realms, two passwordless primaries:
   email carrying a link and a short code. The link works only in the
   browser that asked for it, and the code is typed into that same tab.
   Sign-up follows the realm's self-signup setting, as it does for
-  passwords.
+  passwords. The realm sets `invitations = true`: a realm created through
+  the API has invitations off until its config says so, and from kit
+  v1.59.1 an invite to it is refused at send.
 - **Workforce** signs in with **passkeys** alone.
 
 ## Magic link

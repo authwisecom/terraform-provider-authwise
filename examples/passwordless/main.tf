@@ -7,8 +7,17 @@
 # Password or magic link
 # ---------------------------------------------------------------------------
 
+# A realm created through the API has invitations off until its config
+# turns them on, and from kit v1.59.1 an invite to it is refused at send.
+data "authwise_realm_config" "customers" {
+  provisioning = {
+    invitations = true
+  }
+}
+
 resource "authwise_realm" "customers" {
   display_name = "Customers"
+  config       = data.authwise_realm_config.customers.json
 }
 
 locals {
