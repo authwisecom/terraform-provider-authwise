@@ -3,8 +3,8 @@
 NOTES:
 
 * **Paired with [apis v0.42.0](https://git.authwise.com/authwise/apis/-/releases/v0.42.0).**
-  An older kit never fills `account_client_id`, which then stays null;
-  nothing else changes.
+  kit fills `account_client_id` from v1.61.0. An older kit never fills it,
+  so it stays null; nothing else changes.
 
 FEATURES:
 
