@@ -1,4 +1,4 @@
-## 0.19.0 (Unreleased)
+## 0.19.0 (October 26, 2026)
 
 NOTES:
 
@@ -8,6 +8,11 @@ NOTES:
   issuer. Upgrade kit first. Keep a copy of the state before the first
   apply with 0.19.0 (`terraform state pull`): 0.18 cannot read the state
   0.19.0 writes. The `authwise_domain` page has the upgrade steps.
+* **The upgrade was run against a real kit.** 0.18.1 state (a domain, an
+  issuer on it, an audience) on kit v1.55.0, kit rolled to v1.56.0, then
+  0.19.0 with the recipe's configuration: the plan was empty before and
+  after apply. A custom host's waits were tested against the provider's
+  fakes only, as that install had no domain controller.
 
 BREAKING CHANGES:
 
