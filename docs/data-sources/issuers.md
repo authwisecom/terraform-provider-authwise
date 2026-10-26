@@ -28,6 +28,7 @@ An OAuth 2.0 / OpenID Connect issuer: the login a set of clients shares, with it
 
 Read-Only:
 
+- `account_client_id` (String)
 - `config` (String)
 - `domain_id` (String)
 - `domain_name` (String)

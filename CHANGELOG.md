@@ -1,3 +1,22 @@
+## 0.21.0 (Unreleased)
+
+NOTES:
+
+* **Paired with [apis v0.42.0](https://git.authwise.com/authwise/apis/-/releases/v0.42.0).**
+  An older kit never fills `account_client_id`, which then stays null;
+  nothing else changes.
+
+FEATURES:
+
+* **`authwise_issuer` and its data sources read back `account_client_id`
+  (#34, kit#827).** This is the issuer's "Account Security" client,
+  which kit creates at the issuer's first audience; it is output only and
+  lives outside `config`, so an issuer that sets `config` does not drift.
+  In the apply that creates the first audience the resource still reads
+  it as null; read the `authwise_issuer` data source with `depends_on` on
+  the audience to use it in that apply, as the issuer page shows.
+  `config.account_client_id` remains an override that wins when set.
+
 ## 0.20.0 (October 26, 2026)
 
 NOTES:

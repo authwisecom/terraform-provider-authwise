@@ -29,6 +29,10 @@ import (
 func IssuerResourceSchema() schema.Schema {
 	return schema.Schema{
 		Attributes: map[string]schema.Attribute{
+			"account_client_id": schema.StringAttribute{
+				Computed:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
 			"config": schema.StringAttribute{
 				Computed:            true,
 				CustomType:          jsontypes.NormalizedType{},
@@ -80,27 +84,29 @@ func IssuerResourceSchema() schema.Schema {
 
 // IssuerModel is the Terraform plan/state model for Issuer.
 type IssuerModel struct {
-	Name       types.String         `tfsdk:"name"`
-	IssuerId   types.String         `tfsdk:"issuer_id"`
-	TenantId   types.String         `tfsdk:"tenant_id"`
-	Labels     types.Map            `tfsdk:"labels"`
-	DomainName types.String         `tfsdk:"domain_name"`
-	Path       types.String         `tfsdk:"path"`
-	Config     jsontypes.Normalized `tfsdk:"config"`
-	DomainId   types.String         `tfsdk:"domain_id"`
+	Name            types.String         `tfsdk:"name"`
+	IssuerId        types.String         `tfsdk:"issuer_id"`
+	TenantId        types.String         `tfsdk:"tenant_id"`
+	Labels          types.Map            `tfsdk:"labels"`
+	DomainName      types.String         `tfsdk:"domain_name"`
+	Path            types.String         `tfsdk:"path"`
+	Config          jsontypes.Normalized `tfsdk:"config"`
+	DomainId        types.String         `tfsdk:"domain_id"`
+	AccountClientId types.String         `tfsdk:"account_client_id"`
 }
 
 // NewIssuerModel returns a model with every attribute set to its typed null; collection types cannot be zero-valued.
 func NewIssuerModel() *IssuerModel {
 	return &IssuerModel{
-		Config:     jsontypes.NewNormalizedNull(),
-		DomainId:   types.StringNull(),
-		DomainName: types.StringNull(),
-		IssuerId:   types.StringNull(),
-		Labels:     types.MapNull(types.StringType),
-		Name:       types.StringNull(),
-		Path:       types.StringNull(),
-		TenantId:   types.StringNull(),
+		AccountClientId: types.StringNull(),
+		Config:          jsontypes.NewNormalizedNull(),
+		DomainId:        types.StringNull(),
+		DomainName:      types.StringNull(),
+		IssuerId:        types.StringNull(),
+		Labels:          types.MapNull(types.StringType),
+		Name:            types.StringNull(),
+		Path:            types.StringNull(),
+		TenantId:        types.StringNull(),
 	}
 }
 
@@ -123,6 +129,7 @@ func (m *IssuerModel) ToProto(ctx context.Context) (*v1alpha1.Issuer, diag.Diagn
 		}
 	}
 	out.DomainId = m.DomainId.ValueString()
+	out.AccountClientId = m.AccountClientId.ValueString()
 	return out, diags
 }
 
@@ -160,6 +167,11 @@ func (m *IssuerModel) FromProto(ctx context.Context, e *v1alpha1.Issuer) diag.Di
 		}
 	}
 	m.DomainId = types.StringValue(e.DomainId)
+	if e.AccountClientId == "" {
+		m.AccountClientId = types.StringNull()
+	} else {
+		m.AccountClientId = types.StringValue(e.AccountClientId)
+	}
 	return diags
 }
 
@@ -318,6 +330,7 @@ func (r *issuerResource) ImportState(ctx context.Context, req resource.ImportSta
 func IssuerDataSourceSchema() schema1.Schema {
 	return schema1.Schema{
 		Attributes: map[string]schema1.Attribute{
+			"account_client_id": schema1.StringAttribute{Computed: true},
 			"config": schema1.StringAttribute{
 				Computed:   true,
 				CustomType: jsontypes.NormalizedType{},
@@ -373,25 +386,27 @@ func (d *issuerDataSource) Read(ctx context.Context, req datasource.ReadRequest,
 
 // IssuerItemModel is one element of the issuers data source's "issuers" list.
 type IssuerItemModel struct {
-	IssuerId   types.String         `tfsdk:"issuer_id"`
-	Name       types.String         `tfsdk:"name"`
-	Labels     types.Map            `tfsdk:"labels"`
-	DomainName types.String         `tfsdk:"domain_name"`
-	Path       types.String         `tfsdk:"path"`
-	Config     jsontypes.Normalized `tfsdk:"config"`
-	DomainId   types.String         `tfsdk:"domain_id"`
+	IssuerId        types.String         `tfsdk:"issuer_id"`
+	Name            types.String         `tfsdk:"name"`
+	Labels          types.Map            `tfsdk:"labels"`
+	DomainName      types.String         `tfsdk:"domain_name"`
+	Path            types.String         `tfsdk:"path"`
+	Config          jsontypes.Normalized `tfsdk:"config"`
+	DomainId        types.String         `tfsdk:"domain_id"`
+	AccountClientId types.String         `tfsdk:"account_client_id"`
 }
 
 // IssuerItemAttrTypes returns the attribute types of one issuers list element.
 func IssuerItemAttrTypes() map[string]attr.Type {
 	return map[string]attr.Type{
-		"config":      jsontypes.NormalizedType{},
-		"domain_id":   types.StringType,
-		"domain_name": types.StringType,
-		"issuer_id":   types.StringType,
-		"labels":      types.MapType{ElemType: types.StringType},
-		"name":        types.StringType,
-		"path":        types.StringType,
+		"account_client_id": types.StringType,
+		"config":            jsontypes.NormalizedType{},
+		"domain_id":         types.StringType,
+		"domain_name":       types.StringType,
+		"issuer_id":         types.StringType,
+		"labels":            types.MapType{ElemType: types.StringType},
+		"name":              types.StringType,
+		"path":              types.StringType,
 	}
 }
 
@@ -409,6 +424,7 @@ func IssuerListDataSourceSchema() schema1.Schema {
 				Computed:            true,
 				MarkdownDescription: "Every issuer under the parent, in the order the API lists them.",
 				NestedObject: schema1.NestedAttributeObject{Attributes: map[string]schema1.Attribute{
+					"account_client_id": schema1.StringAttribute{Computed: true},
 					"config": schema1.StringAttribute{
 						Computed:   true,
 						CustomType: jsontypes.NormalizedType{},
@@ -475,6 +491,11 @@ func issuerItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Issuer, *I
 		}
 	}
 	item.DomainId = types.StringValue(e.DomainId)
+	if e.AccountClientId == "" {
+		item.AccountClientId = types.StringNull()
+	} else {
+		item.AccountClientId = types.StringValue(e.AccountClientId)
+	}
 	id, err := crud.IDFromName(e.Name)
 	if err != nil {
 		diags.AddError("unexpected issuer name", err.Error())

@@ -256,9 +256,11 @@ func main() {
 			// domain_name is its hostname, read back. kit still takes
 			// domain_name on create until kit#810, but the provider sends
 			// domain_id only.
+			// account_client_id is the account page's client, which kit
+			// creates at the issuer's first audience (kit#827).
 			crud[corepb.Issuer](scopeTenant,
 				withDescription("An OAuth 2.0 / OpenID Connect issuer: the login a set of clients shares, with its domain, token lifetimes and which realm or realms people sign in to (`config`). Its appearance is whichever of its profiles is the default (`authwise_appearance_profile.is_default`)."), withJSON("config"),
-				withRequired("domain_id"), withImmutable("domain_id"), withComputed("domain_name"),
+				withRequired("domain_id"), withImmutable("domain_id"), withComputed("domain_name", "account_client_id"),
 				withReferences(map[string]gentf.Reference{"domain_id": refDomain})),
 			crud[corepb.Realm](scopeTenant,
 				withDescription("A realm: a population of users with its own providers, factors and authentication policy."), withJSON("config")),

@@ -111,6 +111,46 @@ refuses:
 - any domain rule on a `USERNAME` identifier, since a username has no
   domain.
 
+## The account page
+
+Each issuer has an account page where people manage their own password,
+passkeys and sessions. That page signs in through a client of the
+issuer, the "Account Security" client. kit creates it when the issuer
+gets its first audience, because a client needs one. Its id reads back
+in `account_client_id`, which is output only. Nothing in `config` needs
+to name it, and an issuer that sets `config` does not drift.
+
+The issuer is created before its first audience, so in the apply that
+creates both, `authwise_issuer.x.account_client_id` is still empty. The
+next refresh fills it in. To use the id in that same apply, read the
+issuer back through the data source, ordered after the audience:
+
+```terraform
+resource "authwise_issuer" "login" {
+  domain_id = authwise_domain.login.domain_id
+  config    = data.authwise_issuer_config.login.json
+}
+
+resource "authwise_audience" "api" {
+  issuer_id    = authwise_issuer.login.issuer_id
+  display_name = "https://api.example.com"
+}
+
+# Read after the audience, so the account client exists.
+data "authwise_issuer" "login" {
+  name       = authwise_issuer.login.name
+  depends_on = [authwise_audience.api]
+}
+
+output "account_client_id" {
+  value = data.authwise_issuer.login.account_client_id
+}
+```
+
+To have the account page sign in through a client of your own, set
+`account_client_id` in `config`. It takes precedence over the engine's
+client.
+
 ## Writing `config`
 
 `config` is the protojson encoding of `IssuerConfig`.

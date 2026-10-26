@@ -379,6 +379,8 @@ func (f *fakeIdentityServer) CreateIssuer(ctx context.Context, in *identitypb.Cr
 	i := proto.Clone(in.GetIssuer()).(*corepb.Issuer)
 	i.Name = in.GetParent() + "/issuers/" + f.nextID("i")
 	i.DomainName = d.GetHostname()
+	// account_client_id is kit's to set (kit#827); a value sent is ignored.
+	i.AccountClientId = ""
 	f.issuers[i.GetName()] = i
 	return proto.Clone(i).(*corepb.Issuer), nil
 }
@@ -448,6 +450,20 @@ func (f *fakeIdentityServer) CreateAudience(ctx context.Context, in *identitypb.
 	a := proto.Clone(in.GetAudience()).(*corepb.Audience)
 	a.Name = in.GetParent() + "/audiences/" + f.nextID("a")
 	f.audiences[a.GetName()] = a
+	// The issuer's first audience enables its account page (kit#827): kit
+	// creates the Account Security client, which needs an audience, and
+	// sets the issuer's account_client_id.
+	if i, ok := f.issuers[in.GetParent()]; ok && i.GetAccountClientId() == "" {
+		c := &corepb.Client{
+			Name:                    in.GetParent() + "/clients/" + f.nextID("c"),
+			DisplayName:             "Account Security",
+			AudienceId:              a.GetName()[strings.LastIndex(a.GetName(), "/")+1:],
+			GrantTypes:              []string{"authorization_code", "refresh_token"},
+			TokenEndpointAuthMethod: "none",
+		}
+		f.clients[c.GetName()] = c
+		i.AccountClientId = c.GetName()[strings.LastIndex(c.GetName(), "/")+1:]
+	}
 	return proto.Clone(a).(*corepb.Audience), nil
 }
 
