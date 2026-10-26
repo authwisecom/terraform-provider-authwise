@@ -28,6 +28,10 @@ func ProviderMagicLinkDataSourceSchema() schema.Schema {
 			},
 			"code_length":          schema.Int64Attribute{Optional: true},
 			"identifier_attribute": schema.StringAttribute{Optional: true},
+			"link_scope": schema.StringAttribute{
+				Optional:   true,
+				Validators: []validator.String{stringvalidator.OneOf("LINK_SCOPE_UNSPECIFIED", "SAME_BROWSER", "ANY_BROWSER")},
+			},
 			"mode": schema.StringAttribute{
 				Optional:   true,
 				Validators: []validator.String{stringvalidator.OneOf("MODE_UNSPECIFIED", "LINK_AND_CODE", "CODE_ONLY")},
@@ -36,8 +40,12 @@ func ProviderMagicLinkDataSourceSchema() schema.Schema {
 				MarkdownDescription: "`ttl` as a duration: `\"5s\"`, `\"1.5s\"`, `\"500ms\"`, `\"1m30s\"`.",
 				Optional:            true,
 			},
+			"unknown_address": schema.StringAttribute{
+				Optional:   true,
+				Validators: []validator.String{stringvalidator.OneOf("UNKNOWN_ADDRESS_UNSPECIFIED", "SILENT", "TELL")},
+			},
 		},
-		MarkdownDescription: "A one-time link and code sent by email. Unset fields take kit's defaults: a 6-digit code, a 10-minute ttl, `LINK_AND_CODE`. Builds a ProviderMagicLink config and exposes its google.protobuf.Any encoding as `any`. Makes no API calls.",
+		MarkdownDescription: "A one-time link and code sent by email. Unset fields take kit's defaults: a 6-digit code, a 10-minute ttl, `LINK_AND_CODE`, `SAME_BROWSER`, `SILENT`. `link_scope = \"ANY_BROWSER\"` lets the link sign in whichever browser opens it, after the person confirms, at the price that whoever reads the mailbox can sign in anywhere, so pair it with a step-up rule (it needs `LINK_AND_CODE`). `unknown_address = \"TELL\"` tells a person whose address has no account so, where the realm would not create one, at the price of revealing which addresses have accounts at the request throttle's rate. Builds a ProviderMagicLink config and exposes its google.protobuf.Any encoding as `any`. Makes no API calls.",
 	}
 }
 
@@ -47,6 +55,8 @@ type ProviderMagicLinkModel struct {
 	Ttl                 types.String         `tfsdk:"ttl"`
 	Mode                types.String         `tfsdk:"mode"`
 	IdentifierAttribute types.String         `tfsdk:"identifier_attribute"`
+	LinkScope           types.String         `tfsdk:"link_scope"`
+	UnknownAddress      types.String         `tfsdk:"unknown_address"`
 	Any                 jsontypes.Normalized `tfsdk:"any"`
 }
 
@@ -56,8 +66,10 @@ func NewProviderMagicLinkModel() *ProviderMagicLinkModel {
 		Any:                 jsontypes.NewNormalizedNull(),
 		CodeLength:          types.Int64Null(),
 		IdentifierAttribute: types.StringNull(),
+		LinkScope:           types.StringNull(),
 		Mode:                types.StringNull(),
 		Ttl:                 types.StringNull(),
+		UnknownAddress:      types.StringNull(),
 	}
 }
 
@@ -78,6 +90,12 @@ func (m *ProviderMagicLinkModel) ToProto(ctx context.Context) (*v1alpha1.Provide
 		out.Mode = v1alpha1.ProviderMagicLink_Mode(v1alpha1.ProviderMagicLink_Mode_value[m.Mode.ValueString()])
 	}
 	out.IdentifierAttribute = m.IdentifierAttribute.ValueString()
+	if !m.LinkScope.IsNull() && !m.LinkScope.IsUnknown() {
+		out.LinkScope = v1alpha1.ProviderMagicLink_LinkScope(v1alpha1.ProviderMagicLink_LinkScope_value[m.LinkScope.ValueString()])
+	}
+	if !m.UnknownAddress.IsNull() && !m.UnknownAddress.IsUnknown() {
+		out.UnknownAddress = v1alpha1.ProviderMagicLink_UnknownAddress(v1alpha1.ProviderMagicLink_UnknownAddress_value[m.UnknownAddress.ValueString()])
+	}
 	return out, diags
 }
 

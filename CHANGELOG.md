@@ -1,3 +1,27 @@
+## 0.20.0 (Unreleased)
+
+NOTES:
+
+* **Paired with [apis v0.41.0](https://git.authwise.com/authwise/apis/-/releases/v0.41.0).**
+  The two new attributes take effect from kit v1.59.0. An older kit ignores
+  them and keeps its defaults, so this release is safe ahead of the kit
+  upgrade.
+
+FEATURES:
+
+* **`authwise_provider_magic_link` takes `link_scope` and
+  `unknown_address` (#48, kit#817, kit#825).** Leaving them unset keeps
+  kit's defaults, and each alternative gives something up.
+  `link_scope = "ANY_BROWSER"` lets the link sign in whichever browser
+  opens it, once the person confirms. Whoever reads the mailbox can then
+  sign in anywhere, so pair it with a step-up rule. It applies only with
+  `LINK_AND_CODE`; the default is `SAME_BROWSER`.
+  `unknown_address = "TELL"` tells a person their address has no
+  account, where the realm would not create one. That reveals which
+  addresses have accounts, at the rate the request throttle allows. The
+  default is `SILENT`. Both take kit's upper-case spelling, as `mode`
+  does.
+
 ## 0.19.0 (October 26, 2026)
 
 NOTES:

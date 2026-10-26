@@ -20,13 +20,13 @@ func TestAccProviderMagicLink_RoundTrip(t *testing.T) {
 
 	h := newHarness(t)
 
-	magicLink := func(ttl, mode string) string {
+	magicLink := func(ttl, mode, extra string) string {
 		return h.providerConfig() + realmForFactors + fmt.Sprintf(`
 data "authwise_provider_magic_link" "ml" {
   code_length = 8
   ttl         = %q
   mode        = %q
-}
+%s}
 
 resource "authwise_provider" "ml" {
   realm_id      = local.realm_id
@@ -34,7 +34,7 @@ resource "authwise_provider" "ml" {
   provider_type = "magicLink"
   config        = data.authwise_provider_magic_link.ml.any
 }
-`, ttl, mode)
+`, ttl, mode, extra)
 	}
 
 	serverConfig := func() (*corepb.ProviderMagicLink, error) {
@@ -57,7 +57,10 @@ resource "authwise_provider" "ml" {
 		ProtoV6ProviderFactories: protoFactories(),
 		Steps: []resource.TestStep{
 			{
-				Config: magicLink("15m", "LINK_AND_CODE"),
+				Config: magicLink("15m", "LINK_AND_CODE", `
+  link_scope      = "ANY_BROWSER"
+  unknown_address = "TELL"
+`),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("data.authwise_provider_magic_link.ml", "ttl", "15m"),
 					resource.TestMatchResourceAttr("data.authwise_provider_magic_link.ml", "any",
@@ -68,7 +71,9 @@ resource "authwise_provider" "ml" {
 							return err
 						}
 						if ml.GetTtl().AsDuration() != 15*time.Minute || ml.GetCodeLength() != 8 ||
-							ml.GetMode() != corepb.ProviderMagicLink_LINK_AND_CODE {
+							ml.GetMode() != corepb.ProviderMagicLink_LINK_AND_CODE ||
+							ml.GetLinkScope() != corepb.ProviderMagicLink_ANY_BROWSER ||
+							ml.GetUnknownAddress() != corepb.ProviderMagicLink_TELL {
 							return fmt.Errorf("server config = %v", ml)
 						}
 						return nil
@@ -77,14 +82,17 @@ resource "authwise_provider" "ml" {
 			},
 			{
 				// A change inside the config is an in-place update of the
-				// provider, not a replacement.
-				Config: magicLink("5m", "CODE_ONLY"),
+				// provider, not a replacement. link_scope and unknown_address
+				// left out reach kit unset, so kit's defaults apply.
+				Config: magicLink("5m", "CODE_ONLY", ""),
 				Check: checkServer(func() error {
 					ml, err := serverConfig()
 					if err != nil {
 						return err
 					}
-					if ml.GetTtl().AsDuration() != 5*time.Minute || ml.GetMode() != corepb.ProviderMagicLink_CODE_ONLY {
+					if ml.GetTtl().AsDuration() != 5*time.Minute || ml.GetMode() != corepb.ProviderMagicLink_CODE_ONLY ||
+						ml.GetLinkScope() != corepb.ProviderMagicLink_LINK_SCOPE_UNSPECIFIED ||
+						ml.GetUnknownAddress() != corepb.ProviderMagicLink_UNKNOWN_ADDRESS_UNSPECIFIED {
 						return fmt.Errorf("server config after update = %v", ml)
 					}
 					return nil
@@ -109,6 +117,9 @@ func TestAccProviderMagicLink_Refusals(t *testing.T) {
 		"not matched on email":  {body: `identifier_attribute = "phone"`, want: regexp.MustCompile(`identifier_attribute must be email`)},
 		"ttl is not a duration": {body: `ttl = "10"`, want: regexp.MustCompile(`invalid duration`)},
 		"mode is not a mode":    {body: `mode = "LINK_ONLY"`, want: regexp.MustCompile(`value must be one of`)},
+		// The enums take kit's spelling, as mode does.
+		"link_scope in lower case":      {body: `link_scope = "any_browser"`, want: regexp.MustCompile(`value must be one of`)},
+		"unknown_address in lower case": {body: `unknown_address = "tell"`, want: regexp.MustCompile(`value must be one of`)},
 	}
 
 	for k, v := range cases {

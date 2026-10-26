@@ -477,12 +477,18 @@ func main() {
 			// The passwordless primaries (kit#194, kit#195). ttl is a
 			// Duration, so a string ("10m"); ProviderPasskey has no fields
 			// and its data source exists for the any envelope alone.
+			// link_scope and unknown_address (kit#817, kit#825; apis
+			// v0.41.0) each trade something away, and tfinfra has no
+			// per-attribute description for a config field, so the trade
+			// is said here, one sentence each.
 			{
 				Type: reflect.TypeFor[corepb.ProviderMagicLink](),
 				Implementations: []any{
 					gentf.ConfigDataSource{
-						TypeName:    "provider_magic_link",
-						Description: "A one-time link and code sent by email. Unset fields take kit's defaults: a 6-digit code, a 10-minute ttl, `LINK_AND_CODE`.",
+						TypeName: "provider_magic_link",
+						Description: "A one-time link and code sent by email. Unset fields take kit's defaults: a 6-digit code, a 10-minute ttl, `LINK_AND_CODE`, `SAME_BROWSER`, `SILENT`. " +
+							"`link_scope = \"ANY_BROWSER\"` lets the link sign in whichever browser opens it, after the person confirms, at the price that whoever reads the mailbox can sign in anywhere, so pair it with a step-up rule (it needs `LINK_AND_CODE`). " +
+							"`unknown_address = \"TELL\"` tells a person whose address has no account so, where the realm would not create one, at the price of revealing which addresses have accounts at the request throttle's rate.",
 					},
 				},
 			},

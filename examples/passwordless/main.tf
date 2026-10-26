@@ -27,6 +27,14 @@ data "authwise_provider_magic_link" "email" {
   # identifiers matched on email.
   ttl  = "10m"
   mode = "LINK_AND_CODE" # CODE_ONLY when people read mail on another device
+
+  # The two defaults below are the safe ones; each alternative trades
+  # something away. ANY_BROWSER lets the link sign in whichever browser
+  # opens it, so whoever reads the mailbox can sign in anywhere: pair it
+  # with a step-up rule. TELL says "no account for this address" where
+  # self-signup would not create one, which reveals who has an account.
+  link_scope      = "SAME_BROWSER" # or ANY_BROWSER
+  unknown_address = "SILENT"       # or TELL
 }
 
 resource "authwise_provider" "magic_link" {

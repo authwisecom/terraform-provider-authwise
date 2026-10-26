@@ -453,7 +453,8 @@ func TestAccEndpointExamples(t *testing.T) {
 // TestAccPasswordlessExample applies examples/passwordless verbatim — a
 // password-or-magic-link realm and a passkey realm beside its webauthn
 // factor — then asserts a re-plan is empty, which is the proof that the
-// magic link's ttl survives the round trip through the provider's Any.
+// magic link's ttl, link_scope and unknown_address survive the round trip
+// through the provider's Any.
 func TestAccPasswordlessExample(t *testing.T) {
 
 	if os.Getenv("TF_ACC") == "" {
@@ -474,7 +475,9 @@ func TestAccPasswordlessExample(t *testing.T) {
 		types[p.GetProviderType()]++
 		if p.GetProviderType() == "magicLink" {
 			ml := &corepb.ProviderMagicLink{}
-			if err := p.GetConfig().UnmarshalTo(ml); err != nil || ml.GetTtl().AsDuration() != 10*time.Minute {
+			if err := p.GetConfig().UnmarshalTo(ml); err != nil || ml.GetTtl().AsDuration() != 10*time.Minute ||
+				ml.GetLinkScope() != corepb.ProviderMagicLink_SAME_BROWSER ||
+				ml.GetUnknownAddress() != corepb.ProviderMagicLink_SILENT {
 				t.Errorf("magic link config = %v (%v)", ml, err)
 			}
 		}

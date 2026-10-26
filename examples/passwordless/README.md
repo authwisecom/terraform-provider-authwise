@@ -19,6 +19,11 @@ Two realms, two passwordless primaries:
 | `ttl` | `"10m"` | a duration (`"600s"`, `"10m"`); how long the link and the code live |
 | `mode` | `LINK_AND_CODE` | `CODE_ONLY` for people who read mail on one device and sign in on another |
 | `identifier_attribute` | `email` | the only value kit supports |
+| `link_scope` | `SAME_BROWSER` | `ANY_BROWSER` lets the link sign in whichever browser opens it, after the person confirms; whoever reads the mailbox can then sign in anywhere, so pair it with a step-up rule. Needs `LINK_AND_CODE` |
+| `unknown_address` | `SILENT` | `TELL` says there is no account for the address, where self-signup would not create one; that reveals which addresses have accounts, at the request throttle's rate |
+
+`link_scope` and `unknown_address` need kit v1.59.0; an older kit ignores
+them and keeps the defaults.
 
 ## Passkeys
 
