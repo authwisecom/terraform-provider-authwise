@@ -1,3 +1,16 @@
+## 0.21.1 (Unreleased)
+
+NOTES:
+
+* **Worked branding examples (#50, docs#24).** `authwise_theme` and
+  `authwise_appearance_profile` have examples on their pages, and
+  `examples/branding` applies them whole: a logo asset, a theme built
+  from the center layout's starter, a default appearance profile and a
+  second one a client signs in with. The theme's description says the
+  layout is fixed at creation, that colours are six hex digits without
+  `#`, and that `content` names an asset at `/assets` plus its `path`.
+  No provider behaviour changes.
+
 ## 0.21.0 (October 26, 2026)
 
 NOTES:

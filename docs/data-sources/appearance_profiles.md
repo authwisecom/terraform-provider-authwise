@@ -3,12 +3,12 @@
 page_title: "authwise_appearance_profiles Data Source - Authwise"
 subcategory: "Identity"
 description: |-
-  An issuer's appearance profile: the stylesheet and content its login pages use. The issuer's default profile (is_default) is the issuer's appearance; a client's or audience's appearance_profile_id overrides it. This data source lists every one under a parent.
+  An issuer's appearance profile: a theme plus overrides of its stylesheet_attributes and content, key by key. The issuer's default profile (is_default) is the issuer's appearance; a client's or audience's appearance_profile_id overrides it. This data source lists every one under a parent.
 ---
 
 # authwise_appearance_profiles (Data Source)
 
-An issuer's appearance profile: the stylesheet and content its login pages use. The issuer's default profile (`is_default`) is the issuer's appearance; a client's or audience's `appearance_profile_id` overrides it. This data source lists every one under a parent.
+An issuer's appearance profile: a theme plus overrides of its `stylesheet_attributes` and `content`, key by key. The issuer's default profile (`is_default`) is the issuer's appearance; a client's or audience's `appearance_profile_id` overrides it. This data source lists every one under a parent.
 
 
 

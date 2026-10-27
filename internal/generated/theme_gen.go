@@ -107,7 +107,7 @@ func ThemeResourceSchema() schema.Schema {
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 		},
-		MarkdownDescription: "A tenant theme: the stylesheet and content the hosted login pages render with.",
+		MarkdownDescription: "A tenant theme: the stylesheet and content the hosted login pages render with. Start from a layout's starter (`GET {issuer}/api/v1/ui/layouts`): its stylesheet template, `stylesheet_attributes` and `content`, and its two schemas. `layout` is fixed at creation; kit refuses a change, so another layout is another theme. Colours in `stylesheet_attributes` are six hex digits without `#`. An asset is named in `content` by its served URL, `/assets` plus the asset's `path`.",
 	}
 }
 
@@ -490,7 +490,7 @@ func ThemeDataSourceSchema() schema1.Schema {
 				MarkdownDescription: "Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.",
 			},
 		},
-		MarkdownDescription: "A tenant theme: the stylesheet and content the hosted login pages render with. This data source reads one by its full resource name.",
+		MarkdownDescription: "A tenant theme: the stylesheet and content the hosted login pages render with. Start from a layout's starter (`GET {issuer}/api/v1/ui/layouts`): its stylesheet template, `stylesheet_attributes` and `content`, and its two schemas. `layout` is fixed at creation; kit refuses a change, so another layout is another theme. Colours in `stylesheet_attributes` are six hex digits without `#`. An asset is named in `content` by its served URL, `/assets` plus the asset's `path`. This data source reads one by its full resource name.",
 	}
 }
 
@@ -611,7 +611,7 @@ func ThemeListDataSourceSchema() schema1.Schema {
 				}},
 			},
 		},
-		MarkdownDescription: "A tenant theme: the stylesheet and content the hosted login pages render with. This data source lists every one under a parent.",
+		MarkdownDescription: "A tenant theme: the stylesheet and content the hosted login pages render with. Start from a layout's starter (`GET {issuer}/api/v1/ui/layouts`): its stylesheet template, `stylesheet_attributes` and `content`, and its two schemas. `layout` is fixed at creation; kit refuses a change, so another layout is another theme. Colours in `stylesheet_attributes` are six hex digits without `#`. An asset is named in `content` by its served URL, `/assets` plus the asset's `path`. This data source lists every one under a parent.",
 	}
 }
 

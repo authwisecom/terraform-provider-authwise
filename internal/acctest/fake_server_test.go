@@ -45,6 +45,7 @@ type fakeIdentityServer struct {
 	domains  map[string]*corepb.Domain
 	scopes   map[string]*corepb.Scope
 	profiles map[string]*corepb.AppearanceProfile
+	themes   map[string]*corepb.Theme
 	// scopePerms holds each scope's access-permission set, by name.
 	scopePerms map[string]map[string]bool
 	audiences  map[string]*corepb.Audience
@@ -111,6 +112,7 @@ func newFakeIdentityServer() *fakeIdentityServer {
 		domains:           map[string]*corepb.Domain{},
 		scopes:            map[string]*corepb.Scope{},
 		profiles:          map[string]*corepb.AppearanceProfile{},
+		themes:            map[string]*corepb.Theme{},
 		scopePerms:        map[string]map[string]bool{},
 		audiences:         map[string]*corepb.Audience{},
 		clients:           map[string]*corepb.Client{},

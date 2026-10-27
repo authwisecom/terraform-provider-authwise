@@ -3,12 +3,12 @@
 page_title: "authwise_themes Data Source - Authwise"
 subcategory: "Identity"
 description: |-
-  A tenant theme: the stylesheet and content the hosted login pages render with. This data source lists every one under a parent.
+  A tenant theme: the stylesheet and content the hosted login pages render with. Start from a layout's starter (GET {issuer}/api/v1/ui/layouts): its stylesheet template, stylesheet_attributes and content, and its two schemas. layout is fixed at creation; kit refuses a change, so another layout is another theme. Colours in stylesheet_attributes are six hex digits without #. An asset is named in content by its served URL, /assets plus the asset's path. This data source lists every one under a parent.
 ---
 
 # authwise_themes (Data Source)
 
-A tenant theme: the stylesheet and content the hosted login pages render with. This data source lists every one under a parent.
+A tenant theme: the stylesheet and content the hosted login pages render with. Start from a layout's starter (`GET {issuer}/api/v1/ui/layouts`): its stylesheet template, `stylesheet_attributes` and `content`, and its two schemas. `layout` is fixed at creation; kit refuses a change, so another layout is another theme. Colours in `stylesheet_attributes` are six hex digits without `#`. An asset is named in `content` by its served URL, `/assets` plus the asset's `path`. This data source lists every one under a parent.
 
 
 

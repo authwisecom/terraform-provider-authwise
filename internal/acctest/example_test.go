@@ -575,3 +575,74 @@ func TestAccSocialExample(t *testing.T) {
 		t.Errorf("%d secrets, want 6", len(h.fake.secrets))
 	}
 }
+
+// TestAccBrandingExample applies examples/branding verbatim — a logo, a
+// theme from the center layout's starter, two appearance profiles and a
+// client on the second — then asserts a re-plan is empty, which is the
+// proof that the theme's schemas and merged starter survive the round trip.
+func TestAccBrandingExample(t *testing.T) {
+
+	if os.Getenv("TF_ACC") == "" {
+		t.Skip("acceptance test: set TF_ACC=1 to run")
+	}
+
+	h := newHarness(t)
+	r := newExampleRun(t, h, "branding")
+
+	r.apply()
+	r.expectCleanPlan()
+
+	h.fake.mu.Lock()
+	defer h.fake.mu.Unlock()
+
+	if len(h.fake.themes) != 1 {
+		t.Fatalf("%d themes, want 1", len(h.fake.themes))
+	}
+	var themeID string
+	for name, th := range h.fake.themes {
+		themeID = name[strings.LastIndex(name, "/")+1:]
+		attrs, content := th.GetStylesheetAttributes().AsMap(), th.GetContent().AsMap()
+		// The starter's keys stay; the example's overrides win.
+		if th.GetLayout() != "center" || attrs["primary_main"] != "0B6E4F" || attrs["card_radius"] != "12px" ||
+			content["main_logo"] != "/assets/logo.svg" || content["heading"] != "Welcome" || content["password_label"] != "Password" ||
+			th.GetContentSchema() == "" || th.GetStylesheetAttributesSchema() == "" || th.GetStylesheet() == "" {
+			t.Errorf("theme = %v", th)
+		}
+	}
+	for _, a := range h.fake.assets {
+		if a.GetPath() != "/logo.svg" {
+			t.Errorf("asset path = %q, want /logo.svg so the theme's /assets/logo.svg resolves", a.GetPath())
+		}
+	}
+
+	byName := map[string]string{}
+	defaults := 0
+	for name, p := range h.fake.profiles {
+		byName[p.GetDisplayName()] = name[strings.LastIndex(name, "/")+1:]
+		if p.GetThemeId() != themeID {
+			t.Errorf("profile %s theme_id = %q, want %q", p.GetDisplayName(), p.GetThemeId(), themeID)
+		}
+		if p.GetIsDefault() {
+			defaults++
+			if p.GetDisplayName() != "Example" {
+				t.Errorf("default profile = %s, want Example", p.GetDisplayName())
+			}
+		}
+	}
+	if len(byName) != 2 || defaults != 1 {
+		t.Errorf("profiles = %v, %d default", byName, defaults)
+	}
+
+	portal := 0
+	for _, c := range h.fake.clients {
+		if c.GetDisplayName() == "Partner portal" {
+			portal++
+			if c.GetAppearanceProfileId() != byName["Example for partners"] {
+				t.Errorf("portal appearance_profile_id = %q, want the partners profile %q", c.GetAppearanceProfileId(), byName["Example for partners"])
+			}
+		}
+	}
+	if portal != 1 {
+		t.Errorf("%d partner portal clients, want 1", portal)
+	}
+}

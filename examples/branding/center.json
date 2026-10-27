@@ -1,0 +1,750 @@
+{
+  "key": "center",
+  "displayName": "Center",
+  "description": "One card in the middle of a flat page, with an optional heading and background image. The layout embedded builds carry, and the one every theme starts as.",
+  "stylesheetAttributesSchema": {
+    "type": "object",
+    "properties": {
+      "primary_main": {
+        "type": "string",
+        "title": "Primary",
+        "description": "Buttons and the focus ring.",
+        "format": "color"
+      },
+      "secondary_main": {
+        "type": "string",
+        "title": "Secondary",
+        "description": "Checkboxes and secondary actions.",
+        "format": "color"
+      },
+      "text_primary": {
+        "type": "string",
+        "title": "Text on primary",
+        "description": "Text on primary buttons.",
+        "format": "color"
+      },
+      "text_secondary": {
+        "type": "string",
+        "title": "Body text",
+        "description": "Labels, headings and body copy.",
+        "format": "color"
+      },
+      "text_muted": {
+        "type": "string",
+        "title": "Muted text",
+        "description": "Hints, the footer, secondary copy.",
+        "format": "color"
+      },
+      "link_color": {
+        "type": "string",
+        "title": "Links",
+        "description": "Sign up, forgot password, footer links.",
+        "format": "color"
+      },
+      "error_color": {
+        "type": "string",
+        "title": "Errors",
+        "format": "color"
+      },
+      "background": {
+        "type": "string",
+        "title": "Page background",
+        "description": "Behind everything. Also seen while a page background image loads.",
+        "format": "color"
+      },
+      "card_background": {
+        "type": "string",
+        "title": "Card background",
+        "description": "The card, or the form panel.",
+        "format": "color"
+      },
+      "card_border": {
+        "type": "string",
+        "title": "Card border",
+        "description": "Used only when the card border width is not 0.",
+        "format": "color"
+      },
+      "input_background": {
+        "type": "string",
+        "title": "Input background",
+        "format": "color"
+      },
+      "input_border": {
+        "type": "string",
+        "title": "Input border",
+        "description": "Text fields, selects and outlined buttons.",
+        "format": "color"
+      },
+      "input_text": {
+        "type": "string",
+        "title": "Input text",
+        "format": "color"
+      },
+      "font_family": {
+        "type": "string",
+        "title": "Font",
+        "description": "A CSS font stack, without quotes: Inter, system-ui, sans-serif. To load a web font, add an @import line at the very top of the stylesheet."
+      },
+      "font_size": {
+        "type": "string",
+        "title": "Base font size",
+        "description": "A CSS length; 15px or 1rem. Everything scales from it."
+      },
+      "heading_weight": {
+        "type": "string",
+        "title": "Heading weight",
+        "enum": [
+          "400",
+          "500",
+          "600",
+          "700"
+        ]
+      },
+      "card_radius": {
+        "type": "string",
+        "title": "Card corner radius",
+        "description": "A CSS length; 0 for square corners."
+      },
+      "card_border_width": {
+        "type": "string",
+        "title": "Card border width",
+        "description": "0 for none, 1px for a hairline."
+      },
+      "card_shadow": {
+        "type": "string",
+        "title": "Card shadow",
+        "enum": [
+          "none",
+          "soft",
+          "strong"
+        ]
+      },
+      "control_radius": {
+        "type": "string",
+        "title": "Control corner radius",
+        "description": "Buttons and inputs. A CSS length; 999px for pills."
+      },
+      "button_weight": {
+        "type": "string",
+        "title": "Button text weight",
+        "enum": [
+          "500",
+          "600",
+          "700"
+        ]
+      },
+      "logo_height": {
+        "type": "string",
+        "title": "Logo height",
+        "description": "A CSS length; the logo scales to it and keeps its proportions."
+      },
+      "logo_align": {
+        "type": "string",
+        "title": "Logo and heading alignment",
+        "description": "Inside the card or form panel.",
+        "enum": [
+          "center",
+          "left"
+        ]
+      }
+    }
+  },
+  "contentSchema": {
+    "type": "object",
+    "properties": {
+      "main_logo": {
+        "type": "string",
+        "title": "Logo",
+        "description": "An asset URL such as /assets/logo.png. PNG or SVG with transparency, at least twice the logo height.",
+        "format": "uri"
+      },
+      "favicon": {
+        "type": "string",
+        "title": "Favicon",
+        "description": "An asset URL; 32×32 PNG or an SVG. Empty keeps the layout’s own.",
+        "format": "uri"
+      },
+      "page_background_image": {
+        "type": "string",
+        "title": "Page background image",
+        "description": "Optional, behind the card; scaled and cropped to the window. 1920×1080 or larger, under 1 MB.",
+        "format": "uri"
+      },
+      "page_title": {
+        "type": "string",
+        "title": "Browser tab title"
+      },
+      "heading": {
+        "type": "string",
+        "title": "Heading",
+        "description": "Above the form. Empty for none."
+      },
+      "subheading": {
+        "type": "string",
+        "title": "Subheading",
+        "description": "Under the heading. Empty for none."
+      },
+      "help_text": {
+        "type": "string",
+        "title": "Help text",
+        "description": "A line under the form, such as where to get help. Empty for none."
+      },
+      "footer_text": {
+        "type": "string",
+        "title": "Footer text",
+        "description": "One line at the bottom of the page. Empty for none."
+      },
+      "privacy_label": {
+        "type": "string",
+        "title": "Privacy link label"
+      },
+      "privacy_url": {
+        "type": "string",
+        "title": "Privacy link URL",
+        "description": "Empty hides the link."
+      },
+      "terms_label": {
+        "type": "string",
+        "title": "Terms link label"
+      },
+      "terms_url": {
+        "type": "string",
+        "title": "Terms link URL",
+        "description": "Empty hides the link."
+      },
+      "help_label": {
+        "type": "string",
+        "title": "Help link label"
+      },
+      "help_url": {
+        "type": "string",
+        "title": "Help link URL",
+        "description": "Empty hides the link."
+      },
+      "identifier_label": {
+        "type": "string",
+        "title": "Identifier field label",
+        "description": "The first field on an identifier-first sign-in. Empty keeps the label the sign-in service chooses (E-mail address, Username, or both)."
+      },
+      "identifier_submit_label": {
+        "type": "string",
+        "title": "Identifier continue button"
+      },
+      "not_you_label": {
+        "type": "string",
+        "title": "Not you? link",
+        "description": "Shown under the identifier once it is known; starts again with another."
+      },
+      "username_label": {
+        "type": "string",
+        "title": "Username field label"
+      },
+      "username_placeholder": {
+        "type": "string",
+        "title": "Username placeholder"
+      },
+      "password_label": {
+        "type": "string",
+        "title": "Password field label"
+      },
+      "password_placeholder": {
+        "type": "string",
+        "title": "Password placeholder"
+      },
+      "login_button_label": {
+        "type": "string",
+        "title": "Sign-in button"
+      },
+      "provider_button_prefix": {
+        "type": "string",
+        "title": "Provider button prefix",
+        "description": "Before the provider’s name: \"Continue with\" Google. Google and Apple allow only \"Continue with\", \"Sign in with\" or \"Sign up with\", or the same in the page’s language."
+      },
+      "google_button_theme": {
+        "type": "string",
+        "title": "Google button colours",
+        "description": "Google’s three: light is white with a grey border, dark is near-black, neutral is light grey with no border.",
+        "enum": [
+          "light",
+          "dark",
+          "neutral"
+        ]
+      },
+      "google_button_shape": {
+        "type": "string",
+        "title": "Google button shape",
+        "enum": [
+          "rectangular",
+          "pill"
+        ]
+      },
+      "apple_button_style": {
+        "type": "string",
+        "title": "Apple button style",
+        "description": "Apple’s three: black, white, or white with a black outline. Use white or outline on a dark background.",
+        "enum": [
+          "black",
+          "white",
+          "outline"
+        ]
+      },
+      "signup_prompt": {
+        "type": "string",
+        "title": "Sign-up prompt",
+        "description": "Shown when sign-up is allowed, before the sign-up link."
+      },
+      "signup_label": {
+        "type": "string",
+        "title": "Sign-up link"
+      },
+      "signup_button_label": {
+        "type": "string",
+        "title": "Sign-up button"
+      },
+      "login_prompt": {
+        "type": "string",
+        "title": "Back-to-sign-in prompt",
+        "description": "On the sign-up form, before the sign-in link."
+      },
+      "login_label": {
+        "type": "string",
+        "title": "Back-to-sign-in link"
+      },
+      "forgot_password_label": {
+        "type": "string",
+        "title": "Forgot-password link",
+        "description": "Under the password field, where the realm offers self-service reset."
+      },
+      "reset_request_heading": {
+        "type": "string",
+        "title": "Reset request: heading"
+      },
+      "reset_request_help": {
+        "type": "string",
+        "title": "Reset request: instructions"
+      },
+      "reset_request_button_label": {
+        "type": "string",
+        "title": "Reset request: button"
+      },
+      "reset_request_sent": {
+        "type": "string",
+        "title": "Reset request: sent",
+        "description": "Shown after every request, whether or not an account matched; it must not say which."
+      },
+      "reset_request_unavailable": {
+        "type": "string",
+        "title": "Reset request: not offered",
+        "description": "When the realm does not offer self-service reset."
+      },
+      "recovery_request_throttled": {
+        "type": "string",
+        "title": "Reset request: too many requests",
+        "description": "When a request limit refused the reset request; nothing was sent. {time} is the wait (retry_minutes, retry_seconds)."
+      },
+      "retry_second": {
+        "type": "string",
+        "title": "Wait: one second",
+        "description": "The {time} in a “try again in” line, under a minute, when it is one second."
+      },
+      "retry_seconds": {
+        "type": "string",
+        "title": "Wait: seconds",
+        "description": "The {time} in a “try again in” line, under a minute. {n} is the number."
+      },
+      "retry_minute": {
+        "type": "string",
+        "title": "Wait: one minute",
+        "description": "The {time} in a “try again in” line, when it rounds up to one minute."
+      },
+      "retry_minutes": {
+        "type": "string",
+        "title": "Wait: minutes",
+        "description": "The {time} in a “try again in” line, in whole minutes rounded up. {n} is the number."
+      },
+      "reset_request_back_label": {
+        "type": "string",
+        "title": "Reset request: back link"
+      },
+      "verification_sent": {
+        "type": "string",
+        "title": "Sign-up: confirm your address",
+        "description": "After a sign-up the realm holds until the address is confirmed."
+      },
+      "verify_email_heading": {
+        "type": "string",
+        "title": "Confirm address: heading"
+      },
+      "verify_email_button_label": {
+        "type": "string",
+        "title": "Confirm address: button"
+      },
+      "verify_email_done": {
+        "type": "string",
+        "title": "Confirm address: confirmed",
+        "description": "Before the address that was confirmed."
+      },
+      "invite_skip_label": {
+        "type": "string",
+        "title": "Invitation: skip the password",
+        "description": "Where a password is optional, beside the password form."
+      },
+      "invite_link_done": {
+        "type": "string",
+        "title": "Invitation: accepted without a password",
+        "description": "Before the link on to sign in."
+      },
+      "magic_link_email_label": {
+        "type": "string",
+        "title": "Magic link: e-mail field label"
+      },
+      "magic_link_button_label": {
+        "type": "string",
+        "title": "Magic link: send button"
+      },
+      "magic_link_sent_heading": {
+        "type": "string",
+        "title": "Magic link: sent heading"
+      },
+      "magic_link_sent_body": {
+        "type": "string",
+        "title": "Magic link: sent text",
+        "description": "Before the masked address."
+      },
+      "magic_link_sent_code_body": {
+        "type": "string",
+        "title": "Magic link: sent text, code only",
+        "description": "For a realm that e-mails a code and no link. Before the masked address."
+      },
+      "magic_link_code_prompt": {
+        "type": "string",
+        "title": "Magic link: code prompt"
+      },
+      "magic_link_code_label": {
+        "type": "string",
+        "title": "Magic link: code field label"
+      },
+      "magic_link_verify_label": {
+        "type": "string",
+        "title": "Magic link: code button"
+      },
+      "magic_link_resend_label": {
+        "type": "string",
+        "title": "Magic link: resend link"
+      },
+      "magic_link_unknown_address": {
+        "type": "string",
+        "title": "Magic link: no account",
+        "description": "Under the e-mail field when the provider is set to tell and the address has no account. Before the address."
+      },
+      "magic_link_throttled": {
+        "type": "string",
+        "title": "Magic link: too many requests",
+        "description": "When a request limit refused the request or the resend; nothing was sent. {time} is the wait (retry_minutes, retry_seconds)."
+      },
+      "magic_link_restart_label": {
+        "type": "string",
+        "title": "Magic link: change address link",
+        "description": "Beside the resend link, after a link or code was sent. Goes back to the e-mail field."
+      },
+      "magic_link_landing_failed": {
+        "type": "string",
+        "title": "Magic link: link refused",
+        "description": "When the link is opened somewhere it was not asked for, or has expired."
+      },
+      "magic_link_consumed_elsewhere": {
+        "type": "string",
+        "title": "Magic link: signed in elsewhere",
+        "description": "On the code screen, when the link was confirmed in another browser. This browser stays signed out."
+      },
+      "magic_link_confirm_before": {
+        "type": "string",
+        "title": "Magic link: confirm, before the address",
+        "description": "A link opened in a browser other than the one that asked for it. Before the masked address."
+      },
+      "magic_link_confirm_after": {
+        "type": "string",
+        "title": "Magic link: confirm, after the address"
+      },
+      "magic_link_confirm_button": {
+        "type": "string",
+        "title": "Magic link: confirm button"
+      },
+      "magic_link_continue_before": {
+        "type": "string",
+        "title": "Magic link: continue to the app",
+        "description": "After confirming, when the sign-in came from an app. Before the app’s name."
+      },
+      "magic_link_account_label": {
+        "type": "string",
+        "title": "Magic link: go to the account page",
+        "description": "Beside the continue link after confirming."
+      },
+      "passkey_button_label": {
+        "type": "string",
+        "title": "Passkey sign-in button"
+      },
+      "bot_challenge_unavailable": {
+        "type": "string",
+        "title": "Bot check: could not load",
+        "description": "Beside sign-up, magic link and resend on a realm with bot protection on, when the check cannot be shown."
+      },
+      "factor_heading": {
+        "type": "string",
+        "title": "Second step: heading"
+      },
+      "factor_enroll_heading": {
+        "type": "string",
+        "title": "Second step: set-up heading"
+      },
+      "factor_enroll_required": {
+        "type": "string",
+        "title": "Second step: set-up explanation"
+      },
+      "factor_choose_prompt": {
+        "type": "string",
+        "title": "Second step: chooser prompt"
+      },
+      "factor_other_label": {
+        "type": "string",
+        "title": "Second step: other-method link"
+      },
+      "factor_recovery_label": {
+        "type": "string",
+        "title": "Second step: recovery-code link"
+      },
+      "factor_submit_label": {
+        "type": "string",
+        "title": "Second step: submit button"
+      },
+      "factor_resend_label": {
+        "type": "string",
+        "title": "Second step: resend link"
+      },
+      "factor_resend_wait": {
+        "type": "string",
+        "title": "Second step: resend countdown",
+        "description": "Before the seconds left."
+      },
+      "factor_denied": {
+        "type": "string",
+        "title": "Second step: nothing usable"
+      },
+      "factor_spent": {
+        "type": "string",
+        "title": "Second step: attempt spent"
+      },
+      "remember_device_label": {
+        "type": "string",
+        "title": "Second step: remember this device",
+        "description": "The box that skips the second step on this browser next time, when the sign-in allows it."
+      },
+      "factor_redirect": {
+        "type": "string",
+        "title": "Second step: leaving for the provider",
+        "description": "Shown for the moment before the browser goes to Duo or another provider’s page."
+      },
+      "webauthn_enroll_label": {
+        "type": "string",
+        "title": "Security key: set-up button"
+      },
+      "webauthn_label": {
+        "type": "string",
+        "title": "Security key: use button"
+      },
+      "webauthn_dismissed": {
+        "type": "string",
+        "title": "Security key: dialog dismissed"
+      },
+      "webauthn_unsupported": {
+        "type": "string",
+        "title": "Security key: browser cannot"
+      },
+      "recovery_offer_heading": {
+        "type": "string",
+        "title": "Recovery codes: offer heading"
+      },
+      "recovery_offer_enrolled": {
+        "type": "string",
+        "title": "Recovery codes: offer after set-up"
+      },
+      "recovery_offer_low": {
+        "type": "string",
+        "title": "Recovery codes: offer when low",
+        "description": "Before the number left."
+      },
+      "recovery_offer_accept": {
+        "type": "string",
+        "title": "Recovery codes: accept"
+      },
+      "recovery_offer_decline": {
+        "type": "string",
+        "title": "Recovery codes: decline"
+      },
+      "recovery_copy_label": {
+        "type": "string",
+        "title": "Recovery codes: copy"
+      },
+      "recovery_copied_label": {
+        "type": "string",
+        "title": "Recovery codes: copied"
+      },
+      "recovery_download_label": {
+        "type": "string",
+        "title": "Recovery codes: download"
+      },
+      "recovery_confirm_needed": {
+        "type": "string",
+        "title": "Recovery codes: confirmation missing"
+      },
+      "consent_heading": {
+        "type": "string",
+        "title": "Consent: heading",
+        "description": "After the application’s name."
+      },
+      "consent_scopes_label": {
+        "type": "string",
+        "title": "Consent: permissions intro"
+      },
+      "consent_accept_label": {
+        "type": "string",
+        "title": "Consent: allow button"
+      },
+      "consent_deny_label": {
+        "type": "string",
+        "title": "Consent: deny button"
+      }
+    }
+  },
+  "starter": {
+    "stylesheet": ":root {\n  --primary-main: #{{ .primary_main }};\n  --secondary-main: #{{ .secondary_main }};\n  --text-primary: #{{ .text_primary }};\n  --text-secondary: #{{ .text_secondary }};\n  --text-muted: #{{ .text_muted }};\n  --link-color: #{{ .link_color }};\n  --error-color: #{{ .error_color }};\n  --background: #{{ .background }};\n  --card-background: #{{ .card_background }};\n  --card-border: #{{ .card_border }};\n  --input-background: #{{ .input_background }};\n  --input-border: #{{ .input_border }};\n  --input-text: #{{ .input_text }};\n  --font-family: {{ .font_family }};\n  --font-size: {{ .font_size }};\n  --heading-weight: {{ .heading_weight }};\n  --card-radius: {{ .card_radius }};\n  --card-border-width: {{ .card_border_width }};\n  --card-shadow: {{ if eq .card_shadow \"none\" }}none{{ else if eq .card_shadow \"strong\" }}0 24px 60px rgba(15, 12, 40, 0.22){{ else }}0 12px 32px rgba(15, 12, 40, 0.10){{ end }};\n  --control-radius: {{ .control_radius }};\n  --button-weight: {{ .button_weight }};\n  --logo-height: {{ .logo_height }};\n  --logo-align: {{ if eq .logo_align \"left\" }}flex-start{{ else }}center{{ end }};\n  --brand-text-align: {{ if eq .logo_align \"left\" }}left{{ else }}center{{ end }};\n}\n",
+    "stylesheetAttributes": {
+      "primary_main": "15054A",
+      "secondary_main": "5B4B8A",
+      "text_primary": "FFFFFF",
+      "text_secondary": "333333",
+      "text_muted": "6B6B76",
+      "link_color": "15054A",
+      "error_color": "B3261E",
+      "background": "F4F4F6",
+      "card_background": "FFFFFF",
+      "card_border": "E4E4EA",
+      "input_background": "FFFFFF",
+      "input_border": "C9C9D2",
+      "input_text": "1F1F24",
+      "font_family": "Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif",
+      "font_size": "15px",
+      "heading_weight": "600",
+      "card_radius": "12px",
+      "card_border_width": "0",
+      "card_shadow": "soft",
+      "control_radius": "6px",
+      "button_weight": "600",
+      "logo_height": "56px",
+      "logo_align": "center"
+    },
+    "content": {
+      "main_logo": "/assets/logo.png",
+      "favicon": "",
+      "page_background_image": "",
+      "page_title": "Sign in",
+      "heading": "Sign in",
+      "subheading": "",
+      "help_text": "",
+      "footer_text": "",
+      "privacy_label": "Privacy",
+      "privacy_url": "",
+      "terms_label": "Terms",
+      "terms_url": "",
+      "help_label": "Help",
+      "help_url": "",
+      "identifier_label": "",
+      "identifier_submit_label": "Continue",
+      "not_you_label": "Not you?",
+      "username_label": "Username",
+      "username_placeholder": "username",
+      "password_label": "Password",
+      "password_placeholder": "password",
+      "login_button_label": "Sign in",
+      "provider_button_prefix": "Continue with",
+      "google_button_theme": "light",
+      "google_button_shape": "rectangular",
+      "apple_button_style": "black",
+      "signup_prompt": "Don’t have an account?",
+      "signup_label": "Sign up",
+      "signup_button_label": "Create account",
+      "login_prompt": "Already have an account?",
+      "login_label": "Sign in",
+      "forgot_password_label": "Forgot password?",
+      "reset_request_heading": "Reset your password",
+      "reset_request_help": "Enter the username you sign in with and we’ll e-mail you a link to choose a new password.",
+      "reset_request_button_label": "Send reset link",
+      "reset_request_sent": "If an account matches, we’ve sent a link to its e-mail address. It expires soon, so use it shortly. If nothing arrives, check your spam folder or ask your administrator.",
+      "reset_request_unavailable": "Password reset is not available here. Ask your administrator.",
+      "recovery_request_throttled": "Too many reset requests. Try again in {time}.",
+      "retry_second": "1 second",
+      "retry_seconds": "{n} seconds",
+      "retry_minute": "1 minute",
+      "retry_minutes": "{n} minutes",
+      "reset_request_back_label": "Back to sign in",
+      "verification_sent": "Check your e-mail. We’ve sent a link to confirm your address; open it, then sign in.",
+      "verify_email_heading": "Confirm your e-mail address",
+      "verify_email_button_label": "Confirm my address",
+      "verify_email_done": "Your address is confirmed:",
+      "invite_skip_label": "Skip — I’ll sign in with e-mail links",
+      "invite_link_done": "You’re set — sign in with an e-mail link.",
+      "magic_link_email_label": "E-mail address",
+      "magic_link_button_label": "E-mail me a link",
+      "magic_link_sent_heading": "Check your e-mail",
+      "magic_link_sent_body": "If an account can sign in with it, we sent a link to",
+      "magic_link_sent_code_body": "If an account can sign in with it, we sent a code to",
+      "magic_link_code_prompt": "Or enter the code from the e-mail.",
+      "magic_link_code_label": "Code",
+      "magic_link_verify_label": "Continue",
+      "magic_link_resend_label": "Send it again",
+      "magic_link_unknown_address": "There is no account for",
+      "magic_link_throttled": "Too many sign-in e-mails. Try again in {time}.",
+      "magic_link_restart_label": "Use a different e-mail",
+      "magic_link_landing_failed": "This link only works in the browser where you requested it. Enter the code from the e-mail there instead.",
+      "magic_link_consumed_elsewhere": "You signed in on another device.",
+      "magic_link_confirm_before": "Sign in as",
+      "magic_link_confirm_after": "on this device?",
+      "magic_link_confirm_button": "Sign in",
+      "magic_link_continue_before": "Continue to",
+      "magic_link_account_label": "Go to your account",
+      "passkey_button_label": "Sign in with a passkey",
+      "bot_challenge_unavailable": "We couldn’t load the check that keeps this form safe. Reload the page to try again.",
+      "factor_heading": "Verify it’s you",
+      "factor_enroll_heading": "Add a second sign-in step",
+      "factor_enroll_required": "This account needs a second step to sign in. Choose one to set up now.",
+      "factor_choose_prompt": "Choose how to verify.",
+      "factor_other_label": "Use another method",
+      "factor_recovery_label": "Use a recovery code",
+      "factor_submit_label": "Continue",
+      "factor_resend_label": "Send a new code",
+      "factor_resend_wait": "Send a new code in",
+      "factor_denied": "None of the sign-in methods on this account can be used here. Contact your administrator.",
+      "factor_spent": "That method cannot be used right now. Choose another.",
+      "remember_device_label": "Remember this device",
+      "factor_redirect": "Taking you to finish this step…",
+      "webauthn_enroll_label": "Set up a passkey or security key",
+      "webauthn_label": "Use your passkey or security key",
+      "webauthn_dismissed": "Nothing was used. Try again when you are ready.",
+      "webauthn_unsupported": "This browser cannot use passkeys or security keys. Choose another method.",
+      "recovery_offer_heading": "Save recovery codes",
+      "recovery_offer_enrolled": "Recovery codes sign you in if you lose your other method. Each works once.",
+      "recovery_offer_low": "Recovery codes left on this account:",
+      "recovery_offer_accept": "Show me new codes",
+      "recovery_offer_decline": "Not now",
+      "recovery_copy_label": "Copy",
+      "recovery_copied_label": "Copied",
+      "recovery_download_label": "Download",
+      "recovery_confirm_needed": "Confirm that you have saved the codes to continue.",
+      "consent_heading": "wants to access your account",
+      "consent_scopes_label": "It is asking for:",
+      "consent_accept_label": "Allow",
+      "consent_deny_label": "Deny"
+    }
+  },
+  "available": true
+}

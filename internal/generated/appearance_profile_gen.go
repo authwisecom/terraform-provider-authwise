@@ -92,7 +92,7 @@ func AppearanceProfileResourceSchema() schema.Schema {
 				Validators:    []validator.String{tf.ReferenceID("th", "theme", "authwise_theme.<name>.theme_id")},
 			},
 		},
-		MarkdownDescription: "An issuer's appearance profile: the stylesheet and content its login pages use. The issuer's default profile (`is_default`) is the issuer's appearance; a client's or audience's `appearance_profile_id` overrides it.",
+		MarkdownDescription: "An issuer's appearance profile: a theme plus overrides of its `stylesheet_attributes` and `content`, key by key. The issuer's default profile (`is_default`) is the issuer's appearance; a client's or audience's `appearance_profile_id` overrides it.",
 	}
 }
 
@@ -395,7 +395,7 @@ func AppearanceProfileDataSourceSchema() schema1.Schema {
 			"tenant_id": schema1.StringAttribute{Computed: true},
 			"theme_id":  schema1.StringAttribute{Computed: true},
 		},
-		MarkdownDescription: "An issuer's appearance profile: the stylesheet and content its login pages use. The issuer's default profile (`is_default`) is the issuer's appearance; a client's or audience's `appearance_profile_id` overrides it. This data source reads one by its full resource name.",
+		MarkdownDescription: "An issuer's appearance profile: a theme plus overrides of its `stylesheet_attributes` and `content`, key by key. The issuer's default profile (`is_default`) is the issuer's appearance; a client's or audience's `appearance_profile_id` overrides it. This data source reads one by its full resource name.",
 	}
 }
 
@@ -504,7 +504,7 @@ func AppearanceProfileListDataSourceSchema() schema1.Schema {
 				Validators:          []validator.String{tf.ReferenceID("t", "tenant", "")},
 			},
 		},
-		MarkdownDescription: "An issuer's appearance profile: the stylesheet and content its login pages use. The issuer's default profile (`is_default`) is the issuer's appearance; a client's or audience's `appearance_profile_id` overrides it. This data source lists every one under a parent.",
+		MarkdownDescription: "An issuer's appearance profile: a theme plus overrides of its `stylesheet_attributes` and `content`, key by key. The issuer's default profile (`is_default`) is the issuer's appearance; a client's or audience's `appearance_profile_id` overrides it. This data source lists every one under a parent.",
 	}
 }
 

@@ -265,7 +265,7 @@ func main() {
 			crud[corepb.Realm](scopeTenant,
 				withDescription("A realm: a population of users with its own providers, factors and authentication policy."), withJSON("config")),
 			crud[corepb.Theme](scopeTenant,
-				withDescription("A tenant theme: the stylesheet and content the hosted login pages render with."), withJSON(
+				withDescription("A tenant theme: the stylesheet and content the hosted login pages render with. Start from a layout's starter (`GET {issuer}/api/v1/ui/layouts`): its stylesheet template, `stylesheet_attributes` and `content`, and its two schemas. `layout` is fixed at creation; kit refuses a change, so another layout is another theme. Colours in `stylesheet_attributes` are six hex digits without `#`. An asset is named in `content` by its served URL, `/assets` plus the asset's `path`."), withJSON(
 					"stylesheet_attributes", "content",
 					"placeholder_stylesheet_attributes", "placeholder_content",
 				)),
@@ -337,7 +337,7 @@ func main() {
 				// kit holds exactly one default per issuer and moves it only
 				// through MakeDefaultAppearanceProfile; the wrapper in
 				// internal/provider routes the flag there.
-				withDescription("An issuer's appearance profile: the stylesheet and content its login pages use. The issuer's default profile (`is_default`) is the issuer's appearance; a client's or audience's `appearance_profile_id` overrides it."),
+				withDescription("An issuer's appearance profile: a theme plus overrides of its `stylesheet_attributes` and `content`, key by key. The issuer's default profile (`is_default`) is the issuer's appearance; a client's or audience's `appearance_profile_id` overrides it."),
 				withCollection("appearance-profiles"),
 				withJSON("stylesheet_attributes", "content"),
 				withReferences(map[string]gentf.Reference{"theme_id": refTheme})),
