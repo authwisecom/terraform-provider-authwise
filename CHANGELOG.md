@@ -1,3 +1,32 @@
+## 0.22.0 (Unreleased)
+
+NOTES:
+
+* **Paired with [apis v0.45.0](https://git.authwise.com/authwise/apis/-/releases/v0.45.0)
+  and kit v1.67.0.** An older kit does not have `preferred_domain_id`:
+  it ignores the write, so `authwise_issuer_preferred_domain` is found
+  gone at every refresh and planned again, and mailed links stay on the
+  native host.
+
+FEATURES:
+
+* **New resource `authwise_issuer_preferred_domain` (#52, kit#857).**
+  It sets the host kit builds the links it mails on: an invitation's
+  accept, a password reset, an address verification. Point it at the
+  custom domain your applications sign in on, and an invitation's
+  one-button accept leaves the person signed in where the application
+  looks, instead of on the native host. It takes the issuer's native
+  domain or a custom domain attached to it; kit refuses any other, and
+  keeps links on the native host until the custom domain is `ACTIVE`.
+  It is its own resource because a custom domain names its issuer, so
+  the issuer naming the domain back would be a cycle. Destroying it sets
+  the issuer back to its native host; releasing the domain does too, on
+  kit's side, and the next refresh finds the resource gone.
+* **`authwise_issuer` and its data sources read back
+  `preferred_domain_id`.** It is output only. An update of the issuer
+  plans it as known after apply, since the resource above may change it
+  in the same apply.
+
 ## 0.21.1 (October 26, 2026)
 
 NOTES:

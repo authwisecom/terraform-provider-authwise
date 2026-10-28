@@ -36,3 +36,4 @@ Read-Only:
 - `labels` (Map of String)
 - `name` (String) Full resource name.
 - `path` (String)
+- `preferred_domain_id` (String)

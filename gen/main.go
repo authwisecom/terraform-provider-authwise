@@ -183,6 +183,13 @@ func withImmutable(fields ...string) func(r *gentf.Resource) {
 	return func(r *gentf.Resource) { r.Immutable = fields }
 }
 
+// withVolatile marks computed fields something other than the resource's own
+// write may change: an update plans them unknown rather than promising the
+// prior value.
+func withVolatile(fields ...string) func(r *gentf.Resource) {
+	return func(r *gentf.Resource) { r.Volatile = fields }
+}
+
 // withInputOnly marks the fields kit consumes but never echoes back.
 // Without it the default Optional+Computed shape nulls them on every
 // refresh, which for a create-only field means replacement on every plan.
@@ -258,9 +265,15 @@ func main() {
 			// domain_id only.
 			// account_client_id is the account page's client, which kit
 			// creates at the issuer's first audience (kit#827).
+			// preferred_domain_id is the host kit builds mailed links on
+			// (kit#857), read back here and written by
+			// authwise_issuer_preferred_domain: a custom domain names its
+			// issuer, so the issuer naming it back would be a cycle (#52).
+			// That resource's destroy runs before an update of the issuer
+			// in the same apply, so the issuer plans it unknown: volatile.
 			crud[corepb.Issuer](scopeTenant,
 				withDescription("An OAuth 2.0 / OpenID Connect issuer: the login a set of clients shares, with its domain, token lifetimes and which realm or realms people sign in to (`config`). Its appearance is whichever of its profiles is the default (`authwise_appearance_profile.is_default`)."), withJSON("config"),
-				withRequired("domain_id"), withImmutable("domain_id"), withComputed("domain_name", "account_client_id"),
+				withRequired("domain_id"), withImmutable("domain_id"), withComputed("domain_name", "account_client_id"), withVolatile("preferred_domain_id"),
 				withReferences(map[string]gentf.Reference{"domain_id": refDomain})),
 			crud[corepb.Realm](scopeTenant,
 				withDescription("A realm: a population of users with its own providers, factors and authentication policy."), withJSON("config")),

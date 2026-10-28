@@ -70,6 +70,7 @@ func IssuerResourceSchema() schema.Schema {
 				Optional:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
+			"preferred_domain_id": schema.StringAttribute{Computed: true},
 			"tenant_id": schema.StringAttribute{
 				Computed:            true,
 				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default, and reads back from the name. Changing a configured one replaces the resource.",
@@ -84,29 +85,31 @@ func IssuerResourceSchema() schema.Schema {
 
 // IssuerModel is the Terraform plan/state model for Issuer.
 type IssuerModel struct {
-	Name            types.String         `tfsdk:"name"`
-	IssuerId        types.String         `tfsdk:"issuer_id"`
-	TenantId        types.String         `tfsdk:"tenant_id"`
-	Labels          types.Map            `tfsdk:"labels"`
-	DomainName      types.String         `tfsdk:"domain_name"`
-	Path            types.String         `tfsdk:"path"`
-	Config          jsontypes.Normalized `tfsdk:"config"`
-	DomainId        types.String         `tfsdk:"domain_id"`
-	AccountClientId types.String         `tfsdk:"account_client_id"`
+	Name              types.String         `tfsdk:"name"`
+	IssuerId          types.String         `tfsdk:"issuer_id"`
+	TenantId          types.String         `tfsdk:"tenant_id"`
+	Labels            types.Map            `tfsdk:"labels"`
+	DomainName        types.String         `tfsdk:"domain_name"`
+	Path              types.String         `tfsdk:"path"`
+	Config            jsontypes.Normalized `tfsdk:"config"`
+	DomainId          types.String         `tfsdk:"domain_id"`
+	AccountClientId   types.String         `tfsdk:"account_client_id"`
+	PreferredDomainId types.String         `tfsdk:"preferred_domain_id"`
 }
 
 // NewIssuerModel returns a model with every attribute set to its typed null; collection types cannot be zero-valued.
 func NewIssuerModel() *IssuerModel {
 	return &IssuerModel{
-		AccountClientId: types.StringNull(),
-		Config:          jsontypes.NewNormalizedNull(),
-		DomainId:        types.StringNull(),
-		DomainName:      types.StringNull(),
-		IssuerId:        types.StringNull(),
-		Labels:          types.MapNull(types.StringType),
-		Name:            types.StringNull(),
-		Path:            types.StringNull(),
-		TenantId:        types.StringNull(),
+		AccountClientId:   types.StringNull(),
+		Config:            jsontypes.NewNormalizedNull(),
+		DomainId:          types.StringNull(),
+		DomainName:        types.StringNull(),
+		IssuerId:          types.StringNull(),
+		Labels:            types.MapNull(types.StringType),
+		Name:              types.StringNull(),
+		Path:              types.StringNull(),
+		PreferredDomainId: types.StringNull(),
+		TenantId:          types.StringNull(),
 	}
 }
 
@@ -130,6 +133,7 @@ func (m *IssuerModel) ToProto(ctx context.Context) (*v1alpha1.Issuer, diag.Diagn
 	}
 	out.DomainId = m.DomainId.ValueString()
 	out.AccountClientId = m.AccountClientId.ValueString()
+	out.PreferredDomainId = m.PreferredDomainId.ValueString()
 	return out, diags
 }
 
@@ -171,6 +175,11 @@ func (m *IssuerModel) FromProto(ctx context.Context, e *v1alpha1.Issuer) diag.Di
 		m.AccountClientId = types.StringNull()
 	} else {
 		m.AccountClientId = types.StringValue(e.AccountClientId)
+	}
+	if e.PreferredDomainId == "" {
+		m.PreferredDomainId = types.StringNull()
+	} else {
+		m.PreferredDomainId = types.StringValue(e.PreferredDomainId)
 	}
 	return diags
 }
@@ -349,8 +358,9 @@ func IssuerDataSourceSchema() schema1.Schema {
 				MarkdownDescription: "Full resource name of the object to read.",
 				Required:            true,
 			},
-			"path":      schema1.StringAttribute{Computed: true},
-			"tenant_id": schema1.StringAttribute{Computed: true},
+			"path":                schema1.StringAttribute{Computed: true},
+			"preferred_domain_id": schema1.StringAttribute{Computed: true},
+			"tenant_id":           schema1.StringAttribute{Computed: true},
 		},
 		MarkdownDescription: "An OAuth 2.0 / OpenID Connect issuer: the login a set of clients shares, with its domain, token lifetimes and which realm or realms people sign in to (`config`). Its appearance is whichever of its profiles is the default (`authwise_appearance_profile.is_default`). This data source reads one by its full resource name.",
 	}
@@ -386,27 +396,29 @@ func (d *issuerDataSource) Read(ctx context.Context, req datasource.ReadRequest,
 
 // IssuerItemModel is one element of the issuers data source's "issuers" list.
 type IssuerItemModel struct {
-	IssuerId        types.String         `tfsdk:"issuer_id"`
-	Name            types.String         `tfsdk:"name"`
-	Labels          types.Map            `tfsdk:"labels"`
-	DomainName      types.String         `tfsdk:"domain_name"`
-	Path            types.String         `tfsdk:"path"`
-	Config          jsontypes.Normalized `tfsdk:"config"`
-	DomainId        types.String         `tfsdk:"domain_id"`
-	AccountClientId types.String         `tfsdk:"account_client_id"`
+	IssuerId          types.String         `tfsdk:"issuer_id"`
+	Name              types.String         `tfsdk:"name"`
+	Labels            types.Map            `tfsdk:"labels"`
+	DomainName        types.String         `tfsdk:"domain_name"`
+	Path              types.String         `tfsdk:"path"`
+	Config            jsontypes.Normalized `tfsdk:"config"`
+	DomainId          types.String         `tfsdk:"domain_id"`
+	AccountClientId   types.String         `tfsdk:"account_client_id"`
+	PreferredDomainId types.String         `tfsdk:"preferred_domain_id"`
 }
 
 // IssuerItemAttrTypes returns the attribute types of one issuers list element.
 func IssuerItemAttrTypes() map[string]attr.Type {
 	return map[string]attr.Type{
-		"account_client_id": types.StringType,
-		"config":            jsontypes.NormalizedType{},
-		"domain_id":         types.StringType,
-		"domain_name":       types.StringType,
-		"issuer_id":         types.StringType,
-		"labels":            types.MapType{ElemType: types.StringType},
-		"name":              types.StringType,
-		"path":              types.StringType,
+		"account_client_id":   types.StringType,
+		"config":              jsontypes.NormalizedType{},
+		"domain_id":           types.StringType,
+		"domain_name":         types.StringType,
+		"issuer_id":           types.StringType,
+		"labels":              types.MapType{ElemType: types.StringType},
+		"name":                types.StringType,
+		"path":                types.StringType,
+		"preferred_domain_id": types.StringType,
 	}
 }
 
@@ -443,7 +455,8 @@ func IssuerListDataSourceSchema() schema1.Schema {
 						Computed:            true,
 						MarkdownDescription: "Full resource name.",
 					},
-					"path": schema1.StringAttribute{Computed: true},
+					"path":                schema1.StringAttribute{Computed: true},
+					"preferred_domain_id": schema1.StringAttribute{Computed: true},
 				}},
 			},
 			"tenant_id": schema1.StringAttribute{
@@ -495,6 +508,11 @@ func issuerItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Issuer, *I
 		item.AccountClientId = types.StringNull()
 	} else {
 		item.AccountClientId = types.StringValue(e.AccountClientId)
+	}
+	if e.PreferredDomainId == "" {
+		item.PreferredDomainId = types.StringNull()
+	} else {
+		item.PreferredDomainId = types.StringValue(e.PreferredDomainId)
 	}
 	id, err := crud.IDFromName(e.Name)
 	if err != nil {

@@ -288,6 +288,7 @@ func (p *AuthwiseProvider) Resources(ctx context.Context) []func() resource.Reso
 		newGuardEnrolmentGrantResource,
 		newGuardDeprovisioningResource,
 		newDomainActivationResource,
+		newIssuerPreferredDomainResource,
 		newIssuerDomainResource,
 		newIssuerDomainActivationResource,
 	))

@@ -378,6 +378,11 @@ func (f *fakeIdentityServer) CreateIssuer(ctx context.Context, in *identitypb.Cr
 	if !ok {
 		return nil, status.Errorf(codes.InvalidArgument, "domain_id: no domain %q in %s", in.GetIssuer().GetDomainId(), in.GetParent())
 	}
+	// No custom domain can be attached to an issuer not yet created, so
+	// the native one is all a create may prefer (kit#857).
+	if p := in.GetIssuer().GetPreferredDomainId(); p != "" && p != in.GetIssuer().GetDomainId() {
+		return nil, status.Errorf(codes.InvalidArgument, "preferred_domain_id: %s is not one of this issuer's domains", p)
+	}
 	i := proto.Clone(in.GetIssuer()).(*corepb.Issuer)
 	i.Name = in.GetParent() + "/issuers/" + f.nextID("i")
 	i.DomainName = d.GetHostname()
@@ -406,6 +411,11 @@ func (f *fakeIdentityServer) PatchIssuer(ctx context.Context, in *identitypb.Pat
 				return nil, err
 			}
 			existing.Config = in.GetIssuer().GetConfig()
+		case "preferred_domain_id":
+			if err := f.admitPreferredDomainLocked(existing, in.GetIssuer().GetPreferredDomainId()); err != nil {
+				return nil, err
+			}
+			existing.PreferredDomainId = in.GetIssuer().GetPreferredDomainId()
 		default:
 			if strings.HasPrefix(path, "config.multiRealmProviderSelector.") || strings.HasPrefix(path, "config.multi_realm_provider_selector.") {
 				return nil, status.Errorf(codes.InvalidArgument,
@@ -415,6 +425,20 @@ func (f *fakeIdentityServer) PatchIssuer(ctx context.Context, in *identitypb.Pat
 		}
 	}
 	return proto.Clone(existing).(*corepb.Issuer), nil
+}
+
+// admitPreferredDomainLocked is kit#857's write rule: empty, the issuer's
+// native domain, or a custom domain attached to it; anything else is
+// InvalidArgument.
+func (f *fakeIdentityServer) admitPreferredDomainLocked(i *corepb.Issuer, preferred string) error {
+	if preferred == "" || preferred == i.GetDomainId() {
+		return nil
+	}
+	d, ok := f.domains[tenantOf(i.GetName())+"/domains/"+preferred]
+	if !ok || d.GetIssuerId() != i.GetName()[strings.LastIndex(i.GetName(), "/")+1:] {
+		return status.Errorf(codes.InvalidArgument, "preferred_domain_id: %s is not one of this issuer's domains", preferred)
+	}
+	return nil
 }
 
 func (f *fakeIdentityServer) DeleteIssuer(ctx context.Context, in *identitypb.DeleteIssuerRequest) (*emptypb.Empty, error) {

@@ -151,6 +151,32 @@ To have the account page sign in through a client of your own, set
 `account_client_id` in `config`. It takes precedence over the engine's
 client.
 
+## The host in mailed links
+
+Links that kit mails, such as an invitation's accept button, a password
+reset or an address verification, use one of the issuer's hosts: the
+native one (`domain_id`) unless told otherwise. If your applications sign
+in on a custom domain, that is the wrong host. An invitation accepted on
+the native host leaves the person signed in there, and the application,
+signing in on the custom host, asks for their e-mail address again.
+
+`authwise_issuer_preferred_domain` points the links at the custom domain.
+It is a resource of its own because the custom domain names the issuer,
+so the issuer naming the domain back would be a cycle.
+`preferred_domain_id` here reads the value back.
+
+```terraform
+resource "authwise_domain" "custom" {
+  hostname  = "auth.example.com"
+  issuer_id = authwise_issuer.login.issuer_id
+}
+
+resource "authwise_issuer_preferred_domain" "login" {
+  issuer    = authwise_issuer.login.name
+  domain_id = authwise_domain.custom.domain_id
+}
+```
+
 ## Writing `config`
 
 `config` is the protojson encoding of `IssuerConfig`.
@@ -193,6 +219,7 @@ client.
 - `domain_name` (String)
 - `issuer_id` (String) Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.
 - `name` (String) Full resource name; serves as the Terraform ID.
+- `preferred_domain_id` (String)
 
 ## Import
 

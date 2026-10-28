@@ -38,8 +38,9 @@ func checkParent(kind string, re *regexp.Regexp, parent string) error {
 }
 
 // --- Domain (tenant-scoped, keyed by an AWID since kit#808; the hostname is
-// unique install-wide). Only native hosts here: the custom host's lifecycle
-// is the issuer-domains fake's, and the provider's unit tests'. ---
+// unique install-wide). A custom host is created with its records and stays
+// PENDING_DNS: its lifecycle is the issuer-domains fake's, and the
+// provider's unit tests'. ---
 
 func (f *fakeIdentityServer) GetDomain(ctx context.Context, in *identitypb.GetDomainRequest) (*corepb.Domain, error) {
 	f.mu.Lock()
@@ -76,8 +77,13 @@ func (f *fakeIdentityServer) CreateDomain(ctx context.Context, in *identitypb.Cr
 	if hostname == "" {
 		return nil, status.Error(codes.InvalidArgument, "hostname is required")
 	}
-	if in.GetDomain().GetIssuerId() != "" {
-		return nil, status.Error(codes.Unimplemented, "the fake serves native domains only")
+	// A custom domain (issuer_id set) stays PENDING_DNS: the fake has no
+	// DNS to verify. It is enough to be an issuer's preferred_domain_id
+	// (kit#857).
+	if id := in.GetDomain().GetIssuerId(); id != "" {
+		if _, ok := f.issuers[in.GetParent()+"/issuers/"+id]; !ok {
+			return nil, status.Errorf(codes.InvalidArgument, "issuer_id: no issuer %q in %s", id, in.GetParent())
+		}
 	}
 	for _, d := range f.domains {
 		if d.GetHostname() == hostname {
@@ -86,6 +92,14 @@ func (f *fakeIdentityServer) CreateDomain(ctx context.Context, in *identitypb.Cr
 	}
 	d := proto.Clone(in.GetDomain()).(*corepb.Domain)
 	d.Name = in.GetParent() + "/domains/" + f.nextID("d")
+	if d.GetIssuerId() != "" {
+		d.State = corepb.IssuerDomainState_ISSUER_DOMAIN_STATE_PENDING_DNS
+		d.TrafficTarget = "acme.id.authwise.test"
+		d.DnsRecords = []*corepb.IssuerDomainDnsRecord{
+			{Name: hostname, Type: "CNAME", Value: d.GetTrafficTarget(), Purpose: "traffic"},
+			{Name: "_acme-challenge." + hostname, Type: "CNAME", Value: "abc.authorize.certificatemanager.goog", Purpose: "challenge"},
+		}
+	}
 	f.domains[d.GetName()] = d
 	return proto.Clone(d).(*corepb.Domain), nil
 }
@@ -124,6 +138,13 @@ func (f *fakeIdentityServer) DeleteDomain(ctx context.Context, in *identitypb.De
 		}
 	}
 	delete(f.domains, in.GetName())
+	// issuers.preferred_domain_id is ON DELETE SET NULL (kit#857): the
+	// issuer falls back to its native host.
+	for _, i := range f.issuers {
+		if tenantOf(i.GetName())+"/domains/"+i.GetPreferredDomainId() == in.GetName() {
+			i.PreferredDomainId = ""
+		}
+	}
 	return &emptypb.Empty{}, nil
 }
 
