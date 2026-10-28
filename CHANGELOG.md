@@ -1,4 +1,4 @@
-## 0.22.0 (Unreleased)
+## 0.22.0 (October 28, 2026)
 
 NOTES:
 
