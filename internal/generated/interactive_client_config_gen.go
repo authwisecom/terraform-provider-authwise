@@ -20,10 +20,14 @@ import (
 func InteractiveClientConfigDataSourceSchema() schema.Schema {
 	return schema.Schema{
 		Attributes: map[string]schema.Attribute{
-			"access_token_expire_seconds": schema.Int64Attribute{Optional: true},
+			"access_token_expire_seconds": schema.Int64Attribute{
+				MarkdownDescription: "Access token lifetime in seconds. Unset takes the value from the layer above (tenant, issuer, audience).",
+				Optional:            true,
+			},
 			"allowed_redirect_uris": schema.ListAttribute{
-				ElementType: types.StringType,
-				Optional:    true,
+				ElementType:         types.StringType,
+				MarkdownDescription: "The redirect URIs /authorize accepts for this client.",
+				Optional:            true,
 			},
 			"any": schema.StringAttribute{
 				Computed:            true,
@@ -32,18 +36,27 @@ func InteractiveClientConfigDataSourceSchema() schema.Schema {
 			},
 			"cors": schema.StringAttribute{
 				CustomType:          jsontypes.NormalizedType{},
-				MarkdownDescription: "`cors` as the protojson encoding of CorsConfig.",
+				MarkdownDescription: "The browser origins allowed to call kit for this client. `cors` as the protojson encoding of CorsConfig.",
 				Optional:            true,
 			},
 			"flow_integration_config": schema.StringAttribute{
 				CustomType:          jsontypes.NormalizedType{},
-				MarkdownDescription: "`flow_integration_config` as the protojson encoding of IntegrationConfig.",
+				MarkdownDescription: "The endpoint kit calls during this client's login flow. `flow_integration_config` as the protojson encoding of IntegrationConfig.",
 				Optional:            true,
 			},
-			"interaction_forward_uri":               schema.StringAttribute{Optional: true},
-			"refresh_token_absolute_expire_seconds": schema.Int64Attribute{Optional: true},
-			"refresh_token_expire_seconds":          schema.Int64Attribute{Optional: true},
-			"require_consent":                       schema.BoolAttribute{Optional: true},
+			"interaction_forward_uri": schema.StringAttribute{Optional: true},
+			"refresh_token_absolute_expire_seconds": schema.Int64Attribute{
+				MarkdownDescription: "Hard cap on a refresh token family in seconds, set once when the family is created and never extended. Unset takes the value from the layer above.",
+				Optional:            true,
+			},
+			"refresh_token_expire_seconds": schema.Int64Attribute{
+				MarkdownDescription: "Refresh token idle lifetime in seconds: it slides forward on every rotation. Unset takes the value from the layer above.",
+				Optional:            true,
+			},
+			"require_consent": schema.BoolAttribute{
+				MarkdownDescription: "Make /authorize ask the person to approve this client for the scopes it requests. Default false. `prompt=consent` asks regardless, so this is the floor, not the switch.",
+				Optional:            true,
+			},
 		},
 		MarkdownDescription: "Builds a InteractiveClientConfig config and exposes its google.protobuf.Any encoding as `any`. Makes no API calls.",
 	}

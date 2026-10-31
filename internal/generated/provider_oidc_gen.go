@@ -32,25 +32,35 @@ func ProviderOidcDataSourceSchema() schema.Schema {
 			"claim_map": schema.SingleNestedAttribute{
 				Attributes: map[string]schema.Attribute{
 					"map": schema.MapAttribute{
-						ElementType: types.StringType,
-						Optional:    true,
+						ElementType:         types.StringType,
+						MarkdownDescription: "target name → source path.",
+						Optional:            true,
 					},
 					"passthrough": schema.ListAttribute{
-						ElementType: types.StringType,
-						Optional:    true,
+						ElementType:         types.StringType,
+						MarkdownDescription: "Source names copied through unchanged when present. Applied after `map` and `static`, and never overwrites either.",
+						Optional:            true,
 					},
 					"static": schema.MapAttribute{
-						ElementType: types.StringType,
-						Optional:    true,
+						ElementType:         types.StringType,
+						MarkdownDescription: "target name → literal value, for claims that do not come from anywhere.",
+						Optional:            true,
 					},
 				},
 				Optional: true,
 			},
-			"client_auth_method": schema.StringAttribute{Optional: true},
-			"client_id":          schema.StringAttribute{Optional: true},
+			"client_auth_method": schema.StringAttribute{
+				MarkdownDescription: "client_secret_basic (default) | client_secret_post | none. private_key_jwt is a later addition; the field is a string so it can be.",
+				Optional:            true,
+			},
+			"client_id": schema.StringAttribute{Optional: true},
 			"client_secret_ref": schema.SingleNestedAttribute{
-				Attributes: map[string]schema.Attribute{"name": schema.StringAttribute{Optional: true}},
-				Optional:   true,
+				Attributes: map[string]schema.Attribute{"name": schema.StringAttribute{
+					MarkdownDescription: "tenants/{tenant}/secrets/{secret}. The tenant must be the tenant of the object holding the reference; the writer must hold identity.secrets.use.",
+					Optional:            true,
+				}},
+				MarkdownDescription: "Required unless client_auth_method is none.",
+				Optional:            true,
 			},
 			"endpoints": schema.SingleNestedAttribute{
 				Attributes: map[string]schema.Attribute{
@@ -59,17 +69,34 @@ func ProviderOidcDataSourceSchema() schema.Schema {
 					"token_url":         schema.StringAttribute{Optional: true},
 					"userinfo_url":      schema.StringAttribute{Optional: true},
 				},
-				Optional: true,
+				MarkdownDescription: "Explicit endpoints for an issuer without discovery, or to override one entry of it. Each empty field falls back to discovery.",
+				Optional:            true,
 			},
-			"identifier_claim":  schema.StringAttribute{Optional: true},
-			"internal_base_url": schema.StringAttribute{Optional: true},
-			"issuer":            schema.StringAttribute{Optional: true},
-			"pkce":              schema.StringAttribute{Optional: true},
+			"identifier_claim": schema.StringAttribute{
+				MarkdownDescription: "Default: sub.",
+				Optional:            true,
+			},
+			"internal_base_url": schema.StringAttribute{
+				MarkdownDescription: "Server-to-server calls (discovery, token, JWKS, userinfo) are rewritten onto this base while `iss` is still checked against `issuer`: the in-cluster case ProviderAuthwise.internal_issuer solves.",
+				Optional:            true,
+			},
+			"issuer": schema.StringAttribute{
+				MarkdownDescription: "Discovery at {issuer}/.well-known/openid-configuration, and the exact value every id_token's `iss` must carry.",
+				Optional:            true,
+			},
+			"pkce": schema.StringAttribute{
+				MarkdownDescription: "auto (default: S256 when discovery advertises it) | required | off.",
+				Optional:            true,
+			},
 			"scopes": schema.ListAttribute{
-				ElementType: types.StringType,
-				Optional:    true,
+				ElementType:         types.StringType,
+				MarkdownDescription: "Default: openid profile email.",
+				Optional:            true,
 			},
-			"use_userinfo": schema.BoolAttribute{Optional: true},
+			"use_userinfo": schema.BoolAttribute{
+				MarkdownDescription: "Also call the userinfo endpoint and merge its claims under `claims.*`, the id_token winning a conflict. Default false: most issuers put the profile in the id_token.",
+				Optional:            true,
+			},
 		},
 		MarkdownDescription: "Builds a ProviderOidc config and exposes its google.protobuf.Any encoding as `any`. Makes no API calls.",
 	}

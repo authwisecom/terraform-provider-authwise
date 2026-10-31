@@ -17,14 +17,14 @@ Builds a FactorWebAuthn config and exposes its google.protobuf.Any encoding as `
 
 ### Optional
 
-- `allowed_origins` (List of String)
-- `attestation` (String)
-- `authenticator_attachment` (String)
-- `hints` (List of String)
-- `resident_key` (String)
-- `rp_display_name` (String)
-- `rp_id` (String)
-- `user_verification` (String)
+- `allowed_origins` (List of String) The origins a ceremony may come from, beyond the issuer's own (which is always allowed): the external_ui_url when the login UI is served from elsewhere. Each must be the rp_id or a subdomain of it unless the rp_id host serves WebAuthn L3 related origins (/.well-known/webauthn).
+- `attestation` (String) none | indirect | direct | enterprise. Default none: consumer passkeys carry no attestation, so a public surface cannot demand it.
+- `authenticator_attachment` (String) platform | cross-platform, or empty for either.
+- `hints` (List of String) L3 hints, passed through: security-key | client-device | hybrid.
+- `resident_key` (String) required | preferred | discouraged. Default preferred, so a credential enrolled as a factor can later sign in as a passkey.
+- `rp_display_name` (String) What the browser's passkey sheet names. Default the issuer's host.
+- `rp_id` (String) The relying party id every credential is scoped to. Default the issuer's host. CHANGING IT ORPHANS EVERY CREDENTIAL enrolled under the old one — the browser will not offer them to a different rp_id — which is why a realm sets it once, before anybody enrols.
+- `user_verification` (String) required | preferred | discouraged. Default preferred. A realm that wants a passkey to count as two kinds of proof alone sets required.
 
 ### Read-Only
 

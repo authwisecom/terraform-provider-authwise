@@ -21,9 +21,9 @@ Builds a ProviderOkta config and exposes its google.protobuf.Any encoding as `an
 - `claim_map` (Attributes) (see [below for nested schema](#nestedatt--claim_map))
 - `client_id` (String)
 - `client_secret_ref` (Attributes) (see [below for nested schema](#nestedatt--client_secret_ref))
-- `identifier_claim` (String)
-- `issuer` (String)
-- `scopes` (List of String)
+- `identifier_claim` (String) Default: sub.
+- `issuer` (String) The authorization server's issuer, e.g. https://{org}.okta.com/oauth2/default, or the org server.
+- `scopes` (List of String) Default: openid profile email.
 
 ### Read-Only
 
@@ -34,9 +34,9 @@ Builds a ProviderOkta config and exposes its google.protobuf.Any encoding as `an
 
 Optional:
 
-- `map` (Map of String)
-- `passthrough` (List of String)
-- `static` (Map of String)
+- `map` (Map of String) target name → source path.
+- `passthrough` (List of String) Source names copied through unchanged when present. Applied after `map` and `static`, and never overwrites either.
+- `static` (Map of String) target name → literal value, for claims that do not come from anywhere.
 
 
 <a id="nestedatt--client_secret_ref"></a>
@@ -44,4 +44,4 @@ Optional:
 
 Optional:
 
-- `name` (String)
+- `name` (String) tenants/{tenant}/secrets/{secret}. The tenant must be the tenant of the object holding the reference; the writer must hold identity.secrets.use.

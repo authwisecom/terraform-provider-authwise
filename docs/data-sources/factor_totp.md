@@ -17,11 +17,11 @@ Builds a FactorTOTP config and exposes its google.protobuf.Any encoding as `any`
 
 ### Optional
 
-- `algorithm` (String)
-- `digits` (Number)
-- `issuer_label` (String)
-- `period` (Number)
-- `skew` (Number)
+- `algorithm` (String) SHA1, SHA256 or SHA512. Default SHA1, deliberately: Google Authenticator and Authy IGNORE the algorithm parameter in an otpauth:// URI, so a realm that configured SHA-256 would hand those apps a secret they derive codes from differently, and every code would be wrong with nothing to say why.
+- `digits` (Number) Code length. Default 6, which is what every authenticator app shows.
+- `issuer_label` (String) What the authenticator app shows above the account. Default the issuer's display name — it is how somebody with three Authwise-hosted logins tells them apart.
+- `period` (Number) Step length in seconds. Default 30.
+- `skew` (Number) How many steps either side of the current one are accepted. Default 1, RFC 6238's own suggestion, which covers a phone whose clock has drifted and a person who typed slowly.
 
 ### Read-Only
 

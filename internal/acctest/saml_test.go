@@ -292,6 +292,11 @@ resource "authwise_provider" "partner" {
 						if !saml.GetSignAuthnRequests() || !saml.GetWantAssertionsSigned() {
 							return fmt.Errorf("signing flags lost: %v", saml)
 						}
+						// The short name is encoded as the binding URN kit
+						// takes (#53).
+						if got := saml.GetIdpSsoBinding(); got != "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect" {
+							return fmt.Errorf("idp_sso_binding = %q", got)
+						}
 						if got := saml.GetClockSkewSeconds(); got != 120 {
 							return fmt.Errorf("clock_skew_seconds = %d", got)
 						}

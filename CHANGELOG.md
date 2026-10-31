@@ -1,3 +1,46 @@
+## 0.23.0 (Unreleased)
+
+NOTES:
+
+* **tfinfra v0.0.21; apis v0.45.0, kit v1.67.0.** No new kit is needed.
+  Every value this release refuses at plan was already refused by kit or
+  failing against it.
+* **Config data source pages say what each attribute is (#53).** Every
+  input of the `provider_*`, `factor_*`, `saml_relying_party_config` and
+  `interactive_client_config` data sources, nested ones included, takes
+  its description from the apis proto comment (tfinfra v0.0.21). Where
+  a comment is internal or wrong for an input, the provider replaces it.
+* **Why an issuer plans a no-op update when a provider changes (#55).**
+  If a resource named in a config data source's arguments has a change
+  planned, Terraform reads the data source at apply, even though every
+  argument is known. The `json` output is then unknown, and the resource
+  that takes it plans an update that applies as a no-op. This is
+  Terraform's behaviour, not the provider's. The pages of
+  `authwise_issuer_config`, `authwise_realm_config`,
+  `authwise_audience_config`, `authwise_tenant_config` and
+  `authwise_endpoint_auth` now say so, and name `jsonencode` as the way
+  to keep those plans quiet.
+
+BUG FIXES:
+
+* **`authwise_provider_saml.idp_sso_binding` and
+  `authwise_saml_relying_party_config.acs_binding` take the SAML binding
+  URN (#53).** Both were unchecked strings. kit takes
+  `urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect` or
+  `…:HTTP-POST`, and a provider written with the short name
+  `HTTP-Redirect` applied cleanly and then broke every sign-in at
+  `/authorize`. The plan now refuses anything else, naming the URNs. The
+  short names `HTTP-Redirect` and `HTTP-POST` are still accepted and are
+  encoded as the URN, so a config written that way now works. The first
+  plan after upgrading updates a provider created with the short name.
+* **`authwise_realm_config` refuses kit's reserved provisioning fields at
+  plan (#54).** No kit build acts on `admin_direct`, `scim`,
+  `admin_set_permanent_password` or `allowed_provider_types`, so kit
+  refuses a realm write that sets one (true, or a non-empty list) at
+  apply. The plan now refuses it first with kit's reason, and each
+  field's description says it is not yet supported. Setting one to
+  false or empty is still accepted.
+
 ## 0.22.0 (October 28, 2026)
 
 NOTES:

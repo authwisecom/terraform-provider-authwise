@@ -17,8 +17,8 @@ Builds a FactorExternal config and exposes its google.protobuf.Any encoding as `
 
 ### Optional
 
-- `config` (String) `config` as a JSON object.
-- `endpoint_name` (String)
+- `config` (String) Handed to the endpoint verbatim on every call. `config` as a JSON object.
+- `endpoint_name` (String) tenants/{t}/endpoints/{e}. The endpoint's own auth (kit#373) is what the factor service knows kit by.
 
 ### Read-Only
 

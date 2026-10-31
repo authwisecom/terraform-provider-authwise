@@ -25,14 +25,30 @@ func FactorDuoDataSourceSchema() schema.Schema {
 				CustomType:          jsontypes.NormalizedType{},
 				MarkdownDescription: "protojson-encoded google.protobuf.Any (includes `@type`); reference this from Any-typed resource attributes.",
 			},
-			"api_host":  schema.StringAttribute{Optional: true},
-			"client_id": schema.StringAttribute{Optional: true},
-			"client_secret_ref": schema.SingleNestedAttribute{
-				Attributes: map[string]schema.Attribute{"name": schema.StringAttribute{Optional: true}},
-				Optional:   true,
+			"api_host": schema.StringAttribute{
+				MarkdownDescription: "The API hostname Duo assigned, e.g. api-XXXXXXXX.duosecurity.com.",
+				Optional:            true,
 			},
-			"failmode":           schema.StringAttribute{Optional: true},
-			"username_attribute": schema.StringAttribute{Optional: true},
+			"client_id": schema.StringAttribute{
+				MarkdownDescription: "The Duo application's client id.",
+				Optional:            true,
+			},
+			"client_secret_ref": schema.SingleNestedAttribute{
+				Attributes: map[string]schema.Attribute{"name": schema.StringAttribute{
+					MarkdownDescription: "tenants/{tenant}/secrets/{secret}. The tenant must be the tenant of the object holding the reference; the writer must hold identity.secrets.use.",
+					Optional:            true,
+				}},
+				MarkdownDescription: "The Duo application's client secret, by reference. Writing it needs identity.secrets.use (kit#370).",
+				Optional:            true,
+			},
+			"failmode": schema.StringAttribute{
+				MarkdownDescription: "What an unreachable Duo does to the step: closed (the default) fails it; open lets the person through with no factor asserted, recorded as authn.factor success reason=upstream_bypass at warning.",
+				Optional:            true,
+			},
+			"username_attribute": schema.StringAttribute{
+				MarkdownDescription: "Which of the person's attributes is their Duo username: preferred_username (the default) or email.",
+				Optional:            true,
+			},
 		},
 		MarkdownDescription: "Builds a FactorDuo config and exposes its google.protobuf.Any encoding as `any`. Makes no API calls.",
 	}

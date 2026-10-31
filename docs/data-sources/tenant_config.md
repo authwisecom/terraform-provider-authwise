@@ -4,11 +4,14 @@ page_title: "authwise_tenant_config Data Source - Authwise"
 subcategory: "Identity"
 description: |-
   A tenant's config: its brand, and the token lifetimes and CORS at the tenant, the outermost layer. Builds the TenantConfig message and exposes its protojson encoding as json, the value authwise_tenant_config.config takes. Makes no API calls.
+  When a resource named in its arguments has a change planned, Terraform reads this data source at apply rather than at plan, even though every argument is known: json shows as (known after apply), and authwise_tenant_config.config plans an update that applies as a no-op when nothing else changed. Writing authwise_tenant_config.config with jsonencode keeps those plans quiet, at the cost of this schema's plan-time checks.
 ---
 
 # authwise_tenant_config (Data Source)
 
 A tenant's config: its brand, and the token lifetimes and CORS at the tenant, the outermost layer. Builds the TenantConfig message and exposes its protojson encoding as `json`, the value `authwise_tenant_config.config` takes. Makes no API calls.
+
+When a resource named in its arguments has a change planned, Terraform reads this data source at apply rather than at plan, even though every argument is known: `json` shows as (known after apply), and `authwise_tenant_config.config` plans an update that applies as a no-op when nothing else changed. Writing `authwise_tenant_config.config` with `jsonencode` keeps those plans quiet, at the cost of this schema's plan-time checks.
 
 ## Example Usage
 

@@ -17,14 +17,14 @@ Builds a ProviderMicrosoft config and exposes its google.protobuf.Any encoding a
 
 ### Optional
 
-- `allowed_tenants` (List of String)
-- `authorization_params` (Map of String)
+- `allowed_tenants` (List of String) With a multi-tenant `tenant`, the tenant ids (`tid`) that may sign in. Verified on the id_token. Empty: any tenant the authority admits.
+- `authorization_params` (Map of String) prompt, domain_hint, login_hint…
 - `claim_map` (Attributes) (see [below for nested schema](#nestedatt--claim_map))
 - `client_id` (String)
 - `client_secret_ref` (Attributes) (see [below for nested schema](#nestedatt--client_secret_ref))
-- `identifier_claim` (String)
-- `scopes` (List of String)
-- `tenant` (String)
+- `identifier_claim` (String) Default: sub, which Microsoft makes pairwise per application; oid is the directory-wide alternative.
+- `scopes` (List of String) Default: openid email profile.
+- `tenant` (String) common | organizations | consumers | a tenant id or verified domain. Selects the authority, and therefore who can sign in at all.
 
 ### Read-Only
 
@@ -35,9 +35,9 @@ Builds a ProviderMicrosoft config and exposes its google.protobuf.Any encoding a
 
 Optional:
 
-- `map` (Map of String)
-- `passthrough` (List of String)
-- `static` (Map of String)
+- `map` (Map of String) target name → source path.
+- `passthrough` (List of String) Source names copied through unchanged when present. Applied after `map` and `static`, and never overwrites either.
+- `static` (Map of String) target name → literal value, for claims that do not come from anywhere.
 
 
 <a id="nestedatt--client_secret_ref"></a>
@@ -45,4 +45,4 @@ Optional:
 
 Optional:
 
-- `name` (String)
+- `name` (String) tenants/{tenant}/secrets/{secret}. The tenant must be the tenant of the object holding the reference; the writer must hold identity.secrets.use.

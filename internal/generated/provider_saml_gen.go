@@ -7,11 +7,13 @@ import (
 	v1alpha1 "git.authwise.com/authwise/apis/authwise/types/core/v1alpha1"
 	tf "github.com/activatedio/tfinfra/pkg/tf"
 	jsontypes "github.com/hashicorp/terraform-plugin-framework-jsontypes/jsontypes"
+	stringvalidator "github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	attr "github.com/hashicorp/terraform-plugin-framework/attr"
 	datasource "github.com/hashicorp/terraform-plugin-framework/datasource"
 	schema "github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	diag "github.com/hashicorp/terraform-plugin-framework/diag"
 	path "github.com/hashicorp/terraform-plugin-framework/path"
+	validator "github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
 	basetypes "github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	anypb "google.golang.org/protobuf/types/known/anypb"
@@ -23,9 +25,18 @@ import (
 func ProviderSamlDataSourceSchema() schema.Schema {
 	return schema.Schema{
 		Attributes: map[string]schema.Attribute{
-			"accept_sha1":         schema.BoolAttribute{Optional: true},
-			"allow_create":        schema.BoolAttribute{Optional: true},
-			"allow_idp_initiated": schema.BoolAttribute{Optional: true},
+			"accept_sha1": schema.BoolAttribute{
+				MarkdownDescription: "Accept SHA-1 signatures from this partner. Defaults false. Inbound only, per connection, and logged on every use.",
+				Optional:            true,
+			},
+			"allow_create": schema.BoolAttribute{
+				MarkdownDescription: "Sets AllowCreate on the requested NameIDPolicy: the IdP may create an identifier for a person it has none for.",
+				Optional:            true,
+			},
+			"allow_idp_initiated": schema.BoolAttribute{
+				MarkdownDescription: "Accept an unsolicited Response — one with no InResponseTo, which therefore correlates to no request we made. Defaults false: it removes the replay and CSRF protection that correlation provides, and is only worth enabling for a partner whose portal is the intended entry point.",
+				Optional:            true,
+			},
 			"any": schema.StringAttribute{
 				Computed:            true,
 				CustomType:          jsontypes.NormalizedType{},
@@ -34,36 +45,77 @@ func ProviderSamlDataSourceSchema() schema.Schema {
 			"claim_map": schema.SingleNestedAttribute{
 				Attributes: map[string]schema.Attribute{
 					"map": schema.MapAttribute{
-						ElementType: types.StringType,
-						Optional:    true,
+						ElementType:         types.StringType,
+						MarkdownDescription: "target name → source path.",
+						Optional:            true,
 					},
 					"passthrough": schema.ListAttribute{
-						ElementType: types.StringType,
-						Optional:    true,
+						ElementType:         types.StringType,
+						MarkdownDescription: "Source names copied through unchanged when present. Applied after `map` and `static`, and never overwrites either.",
+						Optional:            true,
 					},
 					"static": schema.MapAttribute{
-						ElementType: types.StringType,
-						Optional:    true,
+						ElementType:         types.StringType,
+						MarkdownDescription: "target name → literal value, for claims that do not come from anywhere.",
+						Optional:            true,
 					},
 				},
-				Optional: true,
-			},
-			"clock_skew_seconds": schema.Int64Attribute{Optional: true},
-			"identifier_source":  schema.StringAttribute{Optional: true},
-			"idp_entity_id":      schema.StringAttribute{Optional: true},
-			"idp_metadata_imported_at": schema.StringAttribute{
-				MarkdownDescription: "`idp_metadata_imported_at` as an RFC 3339 timestamp.",
+				MarkdownDescription: "Assertion to User. Empty uses the documented defaults.",
 				Optional:            true,
 			},
-			"idp_metadata_xml":           schema.StringAttribute{Optional: true},
-			"idp_signing_certificate_id": schema.StringAttribute{Optional: true},
-			"idp_sso_binding":            schema.StringAttribute{Optional: true},
-			"idp_sso_url":                schema.StringAttribute{Optional: true},
-			"name_id_format":             schema.StringAttribute{Optional: true},
-			"sign_authn_requests":        schema.BoolAttribute{Optional: true},
-			"signing_certificate_id":     schema.StringAttribute{Optional: true},
-			"want_assertions_signed":     schema.BoolAttribute{Optional: true},
-			"want_response_signed":       schema.BoolAttribute{Optional: true},
+			"clock_skew_seconds": schema.Int64Attribute{
+				MarkdownDescription: "Tolerance applied to NotBefore and NotOnOrAfter. Defaults to 120.",
+				Optional:            true,
+			},
+			"identifier_source": schema.StringAttribute{
+				MarkdownDescription: "Which part of the assertion becomes the user's identifier. Defaults to `assertion.name_id`; a partner whose NameID is a transient opaque string will want `assertion.attributes.<name>` instead.",
+				Optional:            true,
+			},
+			"idp_entity_id": schema.StringAttribute{
+				MarkdownDescription: "Expected Issuer on every assertion. An assertion from anyone else is refused even if it is correctly signed by a certificate we trust.",
+				Optional:            true,
+			},
+			"idp_metadata_imported_at": schema.StringAttribute{
+				MarkdownDescription: "When kit last imported the IdP's metadata. kit sets it on import; leave it unset. `idp_metadata_imported_at` as an RFC 3339 timestamp.",
+				Optional:            true,
+			},
+			"idp_metadata_xml": schema.StringAttribute{
+				MarkdownDescription: "The last metadata document imported, kept so a re-import can be diffed against it rather than applied blind.",
+				Optional:            true,
+			},
+			"idp_signing_certificate_id": schema.StringAttribute{
+				MarkdownDescription: "Certificate resource name holding their signing certificate. Every inbound signature is checked against this one and nothing else: KeyInfo is never a source of trust.",
+				Optional:            true,
+			},
+			"idp_sso_binding": schema.StringAttribute{
+				MarkdownDescription: "The binding on the IdP's SingleSignOnService, which is how kit sends it an AuthnRequest, as the SAML binding URN. Unset is HTTP-Redirect. Read it off the IdP's metadata: it describes their endpoint, not a choice made here. One of `urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect` or `urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST`. Also takes `HTTP-POST` for `urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST`, `HTTP-Redirect` for `urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect`, and encodes the full value.",
+				Optional:            true,
+				Validators:          []validator.String{stringvalidator.OneOf("urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect", "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST", "HTTP-POST", "HTTP-Redirect")},
+			},
+			"idp_sso_url": schema.StringAttribute{
+				MarkdownDescription: "Their SingleSignOnService location.",
+				Optional:            true,
+			},
+			"name_id_format": schema.StringAttribute{
+				MarkdownDescription: "Requested NameIDPolicy/@Format.",
+				Optional:            true,
+			},
+			"sign_authn_requests": schema.BoolAttribute{
+				MarkdownDescription: "Sign every AuthnRequest with `signing_certificate_id`.",
+				Optional:            true,
+			},
+			"signing_certificate_id": schema.StringAttribute{
+				MarkdownDescription: "Certificate resource name kit signs AuthnRequests with, and decrypts encrypted assertions with.",
+				Optional:            true,
+			},
+			"want_assertions_signed": schema.BoolAttribute{
+				MarkdownDescription: "Require every assertion to be signed. kit requires it anyway unless `want_response_signed` is set: at least one of the two always holds, since an SP that verifies nothing accepts assertions from anyone.",
+				Optional:            true,
+			},
+			"want_response_signed": schema.BoolAttribute{
+				MarkdownDescription: "Require the Response itself to be signed. See `want_assertions_signed`.",
+				Optional:            true,
+			},
 		},
 		MarkdownDescription: "Builds a ProviderSaml config and exposes its google.protobuf.Any encoding as `any`. Makes no API calls.",
 	}
@@ -138,6 +190,12 @@ func (m *ProviderSamlModel) ToProto(ctx context.Context) (*v1alpha1.ProviderSaml
 	out.IdpEntityId = m.IdpEntityId.ValueString()
 	out.IdpSsoUrl = m.IdpSsoUrl.ValueString()
 	out.IdpSsoBinding = m.IdpSsoBinding.ValueString()
+	if v, ok := map[string]string{
+		"HTTP-POST":     "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST",
+		"HTTP-Redirect": "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect",
+	}[out.IdpSsoBinding]; ok {
+		out.IdpSsoBinding = v
+	}
 	out.IdpSigningCertificateId = m.IdpSigningCertificateId.ValueString()
 	out.IdpMetadataXml = m.IdpMetadataXml.ValueString()
 	if !m.IdpMetadataImportedAt.IsNull() && !m.IdpMetadataImportedAt.IsUnknown() {

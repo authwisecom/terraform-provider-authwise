@@ -65,7 +65,7 @@ data "authwise_provider_saml" "partner" {
   # refused even when correctly signed by a certificate we trust.
   idp_entity_id              = "https://idp.partner-co.example/metadata"
   idp_sso_url                = "https://idp.partner-co.example/sso"
-  idp_sso_binding            = "HTTP-Redirect"
+  idp_sso_binding            = "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect"
   idp_signing_certificate_id = authwise_certificate.partner_idp_signing.certificate_id
 
   # Ours.
@@ -147,7 +147,7 @@ data "authwise_saml_relying_party_config" "app" {
     "https://app.partner-co.example/saml/acs",
     "https://app.partner-co.example/saml/acs/alt",
   ]
-  acs_binding               = "HTTP-POST"
+  acs_binding               = "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST"
   sp_signing_certificate_id = authwise_certificate.relying_party_signing.certificate_id
 
   # Ours. At least one of sign_response, sign_assertions or

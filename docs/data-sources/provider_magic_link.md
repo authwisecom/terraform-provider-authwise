@@ -57,13 +57,13 @@ resource "authwise_provider" "magic_link" {
 
 ### Optional
 
-- `code_length` (Number)
-- `identifier_attribute` (String)
-- `link_scope` (String)
+- `code_length` (Number) Digits in the code, 6 to 8. Default 6: the attempt cap, not the length, is what makes a short code safe, and six is what a phone keyboard types.
+- `identifier_attribute` (String) The user attribute the identifier is matched against. Only "email" is supported, and it is the default.
+- `link_scope` (String) Where the mailed link signs in (kit#817). Default SAME_BROWSER.
 - `mode` (String)
 - `request_limits` (Attributes) (see [below for nested schema](#nestedatt--request_limits))
-- `ttl` (String) `ttl` as a duration: `"5s"`, `"1.5s"`, `"500ms"`, `"1m30s"`.
-- `unknown_address` (String)
+- `ttl` (String) How long the link and the code live. Default 10 minutes, NIST's ceiling for an out-of-band secret. `ttl` as a duration: `"5s"`, `"1.5s"`, `"500ms"`, `"1m30s"`.
+- `unknown_address` (String) What a request for an address with no account answers (kit#825). Default SILENT.
 
 ### Read-Only
 
@@ -74,6 +74,6 @@ resource "authwise_provider" "magic_link" {
 
 Optional:
 
-- `per_identifier_per_hour` (Number)
-- `per_ip_per_hour` (Number)
-- `per_realm_per_hour` (Number)
+- `per_identifier_per_hour` (Number) Requests per address per hour, 1–20. Default 3.
+- `per_ip_per_hour` (Number) Requests per client address per hour, 1–100. Default 10.
+- `per_realm_per_hour` (Number) Requests across the realm per hour, 1–10000. Default 500.

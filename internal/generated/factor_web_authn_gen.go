@@ -19,24 +19,44 @@ func FactorWebAuthnDataSourceSchema() schema.Schema {
 	return schema.Schema{
 		Attributes: map[string]schema.Attribute{
 			"allowed_origins": schema.ListAttribute{
-				ElementType: types.StringType,
-				Optional:    true,
+				ElementType:         types.StringType,
+				MarkdownDescription: "The origins a ceremony may come from, beyond the issuer's own (which is always allowed): the external_ui_url when the login UI is served from elsewhere. Each must be the rp_id or a subdomain of it unless the rp_id host serves WebAuthn L3 related origins (/.well-known/webauthn).",
+				Optional:            true,
 			},
 			"any": schema.StringAttribute{
 				Computed:            true,
 				CustomType:          jsontypes.NormalizedType{},
 				MarkdownDescription: "protojson-encoded google.protobuf.Any (includes `@type`); reference this from Any-typed resource attributes.",
 			},
-			"attestation":              schema.StringAttribute{Optional: true},
-			"authenticator_attachment": schema.StringAttribute{Optional: true},
-			"hints": schema.ListAttribute{
-				ElementType: types.StringType,
-				Optional:    true,
+			"attestation": schema.StringAttribute{
+				MarkdownDescription: "none | indirect | direct | enterprise. Default none: consumer passkeys carry no attestation, so a public surface cannot demand it.",
+				Optional:            true,
 			},
-			"resident_key":      schema.StringAttribute{Optional: true},
-			"rp_display_name":   schema.StringAttribute{Optional: true},
-			"rp_id":             schema.StringAttribute{Optional: true},
-			"user_verification": schema.StringAttribute{Optional: true},
+			"authenticator_attachment": schema.StringAttribute{
+				MarkdownDescription: "platform | cross-platform, or empty for either.",
+				Optional:            true,
+			},
+			"hints": schema.ListAttribute{
+				ElementType:         types.StringType,
+				MarkdownDescription: "L3 hints, passed through: security-key | client-device | hybrid.",
+				Optional:            true,
+			},
+			"resident_key": schema.StringAttribute{
+				MarkdownDescription: "required | preferred | discouraged. Default preferred, so a credential enrolled as a factor can later sign in as a passkey.",
+				Optional:            true,
+			},
+			"rp_display_name": schema.StringAttribute{
+				MarkdownDescription: "What the browser's passkey sheet names. Default the issuer's host.",
+				Optional:            true,
+			},
+			"rp_id": schema.StringAttribute{
+				MarkdownDescription: "The relying party id every credential is scoped to. Default the issuer's host. CHANGING IT ORPHANS EVERY CREDENTIAL enrolled under the old one — the browser will not offer them to a different rp_id — which is why a realm sets it once, before anybody enrols.",
+				Optional:            true,
+			},
+			"user_verification": schema.StringAttribute{
+				MarkdownDescription: "required | preferred | discouraged. Default preferred. A realm that wants a passkey to count as two kinds of proof alone sets required.",
+				Optional:            true,
+			},
 		},
 		MarkdownDescription: "Builds a FactorWebAuthn config and exposes its google.protobuf.Any encoding as `any`. Makes no API calls.",
 	}

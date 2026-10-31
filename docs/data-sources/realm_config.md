@@ -4,11 +4,14 @@ page_title: "authwise_realm_config Data Source - Authwise"
 subcategory: "Identity"
 description: |-
   A realm's config: provisioning, recovery, bot protection, SMS and the default locale. The authentication policy is not part of it: declare an authwise_realm_authentication_policy. Builds the RealmConfig message and exposes its protojson encoding as json, the value authwise_realm.config takes. Makes no API calls.
+  When a resource named in its arguments has a change planned, Terraform reads this data source at apply rather than at plan, even though every argument is known: json shows as (known after apply), and authwise_realm.config plans an update that applies as a no-op when nothing else changed. Writing authwise_realm.config with jsonencode keeps those plans quiet, at the cost of this schema's plan-time checks.
 ---
 
 # authwise_realm_config (Data Source)
 
 A realm's config: provisioning, recovery, bot protection, SMS and the default locale. The authentication policy is not part of it: declare an `authwise_realm_authentication_policy`. Builds the RealmConfig message and exposes its protojson encoding as `json`, the value `authwise_realm.config` takes. Makes no API calls.
+
+When a resource named in its arguments has a change planned, Terraform reads this data source at apply rather than at plan, even though every argument is known: `json` shows as (known after apply), and `authwise_realm.config` plans an update that applies as a no-op when nothing else changed. Writing `authwise_realm.config` with `jsonencode` keeps those plans quiet, at the cost of this schema's plan-time checks.
 
 ## Example Usage
 
@@ -83,9 +86,9 @@ Optional:
 
 Optional:
 
-- `admin_direct` (Boolean)
-- `admin_set_permanent_password` (Boolean)
-- `allowed_provider_types` (List of String)
+- `admin_direct` (Boolean) Not yet supported: no kit build acts on it, so kit refuses it set; it awaits an admin-direct credential surface.
+- `admin_set_permanent_password` (Boolean) Not yet supported: no kit build acts on it, so kit refuses it set; it rides `admin_direct`, which has no surface yet.
+- `allowed_provider_types` (List of String) Not yet supported: no kit build acts on it, so kit refuses it set; it awaits the per-realm provider policy surface (kit#222).
 - `invitation_ttl` (String) A Go duration string, e.g. `90s`, `15m`, `12h`.
 - `invitations` (Boolean)
 - `jit_federated` (Boolean)
@@ -93,7 +96,7 @@ Optional:
 - `password_validators` (Attributes List) (see [below for nested schema](#nestedatt--provisioning--password_validators))
 - `provisioning_integration_config` (Attributes) (see [below for nested schema](#nestedatt--provisioning--provisioning_integration_config))
 - `require_email_verification` (Boolean)
-- `scim` (Boolean)
+- `scim` (Boolean) Not yet supported: no kit build acts on it, so kit refuses it set; it awaits an inbound SCIM channel (kit#192).
 - `self_signup` (Boolean)
 
 <a id="nestedatt--provisioning--password_validators"></a>

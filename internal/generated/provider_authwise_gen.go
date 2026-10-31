@@ -23,9 +23,12 @@ func ProviderAuthwiseDataSourceSchema() schema.Schema {
 				CustomType:          jsontypes.NormalizedType{},
 				MarkdownDescription: "protojson-encoded google.protobuf.Any (includes `@type`); reference this from Any-typed resource attributes.",
 			},
-			"client_id":       schema.StringAttribute{Optional: true},
-			"internal_issuer": schema.StringAttribute{Optional: true},
-			"issuer":          schema.StringAttribute{Optional: true},
+			"client_id": schema.StringAttribute{Optional: true},
+			"internal_issuer": schema.StringAttribute{
+				MarkdownDescription: "In case you need to get the token from a different server side address",
+				Optional:            true,
+			},
+			"issuer": schema.StringAttribute{Optional: true},
 		},
 		MarkdownDescription: "Builds a ProviderAuthwise config and exposes its google.protobuf.Any encoding as `any`. Makes no API calls.",
 	}

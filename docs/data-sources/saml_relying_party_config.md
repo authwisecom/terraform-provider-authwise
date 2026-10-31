@@ -17,25 +17,25 @@ Builds a SamlRelyingPartyConfig config and exposes its google.protobuf.Any encod
 
 ### Optional
 
-- `acs_binding` (String)
-- `acs_urls` (List of String)
-- `allow_idp_initiated` (Boolean)
-- `assertion_lifetime_seconds` (Number)
-- `claim_map` (Attributes) (see [below for nested schema](#nestedatt--claim_map))
-- `default_relay_state` (String)
+- `acs_binding` (String) How kit delivers the Response to the partner's AssertionConsumerService, as the SAML binding URN. Unset is HTTP-POST. One of `urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect` or `urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST`. Also takes `HTTP-POST` for `urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST`, `HTTP-Redirect` for `urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect`, and encodes the full value.
+- `acs_urls` (List of String) Allowed AssertionConsumerService locations, matched exactly. The first is the default, used for an IdP-initiated login and for a request that names no ACS.
+- `allow_idp_initiated` (Boolean) Accept a login started at our end with no AuthnRequest at all. Defaults false: it means issuing an assertion for a destination nobody asked about, so it needs a default ACS and a deliberate decision.
+- `assertion_lifetime_seconds` (Number) How long the assertion is good for. Defaults to 300.
+- `claim_map` (Attributes) Grant and user to AttributeStatement. Empty issues nothing but the NameID, which is what a partner asking only "who is this" needs. (see [below for nested schema](#nestedatt--claim_map))
+- `default_relay_state` (String) RelayState sent with an IdP-initiated Response, which is how a partner knows where to land the user.
 - `encrypt_assertions` (Boolean)
-- `name_id_format` (String)
-- `name_id_source` (String)
-- `session_not_on_or_after_seconds` (Number)
+- `name_id_format` (String) NameID Format we issue. Empty uses the unspecified format carrying the same subject an OIDC client would get.
+- `name_id_source` (String) Which value becomes the NameID. Empty uses the default for the format.
+- `session_not_on_or_after_seconds` (Number) SessionNotOnOrAfter on the AuthnStatement. Zero omits it, leaving the partner's own session policy in charge.
 - `sign_assertions` (Boolean)
-- `sign_response` (Boolean)
-- `signing_certificate_id` (String)
-- `sp_encryption_certificate_id` (String)
-- `sp_entity_id` (String)
-- `sp_metadata_imported_at` (String) `sp_metadata_imported_at` as an RFC 3339 timestamp.
-- `sp_metadata_xml` (String)
-- `sp_signing_certificate_id` (String)
-- `want_authn_requests_signed` (Boolean)
+- `sign_response` (Boolean) Defaults true. At least one of sign_response, sign_assertions or encrypt_assertions must hold, which the library enforces.
+- `signing_certificate_id` (String) Certificate resource name kit signs with. Required: an IdP that signs nothing issues assertions anyone can forge.
+- `sp_encryption_certificate_id` (String) Certificate resource name we encrypt assertions to. Required if encrypt_assertions.
+- `sp_entity_id` (String) Expected Issuer on their AuthnRequest, and the Audience our assertion is restricted to. An AuthnRequest from anyone else is refused.
+- `sp_metadata_imported_at` (String) When kit last imported the partner's metadata. kit sets it on import; leave it unset. `sp_metadata_imported_at` as an RFC 3339 timestamp.
+- `sp_metadata_xml` (String) The last metadata document imported, kept so a re-import can be diffed against it rather than applied blind.
+- `sp_signing_certificate_id` (String) Certificate resource name holding their signing certificate. Required if want_authn_requests_signed; every inbound signature is checked against this one and nothing else.
+- `want_authn_requests_signed` (Boolean) Require the partner to sign their AuthnRequest. Off by default because most SPs do not sign, and the request carries nothing an unsigned one could abuse that the ACS allow-list does not already close.
 
 ### Read-Only
 
@@ -46,6 +46,6 @@ Builds a SamlRelyingPartyConfig config and exposes its google.protobuf.Any encod
 
 Optional:
 
-- `map` (Map of String)
-- `passthrough` (List of String)
-- `static` (Map of String)
+- `map` (Map of String) target name → source path.
+- `passthrough` (List of String) Source names copied through unchanged when present. Applied after `map` and `static`, and never overwrites either.
+- `static` (Map of String) target name → literal value, for claims that do not come from anywhere.

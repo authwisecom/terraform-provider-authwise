@@ -17,20 +17,20 @@ OAuth 2.0 with no id_token: explicit endpoints, a userinfo document, and a claim
 
 ### Required
 
-- `claim_map` (Attributes) (see [below for nested schema](#nestedatt--claim_map))
-- `identifier_source` (String)
+- `claim_map` (Attributes) Required, with no default: sources are `userinfo.<path>`. (see [below for nested schema](#nestedatt--claim_map))
+- `identifier_source` (String) Required: the userinfo path that is the stable subject, e.g. userinfo.id.
 
 ### Optional
 
 - `authorization_params` (Map of String)
 - `authorization_url` (String)
-- `client_auth_method` (String)
+- `client_auth_method` (String) client_secret_basic (default) | client_secret_post.
 - `client_id` (String)
 - `client_secret_ref` (Attributes) (see [below for nested schema](#nestedatt--client_secret_ref))
-- `pkce` (String)
+- `pkce` (String) auto | required | off; auto = S256.
 - `scopes` (List of String)
 - `token_url` (String)
-- `userinfo_url` (String)
+- `userinfo_url` (String) Fetched with the access token as a Bearer; the document claim_map reads.
 
 ### Read-Only
 
@@ -41,9 +41,9 @@ OAuth 2.0 with no id_token: explicit endpoints, a userinfo document, and a claim
 
 Optional:
 
-- `map` (Map of String)
-- `passthrough` (List of String)
-- `static` (Map of String)
+- `map` (Map of String) target name → source path.
+- `passthrough` (List of String) Source names copied through unchanged when present. Applied after `map` and `static`, and never overwrites either.
+- `static` (Map of String) target name → literal value, for claims that do not come from anywhere.
 
 
 <a id="nestedatt--client_secret_ref"></a>
@@ -51,4 +51,4 @@ Optional:
 
 Optional:
 
-- `name` (String)
+- `name` (String) tenants/{tenant}/secrets/{secret}. The tenant must be the tenant of the object holding the reference; the writer must hold identity.secrets.use.

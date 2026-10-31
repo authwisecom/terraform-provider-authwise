@@ -5,12 +5,16 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
+	"slices"
+	"strings"
 
 	corepb "git.authwise.com/authwise/apis/authwise/types/core/v1alpha1"
 	"github.com/hashicorp/terraform-plugin-framework-jsontypes/jsontypes"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/path"
+	"github.com/hashicorp/terraform-plugin-go/tftypes"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 )
@@ -18,7 +22,10 @@ import (
 // jsonAttribute is a config data source's output: the message's protojson.
 const jsonAttribute = "json"
 
-var _ datasource.DataSource = &configJSONDataSource{}
+var (
+	_ datasource.DataSource                   = &configJSONDataSource{}
+	_ datasource.DataSourceWithValidateConfig = &configJSONDataSource{}
+)
 
 // configJSONDataSource builds a config message from typed attributes and
 // exposes its protojson as `json`, for the resource attributes that hold a
@@ -51,6 +58,10 @@ type configJSONSpec struct {
 	// omit names top-level fields left out of the schema, because another
 	// resource owns them.
 	omit map[string]bool
+	// reserved names fields, by dotted path, that kit declares but no build
+	// acts on, with why: kit refuses a request that sets one, so the plan
+	// refuses it first (#54). A false or empty value sets nothing.
+	reserved map[string]string
 }
 
 func newConfigJSONDataSource(spec configJSONSpec) func() datasource.DataSource {
@@ -64,7 +75,7 @@ func (d *configJSONDataSource) Metadata(_ context.Context, req datasource.Metada
 func (d *configJSONDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
 
 	md := d.spec.message.ProtoReflect().Descriptor()
-	attrs := protoDataSourceAttributes(md, d.spec.descriptions, d.spec.omit)
+	attrs := protoDataSourceAttributes(md, d.withReservedNotes(), d.spec.omit)
 
 	if _, ok := attrs[jsonAttribute]; ok {
 		panic(fmt.Sprintf("%s: a field named %q collides with the output", md.FullName(), jsonAttribute))
@@ -77,9 +88,74 @@ func (d *configJSONDataSource) Schema(_ context.Context, _ datasource.SchemaRequ
 
 	resp.Schema = schema.Schema{
 		MarkdownDescription: withSuffix(d.spec.description, fmt.Sprintf(
-			"Builds the %s message and exposes its protojson encoding as `json`, the value `%s` takes. Makes no API calls.",
-			md.Name(), d.spec.attribute)),
+			"Builds the %s message and exposes its protojson encoding as `json`, the value `%s` takes. Makes no API calls.\n\n"+
+				"When a resource named in its arguments has a change planned, Terraform reads this data source at apply rather than at plan, "+
+				"even though every argument is known: `json` shows as (known after apply), and `%s` plans an update that applies as a no-op when nothing else changed. "+
+				"Writing `%s` with `jsonencode` keeps those plans quiet, at the cost of this schema's plan-time checks.",
+			md.Name(), d.spec.attribute, d.spec.attribute, d.spec.attribute)),
 		Attributes: attrs,
+	}
+}
+
+// withReservedNotes is the spec's descriptions with each reserved field's
+// refusal said on it.
+func (d *configJSONDataSource) withReservedNotes() map[string]string {
+
+	if len(d.spec.reserved) == 0 {
+		return d.spec.descriptions
+	}
+
+	out := make(map[string]string, len(d.spec.descriptions)+len(d.spec.reserved))
+	maps.Copy(out, d.spec.descriptions)
+	for p, why := range d.spec.reserved {
+		out[p] = withSuffix(out[p], fmt.Sprintf("Not yet supported: no kit build acts on it, so kit refuses it set; it %s.", why))
+	}
+
+	return out
+}
+
+// ValidateConfig refuses a reserved field set, at plan rather than at
+// apply, with kit's reason.
+func (d *configJSONDataSource) ValidateConfig(_ context.Context, req datasource.ValidateConfigRequest, resp *datasource.ValidateConfigResponse) {
+
+	for _, p := range slices.Sorted(maps.Keys(d.spec.reserved)) {
+
+		ap := tftypes.NewAttributePath()
+		fp := path.Empty()
+		for name := range strings.SplitSeq(p, ".") {
+			ap = ap.WithAttributeName(name)
+			fp = fp.AtName(name)
+		}
+
+		v, _, err := tftypes.WalkAttributePath(req.Config.Raw, ap)
+		if err != nil {
+			// An unset parent block: nothing below it is set.
+			continue
+		}
+		if tv, ok := v.(tftypes.Value); ok && reservedSet(tv) {
+			resp.Diagnostics.AddAttributeError(fp, "not yet supported",
+				fmt.Sprintf("`%s` is declared but no kit build acts on it, so kit refuses a request that sets it: it %s. Leave it unset.", p, d.spec.reserved[p]))
+		}
+	}
+}
+
+// reservedSet is kit's test for a reserved field: a known true or a
+// non-empty list. False and empty ask for nothing.
+func reservedSet(v tftypes.Value) bool {
+
+	if !v.IsKnown() || v.IsNull() {
+		return false
+	}
+
+	switch {
+	case v.Type().Is(tftypes.Bool):
+		var b bool
+		return v.As(&b) == nil && b
+	case v.Type().Is(tftypes.List{}):
+		var elems []tftypes.Value
+		return v.As(&elems) == nil && len(elems) > 0
+	default:
+		return true
 	}
 }
 
@@ -199,6 +275,14 @@ var configJSONSpecs = []configJSONSpec{
 			"sms":                          "Where the realm will send an SMS, and how many per destination prefix.",
 		},
 		omit: map[string]bool{authenticationKey: true},
+		// kit's reserved ProvisioningPolicy fields
+		// (pkg/engine/provisioning/reserved.go), with its reasons.
+		reserved: map[string]string{
+			"provisioning.admin_direct":                 "awaits an admin-direct credential surface",
+			"provisioning.scim":                         "awaits an inbound SCIM channel (kit#192)",
+			"provisioning.admin_set_permanent_password": "rides `admin_direct`, which has no surface yet",
+			"provisioning.allowed_provider_types":       "awaits the per-realm provider policy surface (kit#222)",
+		},
 	},
 	{
 		typeName:    "audience_config",

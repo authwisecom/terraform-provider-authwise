@@ -28,10 +28,13 @@ func FactorExternalDataSourceSchema() schema.Schema {
 			},
 			"config": schema.StringAttribute{
 				CustomType:          jsontypes.NormalizedType{},
-				MarkdownDescription: "`config` as a JSON object.",
+				MarkdownDescription: "Handed to the endpoint verbatim on every call. `config` as a JSON object.",
 				Optional:            true,
 			},
-			"endpoint_name": schema.StringAttribute{Optional: true},
+			"endpoint_name": schema.StringAttribute{
+				MarkdownDescription: "tenants/{t}/endpoints/{e}. The endpoint's own auth (kit#373) is what the factor service knows kit by.",
+				Optional:            true,
+			},
 		},
 		MarkdownDescription: "Builds a FactorExternal config and exposes its google.protobuf.Any encoding as `any`. Makes no API calls.",
 	}

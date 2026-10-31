@@ -230,6 +230,20 @@ func clientSecret() gentf.Entry {
 	}
 }
 
+// samlBindings are the SAML 2.0 bindings kit sends and receives on, as the
+// URNs it takes, with the short names its documentation uses standing for
+// them.
+var samlBindings = gentf.Values{
+	Allowed: []string{
+		"urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect",
+		"urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST",
+	},
+	Aliases: map[string]string{
+		"HTTP-Redirect": "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect",
+		"HTTP-POST":     "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST",
+	},
+}
+
 // config declares a typed builder data source over a config message,
 // masking the named fields in output.
 func config[E any](typeName string, sensitive ...string) gentf.Entry {
@@ -476,8 +490,11 @@ func main() {
 				Type: reflect.TypeFor[corepb.ProviderOAuth](),
 				Implementations: []any{
 					gentf.ConfigDataSource{
-						TypeName:    "provider_oauth",
-						Required:    []string{"identifier_source", "claim_map"},
+						TypeName: "provider_oauth",
+						Required: []string{"identifier_source", "claim_map"},
+						Descriptions: map[string]string{
+							"claim_map": "Required, with no default: sources are `userinfo.<path>`.",
+						},
 						Description: "OAuth 2.0 with no id_token: explicit endpoints, a userinfo document, and a claim map over it (`userinfo.<path>` sources). X, Discord, Amazon, Twitch, Spotify and Bitbucket are recipes on this type.",
 					},
 				},
@@ -487,8 +504,44 @@ func main() {
 			// Client). Neither carries a client secret. claim_map is a
 			// nested block rather than a JSON blob — tfinfra v0.0.10 renders
 			// a singular message as a typed nested attribute.
-			config[corepb.ProviderSaml]("provider_saml"),
-			config[corepb.SamlRelyingPartyConfig]("saml_relying_party_config"),
+			//
+			// The bindings are plain strings in the proto holding a SAML
+			// binding URN. A short name ("HTTP-Redirect", as kit's own
+			// comments spell it) applied cleanly and broke every sign-in
+			// at /authorize (#53), so both take the URNs at plan, and the
+			// short names stand for them.
+			{
+				Type: reflect.TypeFor[corepb.ProviderSaml](),
+				Implementations: []any{
+					gentf.ConfigDataSource{
+						TypeName: "provider_saml",
+						Values:   map[string]gentf.Values{"idp_sso_binding": samlBindings},
+						Descriptions: map[string]string{
+							"idp_sso_binding":          "The binding on the IdP's SingleSignOnService, which is how kit sends it an AuthnRequest, as the SAML binding URN. Unset is HTTP-Redirect. Read it off the IdP's metadata: it describes their endpoint, not a choice made here.",
+							"idp_metadata_imported_at": "When kit last imported the IdP's metadata. kit sets it on import; leave it unset.",
+							"signing_certificate_id":   "Certificate resource name kit signs AuthnRequests with, and decrypts encrypted assertions with.",
+							"sign_authn_requests":      "Sign every AuthnRequest with `signing_certificate_id`.",
+							"allow_create":             "Sets AllowCreate on the requested NameIDPolicy: the IdP may create an identifier for a person it has none for.",
+							"want_assertions_signed":   "Require every assertion to be signed. kit requires it anyway unless `want_response_signed` is set: at least one of the two always holds, since an SP that verifies nothing accepts assertions from anyone.",
+							"want_response_signed":     "Require the Response itself to be signed. See `want_assertions_signed`.",
+							"identifier_source":        "Which part of the assertion becomes the user's identifier. Defaults to `assertion.name_id`; a partner whose NameID is a transient opaque string will want `assertion.attributes.<name>` instead.",
+						},
+					},
+				},
+			},
+			{
+				Type: reflect.TypeFor[corepb.SamlRelyingPartyConfig](),
+				Implementations: []any{
+					gentf.ConfigDataSource{
+						TypeName: "saml_relying_party_config",
+						Values:   map[string]gentf.Values{"acs_binding": samlBindings},
+						Descriptions: map[string]string{
+							"acs_binding":             "How kit delivers the Response to the partner's AssertionConsumerService, as the SAML binding URN. Unset is HTTP-POST.",
+							"sp_metadata_imported_at": "When kit last imported the partner's metadata. kit sets it on import; leave it unset.",
+						},
+					},
+				},
+			},
 			// The passwordless primaries (kit#194, kit#195). ttl is a
 			// Duration, so a string ("10m"); ProviderPasskey has no fields
 			// and its data source exists for the any envelope alone.
@@ -536,6 +589,17 @@ func main() {
 				Implementations: []any{
 					gentf.ConfigDataSource{
 						JSON: []string{"cors", "flow_integration_config"},
+						// The proto documents the two refresh lifetimes in one
+						// comment, on the first, in kit's internal terms.
+						Descriptions: map[string]string{
+							"allowed_redirect_uris":                 "The redirect URIs /authorize accepts for this client.",
+							"access_token_expire_seconds":           "Access token lifetime in seconds. Unset takes the value from the layer above (tenant, issuer, audience).",
+							"refresh_token_expire_seconds":          "Refresh token idle lifetime in seconds: it slides forward on every rotation. Unset takes the value from the layer above.",
+							"refresh_token_absolute_expire_seconds": "Hard cap on a refresh token family in seconds, set once when the family is created and never extended. Unset takes the value from the layer above.",
+							"cors":                                  "The browser origins allowed to call kit for this client.",
+							"flow_integration_config":               "The endpoint kit calls during this client's login flow.",
+							"require_consent":                       "Make /authorize ask the person to approve this client for the scopes it requests. Default false. `prompt=consent` asks regardless, so this is the floor, not the switch.",
+						},
 					},
 				},
 			},

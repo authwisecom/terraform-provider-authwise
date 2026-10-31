@@ -18,16 +18,31 @@ import (
 func FactorTOTPDataSourceSchema() schema.Schema {
 	return schema.Schema{
 		Attributes: map[string]schema.Attribute{
-			"algorithm": schema.StringAttribute{Optional: true},
+			"algorithm": schema.StringAttribute{
+				MarkdownDescription: "SHA1, SHA256 or SHA512. Default SHA1, deliberately: Google Authenticator and Authy IGNORE the algorithm parameter in an otpauth:// URI, so a realm that configured SHA-256 would hand those apps a secret they derive codes from differently, and every code would be wrong with nothing to say why.",
+				Optional:            true,
+			},
 			"any": schema.StringAttribute{
 				Computed:            true,
 				CustomType:          jsontypes.NormalizedType{},
 				MarkdownDescription: "protojson-encoded google.protobuf.Any (includes `@type`); reference this from Any-typed resource attributes.",
 			},
-			"digits":       schema.Int64Attribute{Optional: true},
-			"issuer_label": schema.StringAttribute{Optional: true},
-			"period":       schema.Int64Attribute{Optional: true},
-			"skew":         schema.Int64Attribute{Optional: true},
+			"digits": schema.Int64Attribute{
+				MarkdownDescription: "Code length. Default 6, which is what every authenticator app shows.",
+				Optional:            true,
+			},
+			"issuer_label": schema.StringAttribute{
+				MarkdownDescription: "What the authenticator app shows above the account. Default the issuer's display name — it is how somebody with three Authwise-hosted logins tells them apart.",
+				Optional:            true,
+			},
+			"period": schema.Int64Attribute{
+				MarkdownDescription: "Step length in seconds. Default 30.",
+				Optional:            true,
+			},
+			"skew": schema.Int64Attribute{
+				MarkdownDescription: "How many steps either side of the current one are accepted. Default 1, RFC 6238's own suggestion, which covers a phone whose clock has drifted and a person who typed slowly.",
+				Optional:            true,
+			},
 		},
 		MarkdownDescription: "Builds a FactorTOTP config and exposes its google.protobuf.Any encoding as `any`. Makes no API calls.",
 	}

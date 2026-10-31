@@ -21,9 +21,9 @@ Builds a ProviderGoogle config and exposes its google.protobuf.Any encoding as `
 - `claim_map` (Attributes) (see [below for nested schema](#nestedatt--claim_map))
 - `client_id` (String)
 - `client_secret_ref` (Attributes) (see [below for nested schema](#nestedatt--client_secret_ref))
-- `hosted_domains` (List of String)
-- `identifier_claim` (String)
-- `scopes` (List of String)
+- `hosted_domains` (List of String) Google Workspace domains whose accounts may sign in. Sent as the `hd` hint AND verified against the id_token's `hd` claim; a token without the claim, or with another domain, is refused. Empty: any account.
+- `identifier_claim` (String) Default: sub.
+- `scopes` (List of String) Default: openid email profile.
 
 ### Read-Only
 
@@ -34,9 +34,9 @@ Builds a ProviderGoogle config and exposes its google.protobuf.Any encoding as `
 
 Optional:
 
-- `map` (Map of String)
-- `passthrough` (List of String)
-- `static` (Map of String)
+- `map` (Map of String) target name → source path.
+- `passthrough` (List of String) Source names copied through unchanged when present. Applied after `map` and `static`, and never overwrites either.
+- `static` (Map of String) target name → literal value, for claims that do not come from anywhere.
 
 
 <a id="nestedatt--client_secret_ref"></a>
@@ -44,4 +44,4 @@ Optional:
 
 Optional:
 
-- `name` (String)
+- `name` (String) tenants/{tenant}/secrets/{secret}. The tenant must be the tenant of the object holding the reference; the writer must hold identity.secrets.use.

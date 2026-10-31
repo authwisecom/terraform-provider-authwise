@@ -18,7 +18,7 @@ Builds a ProviderAuthwise config and exposes its google.protobuf.Any encoding as
 ### Optional
 
 - `client_id` (String)
-- `internal_issuer` (String)
+- `internal_issuer` (String) In case you need to get the token from a different server side address
 - `issuer` (String)
 
 ### Read-Only

@@ -7,11 +7,13 @@ import (
 	v1alpha1 "git.authwise.com/authwise/apis/authwise/types/core/v1alpha1"
 	tf "github.com/activatedio/tfinfra/pkg/tf"
 	jsontypes "github.com/hashicorp/terraform-plugin-framework-jsontypes/jsontypes"
+	stringvalidator "github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	attr "github.com/hashicorp/terraform-plugin-framework/attr"
 	datasource "github.com/hashicorp/terraform-plugin-framework/datasource"
 	schema "github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	diag "github.com/hashicorp/terraform-plugin-framework/diag"
 	path "github.com/hashicorp/terraform-plugin-framework/path"
+	validator "github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
 	basetypes "github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	anypb "google.golang.org/protobuf/types/known/anypb"
@@ -23,52 +25,100 @@ import (
 func SamlRelyingPartyConfigDataSourceSchema() schema.Schema {
 	return schema.Schema{
 		Attributes: map[string]schema.Attribute{
-			"acs_binding": schema.StringAttribute{Optional: true},
-			"acs_urls": schema.ListAttribute{
-				ElementType: types.StringType,
-				Optional:    true,
+			"acs_binding": schema.StringAttribute{
+				MarkdownDescription: "How kit delivers the Response to the partner's AssertionConsumerService, as the SAML binding URN. Unset is HTTP-POST. One of `urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect` or `urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST`. Also takes `HTTP-POST` for `urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST`, `HTTP-Redirect` for `urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect`, and encodes the full value.",
+				Optional:            true,
+				Validators:          []validator.String{stringvalidator.OneOf("urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect", "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST", "HTTP-POST", "HTTP-Redirect")},
 			},
-			"allow_idp_initiated": schema.BoolAttribute{Optional: true},
+			"acs_urls": schema.ListAttribute{
+				ElementType:         types.StringType,
+				MarkdownDescription: "Allowed AssertionConsumerService locations, matched exactly. The first is the default, used for an IdP-initiated login and for a request that names no ACS.",
+				Optional:            true,
+			},
+			"allow_idp_initiated": schema.BoolAttribute{
+				MarkdownDescription: "Accept a login started at our end with no AuthnRequest at all. Defaults false: it means issuing an assertion for a destination nobody asked about, so it needs a default ACS and a deliberate decision.",
+				Optional:            true,
+			},
 			"any": schema.StringAttribute{
 				Computed:            true,
 				CustomType:          jsontypes.NormalizedType{},
 				MarkdownDescription: "protojson-encoded google.protobuf.Any (includes `@type`); reference this from Any-typed resource attributes.",
 			},
-			"assertion_lifetime_seconds": schema.Int64Attribute{Optional: true},
+			"assertion_lifetime_seconds": schema.Int64Attribute{
+				MarkdownDescription: "How long the assertion is good for. Defaults to 300.",
+				Optional:            true,
+			},
 			"claim_map": schema.SingleNestedAttribute{
 				Attributes: map[string]schema.Attribute{
 					"map": schema.MapAttribute{
-						ElementType: types.StringType,
-						Optional:    true,
+						ElementType:         types.StringType,
+						MarkdownDescription: "target name → source path.",
+						Optional:            true,
 					},
 					"passthrough": schema.ListAttribute{
-						ElementType: types.StringType,
-						Optional:    true,
+						ElementType:         types.StringType,
+						MarkdownDescription: "Source names copied through unchanged when present. Applied after `map` and `static`, and never overwrites either.",
+						Optional:            true,
 					},
 					"static": schema.MapAttribute{
-						ElementType: types.StringType,
-						Optional:    true,
+						ElementType:         types.StringType,
+						MarkdownDescription: "target name → literal value, for claims that do not come from anywhere.",
+						Optional:            true,
 					},
 				},
-				Optional: true,
-			},
-			"default_relay_state":             schema.StringAttribute{Optional: true},
-			"encrypt_assertions":              schema.BoolAttribute{Optional: true},
-			"name_id_format":                  schema.StringAttribute{Optional: true},
-			"name_id_source":                  schema.StringAttribute{Optional: true},
-			"session_not_on_or_after_seconds": schema.Int64Attribute{Optional: true},
-			"sign_assertions":                 schema.BoolAttribute{Optional: true},
-			"sign_response":                   schema.BoolAttribute{Optional: true},
-			"signing_certificate_id":          schema.StringAttribute{Optional: true},
-			"sp_encryption_certificate_id":    schema.StringAttribute{Optional: true},
-			"sp_entity_id":                    schema.StringAttribute{Optional: true},
-			"sp_metadata_imported_at": schema.StringAttribute{
-				MarkdownDescription: "`sp_metadata_imported_at` as an RFC 3339 timestamp.",
+				MarkdownDescription: "Grant and user to AttributeStatement. Empty issues nothing but the NameID, which is what a partner asking only \"who is this\" needs.",
 				Optional:            true,
 			},
-			"sp_metadata_xml":            schema.StringAttribute{Optional: true},
-			"sp_signing_certificate_id":  schema.StringAttribute{Optional: true},
-			"want_authn_requests_signed": schema.BoolAttribute{Optional: true},
+			"default_relay_state": schema.StringAttribute{
+				MarkdownDescription: "RelayState sent with an IdP-initiated Response, which is how a partner knows where to land the user.",
+				Optional:            true,
+			},
+			"encrypt_assertions": schema.BoolAttribute{Optional: true},
+			"name_id_format": schema.StringAttribute{
+				MarkdownDescription: "NameID Format we issue. Empty uses the unspecified format carrying the same subject an OIDC client would get.",
+				Optional:            true,
+			},
+			"name_id_source": schema.StringAttribute{
+				MarkdownDescription: "Which value becomes the NameID. Empty uses the default for the format.",
+				Optional:            true,
+			},
+			"session_not_on_or_after_seconds": schema.Int64Attribute{
+				MarkdownDescription: "SessionNotOnOrAfter on the AuthnStatement. Zero omits it, leaving the partner's own session policy in charge.",
+				Optional:            true,
+			},
+			"sign_assertions": schema.BoolAttribute{Optional: true},
+			"sign_response": schema.BoolAttribute{
+				MarkdownDescription: "Defaults true. At least one of sign_response, sign_assertions or encrypt_assertions must hold, which the library enforces.",
+				Optional:            true,
+			},
+			"signing_certificate_id": schema.StringAttribute{
+				MarkdownDescription: "Certificate resource name kit signs with. Required: an IdP that signs nothing issues assertions anyone can forge.",
+				Optional:            true,
+			},
+			"sp_encryption_certificate_id": schema.StringAttribute{
+				MarkdownDescription: "Certificate resource name we encrypt assertions to. Required if encrypt_assertions.",
+				Optional:            true,
+			},
+			"sp_entity_id": schema.StringAttribute{
+				MarkdownDescription: "Expected Issuer on their AuthnRequest, and the Audience our assertion is restricted to. An AuthnRequest from anyone else is refused.",
+				Optional:            true,
+			},
+			"sp_metadata_imported_at": schema.StringAttribute{
+				MarkdownDescription: "When kit last imported the partner's metadata. kit sets it on import; leave it unset. `sp_metadata_imported_at` as an RFC 3339 timestamp.",
+				Optional:            true,
+			},
+			"sp_metadata_xml": schema.StringAttribute{
+				MarkdownDescription: "The last metadata document imported, kept so a re-import can be diffed against it rather than applied blind.",
+				Optional:            true,
+			},
+			"sp_signing_certificate_id": schema.StringAttribute{
+				MarkdownDescription: "Certificate resource name holding their signing certificate. Required if want_authn_requests_signed; every inbound signature is checked against this one and nothing else.",
+				Optional:            true,
+			},
+			"want_authn_requests_signed": schema.BoolAttribute{
+				MarkdownDescription: "Require the partner to sign their AuthnRequest. Off by default because most SPs do not sign, and the request carries nothing an unsigned one could abuse that the ACS allow-list does not already close.",
+				Optional:            true,
+			},
 		},
 		MarkdownDescription: "Builds a SamlRelyingPartyConfig config and exposes its google.protobuf.Any encoding as `any`. Makes no API calls.",
 	}
@@ -149,6 +199,12 @@ func (m *SamlRelyingPartyConfigModel) ToProto(ctx context.Context) (*v1alpha1.Sa
 		diags.Append(m.AcsUrls.ElementsAs(ctx, &out.AcsUrls, false)...)
 	}
 	out.AcsBinding = m.AcsBinding.ValueString()
+	if v, ok := map[string]string{
+		"HTTP-POST":     "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST",
+		"HTTP-Redirect": "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect",
+	}[out.AcsBinding]; ok {
+		out.AcsBinding = v
+	}
 	out.SpSigningCertificateId = m.SpSigningCertificateId.ValueString()
 	out.SpEncryptionCertificateId = m.SpEncryptionCertificateId.ValueString()
 	out.SpMetadataXml = m.SpMetadataXml.ValueString()

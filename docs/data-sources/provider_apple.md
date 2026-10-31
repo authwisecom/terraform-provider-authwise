@@ -18,12 +18,12 @@ Builds a ProviderApple config and exposes its google.protobuf.Any encoding as `a
 ### Optional
 
 - `authorization_params` (Map of String)
-- `claim_map` (Attributes) (see [below for nested schema](#nestedatt--claim_map))
-- `client_id` (String)
-- `identifier_claim` (String)
+- `claim_map` (Attributes) By default also maps form.user.name.firstName and lastName, which Apple posts on the first authorization only. (see [below for nested schema](#nestedatt--claim_map))
+- `client_id` (String) The Services ID.
+- `identifier_claim` (String) Default: sub.
 - `key_id` (String)
-- `private_key_ref` (Attributes) (see [below for nested schema](#nestedatt--private_key_ref))
-- `scopes` (List of String)
+- `private_key_ref` (Attributes) The .p8 private key, PEM. Minted into an ES256 client-secret JWT per exchange (iss=team_id, sub=client_id, aud=https://appleid.apple.com, exp=5 min); the key never leaves the process and never sits in interaction state. (see [below for nested schema](#nestedatt--private_key_ref))
+- `scopes` (List of String) Default: name email.
 - `team_id` (String)
 
 ### Read-Only
@@ -35,9 +35,9 @@ Builds a ProviderApple config and exposes its google.protobuf.Any encoding as `a
 
 Optional:
 
-- `map` (Map of String)
-- `passthrough` (List of String)
-- `static` (Map of String)
+- `map` (Map of String) target name → source path.
+- `passthrough` (List of String) Source names copied through unchanged when present. Applied after `map` and `static`, and never overwrites either.
+- `static` (Map of String) target name → literal value, for claims that do not come from anywhere.
 
 
 <a id="nestedatt--private_key_ref"></a>
@@ -45,4 +45,4 @@ Optional:
 
 Optional:
 
-- `name` (String)
+- `name` (String) tenants/{tenant}/secrets/{secret}. The tenant must be the tenant of the object holding the reference; the writer must hold identity.secrets.use.

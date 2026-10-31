@@ -32,30 +32,43 @@ func ProviderAuth0DataSourceSchema() schema.Schema {
 			"claim_map": schema.SingleNestedAttribute{
 				Attributes: map[string]schema.Attribute{
 					"map": schema.MapAttribute{
-						ElementType: types.StringType,
-						Optional:    true,
+						ElementType:         types.StringType,
+						MarkdownDescription: "target name → source path.",
+						Optional:            true,
 					},
 					"passthrough": schema.ListAttribute{
-						ElementType: types.StringType,
-						Optional:    true,
+						ElementType:         types.StringType,
+						MarkdownDescription: "Source names copied through unchanged when present. Applied after `map` and `static`, and never overwrites either.",
+						Optional:            true,
 					},
 					"static": schema.MapAttribute{
-						ElementType: types.StringType,
-						Optional:    true,
+						ElementType:         types.StringType,
+						MarkdownDescription: "target name → literal value, for claims that do not come from anywhere.",
+						Optional:            true,
 					},
 				},
 				Optional: true,
 			},
 			"client_id": schema.StringAttribute{Optional: true},
 			"client_secret_ref": schema.SingleNestedAttribute{
-				Attributes: map[string]schema.Attribute{"name": schema.StringAttribute{Optional: true}},
-				Optional:   true,
+				Attributes: map[string]schema.Attribute{"name": schema.StringAttribute{
+					MarkdownDescription: "tenants/{tenant}/secrets/{secret}. The tenant must be the tenant of the object holding the reference; the writer must hold identity.secrets.use.",
+					Optional:            true,
+				}},
+				Optional: true,
 			},
-			"identifier_claim": schema.StringAttribute{Optional: true},
-			"issuer":           schema.StringAttribute{Optional: true},
+			"identifier_claim": schema.StringAttribute{
+				MarkdownDescription: "Default: sub.",
+				Optional:            true,
+			},
+			"issuer": schema.StringAttribute{
+				MarkdownDescription: "e.g. https://{tenant}.auth0.com/",
+				Optional:            true,
+			},
 			"scopes": schema.ListAttribute{
-				ElementType: types.StringType,
-				Optional:    true,
+				ElementType:         types.StringType,
+				MarkdownDescription: "Default: openid profile email.",
+				Optional:            true,
 			},
 		},
 		MarkdownDescription: "Builds a ProviderAuth0 config and exposes its google.protobuf.Any encoding as `any`. Makes no API calls.",

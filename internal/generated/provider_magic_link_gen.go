@@ -28,11 +28,18 @@ func ProviderMagicLinkDataSourceSchema() schema.Schema {
 				CustomType:          jsontypes.NormalizedType{},
 				MarkdownDescription: "protojson-encoded google.protobuf.Any (includes `@type`); reference this from Any-typed resource attributes.",
 			},
-			"code_length":          schema.Int64Attribute{Optional: true},
-			"identifier_attribute": schema.StringAttribute{Optional: true},
+			"code_length": schema.Int64Attribute{
+				MarkdownDescription: "Digits in the code, 6 to 8. Default 6: the attempt cap, not the length, is what makes a short code safe, and six is what a phone keyboard types.",
+				Optional:            true,
+			},
+			"identifier_attribute": schema.StringAttribute{
+				MarkdownDescription: "The user attribute the identifier is matched against. Only \"email\" is supported, and it is the default.",
+				Optional:            true,
+			},
 			"link_scope": schema.StringAttribute{
-				Optional:   true,
-				Validators: []validator.String{stringvalidator.OneOf("LINK_SCOPE_UNSPECIFIED", "SAME_BROWSER", "ANY_BROWSER")},
+				MarkdownDescription: "Where the mailed link signs in (kit#817). Default SAME_BROWSER.",
+				Optional:            true,
+				Validators:          []validator.String{stringvalidator.OneOf("LINK_SCOPE_UNSPECIFIED", "SAME_BROWSER", "ANY_BROWSER")},
 			},
 			"mode": schema.StringAttribute{
 				Optional:   true,
@@ -40,19 +47,29 @@ func ProviderMagicLinkDataSourceSchema() schema.Schema {
 			},
 			"request_limits": schema.SingleNestedAttribute{
 				Attributes: map[string]schema.Attribute{
-					"per_identifier_per_hour": schema.Int64Attribute{Optional: true},
-					"per_ip_per_hour":         schema.Int64Attribute{Optional: true},
-					"per_realm_per_hour":      schema.Int64Attribute{Optional: true},
+					"per_identifier_per_hour": schema.Int64Attribute{
+						MarkdownDescription: "Requests per address per hour, 1–20. Default 3.",
+						Optional:            true,
+					},
+					"per_ip_per_hour": schema.Int64Attribute{
+						MarkdownDescription: "Requests per client address per hour, 1–100. Default 10.",
+						Optional:            true,
+					},
+					"per_realm_per_hour": schema.Int64Attribute{
+						MarkdownDescription: "Requests across the realm per hour, 1–10000. Default 500.",
+						Optional:            true,
+					},
 				},
 				Optional: true,
 			},
 			"ttl": schema.StringAttribute{
-				MarkdownDescription: "`ttl` as a duration: `\"5s\"`, `\"1.5s\"`, `\"500ms\"`, `\"1m30s\"`.",
+				MarkdownDescription: "How long the link and the code live. Default 10 minutes, NIST's ceiling for an out-of-band secret. `ttl` as a duration: `\"5s\"`, `\"1.5s\"`, `\"500ms\"`, `\"1m30s\"`.",
 				Optional:            true,
 			},
 			"unknown_address": schema.StringAttribute{
-				Optional:   true,
-				Validators: []validator.String{stringvalidator.OneOf("UNKNOWN_ADDRESS_UNSPECIFIED", "SILENT", "TELL")},
+				MarkdownDescription: "What a request for an address with no account answers (kit#825). Default SILENT.",
+				Optional:            true,
+				Validators:          []validator.String{stringvalidator.OneOf("UNKNOWN_ADDRESS_UNSPECIFIED", "SILENT", "TELL")},
 			},
 		},
 		MarkdownDescription: "A one-time link and code sent by email. Unset fields take kit's defaults: a 6-digit code, a 10-minute ttl, `LINK_AND_CODE`, `SAME_BROWSER`, `SILENT`. `link_scope = \"ANY_BROWSER\"` lets the link sign in whichever browser opens it, after the person confirms, at the price that whoever reads the mailbox can sign in anywhere, so pair it with a step-up rule (it needs `LINK_AND_CODE`). `unknown_address = \"TELL\"` tells a person whose address has no account so, where the realm would not create one, at the price of revealing which addresses have accounts at the request throttle's rate. `request_limits` caps sign-in requests per hour per address (1 to 20, default 3), per IP (1 to 100, default 10) and per realm (1 to 10000, default 500); 0 or unset takes the default, there is no unlimited, and a higher cap lets more mail through to a person's inbox or to an attacker probing addresses. Builds a ProviderMagicLink config and exposes its google.protobuf.Any encoding as `any`. Makes no API calls.",

@@ -17,23 +17,23 @@ Builds a ProviderSaml config and exposes its google.protobuf.Any encoding as `an
 
 ### Optional
 
-- `accept_sha1` (Boolean)
-- `allow_create` (Boolean)
-- `allow_idp_initiated` (Boolean)
-- `claim_map` (Attributes) (see [below for nested schema](#nestedatt--claim_map))
-- `clock_skew_seconds` (Number)
-- `identifier_source` (String)
-- `idp_entity_id` (String)
-- `idp_metadata_imported_at` (String) `idp_metadata_imported_at` as an RFC 3339 timestamp.
-- `idp_metadata_xml` (String)
-- `idp_signing_certificate_id` (String)
-- `idp_sso_binding` (String)
-- `idp_sso_url` (String)
-- `name_id_format` (String)
-- `sign_authn_requests` (Boolean)
-- `signing_certificate_id` (String)
-- `want_assertions_signed` (Boolean)
-- `want_response_signed` (Boolean)
+- `accept_sha1` (Boolean) Accept SHA-1 signatures from this partner. Defaults false. Inbound only, per connection, and logged on every use.
+- `allow_create` (Boolean) Sets AllowCreate on the requested NameIDPolicy: the IdP may create an identifier for a person it has none for.
+- `allow_idp_initiated` (Boolean) Accept an unsolicited Response — one with no InResponseTo, which therefore correlates to no request we made. Defaults false: it removes the replay and CSRF protection that correlation provides, and is only worth enabling for a partner whose portal is the intended entry point.
+- `claim_map` (Attributes) Assertion to User. Empty uses the documented defaults. (see [below for nested schema](#nestedatt--claim_map))
+- `clock_skew_seconds` (Number) Tolerance applied to NotBefore and NotOnOrAfter. Defaults to 120.
+- `identifier_source` (String) Which part of the assertion becomes the user's identifier. Defaults to `assertion.name_id`; a partner whose NameID is a transient opaque string will want `assertion.attributes.<name>` instead.
+- `idp_entity_id` (String) Expected Issuer on every assertion. An assertion from anyone else is refused even if it is correctly signed by a certificate we trust.
+- `idp_metadata_imported_at` (String) When kit last imported the IdP's metadata. kit sets it on import; leave it unset. `idp_metadata_imported_at` as an RFC 3339 timestamp.
+- `idp_metadata_xml` (String) The last metadata document imported, kept so a re-import can be diffed against it rather than applied blind.
+- `idp_signing_certificate_id` (String) Certificate resource name holding their signing certificate. Every inbound signature is checked against this one and nothing else: KeyInfo is never a source of trust.
+- `idp_sso_binding` (String) The binding on the IdP's SingleSignOnService, which is how kit sends it an AuthnRequest, as the SAML binding URN. Unset is HTTP-Redirect. Read it off the IdP's metadata: it describes their endpoint, not a choice made here. One of `urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect` or `urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST`. Also takes `HTTP-POST` for `urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST`, `HTTP-Redirect` for `urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect`, and encodes the full value.
+- `idp_sso_url` (String) Their SingleSignOnService location.
+- `name_id_format` (String) Requested NameIDPolicy/@Format.
+- `sign_authn_requests` (Boolean) Sign every AuthnRequest with `signing_certificate_id`.
+- `signing_certificate_id` (String) Certificate resource name kit signs AuthnRequests with, and decrypts encrypted assertions with.
+- `want_assertions_signed` (Boolean) Require every assertion to be signed. kit requires it anyway unless `want_response_signed` is set: at least one of the two always holds, since an SP that verifies nothing accepts assertions from anyone.
+- `want_response_signed` (Boolean) Require the Response itself to be signed. See `want_assertions_signed`.
 
 ### Read-Only
 
@@ -44,6 +44,6 @@ Builds a ProviderSaml config and exposes its google.protobuf.Any encoding as `an
 
 Optional:
 
-- `map` (Map of String)
-- `passthrough` (List of String)
-- `static` (Map of String)
+- `map` (Map of String) target name → source path.
+- `passthrough` (List of String) Source names copied through unchanged when present. Applied after `map` and `static`, and never overwrites either.
+- `static` (Map of String) target name → literal value, for claims that do not come from anywhere.

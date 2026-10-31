@@ -19,16 +19,16 @@ Builds a ProviderOidc config and exposes its google.protobuf.Any encoding as `an
 
 - `authorization_params` (Map of String)
 - `claim_map` (Attributes) (see [below for nested schema](#nestedatt--claim_map))
-- `client_auth_method` (String)
+- `client_auth_method` (String) client_secret_basic (default) | client_secret_post | none. private_key_jwt is a later addition; the field is a string so it can be.
 - `client_id` (String)
-- `client_secret_ref` (Attributes) (see [below for nested schema](#nestedatt--client_secret_ref))
-- `endpoints` (Attributes) (see [below for nested schema](#nestedatt--endpoints))
-- `identifier_claim` (String)
-- `internal_base_url` (String)
-- `issuer` (String)
-- `pkce` (String)
-- `scopes` (List of String)
-- `use_userinfo` (Boolean)
+- `client_secret_ref` (Attributes) Required unless client_auth_method is none. (see [below for nested schema](#nestedatt--client_secret_ref))
+- `endpoints` (Attributes) Explicit endpoints for an issuer without discovery, or to override one entry of it. Each empty field falls back to discovery. (see [below for nested schema](#nestedatt--endpoints))
+- `identifier_claim` (String) Default: sub.
+- `internal_base_url` (String) Server-to-server calls (discovery, token, JWKS, userinfo) are rewritten onto this base while `iss` is still checked against `issuer`: the in-cluster case ProviderAuthwise.internal_issuer solves.
+- `issuer` (String) Discovery at {issuer}/.well-known/openid-configuration, and the exact value every id_token's `iss` must carry.
+- `pkce` (String) auto (default: S256 when discovery advertises it) | required | off.
+- `scopes` (List of String) Default: openid profile email.
+- `use_userinfo` (Boolean) Also call the userinfo endpoint and merge its claims under `claims.*`, the id_token winning a conflict. Default false: most issuers put the profile in the id_token.
 
 ### Read-Only
 
@@ -39,9 +39,9 @@ Builds a ProviderOidc config and exposes its google.protobuf.Any encoding as `an
 
 Optional:
 
-- `map` (Map of String)
-- `passthrough` (List of String)
-- `static` (Map of String)
+- `map` (Map of String) target name → source path.
+- `passthrough` (List of String) Source names copied through unchanged when present. Applied after `map` and `static`, and never overwrites either.
+- `static` (Map of String) target name → literal value, for claims that do not come from anywhere.
 
 
 <a id="nestedatt--client_secret_ref"></a>
@@ -49,7 +49,7 @@ Optional:
 
 Optional:
 
-- `name` (String)
+- `name` (String) tenants/{tenant}/secrets/{secret}. The tenant must be the tenant of the object holding the reference; the writer must hold identity.secrets.use.
 
 
 <a id="nestedatt--endpoints"></a>

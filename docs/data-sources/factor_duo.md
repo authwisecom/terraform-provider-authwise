@@ -17,11 +17,11 @@ Builds a FactorDuo config and exposes its google.protobuf.Any encoding as `any`.
 
 ### Optional
 
-- `api_host` (String)
-- `client_id` (String)
-- `client_secret_ref` (Attributes) (see [below for nested schema](#nestedatt--client_secret_ref))
-- `failmode` (String)
-- `username_attribute` (String)
+- `api_host` (String) The API hostname Duo assigned, e.g. api-XXXXXXXX.duosecurity.com.
+- `client_id` (String) The Duo application's client id.
+- `client_secret_ref` (Attributes) The Duo application's client secret, by reference. Writing it needs identity.secrets.use (kit#370). (see [below for nested schema](#nestedatt--client_secret_ref))
+- `failmode` (String) What an unreachable Duo does to the step: closed (the default) fails it; open lets the person through with no factor asserted, recorded as authn.factor success reason=upstream_bypass at warning.
+- `username_attribute` (String) Which of the person's attributes is their Duo username: preferred_username (the default) or email.
 
 ### Read-Only
 
@@ -32,4 +32,4 @@ Builds a FactorDuo config and exposes its google.protobuf.Any encoding as `any`.
 
 Optional:
 
-- `name` (String)
+- `name` (String) tenants/{tenant}/secrets/{secret}. The tenant must be the tenant of the object holding the reference; the writer must hold identity.secrets.use.

@@ -17,14 +17,14 @@ Builds a InteractiveClientConfig config and exposes its google.protobuf.Any enco
 
 ### Optional
 
-- `access_token_expire_seconds` (Number)
-- `allowed_redirect_uris` (List of String)
-- `cors` (String) `cors` as the protojson encoding of CorsConfig.
-- `flow_integration_config` (String) `flow_integration_config` as the protojson encoding of IntegrationConfig.
+- `access_token_expire_seconds` (Number) Access token lifetime in seconds. Unset takes the value from the layer above (tenant, issuer, audience).
+- `allowed_redirect_uris` (List of String) The redirect URIs /authorize accepts for this client.
+- `cors` (String) The browser origins allowed to call kit for this client. `cors` as the protojson encoding of CorsConfig.
+- `flow_integration_config` (String) The endpoint kit calls during this client's login flow. `flow_integration_config` as the protojson encoding of IntegrationConfig.
 - `interaction_forward_uri` (String)
-- `refresh_token_absolute_expire_seconds` (Number)
-- `refresh_token_expire_seconds` (Number)
-- `require_consent` (Boolean)
+- `refresh_token_absolute_expire_seconds` (Number) Hard cap on a refresh token family in seconds, set once when the family is created and never extended. Unset takes the value from the layer above.
+- `refresh_token_expire_seconds` (Number) Refresh token idle lifetime in seconds: it slides forward on every rotation. Unset takes the value from the layer above.
+- `require_consent` (Boolean) Make /authorize ask the person to approve this client for the scopes it requests. Default false. `prompt=consent` asks regardless, so this is the floor, not the switch.
 
 ### Read-Only
 

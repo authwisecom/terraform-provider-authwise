@@ -133,6 +133,27 @@ data "authwise_realm_config" "x" {
 }`,
 			want: regexp.MustCompile(`(?s)Unsupported argument`),
 		},
+		"a reserved provisioning field set": {
+			config: `
+data "authwise_realm_config" "x" {
+  provisioning = { self_signup = true, allowed_provider_types = ["saml"] }
+}`,
+			want: regexp.MustCompile(`(?s)provisioning\.allowed_provider_types.*kit#222`),
+		},
+		"a reserved switch on": {
+			config: `
+data "authwise_realm_config" "x" {
+  provisioning = { scim = true }
+}`,
+			want: regexp.MustCompile(`(?s)not yet supported.*kit#192`),
+		},
+		"a SAML binding that is not one": {
+			config: `
+data "authwise_provider_saml" "x" {
+  idp_sso_binding = "redirect"
+}`,
+			want: regexp.MustCompile(`(?s)value must be one of.*urn:oasis:names:tc:SAML:2\.0:bindings:HTTP-Redirect`),
+		},
 		"misspelled attribute": {
 			config: `
 data "authwise_endpoint_auth" "x" {
