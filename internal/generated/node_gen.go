@@ -111,6 +111,11 @@ func NodeResourceSchema() schema.Schema {
 				ElementType:   types.StringType,
 				PlanModifiers: []planmodifier.List{listplanmodifier.UseStateForUnknown()},
 			},
+			"slug": schema.StringAttribute{
+				Computed:      true,
+				Optional:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
 			"state": schema.StringAttribute{
 				Computed:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
@@ -146,6 +151,7 @@ type NodeModel struct {
 	AuthCode          types.String         `tfsdk:"auth_code"`
 	AuthCodeExpiresAt types.String         `tfsdk:"auth_code_expires_at"`
 	LastSeenAt        types.String         `tfsdk:"last_seen_at"`
+	Slug              types.String         `tfsdk:"slug"`
 }
 
 // NewNodeModel returns a model with every attribute set to its typed null; collection types cannot be zero-valued.
@@ -166,6 +172,7 @@ func NewNodeModel() *NodeModel {
 		OwnerId:           types.StringNull(),
 		PublicKey:         types.StringNull(),
 		Roles:             types.ListNull(types.StringType),
+		Slug:              types.StringNull(),
 		State:             types.StringNull(),
 		TenantId:          types.StringNull(),
 	}
@@ -216,6 +223,7 @@ func (m *NodeModel) ToProto(ctx context.Context) (*v1alpha1.Node, diag.Diagnosti
 			out.LastSeenAt = timestamppb.New(t)
 		}
 	}
+	out.Slug = m.Slug.ValueString()
 	return out, diags
 }
 
@@ -305,6 +313,11 @@ func (m *NodeModel) FromProto(ctx context.Context, e *v1alpha1.Node) diag.Diagno
 	} else {
 		m.LastSeenAt = types.StringValue(e.LastSeenAt.AsTime().Format(time.RFC3339))
 	}
+	if e.Slug == "" {
+		m.Slug = types.StringNull()
+	} else {
+		m.Slug = types.StringValue(e.Slug)
+	}
 	return diags
 }
 
@@ -343,6 +356,9 @@ func (m *NodeModel) UpdateMask(ctx context.Context, prior *NodeModel) []string {
 		if eq, _ := m.Config.StringSemanticEquals(ctx, prior.Config); !eq {
 			paths = append(paths, "config")
 		}
+	}
+	if !m.Slug.Equal(prior.Slug) {
+		paths = append(paths, "slug")
 	}
 	return paths
 }
@@ -508,6 +524,7 @@ func NodeDataSourceSchema() schema1.Schema {
 				Computed:    true,
 				ElementType: types.StringType,
 			},
+			"slug":      schema1.StringAttribute{Computed: true},
 			"state":     schema1.StringAttribute{Computed: true},
 			"tenant_id": schema1.StringAttribute{Computed: true},
 		},
@@ -560,6 +577,7 @@ type NodeItemModel struct {
 	AuthCode          types.String         `tfsdk:"auth_code"`
 	AuthCodeExpiresAt types.String         `tfsdk:"auth_code_expires_at"`
 	LastSeenAt        types.String         `tfsdk:"last_seen_at"`
+	Slug              types.String         `tfsdk:"slug"`
 }
 
 // NodeItemAttrTypes returns the attribute types of one guard_nodes list element.
@@ -579,6 +597,7 @@ func NodeItemAttrTypes() map[string]attr.Type {
 		"owner_id":             types.StringType,
 		"public_key":           types.StringType,
 		"roles":                types.ListType{ElemType: types.StringType},
+		"slug":                 types.StringType,
 		"state":                types.StringType,
 	}
 }
@@ -633,6 +652,7 @@ func NodeListDataSourceSchema() schema1.Schema {
 						Computed:    true,
 						ElementType: types.StringType,
 					},
+					"slug":  schema1.StringAttribute{Computed: true},
 					"state": schema1.StringAttribute{Computed: true},
 				}},
 			},
@@ -737,6 +757,11 @@ func nodeItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Node, *NodeM
 		item.LastSeenAt = types.StringNull()
 	} else {
 		item.LastSeenAt = types.StringValue(e.LastSeenAt.AsTime().Format(time.RFC3339))
+	}
+	if e.Slug == "" {
+		item.Slug = types.StringNull()
+	} else {
+		item.Slug = types.StringValue(e.Slug)
 	}
 	id, err := crud.IDFromName(e.Name)
 	if err != nil {

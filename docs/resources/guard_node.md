@@ -44,6 +44,7 @@ output "gateway_auth_code" {
 - `endpoint` (String)
 - `labels` (Map of String)
 - `public_key` (String)
+- `slug` (String)
 
 ### Read-Only
 

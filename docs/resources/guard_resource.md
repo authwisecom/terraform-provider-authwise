@@ -42,9 +42,22 @@ resource "authwise_guard_resource" "office_lan" {
 
 ### Read-Only
 
+- `addresses` (Attributes List) (see [below for nested schema](#nestedatt--addresses))
 - `guard_resource_id` (String) Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.
 - `name` (String) Full resource name; serves as the Terraform ID.
 - `serving_node_ids` (List of String)
+
+<a id="nestedatt--addresses"></a>
+### Nested Schema for `addresses`
+
+Optional:
+
+- `addresses` (List of String)
+- `expires_at` (String)
+- `node_id` (String)
+- `reason` (String)
+- `refused` (List of String)
+- `seen_at` (String)
 
 ## Import
 

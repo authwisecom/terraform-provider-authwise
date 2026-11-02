@@ -41,6 +41,7 @@ resource "authwise_guard_network" "office" {
 ### Read-Only
 
 - `guard_network_id` (String) Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.
+- `mesh_domain` (String)
 - `name` (String) Full resource name; serves as the Terraform ID.
 
 ## Import

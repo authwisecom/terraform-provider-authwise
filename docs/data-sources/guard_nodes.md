@@ -46,4 +46,5 @@ Read-Only:
 - `owner_id` (String)
 - `public_key` (String)
 - `roles` (List of String)
+- `slug` (String)
 - `state` (String)

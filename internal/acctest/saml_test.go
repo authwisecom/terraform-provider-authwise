@@ -242,6 +242,12 @@ data "authwise_provider_saml" "partner" {
   want_assertions_signed = true
   clock_skew_seconds     = 120
   identifier_source      = "assertion.name_id"
+  identifier_hint        = "SUBJECT"
+
+  requested_authn_context = {
+    comparison = "minimum"
+    class_refs = ["urn:oasis:names:tc:SAML:2.0:ac:classes:PasswordProtectedTransport"]
+  }
 
   claim_map = {
     map = {
@@ -302,6 +308,19 @@ resource "authwise_provider" "partner" {
 						}
 						if got := saml.GetSigningCertificateId(); got == "" {
 							return fmt.Errorf("signing_certificate_id is empty; the certificate reference did not resolve")
+						}
+
+						// identifier_hint and requested_authn_context
+						// (apis v0.48.0, kit#865).
+						if got := saml.GetIdentifierHint(); got != corepb.ProviderSaml_SUBJECT {
+							return fmt.Errorf("identifier_hint = %v", got)
+						}
+						rac := saml.GetRequestedAuthnContext()
+						if got := rac.GetComparison(); got != "minimum" {
+							return fmt.Errorf("requested_authn_context.comparison = %q", got)
+						}
+						if got := rac.GetClassRefs(); len(got) != 1 || got[0] != "urn:oasis:names:tc:SAML:2.0:ac:classes:PasswordProtectedTransport" {
+							return fmt.Errorf("requested_authn_context.class_refs = %v", got)
 						}
 
 						cm := saml.GetClaimMap()
@@ -418,5 +437,25 @@ resource "authwise_client" "app" {
 				),
 			},
 		},
+	})
+}
+
+// TestAccProviderSaml_IdentifierHintRefused: identifier_hint takes only
+// kit's three values, at plan.
+func TestAccProviderSaml_IdentifierHintRefused(t *testing.T) {
+
+	h := newHarness(t)
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: protoFactories(),
+		Steps: []resource.TestStep{{
+			Config: h.providerConfig() + `
+data "authwise_provider_saml" "x" {
+  idp_entity_id   = "https://idp.example.com"
+  identifier_hint = "login_hint"
+}
+`,
+			ExpectError: regexp.MustCompile(`(?s)LOGIN_HINT_QUERY.*SUBJECT.*NONE`),
+		}},
 	})
 }

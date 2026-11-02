@@ -22,7 +22,8 @@ Builds a ProviderSaml config and exposes its google.protobuf.Any encoding as `an
 - `allow_idp_initiated` (Boolean) Accept an unsolicited Response — one with no InResponseTo, which therefore correlates to no request we made. Defaults false: it removes the replay and CSRF protection that correlation provides, and is only worth enabling for a partner whose portal is the intended entry point.
 - `claim_map` (Attributes) Assertion to User. Empty uses the documented defaults. (see [below for nested schema](#nestedatt--claim_map))
 - `clock_skew_seconds` (Number) Tolerance applied to NotBefore and NotOnOrAfter. Defaults to 120.
-- `identifier_source` (String) Which part of the assertion becomes the user's identifier. Defaults to `assertion.name_id`; a partner whose NameID is a transient opaque string will want `assertion.attributes.<name>` instead.
+- `identifier_hint` (String) How the identifier that routed the person to this partner (the address typed at an identifier-first login, or `login_hint` on /authorize) reaches it, so the partner need not ask for it again. Nothing is sent when no identifier was routed. One of `LOGIN_HINT_QUERY` (the default): a `login_hint` query parameter on the IdP's SSO URL, which is what Entra ID, Google Workspace and Okta document; `SUBJECT`: a `<saml:Subject>` in the AuthnRequest, for an IdP that reads one (Entra ID refuses the whole request with AADSTS900236); or `NONE`: send nothing, and the partner asks the person.
+- `identifier_source` (String) Which part of the assertion becomes the user's identifier, as one of two paths: `assertion.name_id`, the Subject's NameID (the default), or `assertion.attributes.<name>`, the first value of the attribute `<name>`, e.g. `assertion.attributes.email`. A partner whose NameID is transient or opaque needs the second form: the identifier links a returning person to their user, so it must be stable across sign-ins.
 - `idp_entity_id` (String) Expected Issuer on every assertion. An assertion from anyone else is refused even if it is correctly signed by a certificate we trust.
 - `idp_metadata_imported_at` (String) When kit last imported the IdP's metadata. kit sets it on import; leave it unset. `idp_metadata_imported_at` as an RFC 3339 timestamp.
 - `idp_metadata_xml` (String) The last metadata document imported, kept so a re-import can be diffed against it rather than applied blind.
@@ -30,6 +31,7 @@ Builds a ProviderSaml config and exposes its google.protobuf.Any encoding as `an
 - `idp_sso_binding` (String) The binding on the IdP's SingleSignOnService, which is how kit sends it an AuthnRequest, as the SAML binding URN. Unset is HTTP-Redirect. Read it off the IdP's metadata: it describes their endpoint, not a choice made here. One of `urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect` or `urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST`. Also takes `HTTP-POST` for `urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST`, `HTTP-Redirect` for `urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect`, and encodes the full value.
 - `idp_sso_url` (String) Their SingleSignOnService location.
 - `name_id_format` (String) Requested NameIDPolicy/@Format.
+- `requested_authn_context` (Attributes) The RequestedAuthnContext kit sends in the AuthnRequest. Unset requests nothing and leaves the partner to authenticate the person however its own policy says. That is the default because an exact `PasswordProtectedTransport` fails anyone who signs in to the partner without a password, such as an Entra ID user on passwordless or MFA (AADSTS75011). When set, `class_refs` must hold at least one non-blank URI. (see [below for nested schema](#nestedatt--requested_authn_context))
 - `sign_authn_requests` (Boolean) Sign every AuthnRequest with `signing_certificate_id`.
 - `signing_certificate_id` (String) Certificate resource name kit signs AuthnRequests with, and decrypts encrypted assertions with.
 - `want_assertions_signed` (Boolean) Require every assertion to be signed. kit requires it anyway unless `want_response_signed` is set: at least one of the two always holds, since an SP that verifies nothing accepts assertions from anyone.
@@ -47,3 +49,12 @@ Optional:
 - `map` (Map of String) target name → source path.
 - `passthrough` (List of String) Source names copied through unchanged when present. Applied after `map` and `static`, and never overwrites either.
 - `static` (Map of String) target name → literal value, for claims that do not come from anywhere.
+
+
+<a id="nestedatt--requested_authn_context"></a>
+### Nested Schema for `requested_authn_context`
+
+Optional:
+
+- `class_refs` (List of String) AuthnContextClassRef URIs, in order of preference, e.g. `urn:oasis:names:tc:SAML:2.0:ac:classes:PasswordProtectedTransport`. At least one is required, and none may be blank.
+- `comparison` (String) One of `exact`, `minimum`, `better` or `maximum`. Unset means `exact`, as SAML defines. kit refuses any other value.

@@ -67,8 +67,13 @@ func ProviderSamlDataSourceSchema() schema.Schema {
 				MarkdownDescription: "Tolerance applied to NotBefore and NotOnOrAfter. Defaults to 120.",
 				Optional:            true,
 			},
+			"identifier_hint": schema.StringAttribute{
+				MarkdownDescription: "How the identifier that routed the person to this partner (the address typed at an identifier-first login, or `login_hint` on /authorize) reaches it, so the partner need not ask for it again. Nothing is sent when no identifier was routed. One of `LOGIN_HINT_QUERY` (the default): a `login_hint` query parameter on the IdP's SSO URL, which is what Entra ID, Google Workspace and Okta document; `SUBJECT`: a `<saml:Subject>` in the AuthnRequest, for an IdP that reads one (Entra ID refuses the whole request with AADSTS900236); or `NONE`: send nothing, and the partner asks the person.",
+				Optional:            true,
+				Validators:          []validator.String{stringvalidator.OneOf("LOGIN_HINT_QUERY", "SUBJECT", "NONE")},
+			},
 			"identifier_source": schema.StringAttribute{
-				MarkdownDescription: "Which part of the assertion becomes the user's identifier. Defaults to `assertion.name_id`; a partner whose NameID is a transient opaque string will want `assertion.attributes.<name>` instead.",
+				MarkdownDescription: "Which part of the assertion becomes the user's identifier, as one of two paths: `assertion.name_id`, the Subject's NameID (the default), or `assertion.attributes.<name>`, the first value of the attribute `<name>`, e.g. `assertion.attributes.email`. A partner whose NameID is transient or opaque needs the second form: the identifier links a returning person to their user, so it must be stable across sign-ins.",
 				Optional:            true,
 			},
 			"idp_entity_id": schema.StringAttribute{
@@ -98,6 +103,21 @@ func ProviderSamlDataSourceSchema() schema.Schema {
 			},
 			"name_id_format": schema.StringAttribute{
 				MarkdownDescription: "Requested NameIDPolicy/@Format.",
+				Optional:            true,
+			},
+			"requested_authn_context": schema.SingleNestedAttribute{
+				Attributes: map[string]schema.Attribute{
+					"class_refs": schema.ListAttribute{
+						ElementType:         types.StringType,
+						MarkdownDescription: "AuthnContextClassRef URIs, in order of preference, e.g. `urn:oasis:names:tc:SAML:2.0:ac:classes:PasswordProtectedTransport`. At least one is required, and none may be blank.",
+						Optional:            true,
+					},
+					"comparison": schema.StringAttribute{
+						MarkdownDescription: "One of `exact`, `minimum`, `better` or `maximum`. Unset means `exact`, as SAML defines. kit refuses any other value.",
+						Optional:            true,
+					},
+				},
+				MarkdownDescription: "The RequestedAuthnContext kit sends in the AuthnRequest. Unset requests nothing and leaves the partner to authenticate the person however its own policy says. That is the default because an exact `PasswordProtectedTransport` fails anyone who signs in to the partner without a password, such as an Entra ID user on passwordless or MFA (AADSTS75011). When set, `class_refs` must hold at least one non-blank URI.",
 				Optional:            true,
 			},
 			"sign_authn_requests": schema.BoolAttribute{
@@ -137,6 +157,20 @@ func ProviderSamlClaimMapAttrTypes() map[string]attr.Type {
 	}
 }
 
+// ProviderSamlRequestedAuthnContextModel is the Terraform model for ProviderSaml's "requested_authn_context" nested attribute.
+type ProviderSamlRequestedAuthnContextModel struct {
+	Comparison types.String `tfsdk:"comparison"`
+	ClassRefs  types.List   `tfsdk:"class_refs"`
+}
+
+// ProviderSamlRequestedAuthnContextAttrTypes returns the attribute types of the "requested_authn_context" nested attribute.
+func ProviderSamlRequestedAuthnContextAttrTypes() map[string]attr.Type {
+	return map[string]attr.Type{
+		"class_refs": types.ListType{ElemType: types.StringType},
+		"comparison": types.StringType,
+	}
+}
+
 // ProviderSamlModel is the Terraform model for the ProviderSaml config data source.
 type ProviderSamlModel struct {
 	IdpEntityId             types.String         `tfsdk:"idp_entity_id"`
@@ -156,6 +190,8 @@ type ProviderSamlModel struct {
 	ClockSkewSeconds        types.Int64          `tfsdk:"clock_skew_seconds"`
 	ClaimMap                types.Object         `tfsdk:"claim_map"`
 	IdentifierSource        types.String         `tfsdk:"identifier_source"`
+	IdentifierHint          types.String         `tfsdk:"identifier_hint"`
+	RequestedAuthnContext   types.Object         `tfsdk:"requested_authn_context"`
 	Any                     jsontypes.Normalized `tfsdk:"any"`
 }
 
@@ -168,6 +204,7 @@ func NewProviderSamlModel() *ProviderSamlModel {
 		Any:                     jsontypes.NewNormalizedNull(),
 		ClaimMap:                types.ObjectNull(ProviderSamlClaimMapAttrTypes()),
 		ClockSkewSeconds:        types.Int64Null(),
+		IdentifierHint:          types.StringNull(),
 		IdentifierSource:        types.StringNull(),
 		IdpEntityId:             types.StringNull(),
 		IdpMetadataImportedAt:   types.StringNull(),
@@ -176,6 +213,7 @@ func NewProviderSamlModel() *ProviderSamlModel {
 		IdpSsoBinding:           types.StringNull(),
 		IdpSsoUrl:               types.StringNull(),
 		NameIdFormat:            types.StringNull(),
+		RequestedAuthnContext:   types.ObjectNull(ProviderSamlRequestedAuthnContextAttrTypes()),
 		SignAuthnRequests:       types.BoolNull(),
 		SigningCertificateId:    types.StringNull(),
 		WantAssertionsSigned:    types.BoolNull(),
@@ -231,6 +269,19 @@ func (m *ProviderSamlModel) ToProto(ctx context.Context) (*v1alpha1.ProviderSaml
 		out.ClaimMap = v
 	}
 	out.IdentifierSource = m.IdentifierSource.ValueString()
+	if !m.IdentifierHint.IsNull() && !m.IdentifierHint.IsUnknown() {
+		out.IdentifierHint = v1alpha1.ProviderSaml_IdentifierHint(v1alpha1.ProviderSaml_IdentifierHint_value[m.IdentifierHint.ValueString()])
+	}
+	if !m.RequestedAuthnContext.IsNull() && !m.RequestedAuthnContext.IsUnknown() {
+		var n ProviderSamlRequestedAuthnContextModel
+		diags.Append(m.RequestedAuthnContext.As(ctx, &n, basetypes.ObjectAsOptions{})...)
+		v := &v1alpha1.ProviderSaml_RequestedAuthnContext{}
+		v.Comparison = n.Comparison.ValueString()
+		if !n.ClassRefs.IsNull() && !n.ClassRefs.IsUnknown() {
+			diags.Append(n.ClassRefs.ElementsAs(ctx, &v.ClassRefs, false)...)
+		}
+		out.RequestedAuthnContext = v
+	}
 	return out, diags
 }
 

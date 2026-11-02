@@ -57,6 +57,7 @@ func NetworkResourceSchema() schema.Schema {
 				Optional:      true,
 				PlanModifiers: []planmodifier.Map{mapplanmodifier.UseStateForUnknown()},
 			},
+			"mesh_domain": schema.StringAttribute{Computed: true},
 			"name": schema.StringAttribute{
 				Computed:            true,
 				MarkdownDescription: "Full resource name; serves as the Terraform ID.",
@@ -89,6 +90,7 @@ type NetworkModel struct {
 	Cidr           types.String         `tfsdk:"cidr"`
 	Config         jsontypes.Normalized `tfsdk:"config"`
 	Slug           types.String         `tfsdk:"slug"`
+	MeshDomain     types.String         `tfsdk:"mesh_domain"`
 }
 
 // NewNetworkModel returns a model with every attribute set to its typed null; collection types cannot be zero-valued.
@@ -99,6 +101,7 @@ func NewNetworkModel() *NetworkModel {
 		DisplayName:    types.StringNull(),
 		GuardNetworkId: types.StringNull(),
 		Labels:         types.MapNull(types.StringType),
+		MeshDomain:     types.StringNull(),
 		Name:           types.StringNull(),
 		Slug:           types.StringNull(),
 		TenantId:       types.StringNull(),
@@ -124,6 +127,7 @@ func (m *NetworkModel) ToProto(ctx context.Context) (*v1alpha1.Network, diag.Dia
 		}
 	}
 	out.Slug = m.Slug.ValueString()
+	out.MeshDomain = m.MeshDomain.ValueString()
 	return out, diags
 }
 
@@ -164,6 +168,11 @@ func (m *NetworkModel) FromProto(ctx context.Context, e *v1alpha1.Network) diag.
 		m.Slug = types.StringNull()
 	} else {
 		m.Slug = types.StringValue(e.Slug)
+	}
+	if e.MeshDomain == "" {
+		m.MeshDomain = types.StringNull()
+	} else {
+		m.MeshDomain = types.StringValue(e.MeshDomain)
 	}
 	return diags
 }
@@ -340,6 +349,7 @@ func NetworkDataSourceSchema() schema1.Schema {
 				Computed:    true,
 				ElementType: types.StringType,
 			},
+			"mesh_domain": schema1.StringAttribute{Computed: true},
 			"name": schema1.StringAttribute{
 				MarkdownDescription: "Full resource name of the object to read.",
 				Required:            true,
@@ -388,6 +398,7 @@ type NetworkItemModel struct {
 	Cidr           types.String         `tfsdk:"cidr"`
 	Config         jsontypes.Normalized `tfsdk:"config"`
 	Slug           types.String         `tfsdk:"slug"`
+	MeshDomain     types.String         `tfsdk:"mesh_domain"`
 }
 
 // NetworkItemAttrTypes returns the attribute types of one guard_networks list element.
@@ -398,6 +409,7 @@ func NetworkItemAttrTypes() map[string]attr.Type {
 		"display_name":     types.StringType,
 		"guard_network_id": types.StringType,
 		"labels":           types.MapType{ElemType: types.StringType},
+		"mesh_domain":      types.StringType,
 		"name":             types.StringType,
 		"slug":             types.StringType,
 	}
@@ -431,6 +443,7 @@ func NetworkListDataSourceSchema() schema1.Schema {
 						Computed:    true,
 						ElementType: types.StringType,
 					},
+					"mesh_domain": schema1.StringAttribute{Computed: true},
 					"name": schema1.StringAttribute{
 						Computed:            true,
 						MarkdownDescription: "Full resource name.",
@@ -486,6 +499,11 @@ func networkItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Network, 
 		item.Slug = types.StringNull()
 	} else {
 		item.Slug = types.StringValue(e.Slug)
+	}
+	if e.MeshDomain == "" {
+		item.MeshDomain = types.StringNull()
+	} else {
+		item.MeshDomain = types.StringValue(e.MeshDomain)
 	}
 	id, err := crud.IDFromName(e.Name)
 	if err != nil {

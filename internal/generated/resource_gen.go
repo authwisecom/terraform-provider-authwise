@@ -24,6 +24,8 @@ import (
 	protojson "google.golang.org/protobuf/encoding/protojson"
 	fieldmaskpb "google.golang.org/protobuf/types/known/fieldmaskpb"
 	structpb "google.golang.org/protobuf/types/known/structpb"
+	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
+	"time"
 )
 
 // ResourceResourceSchema returns the Terraform schema for the Resource resource.
@@ -31,6 +33,37 @@ func ResourceResourceSchema() schema.Schema {
 	return schema.Schema{
 		Attributes: map[string]schema.Attribute{
 			"address": schema.StringAttribute{Required: true},
+			"addresses": schema.ListNestedAttribute{
+				Computed: true,
+				NestedObject: schema.NestedAttributeObject{Attributes: map[string]schema.Attribute{
+					"addresses": schema.ListAttribute{
+						Computed:    true,
+						ElementType: types.StringType,
+						Optional:    true,
+					},
+					"expires_at": schema.StringAttribute{
+						Computed: true,
+						Optional: true,
+					},
+					"node_id": schema.StringAttribute{
+						Computed: true,
+						Optional: true,
+					},
+					"reason": schema.StringAttribute{
+						Computed: true,
+						Optional: true,
+					},
+					"refused": schema.ListAttribute{
+						Computed:    true,
+						ElementType: types.StringType,
+						Optional:    true,
+					},
+					"seen_at": schema.StringAttribute{
+						Computed: true,
+						Optional: true,
+					},
+				}},
+			},
 			"config": schema.StringAttribute{
 				Computed:            true,
 				CustomType:          jsontypes.NormalizedType{},
@@ -87,6 +120,28 @@ func ResourceResourceSchema() schema.Schema {
 	}
 }
 
+// ResourceAddressesModel is the Terraform model for Resource's "addresses" nested attribute.
+type ResourceAddressesModel struct {
+	NodeId    types.String `tfsdk:"node_id"`
+	Addresses types.List   `tfsdk:"addresses"`
+	Refused   types.List   `tfsdk:"refused"`
+	Reason    types.String `tfsdk:"reason"`
+	SeenAt    types.String `tfsdk:"seen_at"`
+	ExpiresAt types.String `tfsdk:"expires_at"`
+}
+
+// ResourceAddressesAttrTypes returns the attribute types of the "addresses" nested attribute.
+func ResourceAddressesAttrTypes() map[string]attr.Type {
+	return map[string]attr.Type{
+		"addresses":  types.ListType{ElemType: types.StringType},
+		"expires_at": types.StringType,
+		"node_id":    types.StringType,
+		"reason":     types.StringType,
+		"refused":    types.ListType{ElemType: types.StringType},
+		"seen_at":    types.StringType,
+	}
+}
+
 // ResourceModel is the Terraform plan/state model for Resource.
 type ResourceModel struct {
 	Name            types.String         `tfsdk:"name"`
@@ -99,12 +154,14 @@ type ResourceModel struct {
 	DisplayName     types.String         `tfsdk:"display_name"`
 	Config          jsontypes.Normalized `tfsdk:"config"`
 	ServingNodeIds  types.List           `tfsdk:"serving_node_ids"`
+	Addresses       types.List           `tfsdk:"addresses"`
 }
 
 // NewResourceModel returns a model with every attribute set to its typed null; collection types cannot be zero-valued.
 func NewResourceModel() *ResourceModel {
 	return &ResourceModel{
 		Address:         types.StringNull(),
+		Addresses:       types.ListNull(types.ObjectType{AttrTypes: ResourceAddressesAttrTypes()}),
 		Config:          jsontypes.NewNormalizedNull(),
 		DisplayName:     types.StringNull(),
 		GuardResourceId: types.StringNull(),
@@ -138,6 +195,38 @@ func (m *ResourceModel) ToProto(ctx context.Context) (*v1alpha1.Resource, diag.D
 	}
 	if !m.ServingNodeIds.IsNull() && !m.ServingNodeIds.IsUnknown() {
 		diags.Append(m.ServingNodeIds.ElementsAs(ctx, &out.ServingNodeIds, false)...)
+	}
+	if !m.Addresses.IsNull() && !m.Addresses.IsUnknown() {
+		var items []ResourceAddressesModel
+		diags.Append(m.Addresses.ElementsAs(ctx, &items, false)...)
+		for i, n := range items {
+			v := &v1alpha1.ApplicationAddresses{}
+			v.NodeId = n.NodeId.ValueString()
+			if !n.Addresses.IsNull() && !n.Addresses.IsUnknown() {
+				diags.Append(n.Addresses.ElementsAs(ctx, &v.Addresses, false)...)
+			}
+			if !n.Refused.IsNull() && !n.Refused.IsUnknown() {
+				diags.Append(n.Refused.ElementsAs(ctx, &v.Refused, false)...)
+			}
+			v.Reason = n.Reason.ValueString()
+			if !n.SeenAt.IsNull() && !n.SeenAt.IsUnknown() {
+				t, err := time.Parse(time.RFC3339, n.SeenAt.ValueString())
+				if err != nil {
+					diags.AddAttributeError(path.Root("addresses").AtListIndex(i).AtName("seen_at"), "invalid RFC 3339 timestamp", err.Error())
+				} else {
+					v.SeenAt = timestamppb.New(t)
+				}
+			}
+			if !n.ExpiresAt.IsNull() && !n.ExpiresAt.IsUnknown() {
+				t, err := time.Parse(time.RFC3339, n.ExpiresAt.ValueString())
+				if err != nil {
+					diags.AddAttributeError(path.Root("addresses").AtListIndex(i).AtName("expires_at"), "invalid RFC 3339 timestamp", err.Error())
+				} else {
+					v.ExpiresAt = timestamppb.New(t)
+				}
+			}
+			out.Addresses = append(out.Addresses, v)
+		}
 	}
 	return out, diags
 }
@@ -180,6 +269,65 @@ func (m *ResourceModel) FromProto(ctx context.Context, e *v1alpha1.Resource) dia
 		v, d := types.ListValueFrom(ctx, types.StringType, e.ServingNodeIds)
 		diags.Append(d...)
 		m.ServingNodeIds = v
+	}
+	if len(e.Addresses) == 0 {
+		if !tf.KeepEmpty(m.Addresses) {
+			m.Addresses = types.ListNull(types.ObjectType{AttrTypes: ResourceAddressesAttrTypes()})
+		}
+	} else {
+		var prior []ResourceAddressesModel
+		if !m.Addresses.IsNull() && !m.Addresses.IsUnknown() {
+			diags.Append(m.Addresses.ElementsAs(ctx, &prior, false)...)
+		}
+		items := make([]ResourceAddressesModel, len(e.Addresses))
+		for i, el := range e.Addresses {
+			var n ResourceAddressesModel
+			if i < len(prior) {
+				n = prior[i]
+			}
+			if el.NodeId == "" {
+				n.NodeId = types.StringNull()
+			} else {
+				n.NodeId = types.StringValue(el.NodeId)
+			}
+			if len(el.Addresses) == 0 {
+				if !tf.KeepEmpty(n.Addresses) {
+					n.Addresses = types.ListNull(types.StringType)
+				}
+			} else {
+				v, d := types.ListValueFrom(ctx, types.StringType, el.Addresses)
+				diags.Append(d...)
+				n.Addresses = v
+			}
+			if len(el.Refused) == 0 {
+				if !tf.KeepEmpty(n.Refused) {
+					n.Refused = types.ListNull(types.StringType)
+				}
+			} else {
+				v, d := types.ListValueFrom(ctx, types.StringType, el.Refused)
+				diags.Append(d...)
+				n.Refused = v
+			}
+			if el.Reason == "" {
+				n.Reason = types.StringNull()
+			} else {
+				n.Reason = types.StringValue(el.Reason)
+			}
+			if el.SeenAt == nil {
+				n.SeenAt = types.StringNull()
+			} else {
+				n.SeenAt = types.StringValue(el.SeenAt.AsTime().Format(time.RFC3339))
+			}
+			if el.ExpiresAt == nil {
+				n.ExpiresAt = types.StringNull()
+			} else {
+				n.ExpiresAt = types.StringValue(el.ExpiresAt.AsTime().Format(time.RFC3339))
+			}
+			items[i] = n
+		}
+		list, d := types.ListValueFrom(ctx, types.ObjectType{AttrTypes: ResourceAddressesAttrTypes()}, items)
+		diags.Append(d...)
+		m.Addresses = list
 	}
 	return diags
 }
@@ -346,6 +494,23 @@ func ResourceDataSourceSchema() schema1.Schema {
 	return schema1.Schema{
 		Attributes: map[string]schema1.Attribute{
 			"address": schema1.StringAttribute{Computed: true},
+			"addresses": schema1.ListNestedAttribute{
+				Computed: true,
+				NestedObject: schema1.NestedAttributeObject{Attributes: map[string]schema1.Attribute{
+					"addresses": schema1.ListAttribute{
+						Computed:    true,
+						ElementType: types.StringType,
+					},
+					"expires_at": schema1.StringAttribute{Computed: true},
+					"node_id":    schema1.StringAttribute{Computed: true},
+					"reason":     schema1.StringAttribute{Computed: true},
+					"refused": schema1.ListAttribute{
+						Computed:    true,
+						ElementType: types.StringType,
+					},
+					"seen_at": schema1.StringAttribute{Computed: true},
+				}},
+			},
 			"config": schema1.StringAttribute{
 				Computed:   true,
 				CustomType: jsontypes.NormalizedType{},
@@ -413,12 +578,14 @@ type ResourceItemModel struct {
 	DisplayName     types.String         `tfsdk:"display_name"`
 	Config          jsontypes.Normalized `tfsdk:"config"`
 	ServingNodeIds  types.List           `tfsdk:"serving_node_ids"`
+	Addresses       types.List           `tfsdk:"addresses"`
 }
 
 // ResourceItemAttrTypes returns the attribute types of one guard_resources list element.
 func ResourceItemAttrTypes() map[string]attr.Type {
 	return map[string]attr.Type{
 		"address":           types.StringType,
+		"addresses":         types.ListType{ElemType: types.ObjectType{AttrTypes: ResourceAddressesAttrTypes()}},
 		"config":            jsontypes.NormalizedType{},
 		"display_name":      types.StringType,
 		"guard_resource_id": types.StringType,
@@ -445,6 +612,23 @@ func ResourceListDataSourceSchema() schema1.Schema {
 				MarkdownDescription: "Every resource under the parent, in the order the API lists them.",
 				NestedObject: schema1.NestedAttributeObject{Attributes: map[string]schema1.Attribute{
 					"address": schema1.StringAttribute{Computed: true},
+					"addresses": schema1.ListNestedAttribute{
+						Computed: true,
+						NestedObject: schema1.NestedAttributeObject{Attributes: map[string]schema1.Attribute{
+							"addresses": schema1.ListAttribute{
+								Computed:    true,
+								ElementType: types.StringType,
+							},
+							"expires_at": schema1.StringAttribute{Computed: true},
+							"node_id":    schema1.StringAttribute{Computed: true},
+							"reason":     schema1.StringAttribute{Computed: true},
+							"refused": schema1.ListAttribute{
+								Computed:    true,
+								ElementType: types.StringType,
+							},
+							"seen_at": schema1.StringAttribute{Computed: true},
+						}},
+					},
 					"config": schema1.StringAttribute{
 						Computed:   true,
 						CustomType: jsontypes.NormalizedType{},
@@ -523,6 +707,65 @@ func resourceItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Resource
 		v, d := types.ListValueFrom(ctx, types.StringType, e.ServingNodeIds)
 		diags.Append(d...)
 		item.ServingNodeIds = v
+	}
+	if len(e.Addresses) == 0 {
+		if !tf.KeepEmpty(item.Addresses) {
+			item.Addresses = types.ListNull(types.ObjectType{AttrTypes: ResourceAddressesAttrTypes()})
+		}
+	} else {
+		var prior []ResourceAddressesModel
+		if !item.Addresses.IsNull() && !item.Addresses.IsUnknown() {
+			diags.Append(item.Addresses.ElementsAs(ctx, &prior, false)...)
+		}
+		items := make([]ResourceAddressesModel, len(e.Addresses))
+		for i, el := range e.Addresses {
+			var n ResourceAddressesModel
+			if i < len(prior) {
+				n = prior[i]
+			}
+			if el.NodeId == "" {
+				n.NodeId = types.StringNull()
+			} else {
+				n.NodeId = types.StringValue(el.NodeId)
+			}
+			if len(el.Addresses) == 0 {
+				if !tf.KeepEmpty(n.Addresses) {
+					n.Addresses = types.ListNull(types.StringType)
+				}
+			} else {
+				v, d := types.ListValueFrom(ctx, types.StringType, el.Addresses)
+				diags.Append(d...)
+				n.Addresses = v
+			}
+			if len(el.Refused) == 0 {
+				if !tf.KeepEmpty(n.Refused) {
+					n.Refused = types.ListNull(types.StringType)
+				}
+			} else {
+				v, d := types.ListValueFrom(ctx, types.StringType, el.Refused)
+				diags.Append(d...)
+				n.Refused = v
+			}
+			if el.Reason == "" {
+				n.Reason = types.StringNull()
+			} else {
+				n.Reason = types.StringValue(el.Reason)
+			}
+			if el.SeenAt == nil {
+				n.SeenAt = types.StringNull()
+			} else {
+				n.SeenAt = types.StringValue(el.SeenAt.AsTime().Format(time.RFC3339))
+			}
+			if el.ExpiresAt == nil {
+				n.ExpiresAt = types.StringNull()
+			} else {
+				n.ExpiresAt = types.StringValue(el.ExpiresAt.AsTime().Format(time.RFC3339))
+			}
+			items[i] = n
+		}
+		list, d := types.ListValueFrom(ctx, types.ObjectType{AttrTypes: ResourceAddressesAttrTypes()}, items)
+		diags.Append(d...)
+		item.Addresses = list
 	}
 	id, err := crud.IDFromName(e.Name)
 	if err != nil {

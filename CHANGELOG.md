@@ -2,11 +2,30 @@
 
 NOTES:
 
-* **apis v0.45.0, kit v1.67.0, as 0.23.0.** No new kit is needed. The
-  functions below need Terraform 1.8 or later. The rest of the provider
-  still runs on older versions.
+* **apis v0.48.0, kit v1.70.0.** `identifier_hint` and
+  `requested_authn_context` need kit v1.70.0 (kit#865). An older kit
+  drops them. The functions below need Terraform 1.8 or later. The rest
+  of the provider still runs on older versions.
 
 FEATURES:
+
+* **`authwise_provider_saml`: `identifier_hint` and
+  `requested_authn_context` (kit#865).**
+  * `identifier_hint` controls how the identifier that routed a person
+    to the partner reaches it. It is one of three values, checked at plan:
+    * `LOGIN_HINT_QUERY` (the default): a `login_hint` query parameter
+      on the SSO URL, as Entra ID, Google Workspace and Okta document.
+    * `SUBJECT`: a `<saml:Subject>` in the AuthnRequest. Entra ID refuses
+      it with AADSTS900236.
+    * `NONE`: nothing is sent.
+  * `requested_authn_context` (`comparison`, `class_refs`) sets the
+    RequestedAuthnContext kit sends. Unset requests nothing, which Entra
+    ID needs for passwordless and MFA users (AADSTS75011). kit refuses a
+    `comparison` other than `exact`, `minimum`, `better` or `maximum`,
+    and refuses an empty or blank `class_refs`. Both refusals happen at
+    apply.
+  * The Registry page now gives the two forms `identifier_source` takes:
+    `assertion.name_id` (the default) and `assertion.attributes.<name>`.
 
 * **Config data sources as provider-defined functions (#55).**
   `provider::authwise::issuer_config`, `realm_config`, `audience_config`,
@@ -20,6 +39,15 @@ FEATURES:
   no longer plans a no-op issuer update every time a provider or realm
   it names changes. `examples/identifier-first` now uses it, and the data
   source pages point to it.
+
+ENHANCEMENTS:
+
+* **Guard, from apis v0.48.0:**
+  * `authwise_guard_node.slug` is the node's DNS label. You can set it,
+    or the server derives it from `display_name`.
+  * `authwise_guard_network.mesh_domain` is read-only.
+  * `authwise_guard_resource.addresses` is read-only: what each serving
+    node last resolved an application to.
 
 ## 0.23.0 (October 31, 2026)
 

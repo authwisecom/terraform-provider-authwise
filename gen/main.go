@@ -416,23 +416,27 @@ func main() {
 				withComputed("status", "created_by"), withJSON("config"),
 				withReferences(map[string]gentf.Reference{"parent_tenant_id": scopeReferences["tenant_id"]})),
 			// cidr cannot change once the network has a node; replacing the
-			// network is the only way to move it.
+			// network is the only way to move it. mesh_domain (apis v0.48.0)
+			// is derived from the network's and its tenant's slugs, so a
+			// slug change moves it.
 			crud[guardpb.Network](scopeTenant,
 				withDescription("A Guard network: a WireGuard mesh in a tenant. `cidr` is its address space inside 100.64.0.0/10, the whole of it when unset; changing it replaces the network."),
 				guard("network"), guardList("networks"),
-				withImmutable("cidr"), withJSON("config")),
+				withImmutable("cidr"), withComputed("mesh_domain"), withVolatile("mesh_domain"), withJSON("config")),
 			crud[guardpb.Relay](scopeGuardNetwork,
 				withDescription("A relay a Guard network's nodes connect through when no direct path exists. guard-control serves a network's relays to its nodes, lowest `priority` first."),
 				guard("relay"), guardList("relays"),
 				withRequired("url"), withComputed("last_seen_at"), withJSON("config")),
 			// serving_node_ids is applied on create and otherwise only
 			// echoed; authwise_guard_resource_nodes owns the set, so here it
-			// is read-only.
+			// is read-only. addresses (apis v0.48.0) is what the serving
+			// nodes last resolved an application to: output-only, and moved
+			// by the nodes rather than by a write.
 			crud[guardpb.Resource](scopeGuardNetwork,
 				withDescription("A routed target in a Guard network that is not a node: a subnet, a host or an application. The nodes that serve it are managed by `authwise_guard_resource_nodes`."),
 				guard("resource"), guardList("resources"),
 				withRequired("kind", "address"), withImmutable("kind"),
-				withComputed("serving_node_ids"), withJSON("config"),
+				withComputed("serving_node_ids", "addresses"), withVolatile("addresses"), withJSON("config"),
 				gentf.Associate{Target: reflect.TypeFor[guardpb.Node](), Attribute: "nodes", TypeName: "guard_resource_nodes"}),
 			// A node terraform declares is a pre-registered server (#32 stage
 			// 2). Created without a public_key it is PENDING, and the create
@@ -517,14 +521,18 @@ func main() {
 						TypeName: "provider_saml",
 						Values:   map[string]gentf.Values{"idp_sso_binding": samlBindings},
 						Descriptions: map[string]string{
-							"idp_sso_binding":          "The binding on the IdP's SingleSignOnService, which is how kit sends it an AuthnRequest, as the SAML binding URN. Unset is HTTP-Redirect. Read it off the IdP's metadata: it describes their endpoint, not a choice made here.",
-							"idp_metadata_imported_at": "When kit last imported the IdP's metadata. kit sets it on import; leave it unset.",
-							"signing_certificate_id":   "Certificate resource name kit signs AuthnRequests with, and decrypts encrypted assertions with.",
-							"sign_authn_requests":      "Sign every AuthnRequest with `signing_certificate_id`.",
-							"allow_create":             "Sets AllowCreate on the requested NameIDPolicy: the IdP may create an identifier for a person it has none for.",
-							"want_assertions_signed":   "Require every assertion to be signed. kit requires it anyway unless `want_response_signed` is set: at least one of the two always holds, since an SP that verifies nothing accepts assertions from anyone.",
-							"want_response_signed":     "Require the Response itself to be signed. See `want_assertions_signed`.",
-							"identifier_source":        "Which part of the assertion becomes the user's identifier. Defaults to `assertion.name_id`; a partner whose NameID is a transient opaque string will want `assertion.attributes.<name>` instead.",
+							"idp_sso_binding":                    "The binding on the IdP's SingleSignOnService, which is how kit sends it an AuthnRequest, as the SAML binding URN. Unset is HTTP-Redirect. Read it off the IdP's metadata: it describes their endpoint, not a choice made here.",
+							"idp_metadata_imported_at":           "When kit last imported the IdP's metadata. kit sets it on import; leave it unset.",
+							"signing_certificate_id":             "Certificate resource name kit signs AuthnRequests with, and decrypts encrypted assertions with.",
+							"sign_authn_requests":                "Sign every AuthnRequest with `signing_certificate_id`.",
+							"allow_create":                       "Sets AllowCreate on the requested NameIDPolicy: the IdP may create an identifier for a person it has none for.",
+							"want_assertions_signed":             "Require every assertion to be signed. kit requires it anyway unless `want_response_signed` is set: at least one of the two always holds, since an SP that verifies nothing accepts assertions from anyone.",
+							"want_response_signed":               "Require the Response itself to be signed. See `want_assertions_signed`.",
+							"identifier_source":                  "Which part of the assertion becomes the user's identifier, as one of two paths: `assertion.name_id`, the Subject's NameID (the default), or `assertion.attributes.<name>`, the first value of the attribute `<name>`, e.g. `assertion.attributes.email`. A partner whose NameID is transient or opaque needs the second form: the identifier links a returning person to their user, so it must be stable across sign-ins.",
+							"identifier_hint":                    "How the identifier that routed the person to this partner (the address typed at an identifier-first login, or `login_hint` on /authorize) reaches it, so the partner need not ask for it again. Nothing is sent when no identifier was routed. One of `LOGIN_HINT_QUERY` (the default): a `login_hint` query parameter on the IdP's SSO URL, which is what Entra ID, Google Workspace and Okta document; `SUBJECT`: a `<saml:Subject>` in the AuthnRequest, for an IdP that reads one (Entra ID refuses the whole request with AADSTS900236); or `NONE`: send nothing, and the partner asks the person.",
+							"requested_authn_context":            "The RequestedAuthnContext kit sends in the AuthnRequest. Unset requests nothing and leaves the partner to authenticate the person however its own policy says. That is the default because an exact `PasswordProtectedTransport` fails anyone who signs in to the partner without a password, such as an Entra ID user on passwordless or MFA (AADSTS75011). When set, `class_refs` must hold at least one non-blank URI.",
+							"requested_authn_context.comparison": "One of `exact`, `minimum`, `better` or `maximum`. Unset means `exact`, as SAML defines. kit refuses any other value.",
+							"requested_authn_context.class_refs": "AuthnContextClassRef URIs, in order of preference, e.g. `urn:oasis:names:tc:SAML:2.0:ac:classes:PasswordProtectedTransport`. At least one is required, and none may be blank.",
 						},
 					},
 				},

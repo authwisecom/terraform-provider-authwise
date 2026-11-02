@@ -22,6 +22,7 @@ A routed target in a Guard network that is not a node: a subnet, a host or an ap
 ### Read-Only
 
 - `address` (String)
+- `addresses` (Attributes List) (see [below for nested schema](#nestedatt--addresses))
 - `config` (String)
 - `display_name` (String)
 - `guard_resource_id` (String) Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.
@@ -30,3 +31,15 @@ A routed target in a Guard network that is not a node: a subnet, a host or an ap
 - `network_id` (String)
 - `serving_node_ids` (List of String)
 - `tenant_id` (String)
+
+<a id="nestedatt--addresses"></a>
+### Nested Schema for `addresses`
+
+Read-Only:
+
+- `addresses` (List of String)
+- `expires_at` (String)
+- `node_id` (String)
+- `reason` (String)
+- `refused` (List of String)
+- `seen_at` (String)
