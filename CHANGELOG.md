@@ -1,3 +1,26 @@
+## 0.24.0 (Unreleased)
+
+NOTES:
+
+* **apis v0.45.0, kit v1.67.0, as 0.23.0.** No new kit is needed. The
+  functions below need Terraform 1.8 or later. The rest of the provider
+  still runs on older versions.
+
+FEATURES:
+
+* **Config data sources as provider-defined functions (#55).**
+  `provider::authwise::issuer_config`, `realm_config`, `audience_config`,
+  `tenant_config` and `endpoint_auth` each take one object, written with
+  the matching data source's arguments. They return the same string the
+  data source exposes as `json`, and apply the same checks: attribute
+  names, types, enum values, durations, oneofs and reserved fields.
+  Terraform reads a data source at apply whenever a resource named in
+  its arguments has a change planned. A function is evaluated at plan,
+  so `authwise_issuer.config = provider::authwise::issuer_config({...})`
+  no longer plans a no-op issuer update every time a provider or realm
+  it names changes. `examples/identifier-first` now uses it, and the data
+  source pages point to it.
+
 ## 0.23.0 (October 31, 2026)
 
 NOTES:

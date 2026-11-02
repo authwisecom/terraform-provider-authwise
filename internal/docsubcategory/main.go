@@ -1,6 +1,7 @@
 // Command docsubcategory fills the subcategory of every page tfplugindocs
-// generated under docs/resources and docs/data-sources, from
-// provider.Subcategory (#31). tfplugindocs takes a subcategory only from a
+// generated under docs/resources, docs/data-sources and docs/functions,
+// from provider.Subcategory (#31). A function takes the group of the data
+// source it is the function form of (#55). tfplugindocs takes a subcategory only from a
 // per-type template; this writes it into the generated frontmatter instead,
 // so no type needs a template for its group alone. `make docs` runs it
 // after `tfplugindocs generate`.
@@ -24,7 +25,7 @@ func main() {
 
 func run(root string) error {
 
-	for _, dir := range []string{"resources", "data-sources"} {
+	for _, dir := range []string{"resources", "data-sources", "functions"} {
 
 		pages, err := filepath.Glob(filepath.Join(root, dir, "*.md"))
 		if err != nil {

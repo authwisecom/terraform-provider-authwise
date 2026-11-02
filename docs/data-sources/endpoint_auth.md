@@ -4,14 +4,14 @@ page_title: "authwise_endpoint_auth Data Source - Authwise"
 subcategory: "Identity"
 description: |-
   The credential kit presents on every call to an endpoint, resolved at call time so a secret's new version takes effect without touching the endpoint. Builds the EndpointAuth message and exposes its protojson encoding as json, the value authwise_endpoint.auth takes. Makes no API calls.
-  When a resource named in its arguments has a change planned, Terraform reads this data source at apply rather than at plan, even though every argument is known: json shows as (known after apply), and authwise_endpoint.auth plans an update that applies as a no-op when nothing else changed. Writing authwise_endpoint.auth with jsonencode keeps those plans quiet, at the cost of this schema's plan-time checks.
+  When a resource named in its arguments has a change planned, Terraform reads this data source at apply rather than at plan, even though every argument is known: json shows as (known after apply), and authwise_endpoint.auth plans an update that applies as a no-op when nothing else changed. The function provider::authwise::endpoint_auth takes the same arguments as an object, returns the same string, and is evaluated at plan: use it to keep those plans quiet (Terraform 1.8 or later).
 ---
 
 # authwise_endpoint_auth (Data Source)
 
 The credential kit presents on every call to an endpoint, resolved at call time so a secret's new version takes effect without touching the endpoint. Builds the EndpointAuth message and exposes its protojson encoding as `json`, the value `authwise_endpoint.auth` takes. Makes no API calls.
 
-When a resource named in its arguments has a change planned, Terraform reads this data source at apply rather than at plan, even though every argument is known: `json` shows as (known after apply), and `authwise_endpoint.auth` plans an update that applies as a no-op when nothing else changed. Writing `authwise_endpoint.auth` with `jsonencode` keeps those plans quiet, at the cost of this schema's plan-time checks.
+When a resource named in its arguments has a change planned, Terraform reads this data source at apply rather than at plan, even though every argument is known: `json` shows as (known after apply), and `authwise_endpoint.auth` plans an update that applies as a no-op when nothing else changed. The function `provider::authwise::endpoint_auth` takes the same arguments as an object, returns the same string, and is evaluated at plan: use it to keep those plans quiet (Terraform 1.8 or later).
 
 ## Example Usage
 

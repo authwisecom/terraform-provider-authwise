@@ -41,44 +41,6 @@ resource "authwise_provider" "partner_saml" {
   config        = data.authwise_provider_saml.partner.any
 }
 
-# The issuer's config, typed: authwise_issuer_config checks the attribute
-# names and enum values at plan and writes the protojson for config.
-data "authwise_issuer_config" "login" {
-  multi_realm_provider_selector = {
-    # The realms this issuer serves. Every target below must be one of
-    # them; invitations and SCIM admission read this list too.
-    realm_names = [
-      authwise_realm.consumers.name,
-      authwise_realm.partner.name,
-    ]
-
-    # The identifier screen. kind is left out: that is EMAIL. Set
-    # "USERNAME" or "ANY" to change it.
-    identifier = {
-      label = "Work or personal email"
-    }
-
-    # Ordered; the first match wins. The name is recorded on each login's
-    # audit row as routing_rule.
-    rules = [
-      {
-        name    = "partner-co"
-        domains = ["partner-co.example", "*.partner-co.example"]
-        target = {
-          realm_name    = authwise_realm.partner.name
-          provider_name = authwise_provider.partner_saml.name
-        }
-      },
-    ]
-
-    # Everyone else. Required. With no provider_name, the realm's own
-    # selection applies: its password provider here.
-    default_target = {
-      realm_name = authwise_realm.consumers.name
-    }
-  }
-}
-
 resource "authwise_domain" "login" {
   hostname = "login.example.com"
 }
@@ -86,6 +48,44 @@ resource "authwise_domain" "login" {
 resource "authwise_issuer" "login" {
   domain_id = authwise_domain.login.domain_id
 
+  # The issuer's config, typed: issuer_config checks the attribute names
+  # and enum values at plan and writes the protojson for config. It is the
+  # function form of data.authwise_issuer_config, evaluated at plan, so a
+  # change to a provider or realm it names does not plan an issuer update.
   # The selector is written whole on every change.
-  config = data.authwise_issuer_config.login.json
+  config = provider::authwise::issuer_config({
+    multi_realm_provider_selector = {
+      # The realms this issuer serves. Every target below must be one of
+      # them; invitations and SCIM admission read this list too.
+      realm_names = [
+        authwise_realm.consumers.name,
+        authwise_realm.partner.name,
+      ]
+
+      # The identifier screen. kind is left out: that is EMAIL. Set
+      # "USERNAME" or "ANY" to change it.
+      identifier = {
+        label = "Work or personal email"
+      }
+
+      # Ordered; the first match wins. The name is recorded on each login's
+      # audit row as routing_rule.
+      rules = [
+        {
+          name    = "partner-co"
+          domains = ["partner-co.example", "*.partner-co.example"]
+          target = {
+            realm_name    = authwise_realm.partner.name
+            provider_name = authwise_provider.partner_saml.name
+          }
+        },
+      ]
+
+      # Everyone else. Required. With no provider_name, the realm's own
+      # selection applies: its password provider here.
+      default_target = {
+        realm_name = authwise_realm.consumers.name
+      }
+    }
+  })
 }

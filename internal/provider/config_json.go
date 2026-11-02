@@ -91,8 +91,8 @@ func (d *configJSONDataSource) Schema(_ context.Context, _ datasource.SchemaRequ
 			"Builds the %s message and exposes its protojson encoding as `json`, the value `%s` takes. Makes no API calls.\n\n"+
 				"When a resource named in its arguments has a change planned, Terraform reads this data source at apply rather than at plan, "+
 				"even though every argument is known: `json` shows as (known after apply), and `%s` plans an update that applies as a no-op when nothing else changed. "+
-				"Writing `%s` with `jsonencode` keeps those plans quiet, at the cost of this schema's plan-time checks.",
-			md.Name(), d.spec.attribute, d.spec.attribute, d.spec.attribute)),
+				"The function `provider::authwise::%s` takes the same arguments as an object, returns the same string, and is evaluated at plan: use it to keep those plans quiet (Terraform 1.8 or later).",
+			md.Name(), d.spec.attribute, d.spec.attribute, d.spec.typeName)),
 		Attributes: attrs,
 	}
 }
@@ -117,8 +117,23 @@ func (d *configJSONDataSource) withReservedNotes() map[string]string {
 // ValidateConfig refuses a reserved field set, at plan rather than at
 // apply, with kit's reason.
 func (d *configJSONDataSource) ValidateConfig(_ context.Context, req datasource.ValidateConfigRequest, resp *datasource.ValidateConfigResponse) {
+	for _, r := range d.spec.reservedViolations(req.Config.Raw) {
+		resp.Diagnostics.AddAttributeError(r.path, "not yet supported", r.detail)
+	}
+}
 
-	for _, p := range slices.Sorted(maps.Keys(d.spec.reserved)) {
+// reservedViolation is a reserved field a config sets.
+type reservedViolation struct {
+	path   path.Path
+	detail string
+}
+
+// reservedViolations lists the reserved fields config sets, in path order.
+func (s configJSONSpec) reservedViolations(config tftypes.Value) []reservedViolation {
+
+	var out []reservedViolation
+
+	for _, p := range slices.Sorted(maps.Keys(s.reserved)) {
 
 		ap := tftypes.NewAttributePath()
 		fp := path.Empty()
@@ -127,16 +142,18 @@ func (d *configJSONDataSource) ValidateConfig(_ context.Context, req datasource.
 			fp = fp.AtName(name)
 		}
 
-		v, _, err := tftypes.WalkAttributePath(req.Config.Raw, ap)
+		v, _, err := tftypes.WalkAttributePath(config, ap)
 		if err != nil {
 			// An unset parent block: nothing below it is set.
 			continue
 		}
 		if tv, ok := v.(tftypes.Value); ok && reservedSet(tv) {
-			resp.Diagnostics.AddAttributeError(fp, "not yet supported",
-				fmt.Sprintf("`%s` is declared but no kit build acts on it, so kit refuses a request that sets it: it %s. Leave it unset.", p, d.spec.reserved[p]))
+			out = append(out, reservedViolation{fp,
+				fmt.Sprintf("`%s` is declared but no kit build acts on it, so kit refuses a request that sets it: it %s. Leave it unset.", p, s.reserved[p])})
 		}
 	}
+
+	return out
 }
 
 // reservedSet is kit's test for a reserved field: a known true or a

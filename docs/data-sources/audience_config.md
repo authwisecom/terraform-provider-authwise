@@ -4,14 +4,14 @@ page_title: "authwise_audience_config Data Source - Authwise"
 subcategory: "Identity"
 description: |-
   An audience's config: its token lifetimes, scopes, CORS and Access settings. Builds the AudienceConfig message and exposes its protojson encoding as json, the value authwise_audience.config takes. Makes no API calls.
-  When a resource named in its arguments has a change planned, Terraform reads this data source at apply rather than at plan, even though every argument is known: json shows as (known after apply), and authwise_audience.config plans an update that applies as a no-op when nothing else changed. Writing authwise_audience.config with jsonencode keeps those plans quiet, at the cost of this schema's plan-time checks.
+  When a resource named in its arguments has a change planned, Terraform reads this data source at apply rather than at plan, even though every argument is known: json shows as (known after apply), and authwise_audience.config plans an update that applies as a no-op when nothing else changed. The function provider::authwise::audience_config takes the same arguments as an object, returns the same string, and is evaluated at plan: use it to keep those plans quiet (Terraform 1.8 or later).
 ---
 
 # authwise_audience_config (Data Source)
 
 An audience's config: its token lifetimes, scopes, CORS and Access settings. Builds the AudienceConfig message and exposes its protojson encoding as `json`, the value `authwise_audience.config` takes. Makes no API calls.
 
-When a resource named in its arguments has a change planned, Terraform reads this data source at apply rather than at plan, even though every argument is known: `json` shows as (known after apply), and `authwise_audience.config` plans an update that applies as a no-op when nothing else changed. Writing `authwise_audience.config` with `jsonencode` keeps those plans quiet, at the cost of this schema's plan-time checks.
+When a resource named in its arguments has a change planned, Terraform reads this data source at apply rather than at plan, even though every argument is known: `json` shows as (known after apply), and `authwise_audience.config` plans an update that applies as a no-op when nothing else changed. The function `provider::authwise::audience_config` takes the same arguments as an object, returns the same string, and is evaluated at plan: use it to keep those plans quiet (Terraform 1.8 or later).
 
 ## Example Usage
 
