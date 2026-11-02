@@ -1,9 +1,9 @@
-## 0.25.0 (Unreleased)
+## 0.25.0 (November 2, 2026)
 
 NOTES:
 
-* **apis v0.50.0.** kit applies the three new fields from kit#879,
-  kit#880 and kit#881 on. An older kit ignores them.
+* **apis v0.50.0, kit v1.73.0.** kit v1.73.0 applies the three new
+  fields (kit#879, kit#880, kit#881). An older kit ignores them.
 
 FEATURES:
 
