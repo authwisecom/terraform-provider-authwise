@@ -1,3 +1,29 @@
+## 0.25.0 (Unreleased)
+
+NOTES:
+
+* **apis v0.50.0.** kit applies the three new fields from kit#879,
+  kit#880 and kit#881 on. An older kit ignores them.
+
+FEATURES:
+
+* **Returning-user continuity (kit#878, tf#58).**
+  * `issuer_config.remember_identifiers` lets the login page offer
+    "Continue as b***@acme.com" after the session has ended. It has three
+    states: unset is on for an identifier-first issuer and off
+    otherwise, and the provider leaves it unset unless you set it. An
+    existing issuer therefore plans no change.
+  * `issuer_config.persistent_session` keeps the session cookie across
+    a browser restart, for the session's remaining absolute lifetime.
+    The default is false.
+  * `authwise_realm_authentication_policy.session.idle` ends a session
+    left untouched for that long. kit requires it, at most `168h`, when
+    `absolute` exceeds `12h`. `absolute` may go up to `720h` with a
+    `NONE` floor and `12h` with a factor floor. kit refuses anything else
+    at apply.
+  * The two issuer fields work in both the data source and
+    `provider::authwise::issuer_config`.
+
 ## 0.24.0 (November 1, 2026)
 
 NOTES:

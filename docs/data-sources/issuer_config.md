@@ -51,8 +51,10 @@ resource "authwise_issuer" "this" {
 - `external_ui_url` (String)
 - `flow_integration_config` (Attributes) The endpoint kit calls during the login flow. (see [below for nested schema](#nestedatt--flow_integration_config))
 - `multi_realm_provider_selector` (Attributes) Identifier-first: the login page asks for an identifier, and ordered rules route it to a realm. kit refuses a selector it could not honour, naming the field. At most one of `single_realm_provider_selector`, `multi_realm_provider_selector`, `external_provider_selector` may be set. (see [below for nested schema](#nestedatt--multi_realm_provider_selector))
+- `persistent_session` (Boolean) Whether the session cookie survives a browser restart: at sign-in it is re-issued to last the session's remaining absolute lifetime (the realm's `session.absolute`). Default false: the cookie ends when the browser closes, the right answer on shared computers.
 - `refresh_token_absolute_expire_seconds` (Number) Hard cap on a refresh token family in seconds, set once when the family is created. Unset takes the value from the layer above.
 - `refresh_token_expire_seconds` (Number) Refresh token idle lifetime in seconds: it slides forward on every rotation. Unset takes the value from the layer above.
+- `remember_identifiers` (Boolean) Whether the login page offers "Continue as b***@acme.com" after the session has ended, from a cookie on the issuer host holding a digest and a masked display form, never the identifier. Unset means on for an identifier-first issuer (`multi_realm_provider_selector`) and off otherwise; set it to say so either way. The cookie proves nothing: every continue runs the realm's whole plan.
 - `single_realm_provider_selector` (Attributes) Every login goes to one realm. At most one of `single_realm_provider_selector`, `multi_realm_provider_selector`, `external_provider_selector` may be set. (see [below for nested schema](#nestedatt--single_realm_provider_selector))
 
 ### Read-Only

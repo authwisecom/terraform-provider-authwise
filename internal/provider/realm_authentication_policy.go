@@ -82,6 +82,8 @@ var authenticationPolicyDescriptions = func() map[string]string {
 		"enrollment.offer_recovery_codes": "Whether recovery codes are offered after the first factor is enrolled.",
 		"acr_levels":                      "The acr vocabulary this realm can emit, weakest first: the last satisfied entry is the emitted acr.",
 		"risk.external_endpoint_name":     "The endpoint (`tenants/{t}/endpoints/{e}`) running AuthwiseRiskService, for modes `EXTERNAL` and `BOTH`.",
+		"session.absolute":                "The session's absolute end, measured from sign-in. Default `12h`. The ceiling follows `floor`: `720h` (30 days) when its mode is `NONE`, `12h` for any factor floor. Above `12h`, `idle` is required. kit refuses a value over the ceiling at apply.",
+		"session.idle":                    "A session untouched for this long ends, whatever `absolute` allows. Unset or zero is no idle bound. Required, and at most `168h` (7 days), when `absolute` exceeds `12h`; kit refuses otherwise at apply.",
 	}
 
 	for k, v := range requirement {

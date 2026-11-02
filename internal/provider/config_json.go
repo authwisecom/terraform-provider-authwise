@@ -272,6 +272,8 @@ var configJSONSpecs = []configJSONSpec{
 			"multi_realm_provider_selector.default_target.provider_name": "A provider in that realm. Unset, the realm's own selection applies.",
 			"external_provider_selector":                                 "An endpoint decides.",
 			"external_provider_selector.endpoint_name":                   "The endpoint's full resource name.",
+			"remember_identifiers":                                       "Whether the login page offers \"Continue as b***@acme.com\" after the session has ended, from a cookie on the issuer host holding a digest and a masked display form, never the identifier. Unset means on for an identifier-first issuer (`multi_realm_provider_selector`) and off otherwise; set it to say so either way. The cookie proves nothing: every continue runs the realm's whole plan.",
+			"persistent_session":                                         "Whether the session cookie survives a browser restart: at sign-in it is re-issued to last the session's remaining absolute lifetime (the realm's `session.absolute`). Default false: the cookie ends when the browser closes, the right answer on shared computers.",
 		}),
 	},
 	{

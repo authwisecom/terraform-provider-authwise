@@ -140,8 +140,9 @@ Optional:
 
 Optional:
 
-- `absolute` (String) A Go duration string, e.g. `90s`, `15m`, `12h`.
+- `absolute` (String) The session's absolute end, measured from sign-in. Default `12h`. The ceiling follows `floor`: `720h` (30 days) when its mode is `NONE`, `12h` for any factor floor. Above `12h`, `idle` is required. kit refuses a value over the ceiling at apply. A Go duration string, e.g. `90s`, `15m`, `12h`.
 - `factor_reauth` (String) A Go duration string, e.g. `90s`, `15m`, `12h`.
+- `idle` (String) A session untouched for this long ends, whatever `absolute` allows. Unset or zero is no idle bound. Required, and at most `168h` (7 days), when `absolute` exceeds `12h`; kit refuses otherwise at apply. A Go duration string, e.g. `90s`, `15m`, `12h`.
 
 
 <a id="nestedatt--throttle"></a>
