@@ -1,4 +1,4 @@
-## 0.26.0 (Unreleased)
+## 0.26.0 (November 3, 2026)
 
 NOTES:
 
