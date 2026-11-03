@@ -1,3 +1,27 @@
+## 0.26.0 (Unreleased)
+
+NOTES:
+
+* **apis v0.51.0, kit v1.75.0.** An older kit ignores
+  `password_rule_set`.
+
+FEATURES:
+
+* **Password rule sets (kit#890, tf#59).**
+  `realm_config.provisioning.password_rule_set` names the catalog set of
+  password rules a realm follows:
+  * Unset or empty means `authwise-baseline`. A realm that never set it
+    plans no change.
+  * `custom` means kit's built-in floor plus `password_validators`
+    alone.
+  * Any other value must be a set the kit build ships. kit refuses
+    anything else at apply, and the provider shows kit's message
+    unchanged. The name is not checked at plan.
+  * `password_validators` are documented as extras on top of the set:
+    they can only tighten it, and the strongest rule of each type wins.
+    The `authwise_realm` page gains a "Password rules" section with
+    examples.
+
 ## 0.25.0 (November 2, 2026)
 
 NOTES:

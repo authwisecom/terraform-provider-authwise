@@ -1,0 +1,73 @@
+---
+page_title: "{{.Name}} {{.Type}} - {{.RenderedProviderName}}"
+subcategory: ""
+description: |-
+{{ .Description | plainmarkdown | trimspace | prefixlines "  " }}
+---
+
+# authwise_realm (Resource)
+
+{{ .Description | trimspace }}
+
+## Example Usage
+
+{{ tffile .ExampleFile }}
+
+## Password rules
+
+A realm's password rules come from a catalog set, named in
+`provisioning.password_rule_set` in its config. Leave it out and the realm
+follows `authwise-baseline`. A realm that never set it plans no change.
+
+`password_validators` are extras added on top of the set. They can only
+tighten it: per type, the larger `min_length` and the smaller `max_length`
+win, and every `regexp` and `entropy` rule is kept. `custom` drops the set
+and leaves kit's built-in floor plus `password_validators` alone.
+
+```terraform
+# The baseline, with a digit required on top of it.
+resource "authwise_realm" "customers" {
+  display_name = "Customers"
+  config = provider::authwise::realm_config({
+    provisioning = {
+      password_validators = [
+        {
+          name   = "digit"
+          type   = "regexp"
+          config = jsonencode({ pattern = "[0-9]", no_match_message = "Must contain a digit" })
+        },
+      ]
+    }
+  })
+}
+
+# custom: the built-in floor and these rules, and nothing else.
+resource "authwise_realm" "legacy" {
+  display_name = "Legacy"
+  config = provider::authwise::realm_config({
+    provisioning = {
+      password_rule_set = "custom"
+      password_validators = [
+        { name = "length", type = "min_length", config = jsonencode({ min = 10 }) },
+        {
+          name   = "digit"
+          type   = "regexp"
+          config = jsonencode({ pattern = "[0-9]", no_match_message = "Must contain a digit" })
+        },
+      ]
+    }
+  })
+}
+```
+
+kit refuses a set its build does not ship, at apply, with its own message:
+`password_rule_set "nist" is not a set this build ships (authwise-baseline,
+custom); omit it for authwise-baseline.` A set is named, never versioned: a
+shipped set only ever strengthens, and only passwords set after a change
+are checked against it.
+
+{{ .SchemaMarkdown | trimspace }}
+
+## Import
+
+{{ codefile "shell" .ImportFile }}
