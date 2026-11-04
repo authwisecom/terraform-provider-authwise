@@ -597,6 +597,11 @@ func main() {
 				Implementations: []any{
 					gentf.ConfigDataSource{
 						JSON: []string{"cors", "flow_integration_config"},
+						// kit writes metadata_document on the clients it
+						// derives from a Client ID Metadata Document (kit#413),
+						// and a value set on any other client changes nothing
+						// (tf#63).
+						Omit: []string{"metadata_document"},
 						// The proto documents the two refresh lifetimes in one
 						// comment, on the first, in kit's internal terms.
 						Descriptions: map[string]string{

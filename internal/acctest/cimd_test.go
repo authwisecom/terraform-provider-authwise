@@ -4,6 +4,7 @@ package acctest_test
 
 import (
 	"fmt"
+	"regexp"
 	"slices"
 	"testing"
 
@@ -124,5 +125,25 @@ resource "authwise_issuer" "login" {
 			{Config: config(claude), ConfigPlanChecks: empty},
 		},
 		CheckDestroy: noneLeft(h),
+	})
+}
+
+// TestAccInteractiveClientConfig_NoMetadataDocument: kit writes
+// metadata_document on the clients it derives from a document, so the
+// config builder takes none (tf#63).
+func TestAccInteractiveClientConfig_NoMetadataDocument(t *testing.T) {
+
+	h := newHarness(t)
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: protoFactories(),
+		Steps: []resource.TestStep{{
+			Config: h.providerConfig() + `
+data "authwise_interactive_client_config" "x" {
+  metadata_document = { url = "https://claude.ai/oauth/client.json" }
+}
+`,
+			ExpectError: regexp.MustCompile(`(?s)Unsupported\s+argument.*metadata_document`),
+		}},
 	})
 }

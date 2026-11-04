@@ -1,3 +1,18 @@
+## 0.29.0 (Unreleased)
+
+NOTES:
+
+* **tfinfra v0.0.22.** It adds `ConfigDataSource.Omit`, used below, and
+  changes nothing else in the generated code.
+
+BREAKING CHANGES:
+
+* **`data.authwise_interactive_client_config` no longer takes
+  `metadata_document` (tf#63).** kit writes it on the clients it derives
+  from a Client ID Metadata Document, and a value set on any other client
+  never had an effect. A configuration that sets it now fails at plan
+  with an unsupported-argument error: remove the attribute.
+
 ## 0.28.0 (November 4, 2026)
 
 NOTES:
