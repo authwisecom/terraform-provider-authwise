@@ -312,7 +312,8 @@ var configJSONSpecs = []configJSONSpec{
 		attribute:   "authwise_audience.config",
 		description: "An audience's config: its token lifetimes, scopes, CORS and Access settings.",
 		descriptions: withTokenLifetimes(map[string]string{
-			"scopes.openid": "Whether the audience offers OpenID Connect. Unset means true; set false for an audience that must not.",
+			"scopes.openid":             "Whether the audience offers OpenID Connect. Unset means true; set false for an audience that must not.",
+			"access_token_claim_scopes": "The OpenID Connect scopes whose claims kit also writes into this audience's access tokens, so an API that validates the bearer can see who called without a userinfo round trip. Any of `profile`, `email` and `phone`, each at most once; kit refuses anything else, or a repeat, at apply. Default empty: the access token carries no profile claims. A claim is copied only when the grant includes its scope, so the access token carries what the ID token for the same grant carries for those scopes, never more.",
 			"authorization.access.default_resource_expander_endpoint_name": "The endpoint for pull-mode resource-parent expansion when a resource type names none.",
 			"authorization.access.default_subject_expander_endpoint_name":  "The endpoint for pull-mode subject-group expansion.",
 			"authorization.access.decision_sampling":                       "The percentage of ALLOW decisions recorded as `access.decision` audit events, 0-100. DENY is always recorded.",

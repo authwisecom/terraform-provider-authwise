@@ -10,3 +10,12 @@ resource "authwise_audience" "this" {
     }
   })
 }
+
+# An API that wants the caller's name and email in the bearer itself. They
+# are copied only when the grant includes the scope.
+resource "authwise_audience" "orders" {
+  display_name = "https://orders.example.com"
+  config = provider::authwise::audience_config({
+    access_token_claim_scopes = ["profile", "email"]
+  })
+}

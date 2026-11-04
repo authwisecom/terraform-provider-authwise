@@ -1,3 +1,28 @@
+## 0.27.0 (Unreleased)
+
+NOTES:
+
+* **apis v0.52.0.** `access_token_claim_scopes` needs a kit carrying
+  kit#892, which is on kit develop and not yet tagged. An older kit
+  ignores it.
+
+FEATURES:
+
+* **Profile claims in access tokens (kit#892, tf#61).**
+  `audience_config.access_token_claim_scopes` lists the OpenID Connect
+  scopes whose claims kit also writes into the audience's access tokens,
+  so an API that validates the bearer can see who called without a
+  userinfo round trip. It works in both the data source and
+  `provider::authwise::audience_config`.
+  * Any of `profile`, `email` and `phone`, each at most once.
+  * The default is empty, and an audience that never set it plans no
+    change.
+  * kit refuses any other value, or a repeat, at apply. The provider
+    shows kit's message as is.
+  * A claim is copied only when the grant includes its scope.
+  * The audience_config pages gain an example: an API that wants the
+    caller's name and email in the bearer.
+
 ## 0.26.0 (November 3, 2026)
 
 NOTES:

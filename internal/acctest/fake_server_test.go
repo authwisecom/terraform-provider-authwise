@@ -473,6 +473,9 @@ func (f *fakeIdentityServer) CreateAudience(ctx context.Context, in *identitypb.
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.recordAuth(ctx)
+	if err := admitAudienceConfig(in.GetAudience().GetConfig()); err != nil {
+		return nil, err
+	}
 	a := proto.Clone(in.GetAudience()).(*corepb.Audience)
 	a.Name = in.GetParent() + "/audiences/" + f.nextID("a")
 	f.audiences[a.GetName()] = a
@@ -508,6 +511,9 @@ func (f *fakeIdentityServer) PatchAudience(ctx context.Context, in *identitypb.P
 		case "labels":
 			existing.Labels = in.GetAudience().GetLabels()
 		case "config":
+			if err := admitAudienceConfig(in.GetAudience().GetConfig()); err != nil {
+				return nil, err
+			}
 			existing.Config = in.GetAudience().GetConfig()
 		case "appearance_profile_id":
 			existing.AppearanceProfileId = in.GetAudience().GetAppearanceProfileId()
@@ -1024,4 +1030,20 @@ provider "authwise" {
   audience_id = "a-1"
 }
 `, h.grpcAddr, h.guardAddr, h.tokenServer.URL+"/oauth/token")
+}
+
+// admitAudienceConfig refuses access_token_claim_scopes as kit#892 does: a
+// scope other than profile, email or phone, or one listed twice.
+func admitAudienceConfig(c *corepb.AudienceConfig) error {
+	seen := map[string]bool{}
+	for _, s := range c.GetAccessTokenClaimScopes() {
+		switch {
+		case s != "profile" && s != "email" && s != "phone":
+			return status.Errorf(codes.InvalidArgument, "access_token_claim_scopes: %q is not one of profile, email, phone", s)
+		case seen[s]:
+			return status.Errorf(codes.InvalidArgument, "access_token_claim_scopes: %q is listed twice", s)
+		}
+		seen[s] = true
+	}
+	return nil
 }
