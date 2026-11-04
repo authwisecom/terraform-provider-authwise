@@ -383,6 +383,9 @@ func (f *fakeIdentityServer) CreateIssuer(ctx context.Context, in *identitypb.Cr
 	if p := in.GetIssuer().GetPreferredDomainId(); p != "" && p != in.GetIssuer().GetDomainId() {
 		return nil, status.Errorf(codes.InvalidArgument, "preferred_domain_id: %s is not one of this issuer's domains", p)
 	}
+	if err := admitCimd(in.GetIssuer().GetConfig().GetCimd()); err != nil {
+		return nil, err
+	}
 	i := proto.Clone(in.GetIssuer()).(*corepb.Issuer)
 	i.Name = in.GetParent() + "/issuers/" + f.nextID("i")
 	i.DomainName = d.GetHostname()
@@ -396,10 +399,13 @@ func (f *fakeIdentityServer) PatchIssuer(ctx context.Context, in *identitypb.Pat
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.recordAuth(ctx)
-	existing, ok := f.issuers[in.GetName()]
+	stored, ok := f.issuers[in.GetName()]
 	if !ok {
 		return nil, status.Errorf(codes.NotFound, "issuer %q not found", in.GetName())
 	}
+	// The mask applies to a copy, which is judged as a whole and stored
+	// only when admitted: kit judges the merged row, not the request body.
+	existing := proto.Clone(stored).(*corepb.Issuer)
 	for _, path := range in.GetUpdateMask().GetPaths() {
 		switch path {
 		case "labels":
@@ -424,7 +430,24 @@ func (f *fakeIdentityServer) PatchIssuer(ctx context.Context, in *identitypb.Pat
 			return nil, status.Errorf(codes.InvalidArgument, "unsupported update_mask path %q", path)
 		}
 	}
+	if err := admitCimd(existing.GetConfig().GetCimd()); err != nil {
+		return nil, err
+	}
+	f.issuers[in.GetName()] = existing
 	return proto.Clone(existing).(*corepb.Issuer), nil
+}
+
+// admitCimd is kit#413's fail-closed rule, in kit's words: while enabled,
+// an issuer names the hosts it trusts or sets allow_any_host, never
+// neither, and never both.
+func admitCimd(c *corepb.CimdConfig) error {
+	switch {
+	case c.GetAllowAnyHost() && len(c.GetTrustedDomains()) > 0:
+		return status.Error(codes.InvalidArgument, "cimd.allow_any_host and cimd.trusted_domains are exclusive: name the hosts, or allow any host")
+	case c.GetEnabled() && !c.GetAllowAnyHost() && len(c.GetTrustedDomains()) == 0:
+		return status.Error(codes.InvalidArgument, "cimd.trusted_domains is required while cimd.enabled; set cimd.allow_any_host to accept a document from any https host")
+	}
+	return nil
 }
 
 // admitPreferredDomainLocked is kit#857's write rule: empty, the issuer's

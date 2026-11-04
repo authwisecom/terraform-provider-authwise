@@ -22,7 +22,9 @@ resource "authwise_issuer" "this" {
 
 # An issuer that accepts Claude's client ID metadata documents: a client_id
 # that is an https URL on claude.ai is fetched and registered, any other host
-# is refused.
+# is refused. To accept a document from any https host instead, the
+# deliberate open setting, leave trusted_domains out and set
+# allow_any_host = true.
 data "authwise_issuer_config" "mcp" {
   cimd = {
     enabled         = true

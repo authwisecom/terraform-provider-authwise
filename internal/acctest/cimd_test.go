@@ -147,3 +147,67 @@ data "authwise_interactive_client_config" "x" {
 		}},
 	})
 }
+
+// TestAccIssuer_CimdFailClosed: kit#413 fails closed. An issuer that
+// enables CIMD names its hosts or sets allow_any_host; neither, or both,
+// is refused at apply in kit's words. Switching between the two postures
+// is one write either way, because kit judges the issuer the write leaves,
+// not the request.
+func TestAccIssuer_CimdFailClosed(t *testing.T) {
+
+	h := newHarness(t)
+
+	config := func(cimd string) string {
+		return h.providerConfig() + fmt.Sprintf(`
+resource "authwise_domain" "login" {
+  hostname = "login.example.com"
+}
+
+resource "authwise_issuer" "login" {
+  domain_id = authwise_domain.login.domain_id
+  config    = provider::authwise::issuer_config({ cimd = %s })
+}
+`, cimd)
+	}
+
+	const (
+		claude  = `{ enabled = true, trusted_domains = ["claude.ai"] }`
+		anyHost = `{ enabled = true, allow_any_host = true }`
+	)
+
+	posture := func(anyHost bool, domains ...string) resource.TestCheckFunc {
+		return checkServer(func() error {
+			h.fake.mu.Lock()
+			defer h.fake.mu.Unlock()
+			for _, i := range h.fake.issuers {
+				c := i.GetConfig().GetCimd()
+				if c.GetAllowAnyHost() != anyHost || !slices.Equal(c.GetTrustedDomains(), domains) {
+					return fmt.Errorf("cimd = allow_any_host %v, trusted_domains %q; want %v, %q", c.GetAllowAnyHost(), c.GetTrustedDomains(), anyHost, domains)
+				}
+			}
+			return nil
+		})
+	}
+
+	empty := resource.ConfigPlanChecks{PreApply: []plancheck.PlanCheck{plancheck.ExpectEmptyPlan()}}
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: protoFactories(),
+		Steps: []resource.TestStep{
+			{
+				Config:      config(`{ enabled = true }`),
+				ExpectError: regexp.MustCompile(`(?s)cimd\.trusted_domains\s+is\s+required\s+while\s+cimd\.enabled;\s+set\s+cimd\.allow_any_host`),
+			},
+			{
+				Config:      config(`{ enabled = true, allow_any_host = true, trusted_domains = ["claude.ai"] }`),
+				ExpectError: regexp.MustCompile(`(?s)cimd\.allow_any_host\s+and\s+cimd\.trusted_domains\s+are\s+exclusive`),
+			},
+			{Config: config(claude), Check: posture(false, "claude.ai")},
+			{Config: config(anyHost), Check: posture(true)},
+			{Config: config(anyHost), ConfigPlanChecks: empty},
+			{Config: config(claude), Check: posture(false, "claude.ai")},
+			{Config: config(claude), ConfigPlanChecks: empty},
+		},
+		CheckDestroy: noneLeft(h),
+	})
+}

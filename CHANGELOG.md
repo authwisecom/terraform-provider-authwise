@@ -4,6 +4,28 @@ NOTES:
 
 * **tfinfra v0.0.22.** It adds `ConfigDataSource.Omit`, used below, and
   changes nothing else in the generated code.
+* **apis v0.54.0.** `cimd.allow_any_host` and the fail-closed rule need a
+  kit carrying kit#413's fail-closed change (develop bf296832). An older
+  kit ignores `allow_any_host` and still reads an empty
+  `trusted_domains` with `enabled` as any host.
+
+FEATURES:
+
+* **CIMD fails closed: `issuer_config.cimd.allow_any_host` (kit#413,
+  tf#64).** An issuer with `cimd.enabled` must now either name its
+  hosts in `trusted_domains` or set `allow_any_host = true`, the
+  deliberate setting that accepts a document from any https host.
+  * kit refuses neither and refuses both, at apply, and the provider
+    shows kit's message.
+  * kit judges the issuer the write leaves, so switching between the
+    two settings is one apply.
+  * `allow_any_host` works in both the data source and
+    `provider::authwise::issuer_config`. It is sent only when set, and
+    nothing is checked at plan.
+  * **Action needed:** a configuration that enables CIMD with no
+    `trusted_domains`, which 0.28.0 documented as any host, is refused
+    once kit carries the rule. Add `allow_any_host = true` to keep that
+    behaviour, or list the hosts.
 
 BREAKING CHANGES:
 

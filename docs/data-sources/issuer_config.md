@@ -40,7 +40,9 @@ resource "authwise_issuer" "this" {
 
 # An issuer that accepts Claude's client ID metadata documents: a client_id
 # that is an https URL on claude.ai is fetched and registered, any other host
-# is refused.
+# is refused. To accept a document from any https host instead, the
+# deliberate open setting, leave trusted_domains out and set
+# allow_any_host = true.
 data "authwise_issuer_config" "mcp" {
   cimd = {
     enabled         = true
@@ -82,8 +84,9 @@ resource "authwise_issuer" "mcp" {
 
 Optional:
 
+- `allow_any_host` (Boolean) Accept a document from any https host, the MCP "open server" posture: the deliberate way to open the issuer to every host, and the only one. kit refuses it beside a non-empty `trusted_domains`, and refuses `enabled` with neither, at apply.
 - `enabled` (Boolean) Accept URL-form `client_id`s. Default false.
-- `trusted_domains` (List of String) The hosts whose documents are accepted, matched exactly against the URL's host: lower case, no port, no wildcard. Empty with `enabled = true` accepts any https host, the MCP "open server" posture.
+- `trusted_domains` (List of String) The hosts whose documents are accepted, matched exactly against the URL's host: lower case, no port, no wildcard. Required while `enabled`, unless `allow_any_host`: CIMD fails closed, so turning it on never opens the issuer to every host by leaving the list empty.
 
 
 <a id="nestedatt--cors"></a>
