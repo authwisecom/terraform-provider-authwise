@@ -14,3 +14,16 @@ resource "authwise_issuer" "this" {
     }
   })
 }
+
+# An issuer that accepts Claude's client ID metadata documents: a client_id
+# that is an https URL on claude.ai is fetched and registered, any other host
+# is refused.
+resource "authwise_issuer" "mcp" {
+  domain_id = authwise_domain.this.domain_id
+  config = provider::authwise::issuer_config({
+    cimd = {
+      enabled         = true
+      trusted_domains = ["claude.ai"]
+    }
+  })
+}

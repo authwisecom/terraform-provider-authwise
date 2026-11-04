@@ -19,3 +19,18 @@ resource "authwise_issuer" "this" {
   domain_id = authwise_domain.this.domain_id
   config    = data.authwise_issuer_config.this.json
 }
+
+# An issuer that accepts Claude's client ID metadata documents: a client_id
+# that is an https URL on claude.ai is fetched and registered, any other host
+# is refused.
+data "authwise_issuer_config" "mcp" {
+  cimd = {
+    enabled         = true
+    trusted_domains = ["claude.ai"]
+  }
+}
+
+resource "authwise_issuer" "mcp" {
+  domain_id = authwise_domain.this.domain_id
+  config    = data.authwise_issuer_config.mcp.json
+}

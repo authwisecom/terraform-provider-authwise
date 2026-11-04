@@ -22,6 +22,7 @@ Builds a InteractiveClientConfig config and exposes its google.protobuf.Any enco
 - `cors` (String) The browser origins allowed to call kit for this client. `cors` as the protojson encoding of CorsConfig.
 - `flow_integration_config` (String) The endpoint kit calls during this client's login flow. `flow_integration_config` as the protojson encoding of IntegrationConfig.
 - `interaction_forward_uri` (String)
+- `metadata_document` (Attributes) Set on a client kit materialised from a Client ID Metadata Document (kit#413). Written by kit when it fetches the document; read only on the rows kit derives from a document URL, so a value written on any other client changes nothing. (see [below for nested schema](#nestedatt--metadata_document))
 - `refresh_token_absolute_expire_seconds` (Number) Hard cap on a refresh token family in seconds, set once when the family is created and never extended. Unset takes the value from the layer above.
 - `refresh_token_expire_seconds` (Number) Refresh token idle lifetime in seconds: it slides forward on every rotation. Unset takes the value from the layer above.
 - `require_consent` (Boolean) Make /authorize ask the person to approve this client for the scopes it requests. Default false. `prompt=consent` asks regardless, so this is the floor, not the switch.
@@ -29,3 +30,12 @@ Builds a InteractiveClientConfig config and exposes its google.protobuf.Any enco
 ### Read-Only
 
 - `any` (String) protojson-encoded google.protobuf.Any (includes `@type`); reference this from Any-typed resource attributes.
+
+<a id="nestedatt--metadata_document"></a>
+### Nested Schema for `metadata_document`
+
+Optional:
+
+- `expires_at` (String) When the document is fetched again on the next authorization: the response's Cache-Control max-age, clamped to [5 min, 24 h]. `expires_at` as an RFC 3339 timestamp.
+- `fetched_at` (String) `fetched_at` as an RFC 3339 timestamp.
+- `url` (String) The document's URL, which is the client_id the client sends and the client_id claim on its tokens.

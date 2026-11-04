@@ -1,3 +1,33 @@
+## 0.28.0 (Unreleased)
+
+NOTES:
+
+* **apis v0.53.0.** `cimd` needs a kit carrying kit#413, expected in
+  kit v1.78.0. An older kit ignores it.
+
+FEATURES:
+
+* **Client ID Metadata Documents (kit#413, tf#62).** `issuer_config.cimd`
+  lets an issuer accept an https URL as a `client_id`. kit fetches the
+  client's registration from the document at that URL, as MCP clients
+  such as Claude do. It works in both the data source and
+  `provider::authwise::issuer_config`.
+  * `enabled` defaults to false.
+  * `trusted_domains` lists the hosts whose documents are accepted,
+    matched exactly against the URL's host. Empty with `enabled = true`
+    accepts any https host.
+  * An issuer that never set `cimd` plans no change. Nothing is checked
+    at plan beyond types.
+  * The issuer_config pages gain an example: an issuer accepting
+    Claude's documents from `claude.ai`.
+
+ENHANCEMENTS:
+
+* **`interactive_client_config.metadata_document`, from apis v0.53.0.**
+  kit writes it on clients it derives from a Client ID Metadata Document,
+  and a value set on any other client changes nothing. It is generated
+  as an input only because the config builder exposes every field.
+
 ## 0.27.0 (November 4, 2026)
 
 NOTES:

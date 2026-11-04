@@ -7,13 +7,17 @@ import (
 	v1alpha1 "git.authwise.com/authwise/apis/authwise/types/core/v1alpha1"
 	tf "github.com/activatedio/tfinfra/pkg/tf"
 	jsontypes "github.com/hashicorp/terraform-plugin-framework-jsontypes/jsontypes"
+	attr "github.com/hashicorp/terraform-plugin-framework/attr"
 	datasource "github.com/hashicorp/terraform-plugin-framework/datasource"
 	schema "github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	diag "github.com/hashicorp/terraform-plugin-framework/diag"
 	path "github.com/hashicorp/terraform-plugin-framework/path"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
+	basetypes "github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	protojson "google.golang.org/protobuf/encoding/protojson"
 	anypb "google.golang.org/protobuf/types/known/anypb"
+	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
+	"time"
 )
 
 // InteractiveClientConfigDataSourceSchema returns the Terraform schema for the InteractiveClientConfig config data source.
@@ -45,6 +49,24 @@ func InteractiveClientConfigDataSourceSchema() schema.Schema {
 				Optional:            true,
 			},
 			"interaction_forward_uri": schema.StringAttribute{Optional: true},
+			"metadata_document": schema.SingleNestedAttribute{
+				Attributes: map[string]schema.Attribute{
+					"expires_at": schema.StringAttribute{
+						MarkdownDescription: "When the document is fetched again on the next authorization: the response's Cache-Control max-age, clamped to [5 min, 24 h]. `expires_at` as an RFC 3339 timestamp.",
+						Optional:            true,
+					},
+					"fetched_at": schema.StringAttribute{
+						MarkdownDescription: "`fetched_at` as an RFC 3339 timestamp.",
+						Optional:            true,
+					},
+					"url": schema.StringAttribute{
+						MarkdownDescription: "The document's URL, which is the client_id the client sends and the client_id claim on its tokens.",
+						Optional:            true,
+					},
+				},
+				MarkdownDescription: "Set on a client kit materialised from a Client ID Metadata Document (kit#413). Written by kit when it fetches the document; read only on the rows kit derives from a document URL, so a value written on any other client changes nothing.",
+				Optional:            true,
+			},
 			"refresh_token_absolute_expire_seconds": schema.Int64Attribute{
 				MarkdownDescription: "Hard cap on a refresh token family in seconds, set once when the family is created and never extended. Unset takes the value from the layer above.",
 				Optional:            true,
@@ -62,6 +84,22 @@ func InteractiveClientConfigDataSourceSchema() schema.Schema {
 	}
 }
 
+// InteractiveClientConfigMetadataDocumentModel is the Terraform model for InteractiveClientConfig's "metadata_document" nested attribute.
+type InteractiveClientConfigMetadataDocumentModel struct {
+	Url       types.String `tfsdk:"url"`
+	FetchedAt types.String `tfsdk:"fetched_at"`
+	ExpiresAt types.String `tfsdk:"expires_at"`
+}
+
+// InteractiveClientConfigMetadataDocumentAttrTypes returns the attribute types of the "metadata_document" nested attribute.
+func InteractiveClientConfigMetadataDocumentAttrTypes() map[string]attr.Type {
+	return map[string]attr.Type{
+		"expires_at": types.StringType,
+		"fetched_at": types.StringType,
+		"url":        types.StringType,
+	}
+}
+
 // InteractiveClientConfigModel is the Terraform model for the InteractiveClientConfig config data source.
 type InteractiveClientConfigModel struct {
 	InteractionForwardUri             types.String         `tfsdk:"interaction_forward_uri"`
@@ -72,6 +110,7 @@ type InteractiveClientConfigModel struct {
 	RefreshTokenExpireSeconds         types.Int64          `tfsdk:"refresh_token_expire_seconds"`
 	RefreshTokenAbsoluteExpireSeconds types.Int64          `tfsdk:"refresh_token_absolute_expire_seconds"`
 	RequireConsent                    types.Bool           `tfsdk:"require_consent"`
+	MetadataDocument                  types.Object         `tfsdk:"metadata_document"`
 	Any                               jsontypes.Normalized `tfsdk:"any"`
 }
 
@@ -84,6 +123,7 @@ func NewInteractiveClientConfigModel() *InteractiveClientConfigModel {
 		Cors:                              jsontypes.NewNormalizedNull(),
 		FlowIntegrationConfig:             jsontypes.NewNormalizedNull(),
 		InteractionForwardUri:             types.StringNull(),
+		MetadataDocument:                  types.ObjectNull(InteractiveClientConfigMetadataDocumentAttrTypes()),
 		RefreshTokenAbsoluteExpireSeconds: types.Int64Null(),
 		RefreshTokenExpireSeconds:         types.Int64Null(),
 		RequireConsent:                    types.BoolNull(),
@@ -118,6 +158,29 @@ func (m *InteractiveClientConfigModel) ToProto(ctx context.Context) (*v1alpha1.I
 	out.RefreshTokenExpireSeconds = int32(m.RefreshTokenExpireSeconds.ValueInt64())
 	out.RefreshTokenAbsoluteExpireSeconds = int32(m.RefreshTokenAbsoluteExpireSeconds.ValueInt64())
 	out.RequireConsent = m.RequireConsent.ValueBool()
+	if !m.MetadataDocument.IsNull() && !m.MetadataDocument.IsUnknown() {
+		var n InteractiveClientConfigMetadataDocumentModel
+		diags.Append(m.MetadataDocument.As(ctx, &n, basetypes.ObjectAsOptions{})...)
+		v := &v1alpha1.ClientMetadataDocument{}
+		v.Url = n.Url.ValueString()
+		if !n.FetchedAt.IsNull() && !n.FetchedAt.IsUnknown() {
+			t, err := time.Parse(time.RFC3339, n.FetchedAt.ValueString())
+			if err != nil {
+				diags.AddAttributeError(path.Root("metadata_document").AtName("fetched_at"), "invalid RFC 3339 timestamp", err.Error())
+			} else {
+				v.FetchedAt = timestamppb.New(t)
+			}
+		}
+		if !n.ExpiresAt.IsNull() && !n.ExpiresAt.IsUnknown() {
+			t, err := time.Parse(time.RFC3339, n.ExpiresAt.ValueString())
+			if err != nil {
+				diags.AddAttributeError(path.Root("metadata_document").AtName("expires_at"), "invalid RFC 3339 timestamp", err.Error())
+			} else {
+				v.ExpiresAt = timestamppb.New(t)
+			}
+		}
+		out.MetadataDocument = v
+	}
 	return out, diags
 }
 
