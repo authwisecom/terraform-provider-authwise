@@ -1,11 +1,11 @@
-## 0.30.0 (Unreleased)
+## 0.30.0 (November 6, 2026)
 
 NOTES:
 
 * **apis v0.57.0.** Guard's tenant collapse (guard-control#80, kit#899).
-  It needs the guard-control release that implements it; until that
-  release is installed, the Guard resources here do not work against
-  guard-control. Upgrade the provider and guard-control together.
+  It needs guard-control v0.26.0 or later, the release that implements
+  it. Against an earlier guard-control, the Guard resources here do not
+  work. Upgrade the provider and guard-control together.
 * **Pin before upgrading.** A root pinned `~> 0.29` allows 0.30.0, and
   takes it on `terraform init -upgrade`. A root whose guard-control is
   still before the cutover should pin `~> 0.29.0`, which allows only
