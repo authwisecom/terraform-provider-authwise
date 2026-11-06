@@ -1,11 +1,23 @@
-# A Guard network, in a Guard tenant, down to a gateway server and the first
-# invite.
+# Guard on a kit tenant: its settings, a network, down to a gateway server
+# and the first invite.
 
 locals {
-  # The Guard tenant (gt-…). awtenant creates it under the Authwise tenant,
-  # with the users link its people sign in through, and reports its id; the
-  # provider cannot create one.
-  guard_tenant_id = "gt-01"
+  # The kit tenant (t-…) Guard is on. There is no Guard tenant: Guard's
+  # networks and settings are keyed by the kit tenant, and kit reports
+  # Guard on it before guard-control takes a write.
+  guard_tenant_id = "t-01"
+}
+
+# 0. Guard's settings for the tenant: the slug that names it in mesh DNS,
+#    and the sweep that revokes the devices of people who lost Guard.
+#    Destroying this leaves the settings in place.
+resource "authwise_guard_tenant_settings" "this" {
+  tenant_id = local.guard_tenant_id
+  slug      = "acme"
+
+  config = {
+    deprovisioning = { enabled = true }
+  }
 }
 
 # 1. The network: a WireGuard mesh. Its cidr is the address space nodes get

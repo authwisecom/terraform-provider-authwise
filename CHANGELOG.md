@@ -1,3 +1,59 @@
+## 0.30.0 (Unreleased)
+
+NOTES:
+
+* **apis v0.57.0.** Guard's tenant collapse (guard-control#80, kit#899).
+  It needs the guard-control release that implements it; until that
+  release is installed, the Guard resources here do not work against
+  guard-control. Upgrade the provider and guard-control together.
+
+FEATURES:
+
+* **`authwise_guard_tenant_settings` (tf#65).** Guard's settings for a kit
+  tenant, keyed by the kit tenant's id (`t-…`):
+  * writable: `slug`, `labels`, `config.users.realms` and
+    `config.deprovisioning.enabled`;
+  * read-only: `display_name`, `status`, `issuer`, `audience` and
+    `console_client_id`.
+  * Create and update both write with guard-control's `PatchTenant`, and
+    send only what the plan changes. An attribute left unset is not
+    written.
+  * guard-control refuses a tenant kit has not turned Guard on for
+    (`GUARD_NOT_ENABLED`) or one that is suspended (`TENANT_SUSPENDED`).
+    The provider shows guard-control's message.
+  * **Destroy writes nothing.** It removes the resource from state and
+    leaves the settings on the tenant.
+* **`authwise_guard_node.platform`** (apis v0.55.0): the platform the
+  node enrolled from. Read-only.
+
+BREAKING CHANGES:
+
+* **There is no Guard tenant (tf#65).** Guard is keyed by the kit tenant.
+  * `authwise_guard_tenant` and `authwise_guard_tenants` are removed, with
+    every users-link and parent attribute. Use
+    `authwise_guard_tenant_settings` for Guard's settings on a tenant.
+  * Every Guard resource and data source takes the kit tenant's id
+    (`t-…`) as `tenant_id`. A Guard tenant's id (`gt-…`) fails at plan,
+    with the upgrade steps.
+  * `authwise_guard_enrolment_grant` binds in kit at the kit tenant. Its
+    import ID is `<t-id>/<binding>`.
+* **`authwise_guard_deprovisioning` (resource and data source) is removed
+  (tf#65).** guard-control sweeps with its install's own credential, so a
+  tenant has no account to give it. Turn the sweep on with
+  `authwise_guard_tenant_settings`, `config.deprovisioning.enabled = true`.
+  Remove it from configuration, and from state with `terraform state rm`.
+* **Action needed: state written before 0.30.0.** The provider does not
+  rewrite state. A Guard resource whose state still holds a `gt-…` id
+  fails at plan, before guard-control is asked, so nothing is dropped or
+  recreated. For each one:
+  1. Set `tenant_id` to the kit tenant's id.
+  2. Move the resource across: `terraform state rm <address>`, then
+     `terraform import <address> tenants/t-…/networks/n-…` (or `removed`
+     and `import` blocks), using the name guard-control now reports for
+     it.
+  3. Remove `authwise_guard_tenant` and `authwise_guard_deprovisioning`
+     from configuration and state.
+
 ## 0.29.0 (November 4, 2026)
 
 NOTES:

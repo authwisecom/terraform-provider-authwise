@@ -42,7 +42,7 @@ var (
 	scopeAudience = tf.NewScope("tenants", "issuers", "audiences")
 	scopeClient   = tf.NewScope("tenants", "issuers", "clients")
 
-	// Guard's (guard-control): its tenants are its own (`gt-…`, #35).
+	// Guard's (guard-control): a network in a kit tenant (tf#65).
 	scopeGuardNetwork = tf.NewScope("tenants", "networks")
 )
 
@@ -402,19 +402,10 @@ func main() {
 				withComputed("created_by"),
 				withReferences(map[string]gentf.Reference{"condition_id": refAccessCondition})),
 
-			// Guard (guard-control, #32). A Guard tenant is Guard's own
-			// (`gt-…`, #35), created under a parent Authwise tenant only
-			// through guard-control's mTLS tenancy listener, by awtenant and
-			// the portal worker (E22, #36): no bearer surface creates or
-			// deletes one. It is read-only here. tfinfra's data sources need
-			// the resource marker, so the resource is generated and
-			// internal/provider leaves it unregistered.
-			crud[guardpb.Tenant](tf.NewScope(),
-				withDescription("A Guard tenant, under a parent Authwise tenant. Nothing else in Guard exists until this does. awtenant creates it; the provider only reads it. `users` is where the tenant's people sign in and are decided."),
-				guard("tenant"), guardList("tenants"),
-				withOps(gentf.OpGet|gentf.OpList),
-				withComputed("status", "created_by"), withJSON("config"),
-				withReferences(map[string]gentf.Reference{"parent_tenant_id": scopeReferences["tenant_id"]})),
+			// Guard (guard-control, #32). Its rows are keyed by kit's tenant
+			// (`t-…`) since the tenant collapse (apis v0.57.0, tf#65): there is
+			// no Guard tenant. Guard's settings for a kit tenant are the
+			// hand-written authwise_guard_tenant_settings.
 			// cidr cannot change once the network has a node; replacing the
 			// network is the only way to move it. mesh_domain (apis v0.48.0)
 			// is derived from the network's and its tenant's slugs, so a
@@ -451,7 +442,7 @@ func main() {
 				withDescription("A server's node in a Guard network, registered ahead of time. Created without a `public_key`, it is `PENDING` and its one-time `auth_code` enrols the server; created with one, it is `ACTIVE` at once. The auth code is shown once, so it is kept in state: treat the state as sensitive. People's nodes join by invite and are not managed here."),
 				guard("node"), guardList("nodes"),
 				withImmutable("address"),
-				withComputed("allowed_ips", "owner_id", "state", "roles", "auth_code", "auth_code_expires_at", "last_seen_at"),
+				withComputed("allowed_ips", "owner_id", "state", "roles", "auth_code", "auth_code_expires_at", "last_seen_at", "platform"),
 				withSensitive("auth_code"),
 				withJSON("config")),
 			// An invite is create-only: guard-control has no update. Its code

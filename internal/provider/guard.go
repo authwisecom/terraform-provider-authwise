@@ -37,12 +37,69 @@ const (
 
 	networkIDAttribute = "network_id"
 
-	guardTenantIDDescription = "The Guard tenant's id (`gt-…`), as awtenant reports it or `authwise_guard_tenants` lists it; the provider's `tenant_id` is not used."
+	guardTenantIDDescription = "The kit tenant's id (`t-…`) the Guard row belongs to. Guard has no tenant of its own since the tenant collapse (tf#65). The provider's `tenant_id` is not used."
 )
 
-// guardTenantReference validates a Guard tenant's id: Guard's tenants are
-// its own since apis v0.24.0 (#35), not kit's.
-var guardTenantReference = tfruntime.ReferenceID("gt", "guard_tenant", "")
+// guardTenantReference validates the kit tenant a Guard row is keyed by
+// (apis v0.57.0, tf#65), and refuses a Guard tenant's id (`gt-…`) with the
+// upgrade note.
+var guardTenantReference validator.String = guardTenantIDValidator{kit: tfruntime.ReferenceID("t", "tenant", "")}
+
+type guardTenantIDValidator struct {
+	kit validator.String
+}
+
+func (v guardTenantIDValidator) Description(ctx context.Context) string {
+	return v.kit.Description(ctx)
+}
+
+func (v guardTenantIDValidator) MarkdownDescription(ctx context.Context) string {
+	return v.kit.MarkdownDescription(ctx)
+}
+
+func (v guardTenantIDValidator) ValidateString(ctx context.Context, req validator.StringRequest, resp *validator.StringResponse) {
+	if id := req.ConfigValue.ValueString(); strings.HasPrefix(id, guardTenantIDPrefix) {
+		resp.Diagnostics.AddAttributeError(req.Path, "a Guard tenant id is no longer accepted", "tenant_id is "+id+"."+guardTenantUpgradeHint(id))
+		return
+	}
+	v.kit.ValidateString(ctx, req, resp)
+}
+
+// guardTenantIDPrefix starts a Guard tenant's id, which the tenant collapse
+// retired.
+const guardTenantIDPrefix = "gt-"
+
+// guardTenantUpgradeHint is the upgrade note for a Guard tenant's id, or
+// nothing for any other id.
+func guardTenantUpgradeHint(id string) string {
+	if !strings.HasPrefix(id, guardTenantIDPrefix) {
+		return ""
+	}
+	return " Guard tenants (`gt-…`) are gone since guard-control's tenant collapse (apis v0.57.0, tf#65): " +
+		"Guard's networks, and everything in them, belong to the kit tenant (`t-…`). " +
+		"The provider does not rewrite state. Set tenant_id to the kit tenant's id, then move each resource across: " +
+		"`terraform state rm <address>`, then `terraform import <address>` with the name guard-control now reports (`tenants/t-…/networks/n-…`), or `removed` and `import` blocks. " +
+		"For authwise_guard_tenant settings, use authwise_guard_tenant_settings; for authwise_guard_deprovisioning, its `config.deprovisioning.enabled`."
+}
+
+// refuseGuardTenantState fails a read or plan of a resource whose state
+// still holds a Guard tenant's id: guard-control would answer NotFound, and
+// a refresh would drop the resource, so that the plan recreates it.
+func refuseGuardTenantState(ctx context.Context, state tfsdk.State, diags *diag.Diagnostics) bool {
+	if state.Raw.IsNull() {
+		return false
+	}
+	var id types.String
+	if state.GetAttribute(ctx, path.Root(tenantIDAttribute), &id).HasError() {
+		return false
+	}
+	if !strings.HasPrefix(id.ValueString(), guardTenantIDPrefix) {
+		return false
+	}
+	diags.AddAttributeError(path.Root(tenantIDAttribute), "this state holds a Guard tenant id",
+		"The resource's state has tenant_id "+id.ValueString()+"."+guardTenantUpgradeHint(id.ValueString()))
+	return true
+}
 
 const errGuardNotConfigured = "guard_endpoint is not configured: set the provider's guard_endpoint attribute or the AUTHWISE_GUARD_ENDPOINT environment variable to guard-control's gRPC host:port"
 
@@ -105,9 +162,9 @@ func (r *guardResource) Metadata(ctx context.Context, req resource.MetadataReque
 }
 
 // Schema makes tenant_id and network_id required where a resource has
-// them. tenant_id is a Guard tenant's id (`gt-…`), which the provider's
-// tenant_id, a kit tenant's, is not; and the provider has no network
-// default. A required attribute cannot also be computed, which a generated
+// them. tenant_id is the kit tenant a Guard row is keyed by, given
+// explicitly rather than inherited from the provider's tenant_id; and the
+// provider has no network default. A required attribute cannot also be computed, which a generated
 // parent identifier is so that it can inherit the provider default.
 func (r *guardResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	r.inner.Schema(ctx, req, resp)
@@ -157,6 +214,9 @@ func (r *guardResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanR
 		resp.Diagnostics.AddError("Guard is not configured", errGuardNotConfigured)
 		return
 	}
+	if refuseGuardTenantState(ctx, req.State, &resp.Diagnostics) {
+		return
+	}
 	if inner, ok := r.inner.(resource.ResourceWithModifyPlan); ok {
 		inner.ModifyPlan(ctx, req, resp)
 	}
@@ -167,6 +227,9 @@ func (r *guardResource) Create(ctx context.Context, req resource.CreateRequest, 
 }
 
 func (r *guardResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	if refuseGuardTenantState(ctx, req.State, &resp.Diagnostics) {
+		return
+	}
 	r.inner.Read(ctx, req, resp)
 }
 
@@ -234,12 +297,6 @@ func (d *guardDataSource) Configure(ctx context.Context, req datasource.Configur
 func (d *guardDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
 	d.inner.Read(ctx, req, resp)
 }
-
-// guardTenantTypeName is the generated Guard tenant resource, which the
-// provider does not register: a Guard tenant is created only through
-// guard-control's mTLS tenancy listener, by awtenant and the portal worker
-// (E22, #36). Its data sources remain.
-const guardTenantTypeName = "authwise_guard_tenant"
 
 // The Guard types whose create response alone carries a value: an invite's
 // code and join link, and a node's auth code.

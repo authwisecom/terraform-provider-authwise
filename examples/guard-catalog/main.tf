@@ -155,10 +155,9 @@ resource "authwise_access_role_access_permissions" "guardcontrol_admin" {
 # 5. The binding. Without it the console loads and everything 403s.
 #
 #    resource_type and resource_id are left unset, which anchors the grant at
-#    the root so it applies on every Guard tenant. Two narrower anchors:
-#    resource_type = "tenant" with an Authwise tenant's AWID reaches every
-#    Guard tenant under it; resource_type = "guardcontrol.tenant" with a
-#    `gt-…` id reaches one Guard tenant.
+#    the root so it applies on every tenant. A narrower anchor:
+#    resource_type = "guardcontrol.tenant" with a kit tenant's `t-…` id
+#    reaches Guard on that one tenant.
 resource "authwise_access_binding" "guardcontrol_admin" {
   subject_type = "user"
   subject_id   = local.admin_subject_id

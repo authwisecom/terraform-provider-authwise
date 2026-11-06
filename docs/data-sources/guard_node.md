@@ -33,6 +33,7 @@ A server's node in a Guard network, registered ahead of time. Created without a 
 - `last_seen_at` (String)
 - `network_id` (String)
 - `owner_id` (String)
+- `platform` (String)
 - `public_key` (String)
 - `roles` (List of String)
 - `slug` (String)

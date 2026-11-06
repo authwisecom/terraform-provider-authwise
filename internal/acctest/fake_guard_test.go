@@ -11,6 +11,7 @@ import (
 	"time"
 
 	guardpb "git.authwise.com/authwise/apis/authwise/guardcontrol/v1alpha1"
+	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
@@ -20,8 +21,8 @@ import (
 )
 
 // fakeGuardServer is guard-control v0.15.0's admin API (apis v0.28.0) as the
-// Guard resources use it: one Guard tenant, gt-acme, seeded as awtenant
-// would create it through the tenancy listener (E22, #36), networks
+// Guard resources use it: since the tenant collapse (apis v0.57.0, tf#65),
+// Guard's settings for the kit tenant t-1, which kit reports Guard on, networks
 // with a cidr in the mesh range, relays, resources and the nodes serving
 // them, and invites whose code is returned once. The rules are
 // guard-control's creator.go and validations.go.
@@ -60,28 +61,24 @@ func newFakeGuardServer() *fakeGuardServer {
 		codes:     map[string]string{},
 		grants:    map[string][]string{},
 	}
-	f.seedTenant("gt-acme")
+	f.seedTenant("t-1")
 	return f
 }
 
-// seedTenant adds a Guard tenant under the kit tenant t-1, as awtenant
-// would create it through the tenancy listener: no bearer surface does.
+// seedTenant adds Guard's settings for a kit tenant, as guard-control
+// holds them once kit reports Guard on it: what kit owns is cached and
+// output-only. A tenant not seeded has no Guard.
 func (f *fakeGuardServer) seedTenant(id string) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	name := "tenants/" + id
 	f.tenants[name] = &guardpb.Tenant{
-		Name:           name,
-		DisplayName:    "Acme",
-		Status:         "ACTIVE",
-		ParentTenantId: "t-1",
-		Users: &guardpb.TenantUsersLink{
-			Issuer:         "https://id.example.com/t-1",
-			Audience:       "a-guard",
-			AccessEndpoint: "access.example.com:443",
-			TenantId:       "t-1",
-		},
-		CreatedBy: "awtenant",
+		Name:            name,
+		DisplayName:     "Acme",
+		Status:          "ACTIVE",
+		Issuer:          "https://id.example.com/" + id,
+		Audience:        "a-guard",
+		ConsoleClientId: "c-console",
 	}
 }
 
@@ -174,25 +171,51 @@ func (f *fakeGuardServer) ListTenants(ctx context.Context, _ *guardpb.ListTenant
 	return out, nil
 }
 
+// PatchTenant is an upsert of Guard's settings once kit reports Guard on
+// the tenant; it refuses a tenant without Guard, or a suspended one, with
+// guard-control's ErrorInfo reasons. Only the four writable paths are
+// taken (apis v0.57.0).
 func (f *fakeGuardServer) PatchTenant(ctx context.Context, in *guardpb.PatchTenantRequest) (*guardpb.Tenant, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.record(ctx)
-	t, ok := f.tenants[in.GetName()]
+	t, ok := f.tenants[in.GetTenant().GetName()]
 	if !ok {
-		return nil, status.Errorf(codes.NotFound, "tenant %q not found", in.GetName())
+		return nil, guardRefusal(codes.FailedPrecondition, "GUARD_NOT_ENABLED", "Guard is not enabled on tenant "+in.GetTenant().GetName())
 	}
-	for _, p := range in.GetUpdateMask().GetPaths() {
-		if p == "parent_tenant_id" || p == "users" || p == "created_by" {
-			return nil, status.Errorf(codes.InvalidArgument, "%s is output-only", p)
-		}
+	if t.GetStatus() == "SUSPENDED" {
+		return nil, guardRefusal(codes.FailedPrecondition, "TENANT_SUSPENDED", "tenant "+t.GetName()+" is suspended")
 	}
 	next := proto.Clone(t).(*guardpb.Tenant)
-	if err := applyMask(next, in.GetTenant(), in.GetUpdateMask().GetPaths()); err != nil {
-		return nil, err
+	if next.GetConfig() == nil {
+		next.Config = &guardpb.TenantConfig{}
 	}
-	f.tenants[in.GetName()] = next
+	src := in.GetTenant()
+	for _, p := range in.GetUpdateMask().GetPaths() {
+		switch p {
+		case "slug":
+			next.Slug = src.GetSlug()
+		case "labels":
+			next.Labels = src.GetLabels()
+		case "config.users.realms":
+			next.Config.Users = &guardpb.TenantUsersConfig{Realms: src.GetConfig().GetUsers().GetRealms()}
+		case "config.deprovisioning.enabled":
+			next.Config.Deprovisioning = &guardpb.TenantDeprovisioningConfig{Enabled: src.GetConfig().GetDeprovisioning().GetEnabled()}
+		default:
+			return nil, status.Errorf(codes.InvalidArgument, "unsupported update_mask path %q", p)
+		}
+	}
+	f.tenants[t.GetName()] = next
 	return proto.Clone(next).(*guardpb.Tenant), nil
+}
+
+// guardRefusal is a refusal carrying guard-control's ErrorInfo.
+func guardRefusal(code codes.Code, reason, msg string) error {
+	st, err := status.New(code, msg).WithDetails(&errdetails.ErrorInfo{Domain: "guard.authwise.com", Reason: reason})
+	if err != nil {
+		panic(err)
+	}
+	return st.Err()
 }
 
 // --- Network ---
@@ -213,7 +236,7 @@ func (f *fakeGuardServer) CreateNetwork(ctx context.Context, in *guardpb.CreateN
 	defer f.mu.Unlock()
 	f.record(ctx)
 	if _, ok := f.tenants[in.GetParent()]; !ok {
-		return nil, status.Errorf(codes.NotFound, "tenant %q not found", in.GetParent())
+		return nil, guardRefusal(codes.FailedPrecondition, "GUARD_NOT_ENABLED", "Guard is not enabled on tenant "+in.GetParent())
 	}
 	n := proto.Clone(in.GetNetwork()).(*guardpb.Network)
 	if err := checkNetworkCIDR(n.GetCidr()); err != nil {

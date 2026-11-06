@@ -27,7 +27,7 @@ import (
 const guardTenantAdminClientKey = "guard_tenant_admin"
 
 // The subject types an enrolment grant names, and the resource type of a
-// grant anchored at the Guard tenant itself.
+// grant anchored at the tenant itself.
 const (
 	enrolmentSubjectUser   = "user"
 	enrolmentSubjectGroup  = "group"
@@ -38,9 +38,9 @@ const (
 	networksCollection = "networks"
 )
 
-// The roles Guard binds in its audience at the users-link home
+// The roles Guard binds in its audience in kit
 // (guard-control#59). guardcontrol.user is enrolment; the others are
-// administration, and tenantAdmin is bound only at the Guard tenant,
+// administration, and tenantAdmin is bound only at the tenant,
 // networkAdmin only at a network.
 const (
 	guardRoleUser         = "guardcontrol.user"
@@ -57,12 +57,12 @@ var (
 )
 
 // guardEnrolmentGrantResource is authwise_guard_enrolment_grant: one Guard
-// role bound to a user or group of a Guard tenant's users link, on the
-// users-link home, through guard-control. Its identity is the home's
+// role bound to a user or group of a kit tenant, in kit, through
+// guard-control (tf#65: no Guard tenant, no users link). Its identity is kit's
 // binding name. guard-control has no Get for one grant: Read finds it in an
 // unpaged list.
 //
-// The default, guardcontrol.user at the Guard tenant, is an enrolment
+// The default, guardcontrol.user at the tenant, is an enrolment
 // grant (guard-control#55) and keeps the enrolment calls, which a
 // guard-control without #59 also serves. Any other role, or any role at a
 // network, is a role grant (guard-control#59: GrantRole, RevokeRole,
@@ -96,20 +96,18 @@ func (r *guardEnrolmentGrantResource) Schema(_ context.Context, _ resource.Schem
 	replace := []planmodifier.String{stringplanmodifier.RequiresReplace()}
 
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "Binds one Guard role to a user or group of a Guard tenant's users-link tenant, on the users-link home, through guard-control. " +
-			"By default the role is `guardcontrol.user` at the Guard tenant: the subject may enrol devices. " +
-			"`guardcontrol.tenantAdmin` (at the Guard tenant), `guardcontrol.networkAdmin` (at a network, `network_id`) and `guardcontrol.viewer` (either) let the subject administer the Guard tenant, or part of it, from the users-link home.\n\n" +
+		MarkdownDescription: "Binds one Guard role to a user or group of a kit tenant, in kit, through guard-control. " +
+			"By default the role is `guardcontrol.user` at the tenant: the subject may enrol devices. " +
+			"`guardcontrol.tenantAdmin` (at the tenant), `guardcontrol.networkAdmin` (at a network, `network_id`) and `guardcontrol.viewer` (either) let the subject administer the tenant's Guard, or part of it.\n\n" +
 			"**One way, not both.** This is the same binding an `authwise_access_binding` with that role in the Guard audience would write. Declare a grant one way only, or the two will fight.\n\n" +
-			"**Who may apply it.** Each call is admitted at guard-control, then by the home on the same bearer, so the provider's credential must administer the users-link tenant. " +
-			"A tenant administrator's credential works against a home on identity server 1.46.0 or later (kit#770); on older homes, apply with an operator credential or one holding `access.bindingAdmin` at the tenant. " +
-			"A Guard administrator who does not administer the users-link tenant (the MSP shape) is refused with PermissionDenied.\n\n" +
+			"**Who may apply it.** Each call is admitted at guard-control, then by kit on the same bearer, so the provider's credential must administer the tenant's bindings in kit; otherwise it is refused with PermissionDenied.\n\n" +
 			"**Versions.** A role other than `guardcontrol.user`, or a grant at a network, needs guard-control with role grants (guard-control#59); an older one refuses it with Unimplemented. " +
-			"`guardcontrol.tenantAdmin` and `guardcontrol.networkAdmin` carry the home's step-up condition (`condition_id`), and are refused while the home advertises none.\n\n" +
-			"**Revoking does not deprovision.** Destroying a grant stops new enrolments; a device already enrolled keeps working until it is revoked by hand or by the deprovisioning sweep (`authwise_guard_deprovisioning`).",
+			"`guardcontrol.tenantAdmin` and `guardcontrol.networkAdmin` carry the Guard audience's step-up condition (`condition_id`), and are refused while it has none.\n\n" +
+			"**Revoking does not deprovision.** Destroying a grant stops new enrolments; a device already enrolled keeps working until it is revoked by hand or by the deprovisioning sweep (`authwise_guard_tenant_settings`, `config.deprovisioning.enabled`).",
 		Attributes: map[string]schema.Attribute{
 			"binding": schema.StringAttribute{
 				Computed:            true,
-				MarkdownDescription: "The binding's name at the users-link home; serves as the Terraform ID.",
+				MarkdownDescription: "The binding's name in kit; serves as the Terraform ID.",
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			tenantIDAttribute: schema.StringAttribute{
@@ -118,7 +116,7 @@ func (r *guardEnrolmentGrantResource) Schema(_ context.Context, _ resource.Schem
 			},
 			networkIDAttribute: schema.StringAttribute{
 				Optional: true,
-				MarkdownDescription: "A network of the Guard tenant (`n-…`) to bind the role at, instead of the Guard tenant itself. " +
+				MarkdownDescription: "A network of the tenant (`n-…`) to bind the role at, instead of the tenant itself. " +
 					"Required for `guardcontrol.networkAdmin`; not allowed for `guardcontrol.tenantAdmin`. Changing it replaces the grant.",
 				PlanModifiers: replace,
 			},
@@ -136,7 +134,7 @@ func (r *guardEnrolmentGrantResource) Schema(_ context.Context, _ resource.Schem
 			},
 			"condition_id": schema.StringAttribute{
 				Computed:            true,
-				MarkdownDescription: "The access condition the binding carries: the home's step-up condition on an administrative role; empty on the others.",
+				MarkdownDescription: "The access condition the binding carries: the Guard audience's step-up condition on an administrative role; empty on the others.",
 			},
 			"subject_type": schema.StringAttribute{
 				Required:            true,
@@ -146,31 +144,31 @@ func (r *guardEnrolmentGrantResource) Schema(_ context.Context, _ resource.Schem
 			},
 			"subject_id": schema.StringAttribute{
 				Required: true,
-				MarkdownDescription: "The user's (`u-…`) or group's (`g-…`) id at the home, in one of the Guard tenant's realms; the home refuses any other. " +
+				MarkdownDescription: "The user's (`u-…`) or group's (`g-…`) id, in one of the tenant's realms; kit refuses any other. " +
 					"Changing it replaces the grant.",
 				PlanModifiers: replace,
 			},
 			"display_name": schema.StringAttribute{
 				Computed:            true,
-				MarkdownDescription: "The subject's display name at the home; empty when the home no longer has it in the Guard tenant's realms.",
+				MarkdownDescription: "The subject's display name in kit; empty when kit no longer has it in the tenant's realms.",
 			},
 			"email": schema.StringAttribute{
 				Computed:            true,
-				MarkdownDescription: "The user's email at the home; empty for a group.",
+				MarkdownDescription: "The user's email in kit; empty for a group.",
 			},
 		},
 	}
 }
 
 // networkIDIsOptional keeps guardResource from making network_id required:
-// a grant without one is bound at the Guard tenant.
+// a grant without one is bound at the tenant.
 func (r *guardEnrolmentGrantResource) networkIDIsOptional() {}
 
 func (r *guardEnrolmentGrantResource) Configure(_ context.Context, req resource.ConfigureRequest, _ *resource.ConfigureResponse) {
 	r.client = guardTenantAdminClientFrom(req.ProviderData)
 }
 
-// ValidateConfig refuses at plan what guard-control or the home would
+// ValidateConfig refuses at plan what guard-control or kit would
 // refuse at apply: a role at the wrong kind of target, and a subject id of
 // the other type.
 func (r *guardEnrolmentGrantResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
@@ -195,7 +193,7 @@ func (r *guardEnrolmentGrantResource) ValidateConfig(ctx context.Context, req re
 }
 
 // validateTarget refuses tenantAdmin at a network and networkAdmin at the
-// Guard tenant.
+// tenant.
 func (m *guardEnrolmentGrantModel) validateTarget(diags *diag.Diagnostics) {
 
 	if m.Role.IsUnknown() || m.NetworkID.IsUnknown() {
@@ -207,7 +205,7 @@ func (m *guardEnrolmentGrantModel) validateTarget(diags *diag.Diagnostics) {
 		diags.AddAttributeError(path.Root(networkIDAttribute), "guardcontrol.networkAdmin is bound at a network",
 			"set network_id to the network the role administers")
 	case m.Role.ValueString() == guardRoleTenantAdmin && !m.NetworkID.IsNull():
-		diags.AddAttributeError(path.Root(networkIDAttribute), "guardcontrol.tenantAdmin is bound at the Guard tenant",
+		diags.AddAttributeError(path.Root(networkIDAttribute), "guardcontrol.tenantAdmin is bound at the tenant",
 			"remove network_id, or use guardcontrol.networkAdmin to administer one network")
 	}
 }
@@ -319,7 +317,7 @@ func (r *guardEnrolmentGrantResource) readEnrolment(ctx context.Context, state *
 		// network.
 		if g.GetResourceType() != enrolmentAnchorTenant {
 			return false, fmt.Errorf("binding %s grants enrolment at %s/%s; this guard-control has no role grants (guard-control#59), "+
-				"so authwise_guard_enrolment_grant manages grants at the Guard tenant only. Manage it as an authwise_access_binding instead",
+				"so authwise_guard_enrolment_grant manages grants at the tenant only. Manage it as an authwise_access_binding instead",
 				g.GetBinding(), g.GetResourceType(), g.GetResourceId())
 		}
 		state.fromProto(g)
@@ -394,14 +392,14 @@ func (r *guardEnrolmentGrantResource) Delete(ctx context.Context, req resource.D
 	}
 }
 
-// ImportState takes `<gt-id>/<binding>`: revoking needs the Guard tenant as
+// ImportState takes `<t-id>/<binding>`: revoking needs the tenant as
 // well as the binding, and the binding's name carries slashes of its own.
 func (r *guardEnrolmentGrantResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 
 	tenantID, binding, ok := strings.Cut(req.ID, "/")
-	if !ok || !strings.HasPrefix(tenantID, "gt-") || binding == "" {
+	if !ok || !strings.HasPrefix(tenantID, "t-") || binding == "" {
 		resp.Diagnostics.AddError("invalid import ID for enrolment grant",
-			"expected <guard tenant id>/<binding>, e.g. gt-01/<the binding's name at the home>, got "+req.ID)
+			"expected <tenant id>/<binding>, e.g. t-01/<the binding's name in kit>, got "+req.ID+guardTenantUpgradeHint(tenantID))
 		return
 	}
 
@@ -410,13 +408,13 @@ func (r *guardEnrolmentGrantResource) ImportState(ctx context.Context, req resou
 }
 
 // isEnrolment is whether the grant is an enrolment grant: guardcontrol.user
-// at the Guard tenant, made and revoked with the enrolment calls. A state
+// at the tenant, made and revoked with the enrolment calls. A state
 // with no role (an import) is not, until Read finds its role.
 func (m *guardEnrolmentGrantModel) isEnrolment() bool {
 	return m.Role.ValueString() == guardRoleUser && m.NetworkID.IsNull()
 }
 
-// target is the resource name the role is bound at: the Guard tenant or one
+// target is the resource name the role is bound at: the tenant or one
 // of its networks.
 func (m *guardEnrolmentGrantModel) target() string {
 	name := guardTenantName(m.TenantID.ValueString())
@@ -461,20 +459,20 @@ func guardTenantAdminClientFrom(providerData any) guardpb.GuardTenantAdminServic
 	return client
 }
 
-// guardTenantName is a Guard tenant's resource name.
+// guardTenantName is a tenant's resource name at guard-control: kit's
+// tenant id since the collapse (tf#65).
 func guardTenantName(id string) string {
 	return tenantsCollection + "/" + id
 }
 
-// addGuardPeopleError reports a failed call on a Guard tenant's people,
+// addGuardPeopleError reports a failed call on a tenant's Guard people,
 // saying who may make it when it was refused: these calls are admitted at
-// guard-control and then by the users-link home.
+// guard-control and then by kit.
 func addGuardPeopleError(diags *diag.Diagnostics, summary string, err error) {
 	detail := err.Error()
 	if status.Code(err) == codes.PermissionDenied {
-		detail += "\n\nThis call is admitted twice: at guard-control on the Guard tenant, then by the users-link home on the same bearer. " +
-			"The provider's credential must administer the users-link tenant. A tenant administrator's credential is admitted by a home on identity server 1.46.0 or later; " +
-			"on an older home, use an operator credential or one holding access.bindingAdmin at the tenant."
+		detail += "\n\nThis call is admitted twice: at guard-control on the tenant, then by kit on the same bearer. " +
+			"The provider's credential must administer the tenant's bindings in kit."
 	}
 	diags.AddError(summary, detail)
 }

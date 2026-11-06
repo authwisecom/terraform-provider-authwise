@@ -2,7 +2,7 @@
 # 100.64.0.0/10; it cannot change in place, and guard-control refuses to
 # delete a network that still has nodes.
 resource "authwise_guard_network" "office" {
-  tenant_id    = "gt-01" # the Guard tenant, from awtenant
+  tenant_id    = "t-01" # the kit tenant Guard is on
   display_name = "Office"
   cidr         = "100.96.0.0/16"
 }

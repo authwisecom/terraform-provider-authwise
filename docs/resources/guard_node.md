@@ -17,7 +17,7 @@ A server's node in a Guard network, registered ahead of time. Created without a 
 # the agent on the server with the auth code to enrol it. Enrolment writes
 # public_key and endpoint, which read back without a diff.
 resource "authwise_guard_node" "gateway" {
-  tenant_id    = "gt-01" # the Guard tenant, from awtenant
+  tenant_id    = "t-01" # the kit tenant Guard is on
   network_id   = authwise_guard_network.office.guard_network_id
   display_name = "office-gateway"
 }
@@ -34,7 +34,7 @@ output "gateway_auth_code" {
 ### Required
 
 - `network_id` (String) The network's id, `authwise_guard_network.<name>.guard_network_id`. Changing it replaces the resource.
-- `tenant_id` (String) The Guard tenant's id (`gt-…`), as awtenant reports it or `authwise_guard_tenants` lists it; the provider's `tenant_id` is not used. Changing it replaces the resource.
+- `tenant_id` (String) The kit tenant's id (`t-…`) the Guard row belongs to. Guard has no tenant of its own since the tenant collapse (tf#65). The provider's `tenant_id` is not used. Changing it replaces the resource.
 
 ### Optional
 
@@ -55,6 +55,7 @@ output "gateway_auth_code" {
 - `last_seen_at` (String) `last_seen_at` as an RFC 3339 timestamp.
 - `name` (String) Full resource name; serves as the Terraform ID.
 - `owner_id` (String)
+- `platform` (String)
 - `roles` (List of String)
 - `state` (String)
 

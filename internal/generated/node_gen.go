@@ -8,6 +8,7 @@ import (
 	v1alpha1 "git.authwise.com/authwise/apis/authwise/guardcontrol/v1alpha1"
 	tf "github.com/activatedio/tfinfra/pkg/tf"
 	jsontypes "github.com/hashicorp/terraform-plugin-framework-jsontypes/jsontypes"
+	stringvalidator "github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	attr "github.com/hashicorp/terraform-plugin-framework/attr"
 	datasource "github.com/hashicorp/terraform-plugin-framework/datasource"
 	schema1 "github.com/hashicorp/terraform-plugin-framework/datasource/schema"
@@ -101,6 +102,11 @@ func NodeResourceSchema() schema.Schema {
 				Computed:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
+			"platform": schema.StringAttribute{
+				Computed:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+				Validators:    []validator.String{stringvalidator.OneOf("PLATFORM_UNSPECIFIED", "PLATFORM_LINUX", "PLATFORM_MACOS", "PLATFORM_WINDOWS", "PLATFORM_IOS", "PLATFORM_MACOS_APP")},
+			},
 			"public_key": schema.StringAttribute{
 				Computed:      true,
 				Optional:      true,
@@ -152,6 +158,7 @@ type NodeModel struct {
 	AuthCodeExpiresAt types.String         `tfsdk:"auth_code_expires_at"`
 	LastSeenAt        types.String         `tfsdk:"last_seen_at"`
 	Slug              types.String         `tfsdk:"slug"`
+	Platform          types.String         `tfsdk:"platform"`
 }
 
 // NewNodeModel returns a model with every attribute set to its typed null; collection types cannot be zero-valued.
@@ -170,6 +177,7 @@ func NewNodeModel() *NodeModel {
 		Name:              types.StringNull(),
 		NetworkId:         types.StringNull(),
 		OwnerId:           types.StringNull(),
+		Platform:          types.StringNull(),
 		PublicKey:         types.StringNull(),
 		Roles:             types.ListNull(types.StringType),
 		Slug:              types.StringNull(),
@@ -224,6 +232,9 @@ func (m *NodeModel) ToProto(ctx context.Context) (*v1alpha1.Node, diag.Diagnosti
 		}
 	}
 	out.Slug = m.Slug.ValueString()
+	if !m.Platform.IsNull() && !m.Platform.IsUnknown() {
+		out.Platform = v1alpha1.Platform(v1alpha1.Platform_value[m.Platform.ValueString()])
+	}
 	return out, diags
 }
 
@@ -318,6 +329,7 @@ func (m *NodeModel) FromProto(ctx context.Context, e *v1alpha1.Node) diag.Diagno
 	} else {
 		m.Slug = types.StringValue(e.Slug)
 	}
+	m.Platform = tf.EnumValue(m.Platform, int32(e.Platform), e.Platform.String())
 	return diags
 }
 
@@ -519,6 +531,7 @@ func NodeDataSourceSchema() schema1.Schema {
 			},
 			"network_id": schema1.StringAttribute{Computed: true},
 			"owner_id":   schema1.StringAttribute{Computed: true},
+			"platform":   schema1.StringAttribute{Computed: true},
 			"public_key": schema1.StringAttribute{Computed: true},
 			"roles": schema1.ListAttribute{
 				Computed:    true,
@@ -578,6 +591,7 @@ type NodeItemModel struct {
 	AuthCodeExpiresAt types.String         `tfsdk:"auth_code_expires_at"`
 	LastSeenAt        types.String         `tfsdk:"last_seen_at"`
 	Slug              types.String         `tfsdk:"slug"`
+	Platform          types.String         `tfsdk:"platform"`
 }
 
 // NodeItemAttrTypes returns the attribute types of one guard_nodes list element.
@@ -595,6 +609,7 @@ func NodeItemAttrTypes() map[string]attr.Type {
 		"last_seen_at":         types.StringType,
 		"name":                 types.StringType,
 		"owner_id":             types.StringType,
+		"platform":             types.StringType,
 		"public_key":           types.StringType,
 		"roles":                types.ListType{ElemType: types.StringType},
 		"slug":                 types.StringType,
@@ -647,6 +662,7 @@ func NodeListDataSourceSchema() schema1.Schema {
 						MarkdownDescription: "Full resource name.",
 					},
 					"owner_id":   schema1.StringAttribute{Computed: true},
+					"platform":   schema1.StringAttribute{Computed: true},
 					"public_key": schema1.StringAttribute{Computed: true},
 					"roles": schema1.ListAttribute{
 						Computed:    true,
@@ -763,6 +779,7 @@ func nodeItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Node, *NodeM
 	} else {
 		item.Slug = types.StringValue(e.Slug)
 	}
+	item.Platform = tf.EnumValue(item.Platform, int32(e.Platform), e.Platform.String())
 	id, err := crud.IDFromName(e.Name)
 	if err != nil {
 		diags.AddError("unexpected guard_node name", err.Error())

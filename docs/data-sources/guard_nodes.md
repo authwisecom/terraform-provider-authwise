@@ -17,7 +17,7 @@ A server's node in a Guard network, registered ahead of time. Created without a 
 
 ### Required
 
-- `tenant_id` (String) The Guard tenant's id (`gt-…`), as awtenant reports it or `authwise_guard_tenants` lists it; the provider's `tenant_id` is not used.
+- `tenant_id` (String) The kit tenant's id (`t-…`) the Guard row belongs to. Guard has no tenant of its own since the tenant collapse (tf#65). The provider's `tenant_id` is not used.
 
 ### Optional
 
@@ -44,6 +44,7 @@ Read-Only:
 - `last_seen_at` (String)
 - `name` (String) Full resource name.
 - `owner_id` (String)
+- `platform` (String)
 - `public_key` (String)
 - `roles` (List of String)
 - `slug` (String)

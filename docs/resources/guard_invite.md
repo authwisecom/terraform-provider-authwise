@@ -18,7 +18,7 @@ An invite that admits people to a Guard network, with the grants every node it c
 # A spent or expired invite stays in state: replace it to issue another,
 # with `terraform apply -replace=authwise_guard_invite.dana`.
 resource "authwise_guard_invite" "dana" {
-  tenant_id    = "gt-01" # the Guard tenant, from awtenant
+  tenant_id    = "t-01" # the kit tenant Guard is on
   network_id   = authwise_guard_network.office.guard_network_id
   display_name = "for Dana"
   grants       = [authwise_guard_resource.office_lan.name]
@@ -37,7 +37,7 @@ output "dana_invite_url" {
 ### Required
 
 - `network_id` (String) The network's id, `authwise_guard_network.<name>.guard_network_id`. Changing it replaces the resource.
-- `tenant_id` (String) The Guard tenant's id (`gt-…`), as awtenant reports it or `authwise_guard_tenants` lists it; the provider's `tenant_id` is not used. Changing it replaces the resource.
+- `tenant_id` (String) The kit tenant's id (`t-…`) the Guard row belongs to. Guard has no tenant of its own since the tenant collapse (tf#65). The provider's `tenant_id` is not used. Changing it replaces the resource.
 
 ### Optional
 

@@ -104,11 +104,13 @@ The Guard resources talk to guard-control rather than kit. Set
 `guard_endpoint` to its gRPC address; the provider sends it the same bearer
 it sends `endpoint`, so the credential needs Guard's permissions too
 (`guardcontrol.*`, which the guard-catalog example creates). Without
-`guard_endpoint`, a Guard resource fails at plan. A Guard tenant is Guard's
-own (`gt-…`), created under a kit tenant by awtenant, never by the
-provider; the Guard resources and data sources take its id as a required
-`tenant_id`, and do not inherit the provider's. `authwise_guard_tenants`
-lists the Guard tenants the credential can see.
+`guard_endpoint`, a Guard resource fails at plan. There is no Guard
+tenant: Guard is keyed by the kit tenant (`t-…`), which the Guard resources
+and data sources take as a required `tenant_id`, without inheriting the
+provider's. `authwise_guard_tenant_settings` holds Guard's settings for a
+tenant. A configuration or state that still holds a Guard tenant's id
+(`gt-…`) fails at plan with the upgrade steps; the provider does not
+rewrite it.
 
 ## Scope defaults
 

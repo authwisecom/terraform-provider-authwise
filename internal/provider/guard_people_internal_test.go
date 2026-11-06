@@ -31,10 +31,6 @@ type stubTenantAdmin struct {
 	roleListErr  error
 	rolesGranted []*guardpb.GrantRoleRequest
 	rolesRevoked []*guardpb.RevokeRoleRequest
-
-	deprovisioning *guardpb.Deprovisioning
-	set            []*guardpb.SetDeprovisioningAccountRequest
-	cleared        int
 }
 
 func (s *stubTenantAdmin) GrantEnrolment(_ context.Context, in *guardpb.GrantEnrolmentRequest, _ ...grpc.CallOption) (*guardpb.EnrolmentGrant, error) {
@@ -42,7 +38,7 @@ func (s *stubTenantAdmin) GrantEnrolment(_ context.Context, in *guardpb.GrantEnr
 		return nil, s.grantErr
 	}
 	s.granted = append(s.granted, in)
-	return &guardpb.EnrolmentGrant{Binding: grantBinding, Subject: in.GetSubject(), ResourceType: enrolmentAnchorTenant, ResourceId: "gt-1", DisplayName: "Ada"}, nil
+	return &guardpb.EnrolmentGrant{Binding: grantBinding, Subject: in.GetSubject(), ResourceType: enrolmentAnchorTenant, ResourceId: "t-1", DisplayName: "Ada"}, nil
 }
 
 func (s *stubTenantAdmin) ListEnrolmentGrants(_ context.Context, _ *guardpb.ListEnrolmentGrantsRequest, _ ...grpc.CallOption) (*guardpb.ListEnrolmentGrantsResponse, error) {
@@ -72,20 +68,6 @@ func (s *stubTenantAdmin) RevokeRole(_ context.Context, in *guardpb.RevokeRoleRe
 	return &guardpb.RevokeRoleResponse{}, nil
 }
 
-func (s *stubTenantAdmin) GetDeprovisioning(_ context.Context, _ *guardpb.GetDeprovisioningRequest, _ ...grpc.CallOption) (*guardpb.Deprovisioning, error) {
-	return s.deprovisioning, nil
-}
-
-func (s *stubTenantAdmin) SetDeprovisioningAccount(_ context.Context, in *guardpb.SetDeprovisioningAccountRequest, _ ...grpc.CallOption) (*guardpb.Deprovisioning, error) {
-	s.set = append(s.set, in)
-	return &guardpb.Deprovisioning{Available: true, Configured: true}, nil
-}
-
-func (s *stubTenantAdmin) ClearDeprovisioningAccount(_ context.Context, _ *guardpb.ClearDeprovisioningAccountRequest, _ ...grpc.CallOption) (*guardpb.Deprovisioning, error) {
-	s.cleared++
-	return &guardpb.Deprovisioning{Available: true}, nil
-}
-
 const grantBinding = "audiences/a-1/access-bindings/ab-1"
 
 // stateOf is a state, plan or config value of r's schema holding m.
@@ -107,7 +89,7 @@ func emptyState(ctx context.Context, t *testing.T, r resource.Resource) tfsdk.St
 
 func grantModel(binding string) *guardEnrolmentGrantModel {
 	m := &guardEnrolmentGrantModel{}
-	m.TenantID = types.StringValue("gt-1")
+	m.TenantID = types.StringValue("t-1")
 	m.NetworkID = types.StringNull()
 	m.Role = types.StringValue(guardRoleUser)
 	m.ConditionID = types.StringValue("")
@@ -131,7 +113,7 @@ func TestEnrolmentGrantCreateSendsSubject(t *testing.T) {
 	require.False(t, resp.Diagnostics.HasError(), resp.Diagnostics)
 
 	require.Len(t, stub.granted, 1)
-	assert.Equal(t, "tenants/gt-1", stub.granted[0].GetName())
+	assert.Equal(t, "tenants/t-1", stub.granted[0].GetName())
 	assert.Equal(t, "user", stub.granted[0].GetSubject().GetType())
 	assert.Equal(t, "u-1", stub.granted[0].GetSubject().GetId())
 
@@ -143,13 +125,13 @@ func TestEnrolmentGrantCreateSendsSubject(t *testing.T) {
 
 func TestEnrolmentGrantPermissionDeniedSaysWhoMay(t *testing.T) {
 
-	stub := &stubTenantAdmin{grantErr: status.Error(codes.PermissionDenied, "the users-link home refused")}
+	stub := &stubTenantAdmin{grantErr: status.Error(codes.PermissionDenied, "kit refused")}
 	r := &guardEnrolmentGrantResource{client: stub}
 
 	resp := &resource.CreateResponse{State: emptyState(context.Background(), t, r)}
 	r.Create(context.Background(), resource.CreateRequest{Plan: tfsdk.Plan(stateOf(context.Background(), t, r, grantModel("")))}, resp)
 	require.True(t, resp.Diagnostics.HasError())
-	assert.Contains(t, resp.Diagnostics.Errors()[0].Detail(), "identity server 1.46.0")
+	assert.Contains(t, resp.Diagnostics.Errors()[0].Detail(), "administer the tenant's bindings in kit")
 }
 
 func TestEnrolmentGrantRead(t *testing.T) {
@@ -204,7 +186,7 @@ func TestEnrolmentGrantDeleteRevokesBinding(t *testing.T) {
 	require.False(t, resp.Diagnostics.HasError(), resp.Diagnostics)
 
 	require.Len(t, stub.revoked, 1)
-	assert.Equal(t, "tenants/gt-1", stub.revoked[0].GetName())
+	assert.Equal(t, "tenants/t-1", stub.revoked[0].GetName())
 	assert.Equal(t, grantBinding, stub.revoked[0].GetBinding())
 }
 
@@ -214,15 +196,15 @@ func TestEnrolmentGrantImportID(t *testing.T) {
 	r := &guardEnrolmentGrantResource{}
 
 	resp := &resource.ImportStateResponse{State: emptyState(context.Background(), t, r)}
-	r.ImportState(ctx, resource.ImportStateRequest{ID: "gt-1/" + grantBinding}, resp)
+	r.ImportState(ctx, resource.ImportStateRequest{ID: "t-1/" + grantBinding}, resp)
 	require.False(t, resp.Diagnostics.HasError(), resp.Diagnostics)
 
 	var got guardEnrolmentGrantModel
 	require.False(t, resp.State.Get(ctx, &got).HasError())
-	assert.Equal(t, "gt-1", got.TenantID.ValueString())
+	assert.Equal(t, "t-1", got.TenantID.ValueString())
 	assert.Equal(t, grantBinding, got.Binding.ValueString())
 
-	for _, bad := range []string{grantBinding, "gt-1", "gt-1/", "t-1/" + grantBinding} {
+	for _, bad := range []string{grantBinding, "t-1", "t-1/", "gt-1/" + grantBinding} {
 		resp := &resource.ImportStateResponse{State: emptyState(context.Background(), t, r)}
 		r.ImportState(ctx, resource.ImportStateRequest{ID: bad}, resp)
 		assert.True(t, resp.Diagnostics.HasError(), bad)
@@ -264,7 +246,7 @@ func TestRoleGrantCreateSendsRoleAtTarget(t *testing.T) {
 
 	assert.Empty(t, stub.granted)
 	require.Len(t, stub.rolesGranted, 1)
-	assert.Equal(t, "tenants/gt-1/networks/n-1", stub.rolesGranted[0].GetName())
+	assert.Equal(t, "tenants/t-1/networks/n-1", stub.rolesGranted[0].GetName())
 	assert.Equal(t, guardRoleNetworkAdmin, stub.rolesGranted[0].GetRole())
 	assert.Equal(t, "u-1", stub.rolesGranted[0].GetSubject().GetId())
 
@@ -281,7 +263,7 @@ func TestRoleGrantCreateSendsRoleAtTarget(t *testing.T) {
 	r.Create(ctx, resource.CreateRequest{Plan: tfsdk.Plan(stateOf(ctx, t, r, m))}, resp)
 	require.False(t, resp.Diagnostics.HasError(), resp.Diagnostics)
 	require.Len(t, stub.rolesGranted, 2)
-	assert.Equal(t, "tenants/gt-1", stub.rolesGranted[1].GetName())
+	assert.Equal(t, "tenants/t-1", stub.rolesGranted[1].GetName())
 }
 
 func TestRoleGrantRead(t *testing.T) {
@@ -358,7 +340,7 @@ func TestRoleGrantDeleteRevokesAtTarget(t *testing.T) {
 
 	assert.Empty(t, stub.revoked)
 	require.Len(t, stub.rolesRevoked, 1)
-	assert.Equal(t, "tenants/gt-1/networks/n-1", stub.rolesRevoked[0].GetName())
+	assert.Equal(t, "tenants/t-1/networks/n-1", stub.rolesRevoked[0].GetName())
 	assert.Equal(t, grantBinding, stub.rolesRevoked[0].GetBinding())
 }
 
@@ -408,94 +390,6 @@ func TestRoleChangeReplaces(t *testing.T) {
 		roleChanged(context.Background(), planmodifier.StringRequest{StateValue: c.state, PlanValue: types.StringValue(guardRoleUser)}, resp)
 		assert.Equal(t, c.replace, resp.RequiresReplace, name)
 	}
-}
-
-func deprovisioningModel() *guardDeprovisioningModel {
-	return &guardDeprovisioningModel{
-		TenantID:              types.StringValue("gt-1"),
-		ClientID:              types.StringValue("sa-1"),
-		ClientSecretWO:        types.StringValue("s3cret"),
-		ClientSecretWOVersion: types.Int64Null(),
-		TokenURL:              types.StringValue("https://id.example.com/oauth2/token"),
-		Audience:              types.StringValue("https://admin.example.com"),
-	}
-}
-
-func TestDeprovisioningCreateSendsSecretAndKeepsItOutOfState(t *testing.T) {
-
-	ctx := context.Background()
-	stub := &stubTenantAdmin{deprovisioning: &guardpb.Deprovisioning{Available: true}}
-	r := &guardDeprovisioningResource{client: stub}
-
-	cfg := stateOf(context.Background(), t, r, deprovisioningModel())
-	resp := &resource.CreateResponse{State: emptyState(context.Background(), t, r)}
-	r.Create(ctx, resource.CreateRequest{Plan: tfsdk.Plan(cfg), Config: tfsdk.Config(cfg)}, resp)
-	require.False(t, resp.Diagnostics.HasError(), resp.Diagnostics)
-
-	require.Len(t, stub.set, 1)
-	assert.Equal(t, "tenants/gt-1", stub.set[0].GetName())
-	assert.Equal(t, "s3cret", stub.set[0].GetClientSecret())
-
-	var got guardDeprovisioningModel
-	require.False(t, resp.State.Get(ctx, &got).HasError())
-	assert.True(t, got.ClientSecretWO.IsNull())
-}
-
-func TestDeprovisioningCreateRefusedWhenUnavailable(t *testing.T) {
-
-	stub := &stubTenantAdmin{deprovisioning: &guardpb.Deprovisioning{}}
-	r := &guardDeprovisioningResource{client: stub}
-
-	cfg := stateOf(context.Background(), t, r, deprovisioningModel())
-	resp := &resource.CreateResponse{State: emptyState(context.Background(), t, r)}
-	r.Create(context.Background(), resource.CreateRequest{Plan: tfsdk.Plan(cfg), Config: tfsdk.Config(cfg)}, resp)
-	require.True(t, resp.Diagnostics.HasError())
-	assert.Contains(t, resp.Diagnostics.Errors()[0].Detail(), "sweep.sealKeyFile")
-	assert.Empty(t, stub.set)
-}
-
-func TestDeprovisioningRead(t *testing.T) {
-
-	ctx := context.Background()
-
-	m := deprovisioningModel()
-	m.ClientSecretWO = types.StringNull()
-
-	t.Run("cleared elsewhere", func(t *testing.T) {
-		r := &guardDeprovisioningResource{client: &stubTenantAdmin{deprovisioning: &guardpb.Deprovisioning{Available: true}}}
-		state := stateOf(ctx, t, r, m)
-		resp := &resource.ReadResponse{State: state}
-		r.Read(ctx, resource.ReadRequest{State: state}, resp)
-		require.False(t, resp.Diagnostics.HasError(), resp.Diagnostics)
-		assert.True(t, resp.State.Raw.IsNull())
-	})
-
-	t.Run("changed elsewhere", func(t *testing.T) {
-		r := &guardDeprovisioningResource{client: &stubTenantAdmin{deprovisioning: &guardpb.Deprovisioning{
-			Available: true, Configured: true, ClientId: "sa-2", TokenUrl: m.TokenURL.ValueString(), Audience: m.Audience.ValueString(),
-		}}}
-		state := stateOf(ctx, t, r, m)
-		resp := &resource.ReadResponse{State: state}
-		r.Read(ctx, resource.ReadRequest{State: state}, resp)
-		require.False(t, resp.Diagnostics.HasError(), resp.Diagnostics)
-		var got guardDeprovisioningModel
-		require.False(t, resp.State.Get(ctx, &got).HasError())
-		assert.Equal(t, "sa-2", got.ClientID.ValueString())
-	})
-}
-
-func TestDeprovisioningDeleteClears(t *testing.T) {
-
-	stub := &stubTenantAdmin{}
-	r := &guardDeprovisioningResource{client: stub}
-
-	m := deprovisioningModel()
-	m.ClientSecretWO = types.StringNull()
-	state := stateOf(context.Background(), t, r, m)
-	resp := &resource.DeleteResponse{State: state}
-	r.Delete(context.Background(), resource.DeleteRequest{State: state}, resp)
-	require.False(t, resp.Diagnostics.HasError(), resp.Diagnostics)
-	assert.Equal(t, 1, stub.cleared)
 }
 
 // guardWrap must not hide the grant's subject check behind its wrapper.

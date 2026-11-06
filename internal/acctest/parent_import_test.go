@@ -36,7 +36,7 @@ resource "authwise_factor" "totp" {
 }
 
 resource "authwise_guard_network" "office" {
-  tenant_id    = data.authwise_guard_tenant.acme.guard_tenant_id
+  tenant_id    = local.guard_tenant_id
   display_name = "Office"
 }
 `, realmName)
@@ -66,7 +66,7 @@ func TestAccParentIdentifiers_ImportPlansNoChange(t *testing.T) {
 					// An inherited parent shows the provider default.
 					resource.TestCheckResourceAttr(parentRealmAddr, "tenant_id", "t-1"),
 					resource.TestCheckResourceAttrPair(parentFactorAddr, "realm_id", parentRealmAddr, "realm_id"),
-					resource.TestCheckResourceAttr(guardNetworkAddr, "tenant_id", "gt-acme"),
+					resource.TestCheckResourceAttr(guardNetworkAddr, "tenant_id", "t-1"),
 				),
 			},
 			importPlansNoChange(parentRealmAddr),

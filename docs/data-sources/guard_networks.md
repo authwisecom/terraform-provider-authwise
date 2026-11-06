@@ -17,7 +17,7 @@ A Guard network: a WireGuard mesh in a tenant. `cidr` is its address space insid
 
 ### Required
 
-- `tenant_id` (String) The Guard tenant's id (`gt-…`), as awtenant reports it or `authwise_guard_tenants` lists it; the provider's `tenant_id` is not used.
+- `tenant_id` (String) The kit tenant's id (`t-…`) the Guard row belongs to. Guard has no tenant of its own since the tenant collapse (tf#65). The provider's `tenant_id` is not used.
 
 ### Read-Only
 

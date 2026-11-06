@@ -18,7 +18,7 @@ suite applies the two.
 
 ```sh
 # Edit provider.tf (endpoints, scope AWIDs) and the local at the top of
-# main.tf (the Guard tenant's id, from awtenant), then:
+# main.tf (the kit tenant Guard is on), then:
 terraform init
 terraform apply
 terraform output -raw invite_url          # send it to the person you invited
@@ -27,10 +27,11 @@ terraform output -raw gateway_auth_code   # enrol the gateway with it
 
 ## What terraform does not own
 
-- **The Guard tenant.** awtenant creates it (`gt-…`) under the Authwise
-  tenant, through guard-control's tenancy listener; no bearer API does.
-  Reference it by its id, as `tenant_id`; `authwise_guard_tenants` lists
-  the ones the credential can see.
+- **Guard on the tenant.** There is no Guard tenant: Guard is keyed by the
+  kit tenant (`t-…`), passed as `tenant_id`. Turning Guard on for a tenant
+  is kit's; until it is, guard-control refuses with `GUARD_NOT_ENABLED`.
+  `authwise_guard_tenant_settings` holds Guard's settings for the tenant,
+  and destroying it leaves them in place.
 - **People's nodes.** A person's node joins by following an invite. A
   server's node is declared (`authwise_guard_node`) and enrols with its
   auth code; what it may reach is `authwise_guard_node_grants`.

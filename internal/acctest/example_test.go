@@ -299,7 +299,7 @@ func TestAccGuardExample(t *testing.T) {
 
 	h := newHarness(t)
 	h.access.seedPermissions(accessPrefix, "access", kitLinkPermissions...)
-	h.guard.seedTenant("gt-01")
+	h.guard.seedTenant("t-01")
 	r := newExampleRun(t, h, "guard", "guard-catalog")
 
 	r.apply()
