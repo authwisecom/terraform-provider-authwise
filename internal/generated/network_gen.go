@@ -15,6 +15,7 @@ import (
 	path "github.com/hashicorp/terraform-plugin-framework/path"
 	resource "github.com/hashicorp/terraform-plugin-framework/resource"
 	schema "github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	boolplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	mapplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
 	planmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	stringplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
@@ -23,6 +24,8 @@ import (
 	protojson "google.golang.org/protobuf/encoding/protojson"
 	fieldmaskpb "google.golang.org/protobuf/types/known/fieldmaskpb"
 	structpb "google.golang.org/protobuf/types/known/structpb"
+	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
+	"time"
 )
 
 // NetworkResourceSchema returns the Terraform schema for the Network resource.
@@ -63,6 +66,21 @@ func NetworkResourceSchema() schema.Schema {
 				MarkdownDescription: "Full resource name; serves as the Terraform ID.",
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
+			"pool_fallback": schema.BoolAttribute{
+				Computed:      true,
+				Optional:      true,
+				PlanModifiers: []planmodifier.Bool{boolplanmodifier.UseStateForUnknown()},
+			},
+			"pool_killed": schema.BoolAttribute{Computed: true},
+			"pool_killed_at": schema.StringAttribute{
+				Computed:            true,
+				MarkdownDescription: "`pool_killed_at` as an RFC 3339 timestamp.",
+			},
+			"relay_pool": schema.StringAttribute{
+				Computed:      true,
+				Optional:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
 			"slug": schema.StringAttribute{
 				Computed:      true,
 				Optional:      true,
@@ -91,6 +109,10 @@ type NetworkModel struct {
 	Config         jsontypes.Normalized `tfsdk:"config"`
 	Slug           types.String         `tfsdk:"slug"`
 	MeshDomain     types.String         `tfsdk:"mesh_domain"`
+	RelayPool      types.String         `tfsdk:"relay_pool"`
+	PoolFallback   types.Bool           `tfsdk:"pool_fallback"`
+	PoolKilled     types.Bool           `tfsdk:"pool_killed"`
+	PoolKilledAt   types.String         `tfsdk:"pool_killed_at"`
 }
 
 // NewNetworkModel returns a model with every attribute set to its typed null; collection types cannot be zero-valued.
@@ -103,6 +125,10 @@ func NewNetworkModel() *NetworkModel {
 		Labels:         types.MapNull(types.StringType),
 		MeshDomain:     types.StringNull(),
 		Name:           types.StringNull(),
+		PoolFallback:   types.BoolNull(),
+		PoolKilled:     types.BoolNull(),
+		PoolKilledAt:   types.StringNull(),
+		RelayPool:      types.StringNull(),
 		Slug:           types.StringNull(),
 		TenantId:       types.StringNull(),
 	}
@@ -128,6 +154,17 @@ func (m *NetworkModel) ToProto(ctx context.Context) (*v1alpha1.Network, diag.Dia
 	}
 	out.Slug = m.Slug.ValueString()
 	out.MeshDomain = m.MeshDomain.ValueString()
+	out.RelayPool = m.RelayPool.ValueString()
+	out.PoolFallback = m.PoolFallback.ValueBool()
+	out.PoolKilled = m.PoolKilled.ValueBool()
+	if !m.PoolKilledAt.IsNull() && !m.PoolKilledAt.IsUnknown() {
+		t, err := time.Parse(time.RFC3339, m.PoolKilledAt.ValueString())
+		if err != nil {
+			diags.AddAttributeError(path.Root("pool_killed_at"), "invalid RFC 3339 timestamp", err.Error())
+		} else {
+			out.PoolKilledAt = timestamppb.New(t)
+		}
+	}
 	return out, diags
 }
 
@@ -174,6 +211,18 @@ func (m *NetworkModel) FromProto(ctx context.Context, e *v1alpha1.Network) diag.
 	} else {
 		m.MeshDomain = types.StringValue(e.MeshDomain)
 	}
+	if e.RelayPool == "" {
+		m.RelayPool = types.StringNull()
+	} else {
+		m.RelayPool = types.StringValue(e.RelayPool)
+	}
+	m.PoolFallback = types.BoolValue(e.PoolFallback)
+	m.PoolKilled = types.BoolValue(e.PoolKilled)
+	if e.PoolKilledAt == nil {
+		m.PoolKilledAt = types.StringNull()
+	} else {
+		m.PoolKilledAt = types.StringValue(e.PoolKilledAt.AsTime().Format(time.RFC3339))
+	}
 	return diags
 }
 
@@ -206,6 +255,12 @@ func (m *NetworkModel) UpdateMask(ctx context.Context, prior *NetworkModel) []st
 	}
 	if !m.Slug.Equal(prior.Slug) {
 		paths = append(paths, "slug")
+	}
+	if !m.RelayPool.Equal(prior.RelayPool) {
+		paths = append(paths, "relay_pool")
+	}
+	if !m.PoolFallback.Equal(prior.PoolFallback) {
+		paths = append(paths, "pool_fallback")
 	}
 	return paths
 }
@@ -354,8 +409,12 @@ func NetworkDataSourceSchema() schema1.Schema {
 				MarkdownDescription: "Full resource name of the object to read.",
 				Required:            true,
 			},
-			"slug":      schema1.StringAttribute{Computed: true},
-			"tenant_id": schema1.StringAttribute{Computed: true},
+			"pool_fallback":  schema1.BoolAttribute{Computed: true},
+			"pool_killed":    schema1.BoolAttribute{Computed: true},
+			"pool_killed_at": schema1.StringAttribute{Computed: true},
+			"relay_pool":     schema1.StringAttribute{Computed: true},
+			"slug":           schema1.StringAttribute{Computed: true},
+			"tenant_id":      schema1.StringAttribute{Computed: true},
 		},
 		MarkdownDescription: "A Guard network: a WireGuard mesh in a tenant. `cidr` is its address space inside 100.64.0.0/10, the whole of it when unset; changing it replaces the network. This data source reads one by its full resource name.",
 	}
@@ -399,6 +458,10 @@ type NetworkItemModel struct {
 	Config         jsontypes.Normalized `tfsdk:"config"`
 	Slug           types.String         `tfsdk:"slug"`
 	MeshDomain     types.String         `tfsdk:"mesh_domain"`
+	RelayPool      types.String         `tfsdk:"relay_pool"`
+	PoolFallback   types.Bool           `tfsdk:"pool_fallback"`
+	PoolKilled     types.Bool           `tfsdk:"pool_killed"`
+	PoolKilledAt   types.String         `tfsdk:"pool_killed_at"`
 }
 
 // NetworkItemAttrTypes returns the attribute types of one guard_networks list element.
@@ -411,6 +474,10 @@ func NetworkItemAttrTypes() map[string]attr.Type {
 		"labels":           types.MapType{ElemType: types.StringType},
 		"mesh_domain":      types.StringType,
 		"name":             types.StringType,
+		"pool_fallback":    types.BoolType,
+		"pool_killed":      types.BoolType,
+		"pool_killed_at":   types.StringType,
+		"relay_pool":       types.StringType,
 		"slug":             types.StringType,
 	}
 }
@@ -448,7 +515,11 @@ func NetworkListDataSourceSchema() schema1.Schema {
 						Computed:            true,
 						MarkdownDescription: "Full resource name.",
 					},
-					"slug": schema1.StringAttribute{Computed: true},
+					"pool_fallback":  schema1.BoolAttribute{Computed: true},
+					"pool_killed":    schema1.BoolAttribute{Computed: true},
+					"pool_killed_at": schema1.StringAttribute{Computed: true},
+					"relay_pool":     schema1.StringAttribute{Computed: true},
+					"slug":           schema1.StringAttribute{Computed: true},
 				}},
 			},
 			"tenant_id": schema1.StringAttribute{
@@ -504,6 +575,18 @@ func networkItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Network, 
 		item.MeshDomain = types.StringNull()
 	} else {
 		item.MeshDomain = types.StringValue(e.MeshDomain)
+	}
+	if e.RelayPool == "" {
+		item.RelayPool = types.StringNull()
+	} else {
+		item.RelayPool = types.StringValue(e.RelayPool)
+	}
+	item.PoolFallback = types.BoolValue(e.PoolFallback)
+	item.PoolKilled = types.BoolValue(e.PoolKilled)
+	if e.PoolKilledAt == nil {
+		item.PoolKilledAt = types.StringNull()
+	} else {
+		item.PoolKilledAt = types.StringValue(e.PoolKilledAt.AsTime().Format(time.RFC3339))
 	}
 	id, err := crud.IDFromName(e.Name)
 	if err != nil {

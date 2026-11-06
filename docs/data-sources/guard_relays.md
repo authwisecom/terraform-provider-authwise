@@ -36,9 +36,12 @@ Read-Only:
 - `config` (String)
 - `display_name` (String)
 - `guard_relay_id` (String) Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.
+- `has_credential` (Boolean)
 - `labels` (Map of String)
+- `last_report_at` (String)
 - `last_seen_at` (String)
 - `name` (String) Full resource name.
 - `priority` (Number)
 - `region` (String)
+- `reported_version` (String)
 - `url` (String)

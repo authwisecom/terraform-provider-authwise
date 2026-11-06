@@ -5,4 +5,9 @@ resource "authwise_guard_network" "office" {
   tenant_id    = "t-01" # the kit tenant Guard is on
   display_name = "Office"
   cidr         = "100.96.0.0/16"
+
+  # An estate relay pool the tenant may use, by name (a slug is refused);
+  # unset, the tenant's default pool. pool_fallback serves it after the
+  # network's own relays.
+  relay_pool = "relay-pools/rp-01"
 }

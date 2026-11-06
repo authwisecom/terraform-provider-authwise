@@ -334,6 +334,45 @@ func TestAccGuardExample(t *testing.T) {
 	}
 }
 
+// TestAccGuardRelayPoolsExample applies examples/guard-relay-pools
+// verbatim (tf#66): two estate pools, a pool relay and its credential, a
+// tenant's access and a network on a pool by slug, planning clean after.
+func TestAccGuardRelayPoolsExample(t *testing.T) {
+
+	if os.Getenv("TF_ACC") == "" {
+		t.Skip("acceptance test: set TF_ACC=1 to run")
+	}
+
+	h := newHarness(t)
+	h.guard.seedTenant("t-01")
+	r := newExampleRun(t, h, "guard-relay-pools")
+
+	r.apply()
+	r.expectCleanPlan()
+
+	token := strings.TrimSpace(r.run("output", "-raw", "us_central_a_relay_token"))
+	if !strings.HasPrefix(token, "grk_") {
+		t.Errorf("us_central_a_relay_token = %q", token)
+	}
+
+	h.guard.mu.Lock()
+	defer h.guard.mu.Unlock()
+	if len(h.guard.pools) != 2 || len(h.guard.poolRelays) != 1 || len(h.guard.networks) != 1 {
+		t.Errorf("guard-control holds %d pools, %d pool relays, %d networks; want 2, 1, 1",
+			len(h.guard.pools), len(h.guard.poolRelays), len(h.guard.networks))
+	}
+	for name, c := range h.guard.creds {
+		if c != token {
+			t.Errorf("%s holds %q, the output %q", name, c, token)
+		}
+	}
+	for _, n := range h.guard.networks {
+		if p := h.guard.pools[n.GetRelayPool()]; p.GetSlug() != "eu-west" {
+			t.Errorf("network %s is on %q, want eu-west", n.GetName(), n.GetRelayPool())
+		}
+	}
+}
+
 // TestAccAuthnExample applies examples/authn verbatim, then disables the
 // passkey factor the admins rule requires. kit accepts that write with a
 // warning, which must reach the person running terraform twice: as a

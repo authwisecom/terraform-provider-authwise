@@ -67,8 +67,10 @@ func TestProviderSurface(t *testing.T) {
 	// generated one's place and adds domain_activation. #52 adds the
 	// hand-written issuer_preferred_domain. The tenant collapse (#65)
 	// removes guard_deprovisioning and adds the hand-written
-	// guard_tenant_settings.
-	assert.Len(t, resourceTypes, 41)
+	// guard_tenant_settings. Relay pools (#66) add the generated
+	// guard_relay_pool and guard_pool_relay and the hand-written
+	// guard_relay_credential and guard_relay_pool_access.
+	assert.Len(t, resourceTypes, 45)
 	assert.False(t, resourceTypes["authwise_guard_tenant"], "there is no Guard tenant (#65)")
 	assert.False(t, resourceTypes["authwise_guard_deprovisioning"], "deprovisioning is a tenant setting (#65)")
 	for _, want := range []string{
@@ -128,7 +130,9 @@ func TestProviderSurface(t *testing.T) {
 	// hand-written config JSON builders, and #40 a fifth, tenant_config.
 	// #41 adds the hand-written guard_deprovisioning. The tenant collapse
 	// (#65) removes guard_tenant, guard_tenants and guard_deprovisioning.
-	assert.Len(t, dataSourceTypes, 76)
+	// Relay pools (#66) add a pair each for relay_pool and pool_relay, and
+	// the hand-written guard_allowed_relay_pools.
+	assert.Len(t, dataSourceTypes, 81)
 	for _, gone := range []string{"authwise_guard_tenant", "authwise_guard_tenants", "authwise_guard_deprovisioning"} {
 		assert.False(t, dataSourceTypes[gone], "%s went with the tenant collapse (#65)", gone)
 	}

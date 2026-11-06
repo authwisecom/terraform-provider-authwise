@@ -241,8 +241,20 @@ func (r *guardResource) Delete(ctx context.Context, req resource.DeleteRequest, 
 	r.inner.Delete(ctx, req, resp)
 }
 
+// estateCollections are the top-level Guard resources' collections, by
+// type: their import takes the bare id (rp-…, rl-…) as well as the name.
+var estateCollections = map[string]string{
+	"authwise_guard_relay_pool": relayPoolsCollection,
+	"authwise_guard_pool_relay": poolRelaysCollection,
+}
+
 func (r *guardResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	if inner, ok := r.inner.(resource.ResourceWithImportState); ok {
+		md := &resource.MetadataResponse{}
+		r.inner.Metadata(ctx, resource.MetadataRequest{ProviderTypeName: providerTypeName}, md)
+		if collection, ok := estateCollections[md.TypeName]; ok && !strings.Contains(req.ID, "/") {
+			req.ID = collection + "/" + req.ID
+		}
 		inner.ImportState(ctx, req, resp)
 		return
 	}

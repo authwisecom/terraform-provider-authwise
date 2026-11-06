@@ -253,7 +253,9 @@ func (p *AuthwiseProvider) Configure(ctx context.Context, req provider.Configure
 			guardNodeClientKey: guardpb.NewGuardNodeServiceClient(guardConn),
 			// A tenant's Guard people and grants (#41).
 			guardTenantAdminClientKey: guardpb.NewGuardTenantAdminServiceClient(guardConn),
-			guardConfiguredKey:        guardConfigured,
+			// Relay pools beyond their CRUD: credentials, access (#66).
+			guardRelayPoolClientKey: guardpb.NewGuardRelayPoolServiceClient(guardConn),
+			guardConfiguredKey:      guardConfigured,
 			// A custom host waits on the controller (#44, #47); the
 			// issuer-domains client serves the deprecated aliases.
 			domainsClientKey:       domainClient{identitypb.NewAuthwiseIdentityServiceClient(conn)},
@@ -277,6 +279,7 @@ func (p *AuthwiseProvider) Resources(ctx context.Context) []func() resource.Reso
 		appearanceProfileTypeName: newAppearanceProfileResource,
 		guardInviteTypeName:       newGuardInviteResource,
 		guardNodeTypeName:         newGuardNodeResource,
+		guardNetworkTypeName:      newGuardNetworkResource,
 		domainTypeName:            newDomainResource,
 	}),
 		newSecretResource,
@@ -288,6 +291,8 @@ func (p *AuthwiseProvider) Resources(ctx context.Context) []func() resource.Reso
 		newTenantConfigResource,
 		newGuardEnrolmentGrantResource,
 		newGuardTenantSettingsResource,
+		newGuardRelayCredentialResource,
+		newGuardRelayPoolAccessResource,
 		newDomainActivationResource,
 		newIssuerPreferredDomainResource,
 		newIssuerDomainResource,
@@ -328,7 +333,7 @@ func newFactorResource() resource.Resource {
 // DataSources implements provider.Provider with the generated constructors
 // plus the hand-written ones.
 func (p *AuthwiseProvider) DataSources(ctx context.Context) []func() datasource.DataSource {
-	return guardDataSourceWrap(ctx, append(append(generated.DataSources(), newSecretDataSource, newRealmAuthenticationContextSchemaDataSource), configJSONDataSources()...))
+	return guardDataSourceWrap(ctx, append(append(generated.DataSources(), newSecretDataSource, newRealmAuthenticationContextSchemaDataSource, newGuardAllowedRelayPoolsDataSource), configJSONDataSources()...))
 }
 
 // Functions implements provider.ProviderWithFunctions: the config data

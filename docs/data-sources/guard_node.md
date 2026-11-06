@@ -35,6 +35,7 @@ A server's node in a Guard network, registered ahead of time. Created without a 
 - `owner_id` (String)
 - `platform` (String)
 - `public_key` (String)
+- `region` (String)
 - `roles` (List of String)
 - `slug` (String)
 - `state` (String)

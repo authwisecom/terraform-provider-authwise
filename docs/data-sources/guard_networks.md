@@ -35,4 +35,8 @@ Read-Only:
 - `labels` (Map of String)
 - `mesh_domain` (String)
 - `name` (String) Full resource name.
+- `pool_fallback` (Boolean)
+- `pool_killed` (Boolean)
+- `pool_killed_at` (String)
+- `relay_pool` (String)
 - `slug` (String)

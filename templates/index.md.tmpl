@@ -82,6 +82,13 @@ tenant. A configuration or state that still holds a Guard tenant's id
 (`gt-…`) fails at plan with the upgrade steps; the provider does not
 rewrite it.
 
+Estate relay pools (`authwise_guard_relay_pool`, `authwise_guard_pool_relay`,
+`authwise_guard_relay_pool_access`) sit at the estate's root, not under a
+tenant. guard-control admits them for an operator's credential only. A
+tenant's network picks among its allowed pools through `relay_pool`. A
+relay's credential is `authwise_guard_relay_credential`. The
+guard-relay-pools example shows both halves.
+
 ## Scope defaults
 
 Every Authwise object lives under a parent: a tenant, an issuer, a realm or

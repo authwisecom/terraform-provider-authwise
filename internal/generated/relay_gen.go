@@ -54,11 +54,16 @@ func RelayResourceSchema() schema.Schema {
 				MarkdownDescription: "Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.",
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
+			"has_credential": schema.BoolAttribute{Computed: true},
 			"labels": schema.MapAttribute{
 				Computed:      true,
 				ElementType:   types.StringType,
 				Optional:      true,
 				PlanModifiers: []planmodifier.Map{mapplanmodifier.UseStateForUnknown()},
+			},
+			"last_report_at": schema.StringAttribute{
+				Computed:            true,
+				MarkdownDescription: "`last_report_at` as an RFC 3339 timestamp.",
 			},
 			"last_seen_at": schema.StringAttribute{
 				Computed:            true,
@@ -87,6 +92,7 @@ func RelayResourceSchema() schema.Schema {
 				Optional:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
+			"reported_version": schema.StringAttribute{Computed: true},
 			"tenant_id": schema.StringAttribute{
 				Computed:            true,
 				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default, and reads back from the name. Changing a configured one replaces the resource.",
@@ -102,35 +108,41 @@ func RelayResourceSchema() schema.Schema {
 
 // RelayModel is the Terraform plan/state model for Relay.
 type RelayModel struct {
-	Name         types.String         `tfsdk:"name"`
-	GuardRelayId types.String         `tfsdk:"guard_relay_id"`
-	TenantId     types.String         `tfsdk:"tenant_id"`
-	NetworkId    types.String         `tfsdk:"network_id"`
-	Labels       types.Map            `tfsdk:"labels"`
-	DisplayName  types.String         `tfsdk:"display_name"`
-	Url          types.String         `tfsdk:"url"`
-	CaCertPem    types.String         `tfsdk:"ca_cert_pem"`
-	Region       types.String         `tfsdk:"region"`
-	Priority     types.Int64          `tfsdk:"priority"`
-	Config       jsontypes.Normalized `tfsdk:"config"`
-	LastSeenAt   types.String         `tfsdk:"last_seen_at"`
+	Name            types.String         `tfsdk:"name"`
+	GuardRelayId    types.String         `tfsdk:"guard_relay_id"`
+	TenantId        types.String         `tfsdk:"tenant_id"`
+	NetworkId       types.String         `tfsdk:"network_id"`
+	Labels          types.Map            `tfsdk:"labels"`
+	DisplayName     types.String         `tfsdk:"display_name"`
+	Url             types.String         `tfsdk:"url"`
+	CaCertPem       types.String         `tfsdk:"ca_cert_pem"`
+	Region          types.String         `tfsdk:"region"`
+	Priority        types.Int64          `tfsdk:"priority"`
+	Config          jsontypes.Normalized `tfsdk:"config"`
+	LastSeenAt      types.String         `tfsdk:"last_seen_at"`
+	HasCredential   types.Bool           `tfsdk:"has_credential"`
+	LastReportAt    types.String         `tfsdk:"last_report_at"`
+	ReportedVersion types.String         `tfsdk:"reported_version"`
 }
 
 // NewRelayModel returns a model with every attribute set to its typed null; collection types cannot be zero-valued.
 func NewRelayModel() *RelayModel {
 	return &RelayModel{
-		CaCertPem:    types.StringNull(),
-		Config:       jsontypes.NewNormalizedNull(),
-		DisplayName:  types.StringNull(),
-		GuardRelayId: types.StringNull(),
-		Labels:       types.MapNull(types.StringType),
-		LastSeenAt:   types.StringNull(),
-		Name:         types.StringNull(),
-		NetworkId:    types.StringNull(),
-		Priority:     types.Int64Null(),
-		Region:       types.StringNull(),
-		TenantId:     types.StringNull(),
-		Url:          types.StringNull(),
+		CaCertPem:       types.StringNull(),
+		Config:          jsontypes.NewNormalizedNull(),
+		DisplayName:     types.StringNull(),
+		GuardRelayId:    types.StringNull(),
+		HasCredential:   types.BoolNull(),
+		Labels:          types.MapNull(types.StringType),
+		LastReportAt:    types.StringNull(),
+		LastSeenAt:      types.StringNull(),
+		Name:            types.StringNull(),
+		NetworkId:       types.StringNull(),
+		Priority:        types.Int64Null(),
+		Region:          types.StringNull(),
+		ReportedVersion: types.StringNull(),
+		TenantId:        types.StringNull(),
+		Url:             types.StringNull(),
 	}
 }
 
@@ -163,6 +175,16 @@ func (m *RelayModel) ToProto(ctx context.Context) (*v1alpha1.Relay, diag.Diagnos
 			out.LastSeenAt = timestamppb.New(t)
 		}
 	}
+	out.HasCredential = m.HasCredential.ValueBool()
+	if !m.LastReportAt.IsNull() && !m.LastReportAt.IsUnknown() {
+		t, err := time.Parse(time.RFC3339, m.LastReportAt.ValueString())
+		if err != nil {
+			diags.AddAttributeError(path.Root("last_report_at"), "invalid RFC 3339 timestamp", err.Error())
+		} else {
+			out.LastReportAt = timestamppb.New(t)
+		}
+	}
+	out.ReportedVersion = m.ReportedVersion.ValueString()
 	return out, diags
 }
 
@@ -210,6 +232,17 @@ func (m *RelayModel) FromProto(ctx context.Context, e *v1alpha1.Relay) diag.Diag
 		m.LastSeenAt = types.StringNull()
 	} else {
 		m.LastSeenAt = types.StringValue(e.LastSeenAt.AsTime().Format(time.RFC3339))
+	}
+	m.HasCredential = types.BoolValue(e.HasCredential)
+	if e.LastReportAt == nil {
+		m.LastReportAt = types.StringNull()
+	} else {
+		m.LastReportAt = types.StringValue(e.LastReportAt.AsTime().Format(time.RFC3339))
+	}
+	if e.ReportedVersion == "" {
+		m.ReportedVersion = types.StringNull()
+	} else {
+		m.ReportedVersion = types.StringValue(e.ReportedVersion)
 	}
 	return diags
 }
@@ -391,20 +424,23 @@ func RelayDataSourceSchema() schema1.Schema {
 				Computed:            true,
 				MarkdownDescription: "Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.",
 			},
+			"has_credential": schema1.BoolAttribute{Computed: true},
 			"labels": schema1.MapAttribute{
 				Computed:    true,
 				ElementType: types.StringType,
 			},
-			"last_seen_at": schema1.StringAttribute{Computed: true},
+			"last_report_at": schema1.StringAttribute{Computed: true},
+			"last_seen_at":   schema1.StringAttribute{Computed: true},
 			"name": schema1.StringAttribute{
 				MarkdownDescription: "Full resource name of the object to read.",
 				Required:            true,
 			},
-			"network_id": schema1.StringAttribute{Computed: true},
-			"priority":   schema1.Int64Attribute{Computed: true},
-			"region":     schema1.StringAttribute{Computed: true},
-			"tenant_id":  schema1.StringAttribute{Computed: true},
-			"url":        schema1.StringAttribute{Computed: true},
+			"network_id":       schema1.StringAttribute{Computed: true},
+			"priority":         schema1.Int64Attribute{Computed: true},
+			"region":           schema1.StringAttribute{Computed: true},
+			"reported_version": schema1.StringAttribute{Computed: true},
+			"tenant_id":        schema1.StringAttribute{Computed: true},
+			"url":              schema1.StringAttribute{Computed: true},
 		},
 		MarkdownDescription: "A relay a Guard network's nodes connect through when no direct path exists. guard-control serves a network's relays to its nodes, lowest `priority` first. This data source reads one by its full resource name.",
 	}
@@ -440,31 +476,37 @@ func (d *relayDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 
 // RelayItemModel is one element of the guard_relays data source's "guard_relays" list.
 type RelayItemModel struct {
-	GuardRelayId types.String         `tfsdk:"guard_relay_id"`
-	Name         types.String         `tfsdk:"name"`
-	Labels       types.Map            `tfsdk:"labels"`
-	DisplayName  types.String         `tfsdk:"display_name"`
-	Url          types.String         `tfsdk:"url"`
-	CaCertPem    types.String         `tfsdk:"ca_cert_pem"`
-	Region       types.String         `tfsdk:"region"`
-	Priority     types.Int64          `tfsdk:"priority"`
-	Config       jsontypes.Normalized `tfsdk:"config"`
-	LastSeenAt   types.String         `tfsdk:"last_seen_at"`
+	GuardRelayId    types.String         `tfsdk:"guard_relay_id"`
+	Name            types.String         `tfsdk:"name"`
+	Labels          types.Map            `tfsdk:"labels"`
+	DisplayName     types.String         `tfsdk:"display_name"`
+	Url             types.String         `tfsdk:"url"`
+	CaCertPem       types.String         `tfsdk:"ca_cert_pem"`
+	Region          types.String         `tfsdk:"region"`
+	Priority        types.Int64          `tfsdk:"priority"`
+	Config          jsontypes.Normalized `tfsdk:"config"`
+	LastSeenAt      types.String         `tfsdk:"last_seen_at"`
+	HasCredential   types.Bool           `tfsdk:"has_credential"`
+	LastReportAt    types.String         `tfsdk:"last_report_at"`
+	ReportedVersion types.String         `tfsdk:"reported_version"`
 }
 
 // RelayItemAttrTypes returns the attribute types of one guard_relays list element.
 func RelayItemAttrTypes() map[string]attr.Type {
 	return map[string]attr.Type{
-		"ca_cert_pem":    types.StringType,
-		"config":         jsontypes.NormalizedType{},
-		"display_name":   types.StringType,
-		"guard_relay_id": types.StringType,
-		"labels":         types.MapType{ElemType: types.StringType},
-		"last_seen_at":   types.StringType,
-		"name":           types.StringType,
-		"priority":       types.Int64Type,
-		"region":         types.StringType,
-		"url":            types.StringType,
+		"ca_cert_pem":      types.StringType,
+		"config":           jsontypes.NormalizedType{},
+		"display_name":     types.StringType,
+		"guard_relay_id":   types.StringType,
+		"has_credential":   types.BoolType,
+		"labels":           types.MapType{ElemType: types.StringType},
+		"last_report_at":   types.StringType,
+		"last_seen_at":     types.StringType,
+		"name":             types.StringType,
+		"priority":         types.Int64Type,
+		"region":           types.StringType,
+		"reported_version": types.StringType,
+		"url":              types.StringType,
 	}
 }
 
@@ -493,18 +535,21 @@ func RelayListDataSourceSchema() schema1.Schema {
 						Computed:            true,
 						MarkdownDescription: "Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.",
 					},
+					"has_credential": schema1.BoolAttribute{Computed: true},
 					"labels": schema1.MapAttribute{
 						Computed:    true,
 						ElementType: types.StringType,
 					},
-					"last_seen_at": schema1.StringAttribute{Computed: true},
+					"last_report_at": schema1.StringAttribute{Computed: true},
+					"last_seen_at":   schema1.StringAttribute{Computed: true},
 					"name": schema1.StringAttribute{
 						Computed:            true,
 						MarkdownDescription: "Full resource name.",
 					},
-					"priority": schema1.Int64Attribute{Computed: true},
-					"region":   schema1.StringAttribute{Computed: true},
-					"url":      schema1.StringAttribute{Computed: true},
+					"priority":         schema1.Int64Attribute{Computed: true},
+					"region":           schema1.StringAttribute{Computed: true},
+					"reported_version": schema1.StringAttribute{Computed: true},
+					"url":              schema1.StringAttribute{Computed: true},
 				}},
 			},
 			"network_id": schema1.StringAttribute{
@@ -567,6 +612,17 @@ func relayItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Relay, *Rel
 		item.LastSeenAt = types.StringNull()
 	} else {
 		item.LastSeenAt = types.StringValue(e.LastSeenAt.AsTime().Format(time.RFC3339))
+	}
+	item.HasCredential = types.BoolValue(e.HasCredential)
+	if e.LastReportAt == nil {
+		item.LastReportAt = types.StringNull()
+	} else {
+		item.LastReportAt = types.StringValue(e.LastReportAt.AsTime().Format(time.RFC3339))
+	}
+	if e.ReportedVersion == "" {
+		item.ReportedVersion = types.StringNull()
+	} else {
+		item.ReportedVersion = types.StringValue(e.ReportedVersion)
 	}
 	id, err := crud.IDFromName(e.Name)
 	if err != nil {

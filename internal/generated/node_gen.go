@@ -112,6 +112,11 @@ func NodeResourceSchema() schema.Schema {
 				Optional:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
+			"region": schema.StringAttribute{
+				Computed:      true,
+				Optional:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
 			"roles": schema.ListAttribute{
 				Computed:      true,
 				ElementType:   types.StringType,
@@ -159,6 +164,7 @@ type NodeModel struct {
 	LastSeenAt        types.String         `tfsdk:"last_seen_at"`
 	Slug              types.String         `tfsdk:"slug"`
 	Platform          types.String         `tfsdk:"platform"`
+	Region            types.String         `tfsdk:"region"`
 }
 
 // NewNodeModel returns a model with every attribute set to its typed null; collection types cannot be zero-valued.
@@ -179,6 +185,7 @@ func NewNodeModel() *NodeModel {
 		OwnerId:           types.StringNull(),
 		Platform:          types.StringNull(),
 		PublicKey:         types.StringNull(),
+		Region:            types.StringNull(),
 		Roles:             types.ListNull(types.StringType),
 		Slug:              types.StringNull(),
 		State:             types.StringNull(),
@@ -235,6 +242,7 @@ func (m *NodeModel) ToProto(ctx context.Context) (*v1alpha1.Node, diag.Diagnosti
 	if !m.Platform.IsNull() && !m.Platform.IsUnknown() {
 		out.Platform = v1alpha1.Platform(v1alpha1.Platform_value[m.Platform.ValueString()])
 	}
+	out.Region = m.Region.ValueString()
 	return out, diags
 }
 
@@ -330,6 +338,11 @@ func (m *NodeModel) FromProto(ctx context.Context, e *v1alpha1.Node) diag.Diagno
 		m.Slug = types.StringValue(e.Slug)
 	}
 	m.Platform = tf.EnumValue(m.Platform, int32(e.Platform), e.Platform.String())
+	if e.Region == "" {
+		m.Region = types.StringNull()
+	} else {
+		m.Region = types.StringValue(e.Region)
+	}
 	return diags
 }
 
@@ -371,6 +384,9 @@ func (m *NodeModel) UpdateMask(ctx context.Context, prior *NodeModel) []string {
 	}
 	if !m.Slug.Equal(prior.Slug) {
 		paths = append(paths, "slug")
+	}
+	if !m.Region.Equal(prior.Region) {
+		paths = append(paths, "region")
 	}
 	return paths
 }
@@ -533,6 +549,7 @@ func NodeDataSourceSchema() schema1.Schema {
 			"owner_id":   schema1.StringAttribute{Computed: true},
 			"platform":   schema1.StringAttribute{Computed: true},
 			"public_key": schema1.StringAttribute{Computed: true},
+			"region":     schema1.StringAttribute{Computed: true},
 			"roles": schema1.ListAttribute{
 				Computed:    true,
 				ElementType: types.StringType,
@@ -592,6 +609,7 @@ type NodeItemModel struct {
 	LastSeenAt        types.String         `tfsdk:"last_seen_at"`
 	Slug              types.String         `tfsdk:"slug"`
 	Platform          types.String         `tfsdk:"platform"`
+	Region            types.String         `tfsdk:"region"`
 }
 
 // NodeItemAttrTypes returns the attribute types of one guard_nodes list element.
@@ -611,6 +629,7 @@ func NodeItemAttrTypes() map[string]attr.Type {
 		"owner_id":             types.StringType,
 		"platform":             types.StringType,
 		"public_key":           types.StringType,
+		"region":               types.StringType,
 		"roles":                types.ListType{ElemType: types.StringType},
 		"slug":                 types.StringType,
 		"state":                types.StringType,
@@ -664,6 +683,7 @@ func NodeListDataSourceSchema() schema1.Schema {
 					"owner_id":   schema1.StringAttribute{Computed: true},
 					"platform":   schema1.StringAttribute{Computed: true},
 					"public_key": schema1.StringAttribute{Computed: true},
+					"region":     schema1.StringAttribute{Computed: true},
 					"roles": schema1.ListAttribute{
 						Computed:    true,
 						ElementType: types.StringType,
@@ -780,6 +800,11 @@ func nodeItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Node, *NodeM
 		item.Slug = types.StringValue(e.Slug)
 	}
 	item.Platform = tf.EnumValue(item.Platform, int32(e.Platform), e.Platform.String())
+	if e.Region == "" {
+		item.Region = types.StringNull()
+	} else {
+		item.Region = types.StringValue(e.Region)
+	}
 	id, err := crud.IDFromName(e.Name)
 	if err != nil {
 		diags.AddError("unexpected guard_node name", err.Error())

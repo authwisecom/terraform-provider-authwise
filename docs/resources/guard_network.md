@@ -20,6 +20,11 @@ resource "authwise_guard_network" "office" {
   tenant_id    = "t-01" # the kit tenant Guard is on
   display_name = "Office"
   cidr         = "100.96.0.0/16"
+
+  # An estate relay pool the tenant may use, by name (a slug is refused);
+  # unset, the tenant's default pool. pool_fallback serves it after the
+  # network's own relays.
+  relay_pool = "relay-pools/rp-01"
 }
 ```
 
@@ -36,6 +41,8 @@ resource "authwise_guard_network" "office" {
 - `config` (String) `config` as a JSON object.
 - `display_name` (String)
 - `labels` (Map of String)
+- `pool_fallback` (Boolean) Serve the pool after the network's own relays. Default false. guard-control refuses true on a network with no relay of its own (`POOL_FALLBACK_WITHOUT_RELAY`).
+- `relay_pool` (String) The estate relay pool the network uses: the pool's name, `authwise_guard_relay_pool.<name>.name` or an entry of `authwise_guard_allowed_relay_pools` (`relay-pools/rp-…`). guard-control refuses a slug, and a pool the tenant is not allowed (`RELAY_POOL_NOT_ALLOWED`). Unset on create, the network gets the tenant's default pool, which is stored: changing a default later never moves a network. The network's nodes are served the pool's relays only when it has no relay of its own, or `pool_fallback` is set, and an operator has not stopped its use of the pool (`pool_killed`).
 - `slug` (String)
 
 ### Read-Only
@@ -43,6 +50,8 @@ resource "authwise_guard_network" "office" {
 - `guard_network_id` (String) Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.
 - `mesh_domain` (String)
 - `name` (String) Full resource name; serves as the Terraform ID.
+- `pool_killed` (Boolean)
+- `pool_killed_at` (String) `pool_killed_at` as an RFC 3339 timestamp.
 
 ## Import
 

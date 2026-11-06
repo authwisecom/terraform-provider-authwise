@@ -413,11 +413,38 @@ func main() {
 			crud[guardpb.Network](scopeTenant,
 				withDescription("A Guard network: a WireGuard mesh in a tenant. `cidr` is its address space inside 100.64.0.0/10, the whole of it when unset; changing it replaces the network."),
 				guard("network"), guardList("networks"),
-				withImmutable("cidr"), withComputed("mesh_domain"), withVolatile("mesh_domain"), withJSON("config")),
+				withImmutable("cidr"),
+				withComputed("mesh_domain", "pool_killed", "pool_killed_at"),
+				withVolatile("mesh_domain", "pool_killed", "pool_killed_at"),
+				withJSON("config")),
+			// A relay's credential (:issueCredential, apis v0.59.0) is the
+			// hand-written wrapper's in internal/provider: issued once and
+			// kept, since a second issue rotates. has_credential and the
+			// report fields move with the relay, not with a write.
 			crud[guardpb.Relay](scopeGuardNetwork,
 				withDescription("A relay a Guard network's nodes connect through when no direct path exists. guard-control serves a network's relays to its nodes, lowest `priority` first."),
 				guard("relay"), guardList("relays"),
-				withRequired("url"), withComputed("last_seen_at"), withJSON("config")),
+				withRequired("url"),
+				withComputed("last_seen_at", "has_credential", "last_report_at", "reported_version"),
+				withVolatile("has_credential", "last_report_at", "reported_version"),
+				withJSON("config")),
+			// Estate relay pools (guard-control#81, tf#66): top-level, kebab
+			// collections per kit's naming rule (relay-pools/rp-…,
+			// pool-relays/rl-…), and
+			// operator-only, so a tenant credential is refused at apply. A
+			// pool relay is a flat collection naming its pool; moving it is
+			// an update of pool.
+			crud[guardpb.RelayPool](tf.ScopeNone,
+				withDescription("An estate relay pool: a named set of relays shared across networks and tenants. Operators only. `select` orders the pool's relays for a node, `served-order` (priority, then display name; the default) or `nearest` (by the node's `region`). `default` makes it the estate default pool: every tenant may use it, and it is the default of a tenant without its own (`authwise_guard_relay_pool_access.default_pool`). Setting it on one pool clears it on the previous default. A pool in use is not deleted (`RELAY_POOL_IN_USE`): remove it from networks and from tenants' access first."),
+				guard("relay_pool"), guardList("relay_pools"), withCollection("relay-pools"),
+				withComputed("relay_count"), withVolatile("relay_count"), withJSON("config")),
+			crud[guardpb.PoolRelay](tf.ScopeNone,
+				withDescription("A relay of an estate relay pool. Operators only. Changing `pool` moves the relay; it learns the move on its next report."),
+				guard("pool_relay"), guardList("pool_relays"), withCollection("pool-relays"),
+				withRequired("pool", "url"),
+				withComputed("has_credential", "last_report_at", "reported_version"),
+				withVolatile("has_credential", "last_report_at", "reported_version"),
+				withJSON("config")),
 			// serving_node_ids is applied on create and otherwise only
 			// echoed; authwise_guard_resource_nodes owns the set, so here it
 			// is read-only. addresses (apis v0.48.0) is what the serving

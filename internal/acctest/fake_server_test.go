@@ -989,6 +989,7 @@ func newHarness(t *testing.T) *harness {
 	gs := grpc.NewServer(requireBearer()...)
 	guardpb.RegisterGuardControlServiceServer(gs, h.guard)
 	guardpb.RegisterGuardNodeServiceServer(gs, h.guard)
+	guardpb.RegisterGuardRelayPoolServiceServer(gs, h.guard)
 	go func() { _ = gs.Serve(guardLis) }()
 	t.Cleanup(gs.Stop)
 

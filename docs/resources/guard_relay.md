@@ -45,8 +45,11 @@ resource "authwise_guard_relay" "us_west" {
 ### Read-Only
 
 - `guard_relay_id` (String) Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.
+- `has_credential` (Boolean)
+- `last_report_at` (String) `last_report_at` as an RFC 3339 timestamp.
 - `last_seen_at` (String) `last_seen_at` as an RFC 3339 timestamp.
 - `name` (String) Full resource name; serves as the Terraform ID.
+- `reported_version` (String)
 
 ## Import
 

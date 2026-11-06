@@ -1,3 +1,56 @@
+## 0.31.0 (Unreleased)
+
+NOTES:
+
+* **apis v0.59.0.** Estate relay pools (guard-control#81, kit#898, tf#66).
+  The change is additive on top of 0.30.0. It needs guard-control v0.26.0
+  or later, as 0.30.0 does.
+* **Not modelled.** The operator's incident actions are not modelled:
+  `:killPool` and `:restorePool` on a network, and `:revokeCredential`.
+  They belong to awctl or the console.
+
+FEATURES:
+
+* **`authwise_guard_relay_pool`.** A named set of relays at the estate's
+  root (`relay-pools/rp-…`), shared across tenants' networks. Operators
+  only: guard-control refuses a tenant's credential.
+  * `select` orders the pool's relays for a node: `served-order` (the
+    default) or `nearest` (by the node's `region`).
+  * `default` makes it the **estate** default: every tenant may use it,
+    and it is the default for a tenant without one of its own.
+  * guard-control refuses to delete a pool in use (`RELAY_POOL_IN_USE`).
+    Take it off networks and out of tenants' access first.
+* **`authwise_guard_pool_relay`.** A relay of a pool (`pool-relays/rl-…`).
+  Changing `pool` moves it in place.
+* **`authwise_guard_relay_credential`.** A relay's `grk_…` credential, for
+  a pool relay or a network's own relay (`:issueCredential`).
+  * It is issued once on create and kept in state, sensitive.
+  * Changing `rotation` replaces the resource and issues a new credential.
+  * Destroy revokes nothing; revoking is an operator's action outside
+    Terraform. A credential guard-control no longer holds drops from
+    state at refresh, and the next apply issues a new one.
+  * There is no import, since importing would have to issue.
+* **`authwise_guard_relay_pool_access`.** Which pools a tenant may use
+  beyond the estate default, and its **tenant** default pool
+  (`default_pool`). Operators only, one per tenant, and authoritative.
+  Destroy writes it empty.
+* **`authwise_guard_network.relay_pool` and `pool_fallback`.**
+  * `relay_pool` takes the pool's name (`relay-pools/rp-…`), e.g.
+    `authwise_guard_relay_pool.<name>.name`. guard-control refuses a slug.
+    Unset on create, the network takes the tenant's default pool.
+  * `pool_fallback` serves the pool after the network's own relays.
+  * `pool_killed` and `pool_killed_at` are read-only.
+* **`authwise_guard_node.region`** orders a `nearest` pool's relays for the
+  node.
+* **`authwise_guard_relay`** reads back `has_credential`, `last_report_at`
+  and `reported_version`.
+* **Data sources.** `authwise_guard_relay_pool(s)` and
+  `authwise_guard_pool_relay(s)` are the operator's views.
+  `authwise_guard_allowed_relay_pools` is the tenant's: the pools its
+  networks may use.
+* **Example.** `examples/guard-relay-pools`: an operator's pools, a pool
+  relay and its credential, a tenant's access, and a network on a pool.
+
 ## 0.30.0 (November 6, 2026)
 
 NOTES:

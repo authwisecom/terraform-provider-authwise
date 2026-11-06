@@ -31,6 +31,7 @@ import (
 type fakeGuardServer struct {
 	guardpb.UnimplementedGuardControlServiceServer
 	guardpb.UnimplementedGuardNodeServiceServer
+	guardpb.UnimplementedGuardRelayPoolServiceServer
 
 	mu        sync.Mutex
 	tenants   map[string]*guardpb.Tenant
@@ -39,6 +40,13 @@ type fakeGuardServer struct {
 	resources map[string]*guardpb.Resource
 	invites   map[string]*guardpb.Invite
 	nodes     map[string]*guardpb.Node
+	// Estate relay pools and their relays (tf#66), each tenant's access,
+	// and the relays' credentials, kept apart as guard-control keeps only
+	// a hash.
+	pools      map[string]*guardpb.RelayPool
+	poolRelays map[string]*guardpb.PoolRelay
+	access     map[string]*guardpb.RelayPoolAccess
+	creds      map[string]string
 	// codes are the invites' codes, apart from the row, the way
 	// guard-control keeps only a hash: a read never returns one.
 	codes map[string]string
@@ -52,14 +60,18 @@ type fakeGuardServer struct {
 
 func newFakeGuardServer() *fakeGuardServer {
 	f := &fakeGuardServer{
-		tenants:   map[string]*guardpb.Tenant{},
-		networks:  map[string]*guardpb.Network{},
-		relays:    map[string]*guardpb.Relay{},
-		resources: map[string]*guardpb.Resource{},
-		invites:   map[string]*guardpb.Invite{},
-		nodes:     map[string]*guardpb.Node{},
-		codes:     map[string]string{},
-		grants:    map[string][]string{},
+		tenants:    map[string]*guardpb.Tenant{},
+		networks:   map[string]*guardpb.Network{},
+		relays:     map[string]*guardpb.Relay{},
+		resources:  map[string]*guardpb.Resource{},
+		invites:    map[string]*guardpb.Invite{},
+		nodes:      map[string]*guardpb.Node{},
+		pools:      map[string]*guardpb.RelayPool{},
+		poolRelays: map[string]*guardpb.PoolRelay{},
+		access:     map[string]*guardpb.RelayPoolAccess{},
+		creds:      map[string]string{},
+		codes:      map[string]string{},
+		grants:     map[string][]string{},
 	}
 	f.seedTenant("t-1")
 	return f
@@ -246,6 +258,9 @@ func (f *fakeGuardServer) CreateNetwork(ctx context.Context, in *guardpb.CreateN
 	if n.GetCidr() == "" {
 		n.Cidr = meshRange.String()
 	}
+	if err := f.checkNetworkPoolLocked(in.GetParent(), "", n, true); err != nil {
+		return nil, err
+	}
 	n.Name = in.GetParent() + "/networks/" + f.nextID("n")
 	f.networks[n.GetName()] = n
 	return proto.Clone(n).(*guardpb.Network), nil
@@ -292,6 +307,10 @@ func (f *fakeGuardServer) PatchNetwork(ctx context.Context, in *guardpb.PatchNet
 		if err := checkNetworkCIDR(next.GetCidr()); err != nil {
 			return nil, err
 		}
+	}
+	tenant, _, _ := strings.Cut(in.GetName(), "/networks/")
+	if err := f.checkNetworkPoolLocked(tenant, in.GetName(), next, false); err != nil {
+		return nil, err
 	}
 	f.networks[in.GetName()] = next
 	return proto.Clone(next).(*guardpb.Network), nil
@@ -390,6 +409,7 @@ func (f *fakeGuardServer) DeleteRelay(ctx context.Context, in *guardpb.DeleteRel
 		return nil, status.Errorf(codes.NotFound, "relay %q not found", in.GetName())
 	}
 	delete(f.relays, in.GetName())
+	delete(f.creds, in.GetName())
 	return &emptypb.Empty{}, nil
 }
 
