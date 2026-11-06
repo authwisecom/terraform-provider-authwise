@@ -6,6 +6,10 @@ NOTES:
   It needs the guard-control release that implements it; until that
   release is installed, the Guard resources here do not work against
   guard-control. Upgrade the provider and guard-control together.
+* **Pin before upgrading.** A root pinned `~> 0.29` allows 0.30.0, and
+  takes it on `terraform init -upgrade`. A root whose guard-control is
+  still before the cutover should pin `~> 0.29.0`, which allows only
+  0.29 patch releases, until guard-control is upgraded.
 
 FEATURES:
 
