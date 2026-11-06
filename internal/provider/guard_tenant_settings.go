@@ -2,13 +2,11 @@ package provider
 
 import (
 	"context"
-	"regexp"
 	"strings"
 
 	guardpb "git.authwise.com/authwise/apis/authwise/guardcontrol/v1alpha1"
 	"github.com/activatedio/tfinfra/pkg/aip"
 	tfruntime "github.com/activatedio/tfinfra/pkg/tf"
-	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -20,7 +18,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/objectplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	"google.golang.org/protobuf/types/known/fieldmaskpb"
@@ -39,17 +36,14 @@ const (
 var objectAsOptions = basetypes.ObjectAsOptions{}
 
 // The update mask paths of Guard's settings for a tenant (apis v0.57.0).
+// There is no slug path: the slug is kit's Tenant.slug, and guard-control
+// refuses one (SLUG_MANAGED_BY_IDENTITY).
 const (
-	maskSlug                   = "slug"
 	maskLabels                 = "labels"
 	maskUsersRealms            = "config.users.realms"
 	maskDeprovisioningEnabled  = "config.deprovisioning.enabled"
 	guardTenantSettingsSummary = "Guard's settings for a kit tenant"
 )
-
-// guardSlugPattern is a tenant's Guard slug: a DNS label (kit
-// docswip/GUARD_HOME_USERS_CONSOLE.md §3.4).
-var guardSlugPattern = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$`)
 
 var (
 	_ resource.Resource                = &guardTenantSettingsResource{}
@@ -120,8 +114,8 @@ func (r *guardTenantSettingsResource) Schema(_ context.Context, _ resource.Schem
 	keep := []planmodifier.String{stringplanmodifier.UseStateForUnknown()}
 
 	resp.Schema = schema.Schema{
-		MarkdownDescription: guardTenantSettingsSummary + ": its slug, labels, the realms its people come from, and whether its devices are swept. " +
-			"Guard has no tenant of its own: its networks and settings are keyed by the kit tenant (`t-…`), and what kit owns about the tenant (its name, status, and the issuer, audience and console client its people sign in through) is read-only here.\n\n" +
+		MarkdownDescription: guardTenantSettingsSummary + ": its labels, the realms its people come from, and whether its devices are swept. " +
+			"Guard has no tenant of its own: its networks and settings are keyed by the kit tenant (`t-…`), and what kit owns about the tenant (its name, slug, status, and the issuer, audience and console client its people sign in through) is read-only here.\n\n" +
 			"guard-control writes the settings once kit reports Guard on the tenant; until then it refuses with `GUARD_NOT_ENABLED`, and a suspended tenant with `TENANT_SUSPENDED`. " +
 			"Each refusal is guard-control's own message.\n\n" +
 			"An attribute left unset is neither written nor reset: it reads back what guard-control holds. " +
@@ -139,14 +133,10 @@ func (r *guardTenantSettingsResource) Schema(_ context.Context, _ resource.Schem
 				PlanModifiers:       keep,
 			},
 			"slug": schema.StringAttribute{
-				Optional: true,
 				Computed: true,
-				MarkdownDescription: "A name for people in place of the id: a DNS label, unique per install, an alias and never a reference. " +
-					"It names the tenant in mesh DNS (`<node>.<network>.<slug>.guard.<estate>`), so changing it moves every network's `mesh_domain`. May not begin `t-`, `gt-` or `n-`.",
+				MarkdownDescription: "The kit tenant's slug, which names it in mesh DNS (`<node>.<network>.<slug>.guard.<estate>`). " +
+					"It is kit's, set on the tenant in kit (`awtenant tenants update --slug`, kit 1.83.0 or later); guard-control refuses to write it (`SLUG_MANAGED_BY_IDENTITY`).",
 				PlanModifiers: keep,
-				Validators: []validator.String{
-					stringvalidator.RegexMatches(guardSlugPattern, "must be a DNS label: lower-case letters, digits and hyphens, at most 63, not starting or ending with a hyphen"),
-				},
 			},
 			labelsAttribute: schema.MapAttribute{
 				Optional:            true,
@@ -309,7 +299,7 @@ func guardTenantPatch(ctx context.Context, plan, prior *guardTenantSettingsModel
 	}}
 	var paths []string
 
-	held := guardTenantSettingsModel{Slug: types.StringNull(), Labels: types.MapNull(types.StringType), Config: types.ObjectNull(guardTenantConfigAttrTypes)}
+	held := guardTenantSettingsModel{Labels: types.MapNull(types.StringType), Config: types.ObjectNull(guardTenantConfigAttrTypes)}
 	if prior != nil {
 		held = *prior
 	}
@@ -320,10 +310,6 @@ func guardTenantPatch(ctx context.Context, plan, prior *guardTenantSettingsModel
 	heldRealms, heldEnabled := settingsLeaves(ctx, held.Config, diags)
 	realms, enabled := settingsLeaves(ctx, plan.Config, diags)
 
-	if changed(plan.Slug, held.Slug) {
-		tenant.Slug = plan.Slug.ValueString()
-		paths = append(paths, maskSlug)
-	}
 	if changed(plan.Labels, held.Labels) {
 		diags.Append(plan.Labels.ElementsAs(ctx, &tenant.Labels, false)...)
 		paths = append(paths, maskLabels)

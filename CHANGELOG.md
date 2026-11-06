@@ -15,10 +15,13 @@ FEATURES:
 
 * **`authwise_guard_tenant_settings` (tf#65).** Guard's settings for a kit
   tenant, keyed by the kit tenant's id (`t-…`):
-  * writable: `slug`, `labels`, `config.users.realms` and
+  * writable: `labels`, `config.users.realms` and
     `config.deprovisioning.enabled`;
-  * read-only: `display_name`, `status`, `issuer`, `audience` and
+  * read-only: `slug`, `display_name`, `status`, `issuer`, `audience` and
     `console_client_id`.
+  * The slug is the kit tenant's slug. Set it on the tenant in kit, with
+    `awtenant tenants update --slug` (kit 1.83.0 or later). guard-control
+    refuses to write it (`SLUG_MANAGED_BY_IDENTITY`).
   * Create and update both write with guard-control's `PatchTenant`, and
     send only what the plan changes. An attribute left unset is not
     written.

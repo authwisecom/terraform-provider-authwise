@@ -74,6 +74,7 @@ func (f *fakeGuardServer) seedTenant(id string) {
 	name := "tenants/" + id
 	f.tenants[name] = &guardpb.Tenant{
 		Name:            name,
+		Slug:            "acme",
 		DisplayName:     "Acme",
 		Status:          "ACTIVE",
 		Issuer:          "https://id.example.com/" + id,
@@ -173,8 +174,8 @@ func (f *fakeGuardServer) ListTenants(ctx context.Context, _ *guardpb.ListTenant
 
 // PatchTenant is an upsert of Guard's settings once kit reports Guard on
 // the tenant; it refuses a tenant without Guard, or a suspended one, with
-// guard-control's ErrorInfo reasons. Only the four writable paths are
-// taken (apis v0.57.0).
+// guard-control's ErrorInfo reasons. Only the three writable paths are
+// taken; the slug is kit's, refused with SLUG_MANAGED_BY_IDENTITY.
 func (f *fakeGuardServer) PatchTenant(ctx context.Context, in *guardpb.PatchTenantRequest) (*guardpb.Tenant, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -194,7 +195,7 @@ func (f *fakeGuardServer) PatchTenant(ctx context.Context, in *guardpb.PatchTena
 	for _, p := range in.GetUpdateMask().GetPaths() {
 		switch p {
 		case "slug":
-			next.Slug = src.GetSlug()
+			return nil, guardRefusal(codes.InvalidArgument, "SLUG_MANAGED_BY_IDENTITY", "the slug of "+t.GetName()+" is kit's tenant slug; set it on the tenant in kit")
 		case "labels":
 			next.Labels = src.GetLabels()
 		case "config.users.realms":

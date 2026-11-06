@@ -41,12 +41,10 @@ resource "authwise_guard_tenant_settings" "acme" {
 
 	const (
 		first = `
-  slug = "acme"
   config = {
     deprovisioning = { enabled = true }
   }`
 		second = `
-  slug   = "acme"
   labels = { env = "prod" }
   config = {
     users          = { realms = ["r-staff"] }
@@ -63,6 +61,7 @@ resource "authwise_guard_tenant_settings" "acme" {
 				Config: config(first),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(guardSettingsAddr, "name", "tenants/t-1"),
+					// The slug is kit's, read back.
 					resource.TestCheckResourceAttr(guardSettingsAddr, "slug", "acme"),
 					resource.TestCheckResourceAttr(guardSettingsAddr, "config.deprovisioning.enabled", "true"),
 					// Unset, the realms are read back, not written.
@@ -73,8 +72,8 @@ resource "authwise_guard_tenant_settings" "acme" {
 					resource.TestCheckResourceAttr(guardSettingsAddr, "audience", "a-guard"),
 					resource.TestCheckResourceAttr(guardSettingsAddr, "console_client_id", "c-console"),
 					server(func(t *guardpb.Tenant) error {
-						if t.GetSlug() != "acme" || !t.GetConfig().GetDeprovisioning().GetEnabled() {
-							return fmt.Errorf("server holds slug %q, deprovisioning %v; want acme, true", t.GetSlug(), t.GetConfig().GetDeprovisioning().GetEnabled())
+						if !t.GetConfig().GetDeprovisioning().GetEnabled() {
+							return fmt.Errorf("server holds deprovisioning %v; want true", t.GetConfig().GetDeprovisioning().GetEnabled())
 						}
 						return nil
 					}),
@@ -125,7 +124,7 @@ func TestAccGuardTenantSettings_NotEnabled(t *testing.T) {
 			Config: h.providerConfig() + `
 resource "authwise_guard_tenant_settings" "other" {
   tenant_id = "t-2"
-  slug      = "other"
+  labels    = { env = "prod" }
 }
 `,
 			ExpectError: regexp.MustCompile(`(?s)Guard\s+is\s+not\s+enabled\s+on\s+tenant\s+tenants/t-2`),

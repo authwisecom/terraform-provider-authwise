@@ -3,7 +3,7 @@
 page_title: "authwise_guard_tenant_settings Resource - Authwise"
 subcategory: "Guard"
 description: |-
-  Guard's settings for a kit tenant: its slug, labels, the realms its people come from, and whether its devices are swept. Guard has no tenant of its own: its networks and settings are keyed by the kit tenant (t-…), and what kit owns about the tenant (its name, status, and the issuer, audience and console client its people sign in through) is read-only here.
+  Guard's settings for a kit tenant: its labels, the realms its people come from, and whether its devices are swept. Guard has no tenant of its own: its networks and settings are keyed by the kit tenant (t-…), and what kit owns about the tenant (its name, slug, status, and the issuer, audience and console client its people sign in through) is read-only here.
   guard-control writes the settings once kit reports Guard on the tenant; until then it refuses with GUARD_NOT_ENABLED, and a suspended tenant with TENANT_SUSPENDED. Each refusal is guard-control's own message.
   An attribute left unset is neither written nor reset: it reads back what guard-control holds. Removing one from the configuration later leaves its last value in place; set it explicitly (realms = [], enabled = false) to change it.
   Destroy writes nothing. It removes the resource from state and leaves Guard's settings on the tenant. Deleting a tenant from Guard is an operator's task, refused while it has networks or users.
@@ -11,7 +11,7 @@ description: |-
 
 # authwise_guard_tenant_settings (Resource)
 
-Guard's settings for a kit tenant: its slug, labels, the realms its people come from, and whether its devices are swept. Guard has no tenant of its own: its networks and settings are keyed by the kit tenant (`t-…`), and what kit owns about the tenant (its name, status, and the issuer, audience and console client its people sign in through) is read-only here.
+Guard's settings for a kit tenant: its labels, the realms its people come from, and whether its devices are swept. Guard has no tenant of its own: its networks and settings are keyed by the kit tenant (`t-…`), and what kit owns about the tenant (its name, slug, status, and the issuer, audience and console client its people sign in through) is read-only here.
 
 guard-control writes the settings once kit reports Guard on the tenant; until then it refuses with `GUARD_NOT_ENABLED`, and a suspended tenant with `TENANT_SUSPENDED`. Each refusal is guard-control's own message.
 
@@ -26,7 +26,6 @@ An attribute left unset is neither written nor reset: it reads back what guard-c
 # guard-control holds them; destroying this writes nothing.
 resource "authwise_guard_tenant_settings" "acme" {
   tenant_id = "t-01"
-  slug      = "acme"
 
   labels = {
     owner = "it"
@@ -52,7 +51,6 @@ resource "authwise_guard_tenant_settings" "acme" {
 
 - `config` (Attributes) Guard's settings for the tenant. (see [below for nested schema](#nestedatt--config))
 - `labels` (Map of String) Guard's labels on the tenant. Written whole when it changes.
-- `slug` (String) A name for people in place of the id: a DNS label, unique per install, an alias and never a reference. It names the tenant in mesh DNS (`<node>.<network>.<slug>.guard.<estate>`), so changing it moves every network's `mesh_domain`. May not begin `t-`, `gt-` or `n-`.
 
 ### Read-Only
 
@@ -61,6 +59,7 @@ resource "authwise_guard_tenant_settings" "acme" {
 - `display_name` (String) The kit tenant's display name.
 - `issuer` (String) The issuer the tenant's people sign in at, exactly as their tokens' `iss`.
 - `name` (String) The tenant's resource name at guard-control, `tenants/t-…`.
+- `slug` (String) The kit tenant's slug, which names it in mesh DNS (`<node>.<network>.<slug>.guard.<estate>`). It is kit's, set on the tenant in kit (`awtenant tenants update --slug`, kit 1.83.0 or later); guard-control refuses to write it (`SLUG_MANAGED_BY_IDENTITY`).
 - `status` (String) The kit tenant's state (`ACTIVE`, `SUSPENDED`). Suspension is kit's.
 
 <a id="nestedatt--config"></a>

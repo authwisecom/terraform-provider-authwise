@@ -8,12 +8,13 @@ locals {
   guard_tenant_id = "t-01"
 }
 
-# 0. Guard's settings for the tenant: the slug that names it in mesh DNS,
-#    and the sweep that revokes the devices of people who lost Guard.
+# 0. Guard's settings for the tenant: the sweep that revokes the devices of
+#    people who lost Guard. The slug that names the tenant in mesh DNS is
+#    kit's, set on the tenant in kit (awtenant tenants update --slug,
+#    kit 1.83.0 or later).
 #    Destroying this leaves the settings in place.
 resource "authwise_guard_tenant_settings" "this" {
   tenant_id = local.guard_tenant_id
-  slug      = "acme"
 
   config = {
     deprovisioning = { enabled = true }

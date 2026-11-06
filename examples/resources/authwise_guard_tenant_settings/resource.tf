@@ -2,7 +2,6 @@
 # guard-control holds them; destroying this writes nothing.
 resource "authwise_guard_tenant_settings" "acme" {
   tenant_id = "t-01"
-  slug      = "acme"
 
   labels = {
     owner = "it"
