@@ -85,6 +85,13 @@ func (f *fakeIdentityServer) CreateDomain(ctx context.Context, in *identitypb.Cr
 			return nil, status.Errorf(codes.InvalidArgument, "issuer_id: no issuer %q in %s", id, in.GetParent())
 		}
 	}
+	// A product host (kit#903): guard only, never beside an issuer.
+	switch product := in.GetDomain().GetProduct(); {
+	case product != "" && in.GetDomain().GetIssuerId() != "":
+		return nil, status.Error(codes.InvalidArgument, "a domain serves an issuer or a product: set issuer_id or product, not both")
+	case product != "" && product != "guard":
+		return nil, status.Errorf(codes.InvalidArgument, "product: %q is not a product with hosts; the one is \"guard\"", product)
+	}
 	for _, d := range f.domains {
 		if d.GetHostname() == hostname {
 			return nil, status.Errorf(codes.AlreadyExists, "hostname %q is claimed", hostname)
@@ -92,11 +99,17 @@ func (f *fakeIdentityServer) CreateDomain(ctx context.Context, in *identitypb.Cr
 	}
 	d := proto.Clone(in.GetDomain()).(*corepb.Domain)
 	d.Name = in.GetParent() + "/domains/" + f.nextID("d")
-	if d.GetIssuerId() != "" {
+	if d.GetIssuerId() != "" || d.GetProduct() != "" {
+		// kit leaves a product host's traffic target empty; its record
+		// points at the tenant's default Guard host.
+		target := "acme.guard.authwise.test"
+		if d.GetIssuerId() != "" {
+			d.TrafficTarget = "acme.id.authwise.test"
+			target = d.GetTrafficTarget()
+		}
 		d.State = corepb.IssuerDomainState_ISSUER_DOMAIN_STATE_PENDING_DNS
-		d.TrafficTarget = "acme.id.authwise.test"
 		d.DnsRecords = []*corepb.IssuerDomainDnsRecord{
-			{Name: hostname, Type: "CNAME", Value: d.GetTrafficTarget(), Purpose: "traffic"},
+			{Name: hostname, Type: "CNAME", Value: target, Purpose: "traffic"},
 			{Name: "_acme-challenge." + hostname, Type: "CNAME", Value: "abc.authorize.certificatemanager.goog", Purpose: "challenge"},
 		}
 	}

@@ -69,16 +69,17 @@ func TestProviderSurface(t *testing.T) {
 	// removes guard_deprovisioning and adds the hand-written
 	// guard_tenant_settings. Relay pools (#66) add the generated
 	// guard_relay_pool and guard_pool_relay and the hand-written
-	// guard_relay_credential and guard_relay_pool_access.
-	assert.Len(t, resourceTypes, 45)
+	// guard_relay_credential and guard_relay_pool_access. Guard's Invite
+	// entity is retired (#67, kit#902 D5): guard_invite goes.
+	assert.Len(t, resourceTypes, 44)
 	assert.False(t, resourceTypes["authwise_guard_tenant"], "there is no Guard tenant (#65)")
+	assert.False(t, resourceTypes["authwise_guard_invite"], "Guard's Invite is retired (#67)")
 	assert.False(t, resourceTypes["authwise_guard_deprovisioning"], "deprovisioning is a tenant setting (#65)")
 	for _, want := range []string{
 		"authwise_guard_network",
 		"authwise_guard_relay",
 		"authwise_guard_resource",
 		"authwise_guard_resource_nodes",
-		"authwise_guard_invite",
 		"authwise_guard_node",
 		"authwise_guard_node_grants",
 		"authwise_guard_enrolment_grant",
@@ -131,13 +132,17 @@ func TestProviderSurface(t *testing.T) {
 	// #41 adds the hand-written guard_deprovisioning. The tenant collapse
 	// (#65) removes guard_tenant, guard_tenants and guard_deprovisioning.
 	// Relay pools (#66) add a pair each for relay_pool and pool_relay, and
-	// the hand-written guard_allowed_relay_pools.
-	assert.Len(t, dataSourceTypes, 81)
+	// the hand-written guard_allowed_relay_pools. The Invite's retirement
+	// (#67) removes guard_invite and guard_invites.
+	assert.Len(t, dataSourceTypes, 79)
 	for _, gone := range []string{"authwise_guard_tenant", "authwise_guard_tenants", "authwise_guard_deprovisioning"} {
 		assert.False(t, dataSourceTypes[gone], "%s went with the tenant collapse (#65)", gone)
 	}
+	for _, gone := range []string{"authwise_guard_invite", "authwise_guard_invites"} {
+		assert.False(t, dataSourceTypes[gone], "%s went with Guard's Invite (#67)", gone)
+	}
 	for _, want := range []string{
-		"authwise_guard_invites",
+		"authwise_guard_network", "authwise_guard_nodes",
 		"authwise_issuer_config", "authwise_realm_config", "authwise_audience_config", "authwise_endpoint_auth",
 	} {
 		assert.True(t, dataSourceTypes[want], "missing data source %s", want)

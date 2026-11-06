@@ -23,7 +23,7 @@ import (
 
 const nodeAuthCodeTTL = 24 * time.Hour
 
-// networkOf is the network name a node, resource or invite name sits under.
+// networkOf is the network name a node or resource name sits under.
 func networkOf(name string) string {
 	parts := strings.Split(name, "/")
 	return strings.Join(parts[:4], "/")

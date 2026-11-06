@@ -190,7 +190,7 @@ func (r *domainActivationResource) Create(ctx context.Context, req resource.Crea
 	// waiting on it would never end. Only authwise_domain can name one.
 	if r.attribute == domainActivation.attribute && !out.custom() {
 		resp.Diagnostics.AddAttributeError(path.Root(r.attribute), "not a custom host",
-			name+" has no issuer_id: a native host routes as soon as it exists, and there is nothing to wait for. Activate a custom host (authwise_domain with issuer_id).")
+			name+" has no issuer_id or product: a native host routes as soon as it exists, and there is nothing to wait for. Activate a custom host (authwise_domain with issuer_id or product).")
 		return
 	}
 	if out = r.waitFor(ctx, out, routes, "state PROVISIONING or ACTIVE", &resp.Diagnostics); resp.Diagnostics.HasError() {

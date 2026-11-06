@@ -129,6 +129,11 @@ func DomainResourceSchema() schema.Schema {
 				MarkdownDescription: "Full resource name; serves as the Terraform ID.",
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
+			"product": schema.StringAttribute{
+				Computed:      true,
+				Optional:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace(), stringplanmodifier.UseStateForUnknown()},
+			},
 			"state": schema.StringAttribute{
 				Computed:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
@@ -146,7 +151,7 @@ func DomainResourceSchema() schema.Schema {
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 		},
-		MarkdownDescription: "A hostname the tenant serves logins on: native (no `issuer_id`), the host an issuer names, or custom (`issuer_id` set), a hostname of yours serving that issuer.",
+		MarkdownDescription: "A hostname the tenant serves: native (no `issuer_id` or `product`), the host an issuer names; custom with `issuer_id` set, a hostname of yours serving that issuer; or custom with `product = \"guard\"`, a hostname of yours serving the tenant's Guard address.",
 	}
 }
 
@@ -201,6 +206,7 @@ type DomainModel struct {
 	ClaimExpiresAt       types.String         `tfsdk:"claim_expires_at"`
 	CreatedAt            types.String         `tfsdk:"created_at"`
 	TrafficTarget        types.String         `tfsdk:"traffic_target"`
+	Product              types.String         `tfsdk:"product"`
 }
 
 // NewDomainModel returns a model with every attribute set to its typed null; collection types cannot be zero-valued.
@@ -218,6 +224,7 @@ func NewDomainModel() *DomainModel {
 		IssuerId:             types.StringNull(),
 		Labels:               types.MapNull(types.StringType),
 		Name:                 types.StringNull(),
+		Product:              types.StringNull(),
 		State:                types.StringNull(),
 		TenantId:             types.StringNull(),
 		TrafficTarget:        types.StringNull(),
@@ -301,6 +308,7 @@ func (m *DomainModel) ToProto(ctx context.Context) (*v1alpha1.Domain, diag.Diagn
 		}
 	}
 	out.TrafficTarget = m.TrafficTarget.ValueString()
+	out.Product = m.Product.ValueString()
 	return out, diags
 }
 
@@ -418,6 +426,11 @@ func (m *DomainModel) FromProto(ctx context.Context, e *v1alpha1.Domain) diag.Di
 	} else {
 		m.TrafficTarget = types.StringValue(e.TrafficTarget)
 	}
+	if e.Product == "" {
+		m.Product = types.StringNull()
+	} else {
+		m.Product = types.StringValue(e.Product)
+	}
 	return diags
 }
 
@@ -447,6 +460,9 @@ func (m *DomainModel) UpdateMask(ctx context.Context, prior *DomainModel) []stri
 	}
 	if !m.IssuerId.Equal(prior.IssuerId) {
 		paths = append(paths, "issuer_id")
+	}
+	if !m.Product.Equal(prior.Product) {
+		paths = append(paths, "product")
 	}
 	return paths
 }
@@ -615,11 +631,12 @@ func DomainDataSourceSchema() schema1.Schema {
 				MarkdownDescription: "Full resource name of the object to read.",
 				Required:            true,
 			},
+			"product":        schema1.StringAttribute{Computed: true},
 			"state":          schema1.StringAttribute{Computed: true},
 			"tenant_id":      schema1.StringAttribute{Computed: true},
 			"traffic_target": schema1.StringAttribute{Computed: true},
 		},
-		MarkdownDescription: "A hostname the tenant serves logins on: native (no `issuer_id`), the host an issuer names, or custom (`issuer_id` set), a hostname of yours serving that issuer. This data source reads one by its full resource name.",
+		MarkdownDescription: "A hostname the tenant serves: native (no `issuer_id` or `product`), the host an issuer names; custom with `issuer_id` set, a hostname of yours serving that issuer; or custom with `product = \"guard\"`, a hostname of yours serving the tenant's Guard address. This data source reads one by its full resource name.",
 	}
 }
 
@@ -667,6 +684,7 @@ type DomainItemModel struct {
 	ClaimExpiresAt       types.String         `tfsdk:"claim_expires_at"`
 	CreatedAt            types.String         `tfsdk:"created_at"`
 	TrafficTarget        types.String         `tfsdk:"traffic_target"`
+	Product              types.String         `tfsdk:"product"`
 }
 
 // DomainItemAttrTypes returns the attribute types of one domains list element.
@@ -684,6 +702,7 @@ func DomainItemAttrTypes() map[string]attr.Type {
 		"issuer_id":              types.StringType,
 		"labels":                 types.MapType{ElemType: types.StringType},
 		"name":                   types.StringType,
+		"product":                types.StringType,
 		"state":                  types.StringType,
 		"traffic_target":         types.StringType,
 	}
@@ -742,6 +761,7 @@ func DomainListDataSourceSchema() schema1.Schema {
 						Computed:            true,
 						MarkdownDescription: "Full resource name.",
 					},
+					"product":        schema1.StringAttribute{Computed: true},
 					"state":          schema1.StringAttribute{Computed: true},
 					"traffic_target": schema1.StringAttribute{Computed: true},
 				}},
@@ -752,7 +772,7 @@ func DomainListDataSourceSchema() schema1.Schema {
 				Validators:          []validator.String{tf.ReferenceID("t", "tenant", "")},
 			},
 		},
-		MarkdownDescription: "A hostname the tenant serves logins on: native (no `issuer_id`), the host an issuer names, or custom (`issuer_id` set), a hostname of yours serving that issuer. This data source lists every one under a parent.",
+		MarkdownDescription: "A hostname the tenant serves: native (no `issuer_id` or `product`), the host an issuer names; custom with `issuer_id` set, a hostname of yours serving that issuer; or custom with `product = \"guard\"`, a hostname of yours serving the tenant's Guard address. This data source lists every one under a parent.",
 	}
 }
 
@@ -870,6 +890,11 @@ func domainItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Domain, *D
 		item.TrafficTarget = types.StringNull()
 	} else {
 		item.TrafficTarget = types.StringValue(e.TrafficTarget)
+	}
+	if e.Product == "" {
+		item.Product = types.StringNull()
+	} else {
+		item.Product = types.StringValue(e.Product)
 	}
 	id, err := crud.IDFromName(e.Name)
 	if err != nil {

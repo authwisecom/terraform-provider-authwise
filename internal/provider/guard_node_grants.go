@@ -39,7 +39,7 @@ func (r *guardNodeGrantsResource) Metadata(_ context.Context, req resource.Metad
 func (r *guardNodeGrantsResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = tfruntime.AssociationSchema(guardNodeAttribute, guardGrantsAttribute)
 	resp.Schema.MarkdownDescription = "What a Guard node may reach: the full names of resources and nodes of its network, as an authoritative set. " +
-		"A grant made out of band, such as one an invite gave the node, is removed on the next apply."
+		"A grant made out of band, such as one made in the Guard console, is removed on the next apply."
 }
 
 func (r *guardNodeGrantsResource) Configure(_ context.Context, req resource.ConfigureRequest, _ *resource.ConfigureResponse) {

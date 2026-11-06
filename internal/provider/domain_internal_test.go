@@ -73,9 +73,14 @@ func (f *fakeDomains) CreateDomain(_ context.Context, parent string, in *domain)
 	}
 	f.seq++
 	id := fmt.Sprintf("d-%d", f.seq)
-	d := &domain{Name: parent + "/domains/" + id, Hostname: in.Hostname, IssuerID: in.IssuerID, Labels: maps.Clone(in.Labels)}
-	if d.custom() {
+	d := &domain{Name: parent + "/domains/" + id, Hostname: in.Hostname, IssuerID: in.IssuerID, Product: in.Product, Labels: maps.Clone(in.Labels)}
+	switch {
+	case d.IssuerID != "":
 		d.State, d.TrafficTarget = domainPendingDNS, "acme.id.authwise.test"
+	case d.Product != "":
+		// kit leaves a product host's traffic target empty: the product's
+		// default host is the product's to know (kit#903).
+		d.State = domainPendingDNS
 	}
 	f.rows[id] = d
 	return copyDomain(d), nil
@@ -105,8 +110,12 @@ func (f *fakeDomains) advance(id string) (*domain, error) {
 			return nil, status.Errorf(codes.NotFound, "%s not found", id)
 		}
 	case n >= f.recordsAfter && len(d.DNSRecords) == 0:
+		target := "acme.id.authwise.com"
+		if d.Product == productGuard {
+			target = "acme.guard.authwise.com"
+		}
 		d.DNSRecords = []domainRecord{
-			{Name: d.Hostname, Type: "CNAME", Value: "acme.id.authwise.com", Purpose: "traffic"},
+			{Name: d.Hostname, Type: "CNAME", Value: target, Purpose: "traffic"},
 			{Name: "_acme-challenge." + d.Hostname, Type: "CNAME", Value: "abc.authorize.certificatemanager.goog", Purpose: "challenge"},
 		}
 	case f.fail != "" && n >= f.activeAfter:
@@ -356,6 +365,109 @@ func TestDomainCustomLifecycle(t *testing.T) {
 			},
 		}},
 	})
+}
+
+// guardDomainConfig is the one-apply pattern for a custom Guard address
+// (tf#67, kit#903).
+const guardDomainConfig = `
+resource "authwise_domain" "guard" {
+  product  = "guard"
+  hostname = "guard.acme.com"
+}
+
+locals {
+  records = { for r in authwise_domain.guard.dns_records : r.purpose => r }
+}
+
+resource "terraform_data" "challenge" {
+  input = local.records["challenge"].value
+}
+
+resource "authwise_domain_activation" "guard" {
+  domain     = authwise_domain.guard.name
+  depends_on = [terraform_data.challenge]
+}
+
+resource "terraform_data" "traffic" {
+  input = {
+    content = local.records["traffic"].value
+    after   = authwise_domain_activation.guard.state
+  }
+}
+`
+
+// TestDomainGuardLifecycle: a custom Guard address has an issuer host's
+// lifecycle, records and activation, with no issuer and no traffic target
+// of kit's; it plans clean after, and imports with no change.
+func TestDomainGuardLifecycle(t *testing.T) {
+
+	fake := newFakeDomains()
+	p := &domainTestProvider{fake: fake}
+	const addr = "authwise_domain.guard"
+
+	tfresource.UnitTest(t, tfresource.TestCase{
+		ProtoV6ProviderFactories: p.factories(),
+		CheckDestroy: func(*terraform.State) error {
+			if n := fake.count(); n != 0 {
+				return fmt.Errorf("destroy returned with %d domains still on the server", n)
+			}
+			return nil
+		},
+		Steps: []tfresource.TestStep{
+			{
+				Config: guardDomainConfig,
+				ConfigStateChecks: []statecheck.StateCheck{
+					statecheck.ExpectKnownValue(addr, tfjsonpath.New("product"), knownvalue.StringExact("guard")),
+					statecheck.ExpectKnownValue(addr, tfjsonpath.New("issuer_id"), knownvalue.Null()),
+					statecheck.ExpectKnownValue(addr, tfjsonpath.New("dns_records"), knownvalue.ListSizeExact(2)),
+					statecheck.ExpectKnownValue(addr, tfjsonpath.New("traffic_target"), knownvalue.StringExact("")),
+					statecheck.ExpectKnownValue("authwise_domain_activation.guard", tfjsonpath.New("state"), knownvalue.StringExact(domainActive)),
+					statecheck.ExpectKnownValue("terraform_data.traffic",
+						tfjsonpath.New("output").AtMapKey("content"), knownvalue.StringExact("acme.guard.authwise.com")),
+				},
+			},
+			{Config: guardDomainConfig, PlanOnly: true},
+			{
+				ResourceName:    addr,
+				ImportState:     true,
+				ImportStateKind: tfresource.ImportBlockWithID,
+				ImportStateId:   "tenants/t-1/domains/d-1",
+				Config:          guardDomainConfig,
+			},
+		},
+	})
+}
+
+// TestDomainProductValidated: product is guard or unset, never beside
+// issuer_id, and a product host is a custom hostname.
+func TestDomainProductValidated(t *testing.T) {
+
+	p := &domainTestProvider{fake: newFakeDomains()}
+
+	for config, want := range map[string]string{
+		`resource "authwise_domain" "x" {
+  product  = "vpn"
+  hostname = "vpn.acme.com"
+}`: `value must be one of`,
+		`resource "authwise_domain" "x" {
+  product   = "guard"
+  issuer_id = "i-1"
+  hostname  = "guard.acme.com"
+}`: `cannot be specified when "product" is specified`,
+		`resource "authwise_domain" "x" {
+  product  = "guard"
+  hostname = "guard.acme.com:8443"
+}`: `invalid custom hostname`,
+	} {
+		tfresource.UnitTest(t, tfresource.TestCase{
+			ProtoV6ProviderFactories: p.factories(),
+			Steps: []tfresource.TestStep{{
+				Config:      config,
+				PlanOnly:    true,
+				ExpectError: regexp.MustCompile(`(?s)` + strings.ReplaceAll(regexp.QuoteMeta(want), " ", `\s+`)),
+			}},
+		})
+	}
 }
 
 // TestDomainImportPlansNoChange imports by name (#43), and by the

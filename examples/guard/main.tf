@@ -1,5 +1,4 @@
-# Guard on a kit tenant: its settings, a network, down to a gateway server
-# and the first invite.
+# Guard on a kit tenant: its settings, a network, down to a gateway server.
 
 locals {
   # The kit tenant (t-…) Guard is on. There is no Guard tenant: Guard's
@@ -69,23 +68,6 @@ resource "authwise_guard_node" "gateway" {
 resource "authwise_guard_resource_nodes" "office_lan" {
   guard_resource = authwise_guard_resource.office_lan.name
   nodes          = [authwise_guard_node.gateway.name]
-}
-
-# 5. An invite for one person: the node they join with is granted both.
-resource "authwise_guard_invite" "dana" {
-  tenant_id    = local.guard_tenant_id
-  network_id   = authwise_guard_network.office.guard_network_id
-  display_name = "for Dana"
-  grants = [
-    authwise_guard_resource.office_lan.name,
-    authwise_guard_resource.wiki.name,
-  ]
-}
-
-output "invite_url" {
-  description = "The join link carrying the invite's code. Shown once by guard-control; kept in state."
-  value       = authwise_guard_invite.dana.url
-  sensitive   = true
 }
 
 output "gateway_auth_code" {

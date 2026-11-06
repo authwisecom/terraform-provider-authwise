@@ -2,9 +2,14 @@
 
 NOTES:
 
-* **apis v0.59.0.** Estate relay pools (guard-control#81, kit#898, tf#66).
-  The change is additive on top of 0.30.0. It needs guard-control v0.26.0
-  or later, as 0.30.0 does.
+* **apis v0.60.0.** Estate relay pools (guard-control#81, kit#898, tf#66),
+  and `Domain.product` (kit#903, tf#67). Like 0.30.0, it needs
+  guard-control v0.26.0 or later.
+  * A custom Guard address needs a kit that carries kit#903. An older kit
+    ignores `product` and creates a native host. The apply then fails with
+    an inconsistent result, and the stray host must be deleted by hand.
+    Upgrade kit first.
+  * The invite removal below is the release's one breaking change.
 * **Not modelled.** The operator's incident actions are not modelled:
   `:killPool` and `:restorePool` on a network, and `:revokeCredential`.
   They belong to awctl or the console.
@@ -50,6 +55,31 @@ FEATURES:
   networks may use.
 * **Example.** `examples/guard-relay-pools`: an operator's pools, a pool
   relay and its credential, a tenant's access, and a network on a pool.
+* **`authwise_domain.product` (tf#67, kit#903).** A custom Guard address,
+  such as `guard.acme.com`, that the tenant's people type into the Guard
+  client in place of `<slug>.guard.<estate>`.
+  * `product = "guard"` is the only value, and it conflicts with
+    `issuer_id`. Changing it replaces the domain.
+  * It has an issuer host's lifecycle: `dns_records`, the waits, and
+    `authwise_domain_activation` unchanged.
+  * Its `traffic` record points at the tenant's default Guard address, so
+    the tenant needs a slug first, set on the tenant in kit.
+    `traffic_target` is empty on it.
+  * kit gates it by plan (`PLAN_REQUIRED`). A trial has the default address
+    only.
+  * The `authwise_domain(s)` data sources read `product` back.
+
+BREAKING CHANGES:
+
+* **`authwise_guard_invite` and the `authwise_guard_invite(s)` data sources
+  are removed (tf#67, kit#902 D5).** Guard's Invite entity is retired.
+  * To invite a person, use kit's invitation (the console's "Invite a
+    person"). Grant them a network with `authwise_guard_enrolment_grant`.
+    They join by typing the tenant's Guard address into the client and
+    signing in.
+  * Remove `authwise_guard_invite` from configuration, and from state with
+    `terraform state rm` or a `removed` block. Its invites stay at
+    guard-control until guard-control retires them (guard-control#83).
 
 ## 0.30.0 (November 6, 2026)
 

@@ -21,6 +21,65 @@ func importByName(addr string) resource.ImportStateIdFunc {
 	}
 }
 
+// TestAccDomain_Guard: a custom Guard address (tf#67, kit#903) goes to kit
+// with product, reads back with it, and lists with it.
+func TestAccDomain_Guard(t *testing.T) {
+
+	h := newHarness(t)
+
+	config := h.providerConfig() + `
+resource "authwise_domain" "guard" {
+  product  = "guard"
+  hostname = "guard.acme.com"
+}
+
+data "authwise_domains" "all" {
+  depends_on = [authwise_domain.guard]
+}
+`
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: protoFactories(),
+		Steps: []resource.TestStep{
+			{
+				Config: config,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("authwise_domain.guard", "product", "guard"),
+					resource.TestCheckNoResourceAttr("authwise_domain.guard", "issuer_id"),
+					resource.TestCheckResourceAttr("authwise_domain.guard", "state", "PENDING_DNS"),
+					resource.TestCheckResourceAttr("authwise_domain.guard", "traffic_target", ""),
+					resource.TestCheckResourceAttr("authwise_domain.guard", "dns_records.#", "2"),
+					resource.TestCheckResourceAttr("data.authwise_domains.all", "domains.0.product", "guard"),
+					checkServer(func() error {
+						h.fake.mu.Lock()
+						defer h.fake.mu.Unlock()
+						for _, d := range h.fake.domains {
+							if d.GetProduct() != "guard" || d.GetIssuerId() != "" {
+								return fmt.Errorf("kit holds product %q, issuer_id %q", d.GetProduct(), d.GetIssuerId())
+							}
+						}
+						return nil
+					}),
+				),
+			},
+			{Config: config, PlanOnly: true},
+			{
+				ResourceName:      "authwise_domain.guard",
+				ImportState:       true,
+				ImportStateKind:   resource.ImportBlockWithID,
+				ImportStateIdFunc: importByName("authwise_domain.guard"),
+				Config:            config,
+			},
+		},
+		CheckDestroy: func(_ *terraform.State) error {
+			if n := len(h.fake.domains); n != 0 {
+				return fmt.Errorf("%d domains left", n)
+			}
+			return nil
+		},
+	})
+}
+
 func TestAccDomain_Native(t *testing.T) {
 
 	h := newHarness(t)

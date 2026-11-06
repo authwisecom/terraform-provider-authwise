@@ -3,12 +3,12 @@
 page_title: "authwise_guard_node Data Source - Authwise"
 subcategory: "Guard"
 description: |-
-  A server's node in a Guard network, registered ahead of time. Created without a public_key, it is PENDING and its one-time auth_code enrols the server; created with one, it is ACTIVE at once. The auth code is shown once, so it is kept in state: treat the state as sensitive. People's nodes join by invite and are not managed here. This data source reads one by its full resource name.
+  A server's node in a Guard network, registered ahead of time. Created without a public_key, it is PENDING and its one-time auth_code enrols the server; created with one, it is ACTIVE at once. The auth code is shown once, so it is kept in state: treat the state as sensitive. People's nodes join when they sign in and are not managed here. This data source reads one by its full resource name.
 ---
 
 # authwise_guard_node (Data Source)
 
-A server's node in a Guard network, registered ahead of time. Created without a `public_key`, it is `PENDING` and its one-time `auth_code` enrols the server; created with one, it is `ACTIVE` at once. The auth code is shown once, so it is kept in state: treat the state as sensitive. People's nodes join by invite and are not managed here. This data source reads one by its full resource name.
+A server's node in a Guard network, registered ahead of time. Created without a `public_key`, it is `PENDING` and its one-time `auth_code` enrols the server; created with one, it is `ACTIVE` at once. The auth code is shown once, so it is kept in state: treat the state as sensitive. People's nodes join when they sign in and are not managed here. This data source reads one by its full resource name.
 
 
 

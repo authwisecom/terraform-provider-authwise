@@ -8,7 +8,6 @@ import (
 	"slices"
 	"strings"
 	"sync"
-	"time"
 
 	guardpb "git.authwise.com/authwise/apis/authwise/guardcontrol/v1alpha1"
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
@@ -17,15 +16,14 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/known/emptypb"
-	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 // fakeGuardServer is guard-control v0.15.0's admin API (apis v0.28.0) as the
 // Guard resources use it: since the tenant collapse (apis v0.57.0, tf#65),
 // Guard's settings for the kit tenant t-1, which kit reports Guard on, networks
 // with a cidr in the mesh range, relays, resources and the nodes serving
-// them, and invites whose code is returned once. The rules are
-// guard-control's creator.go and validations.go.
+// them. The rules are guard-control's creator.go and validations.go. It
+// serves no invites: Guard's Invite entity is retired (tf#67).
 // People's nodes are seeded by tests, as enrolment would make them; a
 // server's node is created through CreateNode.
 type fakeGuardServer struct {
@@ -38,7 +36,6 @@ type fakeGuardServer struct {
 	networks  map[string]*guardpb.Network
 	relays    map[string]*guardpb.Relay
 	resources map[string]*guardpb.Resource
-	invites   map[string]*guardpb.Invite
 	nodes     map[string]*guardpb.Node
 	// Estate relay pools and their relays (tf#66), each tenant's access,
 	// and the relays' credentials, kept apart as guard-control keeps only
@@ -47,9 +44,6 @@ type fakeGuardServer struct {
 	poolRelays map[string]*guardpb.PoolRelay
 	access     map[string]*guardpb.RelayPoolAccess
 	creds      map[string]string
-	// codes are the invites' codes, apart from the row, the way
-	// guard-control keeps only a hash: a read never returns one.
-	codes map[string]string
 	// grants are each node's, by node name: resource and node names.
 	grants map[string][]string
 	seq    int
@@ -64,13 +58,11 @@ func newFakeGuardServer() *fakeGuardServer {
 		networks:   map[string]*guardpb.Network{},
 		relays:     map[string]*guardpb.Relay{},
 		resources:  map[string]*guardpb.Resource{},
-		invites:    map[string]*guardpb.Invite{},
 		nodes:      map[string]*guardpb.Node{},
 		pools:      map[string]*guardpb.RelayPool{},
 		poolRelays: map[string]*guardpb.PoolRelay{},
 		access:     map[string]*guardpb.RelayPoolAccess{},
 		creds:      map[string]string{},
-		codes:      map[string]string{},
 		grants:     map[string][]string{},
 	}
 	f.seedTenant("t-1")
@@ -324,7 +316,7 @@ func (f *fakeGuardServer) DeleteNetwork(ctx context.Context, in *guardpb.DeleteN
 		return nil, status.Errorf(codes.NotFound, "network %q not found", in.GetName())
 	}
 	prefix := in.GetName() + "/"
-	for _, names := range [][]string{keys(f.relays), keys(f.resources), keys(f.invites), keys(f.nodes)} {
+	for _, names := range [][]string{keys(f.relays), keys(f.resources), keys(f.nodes)} {
 		for _, name := range names {
 			if strings.HasPrefix(name, prefix) {
 				return nil, status.Errorf(codes.FailedPrecondition, "network %s is not empty: %s remains", in.GetName(), name)
@@ -560,100 +552,6 @@ func (f *fakeGuardServer) AssociateNodesToResource(ctx context.Context, in *guar
 	slices.Sort(ids)
 	r.ServingNodeIds = ids
 	return &emptypb.Empty{}, nil
-}
-
-// --- Invite ---
-
-const maxInviteTTL = 30 * 24 * time.Hour
-
-func (f *fakeGuardServer) CreateInvite(ctx context.Context, in *guardpb.CreateInviteRequest) (*guardpb.Invite, error) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	f.record(ctx)
-	if _, err := f.parentNetwork(in.GetParent()); err != nil {
-		return nil, err
-	}
-	i := proto.Clone(in.GetInvite()).(*guardpb.Invite)
-	switch {
-	case i.GetUses() != 0, i.GetCreatedBy() != "", i.GetState() != "", i.GetCode() != "", i.GetUrl() != "":
-		return nil, status.Error(codes.InvalidArgument, "uses, created_by, state, code and url are output-only")
-	case i.GetMaxUses() < 0:
-		return nil, status.Error(codes.InvalidArgument, "max_uses must be at least 1")
-	}
-	for _, g := range i.GetGrants() {
-		_, isResource := f.resources[g]
-		_, isNode := f.nodes[g]
-		if !strings.HasPrefix(g, in.GetParent()+"/") || !isResource && !isNode {
-			return nil, status.Errorf(codes.InvalidArgument, "grants: %s is not a resource or node of %s", g, in.GetParent())
-		}
-	}
-	now := time.Now().UTC()
-	if i.GetMaxUses() == 0 {
-		i.MaxUses = 1
-	}
-	if i.GetExpiresAt() == nil {
-		i.ExpiresAt = timestamppb.New(now.Add(7 * 24 * time.Hour).Truncate(time.Second))
-	}
-	if exp := i.GetExpiresAt().AsTime(); !exp.After(now) {
-		return nil, status.Error(codes.InvalidArgument, "expires_at must be in the future")
-	} else if exp.After(now.Add(maxInviteTTL)) {
-		return nil, status.Error(codes.InvalidArgument, "expires_at may be at most 30 days ahead")
-	}
-	i.State = "ACTIVE"
-	i.CreatedBy = "acc-client"
-	i.Name = in.GetParent() + "/invites/" + f.nextID("inv")
-	f.seq++
-	code := fmt.Sprintf("gi_code%d", f.seq)
-	f.invites[i.GetName()] = i
-	f.codes[i.GetName()] = code
-
-	out := proto.Clone(i).(*guardpb.Invite)
-	out.Code = code
-	out.Url = "https://join.example.com/i/" + code
-	return out, nil
-}
-
-func (f *fakeGuardServer) GetInvite(ctx context.Context, in *guardpb.GetInviteRequest) (*guardpb.Invite, error) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	f.record(ctx)
-	i, ok := f.invites[in.GetName()]
-	if !ok {
-		return nil, status.Errorf(codes.NotFound, "invite %q not found", in.GetName())
-	}
-	return proto.Clone(i).(*guardpb.Invite), nil
-}
-
-func (f *fakeGuardServer) ListInvites(ctx context.Context, in *guardpb.ListInvitesRequest) (*guardpb.ListInvitesResponse, error) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	f.record(ctx)
-	out := &guardpb.ListInvitesResponse{}
-	for _, i := range children(f.invites, in.GetParent()+"/invites/") {
-		out.Invites = append(out.Invites, proto.Clone(i).(*guardpb.Invite))
-	}
-	return out, nil
-}
-
-func (f *fakeGuardServer) DeleteInvite(ctx context.Context, in *guardpb.DeleteInviteRequest) (*emptypb.Empty, error) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	f.record(ctx)
-	if _, ok := f.invites[in.GetName()]; !ok {
-		return nil, status.Errorf(codes.NotFound, "invite %q not found", in.GetName())
-	}
-	delete(f.invites, in.GetName())
-	delete(f.codes, in.GetName())
-	return &emptypb.Empty{}, nil
-}
-
-// spend uses an invite up, as people joining with it would.
-func (f *fakeGuardServer) spend(name string) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	i := f.invites[name]
-	i.Uses = i.GetMaxUses()
-	i.State = "SPENT"
 }
 
 // --- helpers ---

@@ -277,7 +277,6 @@ func (p *AuthwiseProvider) Resources(ctx context.Context) []func() resource.Reso
 		realmTypeName:             newRealmResource,
 		factorTypeName:            newFactorResource,
 		appearanceProfileTypeName: newAppearanceProfileResource,
-		guardInviteTypeName:       newGuardInviteResource,
 		guardNodeTypeName:         newGuardNodeResource,
 		guardNetworkTypeName:      newGuardNetworkResource,
 		domainTypeName:            newDomainResource,

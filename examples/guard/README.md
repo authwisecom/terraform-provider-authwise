@@ -1,9 +1,8 @@
 # A Guard network
 
-A network in an existing Guard tenant, a relay, the two things on the far side of
-the network people reach (an office subnet and an internal application), a
-gateway server that routes to the subnet, and an invite that admits one
-person with both granted.
+A network on a kit tenant Guard is on, a relay, the two things on the far side of
+the network people reach (an office subnet and an internal application), and
+a gateway server that routes to the subnet.
 
 Guard is managed by the same provider as the identity objects, through a
 second endpoint: `guard_endpoint` (or `AUTHWISE_GUARD_ENDPOINT`) is
@@ -21,7 +20,6 @@ suite applies the two.
 # main.tf (the kit tenant Guard is on), then:
 terraform init
 terraform apply
-terraform output -raw invite_url          # send it to the person you invited
 terraform output -raw gateway_auth_code   # enrol the gateway with it
 ```
 
@@ -32,20 +30,19 @@ terraform output -raw gateway_auth_code   # enrol the gateway with it
   is kit's; until it is, guard-control refuses with `GUARD_NOT_ENABLED`.
   `authwise_guard_tenant_settings` holds Guard's settings for the tenant,
   and destroying it leaves them in place.
-- **People's nodes.** A person's node joins by following an invite. A
-  server's node is declared (`authwise_guard_node`) and enrols with its
-  auth code; what it may reach is `authwise_guard_node_grants`.
+- **People's nodes.** A person types the tenant's Guard address into the
+  client and signs in; their node joins the networks they may enrol in
+  (`authwise_guard_enrolment_grant`). A server's node is declared
+  (`authwise_guard_node`) and enrols with its auth code; what it may reach
+  is `authwise_guard_node_grants`.
 - **People.** Guard's users mirror the people who joined.
 
 Nodes matter on destroy: guard-control refuses to delete a network that
 still has nodes.
 
-## Invites
+## Inviting people
 
-The invite's `code` and `url` are shown once, when it is created, and kept
-in state, so treat the state as sensitive. A spent or expired invite stays
-in state and plans clean; to issue another, replace it:
-
-```sh
-terraform apply -replace=authwise_guard_invite.dana
-```
+Guard has no invites of its own. Invite a person with kit's invitation
+(the console's "Invite a person"), and grant them a network with
+`authwise_guard_enrolment_grant`. A custom Guard address such as
+`guard.acme.com` is an `authwise_domain` with `product = "guard"`.

@@ -138,11 +138,6 @@ func guard(typeName string) func(r *gentf.Resource) {
 	}
 }
 
-// withOps narrows the operations the API exposes.
-func withOps(ops gentf.Ops) func(r *gentf.Resource) {
-	return func(r *gentf.Resource) { r.Ops = ops }
-}
-
 // guardList is the plural data source of a Guard entry, prefixed like its
 // resource.
 func guardList(typeName string) gentf.DataSourceList {
@@ -263,13 +258,14 @@ func main() {
 		ScopeReferences:  scopeReferences,
 		Entries: []gentf.Entry{
 			// Tenant-scoped.
-			// A hostname the tenant serves, native or custom (issuer_id
-			// set), keyed by an AWID since kit#808. The resource is
+			// A hostname the tenant serves, native or custom (issuer_id or
+			// product set), keyed by an AWID since kit#808; product (guard)
+			// since kit#903. The resource is
 			// hand-written in internal/provider (the custom host's waits);
 			// the data sources are these.
 			crud[corepb.Domain](scopeTenant,
-				withDescription("A hostname the tenant serves logins on: native (no `issuer_id`), the host an issuer names, or custom (`issuer_id` set), a hostname of yours serving that issuer."),
-				withRequired("hostname"), withImmutable("hostname", "issuer_id"),
+				withDescription("A hostname the tenant serves: native (no `issuer_id` or `product`), the host an issuer names; custom with `issuer_id` set, a hostname of yours serving that issuer; or custom with `product = \"guard\"`, a hostname of yours serving the tenant's Guard address."),
+				withRequired("hostname"), withImmutable("hostname", "issuer_id", "product"),
 				withComputed("state", "dns_records", "failure", "certificate_expires_at", "activated_at", "claim_expires_at", "created_at", "traffic_target"),
 				withJSON("config"),
 				withReferences(map[string]gentf.Reference{"issuer_id": scopeReferences["issuer_id"]})),
@@ -466,23 +462,15 @@ func main() {
 			// are not modelled, and a person's node (owner_id set) is never
 			// terraform's.
 			crud[guardpb.Node](scopeGuardNetwork,
-				withDescription("A server's node in a Guard network, registered ahead of time. Created without a `public_key`, it is `PENDING` and its one-time `auth_code` enrols the server; created with one, it is `ACTIVE` at once. The auth code is shown once, so it is kept in state: treat the state as sensitive. People's nodes join by invite and are not managed here."),
+				withDescription("A server's node in a Guard network, registered ahead of time. Created without a `public_key`, it is `PENDING` and its one-time `auth_code` enrols the server; created with one, it is `ACTIVE` at once. The auth code is shown once, so it is kept in state: treat the state as sensitive. People's nodes join when they sign in and are not managed here."),
 				guard("node"), guardList("nodes"),
 				withImmutable("address"),
 				withComputed("allowed_ips", "owner_id", "state", "roles", "auth_code", "auth_code_expires_at", "last_seen_at", "platform"),
 				withSensitive("auth_code"),
 				withJSON("config")),
-			// An invite is create-only: guard-control has no update. Its code
-			// and url are shown once, in the create response; the wrapper in
-			// internal/provider keeps them in state.
-			crud[guardpb.Invite](scopeGuardNetwork,
-				withDescription("An invite that admits people to a Guard network, with the grants every node it creates receives. Its `code` and `url` are shown once, so they are kept in state: treat the state as sensitive. A spent or expired invite stays in state; replace it to issue a new one."),
-				guard("invite"), guardList("invites"),
-				withOps(gentf.OpGet|gentf.OpList|gentf.OpCreate|gentf.OpDelete),
-				withComputed("uses", "created_by", "state", "code", "url"),
-				withSensitive("code", "url"),
-				withImmutable("labels", "display_name", "expires_at", "max_uses", "grants", "config"),
-				withJSON("config")),
+			// No Invite: Guard's Invite entity is retired (kit#902 D5, tf#67).
+			// A person is invited by kit's InviteUser and granted with
+			// GrantEnrolment.
 
 			// Config builder data sources for Any-packed configs
 			// (Provider.config, Client.config).

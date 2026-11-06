@@ -10,8 +10,8 @@ The Authwise provider manages an Authwise install's identity and access
 configuration over its published gRPC API. That covers issuers and their
 login routing, realms and the providers and factors people sign in with,
 clients and audiences, the Access catalog, and the secrets and endpoints
-these depend on. It also manages Guard, Authwise's mesh VPN: tenants,
-networks, relays, resources and invites, over guard-control's API.
+these depend on. It also manages Guard, Authwise's mesh VPN: a tenant's settings,
+networks, relays, resources and relay pools, over guard-control's API.
 
 The resources and data sources are grouped by what they manage:
 

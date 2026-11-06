@@ -111,25 +111,23 @@ The `authwise_guard_*` resources manage Guard, the mesh VPN, over
 guard-control's API rather than kit's (#32): `authwise_guard_network`,
 `authwise_guard_relay`, `authwise_guard_resource` with
 `authwise_guard_resource_nodes`, `authwise_guard_node` with
-`authwise_guard_node_grants`, and `authwise_guard_invite`, each entity with
-its singular and plural data sources. A Guard tenant (`gt-…`) is created by
-awtenant, not here (#36); its data sources, `authwise_guard_tenant` and
-`authwise_guard_tenants`, read it. Set `guard_endpoint` (or
-`AUTHWISE_GUARD_ENDPOINT`) to guard-control's gRPC address; the same bearer
-goes to both services, and without it a Guard resource fails at plan.
+`authwise_guard_node_grants`, and the estate's relay pools (#66), each
+entity with its singular and plural data sources. There is no Guard tenant
+(#65): Guard is keyed by the kit tenant (`t-…`), passed as `tenant_id`, and
+`authwise_guard_tenant_settings` holds Guard's settings on it. Set
+`guard_endpoint` (or `AUTHWISE_GUARD_ENDPOINT`) to guard-control's gRPC
+address; the same bearer goes to both services, and without it a Guard
+resource fails at plan.
 
-`examples/guard` is a network in a Guard tenant down to a gateway server and
-an invite, applied by the acceptance suite together with
-`examples/guard-catalog`. A server's node is declared and enrols itself with
-its one-time `auth_code`; the key and endpoint enrolment writes read back
-without a diff. People's nodes and Guard's users are not terraform's: they
-join by invite. That matters on destroy, since guard-control refuses to
-delete a network that still has nodes or a Guard tenant with networks or
-users.
-
-A Guard tenant is Guard's own (`gt-…`), created under a parent Authwise
-tenant with a users link (#35, guard-control v0.12.0). The other Guard
-resources take its id as a required `tenant_id`.
+`examples/guard` is a network on a kit tenant down to a gateway server,
+applied by the acceptance suite together with `examples/guard-catalog`. A
+server's node is declared and enrols itself with its one-time `auth_code`;
+the key and endpoint enrolment writes read back without a diff. People's
+nodes and Guard's users are not terraform's: a person signs in at the
+tenant's Guard address and enrols in the networks they are granted
+(`authwise_guard_enrolment_grant`). Guard has no invites of its own (#67): a
+person is invited by kit's invitation. That matters on destroy, since
+guard-control refuses to delete a network that still has nodes.
 
 ## Associations
 

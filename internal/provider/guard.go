@@ -310,16 +310,10 @@ func (d *guardDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 	d.inner.Read(ctx, req, resp)
 }
 
-// The Guard types whose create response alone carries a value: an invite's
-// code and join link, and a node's auth code.
-const (
-	guardInviteTypeName = "authwise_guard_invite"
-	guardNodeTypeName   = "authwise_guard_node"
-)
-
-func newGuardInviteResource() resource.Resource {
-	return &keepOnceResource{inner: generated.NewInviteResource(), attrs: []string{"code", "url"}}
-}
+// The Guard type whose create response alone carries a value: a node's
+// auth code. (An invite's code was the other, until Guard's Invite entity
+// was retired, tf#67.)
+const guardNodeTypeName = "authwise_guard_node"
 
 func newGuardNodeResource() resource.Resource {
 	return &keepOnceResource{inner: generated.NewNodeResource(), attrs: []string{"auth_code"}}

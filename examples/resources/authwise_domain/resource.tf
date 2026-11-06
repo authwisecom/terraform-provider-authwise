@@ -46,3 +46,39 @@ resource "cloudflare_record" "login_traffic" {
 
   depends_on = [authwise_domain_activation.login]
 }
+
+# A custom Guard address: guard.acme.com is what the tenant's people type
+# into the Guard client, in place of <slug>.guard.<estate>. The same
+# records, in the same order; its traffic record points at the tenant's
+# default Guard address, so the tenant needs a slug first.
+resource "authwise_domain" "guard" {
+  product  = "guard"
+  hostname = "guard.acme.com"
+}
+
+locals {
+  guard_records = { for r in authwise_domain.guard.dns_records : r.purpose => r }
+}
+
+resource "cloudflare_record" "guard_challenge" {
+  zone_id = var.zone_id
+  name    = local.guard_records["challenge"].name
+  type    = local.guard_records["challenge"].type
+  content = local.guard_records["challenge"].value
+  proxied = false
+}
+
+resource "authwise_domain_activation" "guard" {
+  domain     = authwise_domain.guard.name
+  depends_on = [cloudflare_record.guard_challenge]
+}
+
+resource "cloudflare_record" "guard_traffic" {
+  zone_id = var.zone_id
+  name    = local.guard_records["traffic"].name
+  type    = local.guard_records["traffic"].type
+  content = local.guard_records["traffic"].value
+  proxied = false
+
+  depends_on = [authwise_domain_activation.guard]
+}

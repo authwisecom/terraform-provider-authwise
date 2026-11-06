@@ -3,18 +3,18 @@
 page_title: "authwise_guard_node_grants Resource - Authwise"
 subcategory: "Guard"
 description: |-
-  What a Guard node may reach: the full names of resources and nodes of its network, as an authoritative set. A grant made out of band, such as one an invite gave the node, is removed on the next apply.
+  What a Guard node may reach: the full names of resources and nodes of its network, as an authoritative set. A grant made out of band, such as one made in the Guard console, is removed on the next apply.
 ---
 
 # authwise_guard_node_grants (Resource)
 
-What a Guard node may reach: the full names of resources and nodes of its network, as an authoritative set. A grant made out of band, such as one an invite gave the node, is removed on the next apply.
+What a Guard node may reach: the full names of resources and nodes of its network, as an authoritative set. A grant made out of band, such as one made in the Guard console, is removed on the next apply.
 
 ## Example Usage
 
 ```terraform
 # What a node may reach, as an authoritative set of resource and node names
-# of its network. Grants an invite gave the node are removed unless listed.
+# of its network. Grants made out of band are removed unless listed.
 resource "authwise_guard_node_grants" "build" {
   guard_node = authwise_guard_node.build.name
   grants = [

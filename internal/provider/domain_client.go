@@ -20,7 +20,7 @@ type domainClient struct {
 func (c domainClient) CreateDomain(ctx context.Context, parent string, in *domain) (*domain, error) {
 	out, err := c.client.CreateDomain(ctx, &identitypb.CreateDomainRequest{
 		Parent: parent,
-		Domain: &corepb.Domain{Hostname: in.Hostname, IssuerId: in.IssuerID, Labels: in.Labels},
+		Domain: &corepb.Domain{Hostname: in.Hostname, IssuerId: in.IssuerID, Product: in.Product, Labels: in.Labels},
 	})
 	if err != nil {
 		return nil, err
@@ -81,6 +81,7 @@ func domainFromProto(e *corepb.Domain) *domain {
 		Name:          e.GetName(),
 		Hostname:      e.GetHostname(),
 		IssuerID:      e.GetIssuerId(),
+		Product:       e.GetProduct(),
 		Labels:        e.GetLabels(),
 		TrafficTarget: e.GetTrafficTarget(),
 		ActivatedAt:   timeOf(e.GetActivatedAt()),

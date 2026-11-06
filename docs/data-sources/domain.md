@@ -3,12 +3,12 @@
 page_title: "authwise_domain Data Source - Authwise"
 subcategory: "Identity"
 description: |-
-  A hostname the tenant serves logins on: native (no issuer_id), the host an issuer names, or custom (issuer_id set), a hostname of yours serving that issuer. This data source reads one by its full resource name.
+  A hostname the tenant serves: native (no issuer_id or product), the host an issuer names; custom with issuer_id set, a hostname of yours serving that issuer; or custom with product = "guard", a hostname of yours serving the tenant's Guard address. This data source reads one by its full resource name.
 ---
 
 # authwise_domain (Data Source)
 
-A hostname the tenant serves logins on: native (no `issuer_id`), the host an issuer names, or custom (`issuer_id` set), a hostname of yours serving that issuer. This data source reads one by its full resource name.
+A hostname the tenant serves: native (no `issuer_id` or `product`), the host an issuer names; custom with `issuer_id` set, a hostname of yours serving that issuer; or custom with `product = "guard"`, a hostname of yours serving the tenant's Guard address. This data source reads one by its full resource name.
 
 
 
@@ -32,6 +32,7 @@ A hostname the tenant serves logins on: native (no `issuer_id`), the host an iss
 - `hostname` (String)
 - `issuer_id` (String)
 - `labels` (Map of String)
+- `product` (String)
 - `state` (String)
 - `tenant_id` (String)
 - `traffic_target` (String)

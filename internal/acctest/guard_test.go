@@ -1,7 +1,7 @@
-// Guard (guard-control, #32): a network in a Guard tenant that awtenant
-// created (E22, #36), a relay, a resource and the nodes serving it, and
-// an invite whose code is shown once. guard-control is its own endpoint,
-// reached with the same bearer as kit.
+// Guard (guard-control, #32): a network on a kit tenant Guard is on, a
+// relay, and a resource and the nodes serving it. guard-control is its own
+// endpoint, reached with the same bearer as kit. There is no invite: Guard's
+// Invite entity is retired (tf#67, kit#902 D5).
 package acctest_test
 
 import (
@@ -29,11 +29,10 @@ const (
 	guardRelayAddr    = "authwise_guard_relay.west"
 	guardResourceAddr = "authwise_guard_resource.wiki"
 	guardNodesAddr    = "authwise_guard_resource_nodes.wiki"
-	guardInviteAddr   = "authwise_guard_invite.dana"
 )
 
-// guardConfig is a tenant, a network, a relay at priority, a host resource
-// and an invite granting it; extra is appended.
+// guardConfig is a tenant, a network, a relay at priority and a host
+// resource; extra is appended.
 func (h *harness) guardConfig(priority int, extra string) string {
 	return h.providerConfig() + fmt.Sprintf(`
 `+guardTenantHCL+`
@@ -59,13 +58,6 @@ resource "authwise_guard_resource" "wiki" {
   address      = "10.0.0.5"
 }
 
-resource "authwise_guard_invite" "dana" {
-  tenant_id    = local.guard_tenant_id
-  network_id   = authwise_guard_network.office.guard_network_id
-  display_name = "for Dana"
-  grants       = [authwise_guard_resource.wiki.name]
-}
-
 data "authwise_guard_networks" "all" {
   tenant_id  = local.guard_tenant_id
   depends_on = [authwise_guard_network.office]
@@ -83,8 +75,6 @@ func TestAccGuard_Lifecycle(t *testing.T) {
 		defer h.guard.mu.Unlock()
 		return keys(h.guard.networks)[0]
 	}
-
-	var code string
 
 	nodes := func(ids ...string) string {
 		quoted := make([]string, len(ids))
@@ -112,17 +102,7 @@ resource "authwise_guard_resource_nodes" "wiki" {
 					resource.TestCheckResourceAttr(guardNetworkAddr, "cidr", "100.64.0.0/10"),
 					resource.TestCheckResourceAttr(guardRelayAddr, "priority", "10"),
 					resource.TestCheckNoResourceAttr(guardResourceAddr, "serving_node_ids.#"),
-					resource.TestMatchResourceAttr(guardInviteAddr, "code", regexp.MustCompile(`^gi_`)),
-					resource.TestMatchResourceAttr(guardInviteAddr, "url", regexp.MustCompile(`^https://join.example.com/i/gi_`)),
-					resource.TestCheckResourceAttr(guardInviteAddr, "max_uses", "1"),
-					resource.TestCheckResourceAttr(guardInviteAddr, "state", "ACTIVE"),
-					resource.TestCheckResourceAttrSet(guardInviteAddr, "expires_at"),
-					resource.TestCheckResourceAttrPair(guardInviteAddr, "grants.0", guardResourceAddr, "name"),
 					resource.TestCheckResourceAttr("data.authwise_guard_networks.all", "guard_networks.#", "1"),
-					resource.TestCheckResourceAttrWith(guardInviteAddr, "code", func(v string) error {
-						code = v
-						return nil
-					}),
 					func(*terraform.State) error {
 						h.guard.mu.Lock()
 						defer h.guard.mu.Unlock()
@@ -140,8 +120,7 @@ resource "authwise_guard_resource_nodes" "wiki" {
 			},
 			{
 				// Two nodes join; the resource is served by both, and the
-				// relay's priority changes in place. The invite's code
-				// survives the refreshes.
+				// relay's priority changes in place.
 				PreConfig: func() {
 					h.guard.seedNode(network(), "nd-1")
 					h.guard.seedNode(network(), "nd-2")
@@ -152,13 +131,12 @@ resource "authwise_guard_resource_nodes" "wiki" {
 				ConfigPlanChecks: resource.ConfigPlanChecks{
 					PreApply: []plancheck.PlanCheck{
 						plancheck.ExpectResourceAction(guardRelayAddr, plancheck.ResourceActionUpdate),
-						plancheck.ExpectResourceAction(guardInviteAddr, plancheck.ResourceActionNoop),
+						plancheck.ExpectResourceAction(guardNetworkAddr, plancheck.ResourceActionNoop),
 					},
 				},
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(guardRelayAddr, "priority", "20"),
 					resource.TestCheckResourceAttr(guardNodesAddr, "nodes.#", "2"),
-					resource.TestCheckResourceAttrWith(guardInviteAddr, "code", equalTo(&code)),
 				),
 			},
 			{
@@ -181,24 +159,14 @@ resource "authwise_guard_resource_nodes" "wiki" {
 				),
 			},
 			{
-				// Spent, the invite reads back SPENT and still plans clean:
-				// terraform does not reissue it.
-				PreConfig: func() {
-					h.guard.mu.Lock()
-					name := keys(h.guard.invites)[0]
-					h.guard.mu.Unlock()
-					h.guard.spend(name)
-				},
+				// Refreshed, the resource's echo of its serving nodes has
+				// followed the set, and the plan stays empty.
 				Config: h.guardConfig(20, nodes(
 					"${authwise_guard_network.office.name}/nodes/nd-2")),
 				ConfigPlanChecks: resource.ConfigPlanChecks{
 					PreApply: []plancheck.PlanCheck{plancheck.ExpectEmptyPlan()},
 				},
-				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr(guardInviteAddr, "state", "SPENT"),
-					resource.TestCheckResourceAttr(guardInviteAddr, "uses", "1"),
-					resource.TestCheckResourceAttrWith(guardInviteAddr, "code", equalTo(&code)),
-				),
+				Check: resource.TestCheckResourceAttr(guardResourceAddr, "serving_node_ids.#", "1"),
 			},
 			{
 				ResourceName:                         guardNetworkAddr,
@@ -222,15 +190,6 @@ resource "authwise_guard_resource_nodes" "wiki" {
 				ImportStateIdFunc:                    importByName(guardResourceAddr),
 			},
 			{
-				// An imported invite has no code: no read returns it.
-				ResourceName:                         guardInviteAddr,
-				ImportState:                          true,
-				ImportStateVerify:                    true,
-				ImportStateVerifyIdentifierAttribute: "name",
-				ImportStateVerifyIgnore:              []string{"code", "url"},
-				ImportStateIdFunc:                    importByName(guardInviteAddr),
-			},
-			{
 				// The association goes, then the nodes leave as an admin
 				// would remove them: guard-control refuses to delete a
 				// network that still has nodes.
@@ -247,7 +206,7 @@ resource "authwise_guard_resource_nodes" "wiki" {
 			h.guard.mu.Lock()
 			defer h.guard.mu.Unlock()
 			// The tenant is awtenant's and stays.
-			if n := len(h.guard.networks) + len(h.guard.relays) + len(h.guard.resources) + len(h.guard.invites); n != 0 {
+			if n := len(h.guard.networks) + len(h.guard.relays) + len(h.guard.resources); n != 0 {
 				return fmt.Errorf("%d Guard rows remain after destroy", n)
 			}
 			return nil
@@ -317,15 +276,6 @@ resource "authwise_guard_resource" "x" {
   address    = "100.64.0.9"
 }`,
 			want: regexp.MustCompile(`(?s)not\s+a\s+routed\s+address\s+outside`),
-		},
-		"invite too long-lived": {
-			config: `
-resource "authwise_guard_invite" "x" {
-  tenant_id  = local.guard_tenant_id
-  network_id = authwise_guard_network.office.guard_network_id
-  expires_at = "2099-01-01T00:00:00Z"
-}`,
-			want: regexp.MustCompile(`(?s)at\s+most\s+30\s+days\s+ahead`),
 		},
 		"node granted itself": {
 			config: `
