@@ -179,7 +179,9 @@ administration console.
 the issuer's first binding, which kit then holds, and they keep the values
 the issuer was created with: changing them replaces the issuer. `bindings`
 lists where the issuer answers now, and `domain_name` is the first
-binding's hostname.
+binding's hostname. `domain_name` and `path` follow the issuer's first
+binding, its home, and not `preferred_binding_id`, which governs mailed
+links only.
 
 ## The host in mailed links
 
@@ -253,7 +255,7 @@ resource "authwise_issuer_preferred_binding" "login" {
 - `issuer_id` (String) Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.
 - `name` (String) Full resource name; serves as the Terraform ID.
 - `preferred_binding_id` (String) The binding (`idb-…`) kit builds the links it mails on: the invitation accept, the password reset, the address verification. Empty means the issuer's first binding. Written by `authwise_issuer_preferred_binding`, since a binding names its issuer and the issuer naming the binding back would be a cycle.
-- `preferred_domain_id` (String) **Deprecated** (kit#911) for `preferred_binding_id`: the preferred binding's domain.
+- `preferred_domain_id` (String) **Deprecated** (kit#911) for `preferred_binding_id`, which is what kit builds mailed links on. This reads back the domain kit#857 stored, for one more release.
 
 <a id="nestedatt--bindings"></a>
 ### Nested Schema for `bindings`

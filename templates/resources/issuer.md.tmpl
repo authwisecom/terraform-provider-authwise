@@ -179,7 +179,9 @@ administration console.
 the issuer's first binding, which kit then holds, and they keep the values
 the issuer was created with: changing them replaces the issuer. `bindings`
 lists where the issuer answers now, and `domain_name` is the first
-binding's hostname.
+binding's hostname. `domain_name` and `path` follow the issuer's first
+binding, its home, and not `preferred_binding_id`, which governs mailed
+links only.
 
 ## The host in mailed links
 

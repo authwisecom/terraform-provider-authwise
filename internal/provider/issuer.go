@@ -83,7 +83,7 @@ func (r *issuerResource) Schema(ctx context.Context, req resource.SchemaRequest,
 	describe("domain_name", "The hostname of the issuer's first binding; empty when it has none.", "")
 	describe("preferred_binding_id", "The binding (`idb-…`) kit builds the links it mails on: the invitation accept, the password reset, the address verification. "+
 		"Empty means the issuer's first binding. Written by `authwise_issuer_preferred_binding`, since a binding names its issuer and the issuer naming the binding back would be a cycle.", "")
-	describe("preferred_domain_id", "**Deprecated** (kit#911) for `preferred_binding_id`: the preferred binding's domain.", "")
+	describe("preferred_domain_id", "**Deprecated** (kit#911) for `preferred_binding_id`, which is what kit builds mailed links on. This reads back the domain kit#857 stored, for one more release.", "")
 }
 
 func (r *issuerResource) Configure(ctx context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
