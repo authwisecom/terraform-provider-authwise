@@ -1,11 +1,12 @@
-## 0.31.0 (Unreleased)
+## 0.31.0 (November 6, 2026)
 
 NOTES:
 
 * **apis v0.60.0.** Estate relay pools (guard-control#81, kit#898, tf#66),
   and `Domain.product` (kit#903, tf#67). Like 0.30.0, it needs
   guard-control v0.26.0 or later.
-  * A custom Guard address needs a kit that carries kit#903. An older kit
+  * Pairs with guard-control v0.26.0 and kit v1.83.0.
+  * A custom Guard address needs kit v1.83.0 or later (kit#903). An older kit
     ignores `product` and creates a native host. The apply then fails with
     an inconsistent result, and the stray host must be deleted by hand.
     Upgrade kit first.
