@@ -8,35 +8,34 @@
 # docs/AUTHORIZATION.md carries the same entries as an awctl runbook and as a
 # first-install static overlay.
 #
-# Requires kit >= 1.40.0. guard-control links each Guard tenant under its
-# parent, and each network under its Guard tenant, at central with the
-# caller's own bearer: kit admits those link writes at the link's parent
-# from that release (ESTATE_TENANCY.md E21), and writes the declared types
-# below to a database install (kit#738). Before it, every Guard tenant
-# create is refused at the link.
+# These are the operators' entries, in the admin audience. A tenant's own
+# people are authorized in the tenant's Guard audience, which kit's
+# EnableProduct creates with its roles and resource types (guard-control#80).
 #
-# kit's authwise-guard preset (kit#727) seeds all of this itself: the
-# permissions, the role and the declared types. Apply this on any other
-# install.
+# kit's authwise-guard preset (kit#727) seeds all of this itself. Apply this
+# on any other install.
 
 locals {
-  # Generated from guard-control v0.12.0's proto. Do not hand-maintain a copy —
-  # regenerate from the version you deploy, and apply the new version's
-  # entries BEFORE rolling it out:
+  # Generated from guard-control v0.27.0 (c9c1034). Do not hand-maintain a
+  # copy: regenerate from the version you deploy, and apply the new
+  # version's entries BEFORE rolling it out.
   #
-  #   guard-control authz-permissions
+  #   guard-control authz-permissions --role   # admin_permissions (52)
+  #   guard-control authz-permissions          # both lists together (59)
   #
   # A permission nothing yet requires is harmless; a binary that requires a
   # permission nobody created denies that method for everyone, with a healthy
   # install and nothing in any log explaining it.
-  guardcontrol_permissions = [
+  #
+  # What guardcontrol.admin carries.
+  admin_permissions = [
     "guardcontrol.events.get",
     "guardcontrol.events.list",
     "guardcontrol.events.search",
     "guardcontrol.networks.create",
     "guardcontrol.networks.delete",
-    "guardcontrol.networks.enrol",
     "guardcontrol.networks.get",
+    "guardcontrol.networks.killPool",
     "guardcontrol.networks.list",
     "guardcontrol.networks.update",
     "guardcontrol.nodes.associateGrants",
@@ -46,6 +45,19 @@ locals {
     "guardcontrol.nodes.issueAuthCode",
     "guardcontrol.nodes.list",
     "guardcontrol.nodes.update",
+    "guardcontrol.poolRelays.create",
+    "guardcontrol.poolRelays.delete",
+    "guardcontrol.poolRelays.get",
+    "guardcontrol.poolRelays.issueCredential",
+    "guardcontrol.poolRelays.list",
+    "guardcontrol.poolRelays.revokeCredential",
+    "guardcontrol.poolRelays.update",
+    "guardcontrol.relayPools.create",
+    "guardcontrol.relayPools.delete",
+    "guardcontrol.relayPools.get",
+    "guardcontrol.relayPools.list",
+    "guardcontrol.relayPools.listAllowed",
+    "guardcontrol.relayPools.update",
     "guardcontrol.relays.create",
     "guardcontrol.relays.delete",
     "guardcontrol.relays.get",
@@ -57,11 +69,13 @@ locals {
     "guardcontrol.resources.get",
     "guardcontrol.resources.list",
     "guardcontrol.resources.update",
-    "guardcontrol.tenants.create",
     "guardcontrol.tenants.delete",
     "guardcontrol.tenants.get",
-    "guardcontrol.tenants.list",
+    "guardcontrol.tenants.grants.list",
+    "guardcontrol.tenants.grants.write",
+    "guardcontrol.tenants.people.list",
     "guardcontrol.tenants.update",
+    "guardcontrol.traffic.read",
     "guardcontrol.users.create",
     "guardcontrol.users.delete",
     "guardcontrol.users.get",
@@ -69,14 +83,18 @@ locals {
     "guardcontrol.users.update",
   ]
 
-  # kit's own permissions the role carries beside guard-control's: the link
-  # writes guard-control makes with the caller's bearer, and the list an
-  # unlink finds the link with. kit declares them, so they are read, not
-  # created (`guard-control authz-permissions --role` prints all 40 from gc 0.27.0).
-  kit_permissions = [
-    "access.resourceLinks.create",
-    "access.resourceLinks.delete",
-    "access.resourceLinks.list",
+  # A person's own permissions: self-service and enrolling a device. The
+  # catalog declares them but guardcontrol.admin does not carry them
+  # (administering is not using, kit#787). They are the difference between
+  # the two commands above.
+  user_permissions = [
+    "guardcontrol.networks.enrol",
+    "guardcontrol.self.enrolments.list",
+    "guardcontrol.self.enrolments.revoke",
+    "guardcontrol.self.nodes.delete",
+    "guardcontrol.self.nodes.get",
+    "guardcontrol.self.nodes.list",
+    "guardcontrol.self.nodes.update",
   ]
 
   # Your first console admin: a user that already exists in the install.
@@ -100,67 +118,42 @@ locals {
 #    deployer rather than the server — access_permission_id IS the name the
 #    authorization engine matches on.
 resource "authwise_access_permission" "guardcontrol" {
-  for_each = toset(local.guardcontrol_permissions)
+  for_each = toset(concat(local.admin_permissions, local.user_permissions))
 
   access_permission_id = each.value
   service              = "guardcontrol"
 }
 
-# 2. The declared types a grant reaches Guard through. A Guard tenant is
-#    linked under its parent Authwise tenant, and a network under its Guard
-#    tenant, so a binding at the parent reaches both. Without them the link
-#    guard-control writes is refused, and so is the create.
-resource "authwise_access_resource_type" "guardcontrol_tenant" {
-  access_resource_type_id = "guardcontrol.tenant"
-  parent_type             = "tenant"
-  expansion_mode          = "PUSH"
-  description             = "A Guard tenant, administered through its parent Authwise tenant"
-}
-
-resource "authwise_access_resource_type" "guardcontrol_network" {
-  access_resource_type_id = "guardcontrol.network"
-  parent_type             = authwise_access_resource_type.guardcontrol_tenant.access_resource_type_id
-  expansion_mode          = "PUSH"
-  description             = "A Guard network, administered through its Guard tenant"
-}
-
-# 3. What you actually grant.
+# 2. What you actually grant.
 resource "authwise_access_role" "guardcontrol_admin" {
   access_role_id = "guardcontrol.admin"
   description    = "Full guard-control console administration."
 }
 
-# 4. The role's permissions, as an authoritative set: a permission associated
+# 3. The role's permissions, as an authoritative set: a permission associated
 #    out of band is removed on the next apply, and a role that exists but
 #    carries no permissions grants a bundle of nothing while looking correct.
-#    kit's link permissions are read from the role's own catalog, so an
-#    install without them fails the plan here.
-data "authwise_access_permission" "kit" {
-  for_each = toset(local.kit_permissions)
-  name     = "${trimsuffix(authwise_access_role.guardcontrol_admin.name, "/access-roles/${authwise_access_role.guardcontrol_admin.access_role_id}")}/access-permissions/${each.value}"
-}
-
+#    An install that applied an earlier version of this example loses kit's
+#    access.resourceLinks.* from the role here; guard-control has not needed
+#    them since guard-control#80, and the permissions themselves stay.
 resource "authwise_access_role_access_permissions" "guardcontrol_admin" {
-  access_role = authwise_access_role.guardcontrol_admin.name
-  access_permissions = concat(
-    [for p in authwise_access_permission.guardcontrol : p.name],
-    [for p in data.authwise_access_permission.kit : p.name],
-  )
+  access_role        = authwise_access_role.guardcontrol_admin.name
+  access_permissions = [for id in local.admin_permissions : authwise_access_permission.guardcontrol[id].name]
 }
 
-# 5. The binding. Without it the console loads and everything 403s.
+# 4. The binding. Without it the console loads and everything 403s.
 #
 #    resource_type and resource_id are left unset, which anchors the grant at
-#    the root so it applies on every tenant. A narrower anchor:
-#    resource_type = "guardcontrol.tenant" with a kit tenant's `t-…` id
-#    reaches Guard on that one tenant.
+#    the root. The root is the only place an operator is checked
+#    (guard-control#80), so a narrower anchor in this audience admits
+#    nothing.
 resource "authwise_access_binding" "guardcontrol_admin" {
   subject_type = "user"
   subject_id   = local.admin_subject_id
   role_name    = authwise_access_role.guardcontrol_admin.access_role_id
 }
 
-# 6. The console's audience and OIDC client. Without these the console cannot
+# 5. The console's audience and OIDC client. Without these the console cannot
 #    start a login at all. Unlike the entries above — which are the install
 #    learning Guard's vocabulary, once per install — this pair carries one
 #    deployment's URLs.

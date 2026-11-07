@@ -3,7 +3,6 @@ package acctest_test
 import (
 	"context"
 	"fmt"
-	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -197,16 +196,17 @@ func asExitError(err error, target **exec.ExitError) bool {
 	return ok
 }
 
-// kitLinkPermissions are kit's own permissions guardcontrol.admin carries,
-// which kit's seed declares: the example reads them rather than creating
-// them.
+// kitLinkPermissions are kit's own permissions, which kit's seed declares.
+// An earlier guard-catalog example put them on guardcontrol.admin;
+// guard-control#80 retired them from the role, so the example no longer
+// reads or associates them.
 var kitLinkPermissions = []string{"access.resourceLinks.create", "access.resourceLinks.delete", "access.resourceLinks.list"}
 
 // TestAccGuardCatalogExample applies examples/guard-catalog verbatim: the
-// whole guard prerequisite — 41 permissions (guard-control v0.12.0), the two
-// declared types, the role carrying them and kit's three link permissions,
-// the authoritative association, the root-anchored binding, and the console
-// audience and client — then asserts a re-plan is empty.
+// whole guard prerequisite — 59 permissions (guard-control v0.27.0, c9c1034),
+// the role carrying the 52 that are not a person's own, the authoritative
+// association, the root-anchored binding, and the console audience and
+// client — then asserts a re-plan is empty.
 func TestAccGuardCatalogExample(t *testing.T) {
 
 	if os.Getenv("TF_ACC") == "" {
@@ -221,31 +221,31 @@ func TestAccGuardCatalogExample(t *testing.T) {
 	r.expectCleanPlan()
 
 	h.access.mu.Lock()
-	permissions, bindings := len(h.access.permissions), len(h.access.bindings)
-	types := map[string]string{}
-	for _, rt := range h.access.types {
-		types[rt.GetName()[strings.LastIndex(rt.GetName(), "/")+1:]] = rt.GetParentType() + " " + rt.GetExpansionMode()
-	}
+	permissions, bindings, types := len(h.access.permissions), len(h.access.bindings), len(h.access.types)
 	h.access.mu.Unlock()
 
-	// guard-control's 37 and kit's 3, which were there already.
-	if permissions != 40 {
-		t.Errorf("%d access permissions on the server, want 40", permissions)
+	// guard-control's 59 and kit's 3, which were there already.
+	if permissions != 62 {
+		t.Errorf("%d access permissions on the server, want 62", permissions)
 	}
-	if want := map[string]string{"guardcontrol.tenant": "tenant PUSH", "guardcontrol.network": "guardcontrol.tenant PUSH"}; !maps.Equal(types, want) {
-		t.Errorf("declared types = %v, want %v", types, want)
+	// guard-control#80: an operator is checked at the root, so the example
+	// declares no types.
+	if types != 0 {
+		t.Errorf("%d declared types, want 0", types)
 	}
 	if bindings != 1 {
 		t.Errorf("%d access bindings, want 1", bindings)
 	}
 
 	members := h.access.rolePermissions(accessPrefix + "/access-roles/guardcontrol.admin")
-	if len(members) != 40 {
-		t.Errorf("the role carries %d permissions, want 40", len(members))
+	if len(members) != 52 {
+		t.Errorf("the role carries %d permissions, want 52", len(members))
 	}
-	for _, p := range kitLinkPermissions {
-		if !slices.Contains(members, accessPrefix+"/access-permissions/"+p) {
-			t.Errorf("the role does not carry kit's %s", p)
+	// A person's own permissions and kit's link permissions stay off the
+	// role.
+	for _, p := range append([]string{"guardcontrol.networks.enrol", "guardcontrol.self.nodes.list"}, kitLinkPermissions...) {
+		if slices.Contains(members, accessPrefix+"/access-permissions/"+p) {
+			t.Errorf("the role carries %s", p)
 		}
 	}
 
@@ -321,8 +321,8 @@ func TestAccGuardExample(t *testing.T) {
 			t.Errorf("the office LAN is served by %v, want the gateway", r.GetServingNodeIds())
 		}
 	}
-	if len(h.access.permissions) != 40 {
-		t.Errorf("%d access permissions beside the network, want 40", len(h.access.permissions))
+	if len(h.access.permissions) != 62 {
+		t.Errorf("%d access permissions beside the network, want 62", len(h.access.permissions))
 	}
 }
 

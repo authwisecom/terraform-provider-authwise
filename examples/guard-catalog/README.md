@@ -1,10 +1,9 @@
 # guard-control's authorization catalog
 
 The terraform path for the prerequisite guard-control needs on an Authwise
-install: the `guardcontrol.*` permission vocabulary, the declared types
-`guardcontrol.tenant` and `guardcontrol.network`, the `guardcontrol.admin`
-role carrying the permissions and kit's link permissions, a binding to your
-first admin, and the console's audience and OIDC client.
+install: the `guardcontrol.*` permission vocabulary, the `guardcontrol.admin`
+role carrying the permissions an operator administers with, a root binding
+to your first admin, and the console's audience and OIDC client.
 
 This is the same set of entries as guard-control's `docs/AUTHORIZATION.md`
 Path A (static overlay, first install only) and Path B (awctl runbook, live
@@ -23,15 +22,23 @@ The `console_client_id` output is what guard-admin is configured with
 
 ## Requirements
 
-**kit >= 1.40.0** and **guard-control v0.12.0.** guard-control links each
-Guard tenant under its parent Authwise tenant, and each network under its
-Guard tenant, at central with the caller's own bearer. kit admits those
-link writes at the link's parent from v1.40.0 (ESTATE_TENANCY.md E21), and
-writes declared types to a database install from the same release
-(kit#738). Against an older kit, every Guard tenant create is refused at the
-link. The role's three `access.resourceLinks.*` permissions are kit's own:
-the example reads them from the catalog and fails the plan if they are
-missing.
+**guard-control v0.27.0.** The list is generated from guard-control
+v0.27.0 (c9c1034): 59 permissions, 52 of them on `guardcontrol.admin`. The
+other seven, `guardcontrol.networks.enrol` and `guardcontrol.self.*`, are a
+person's own. The catalog declares them, but the admin role does not carry
+them.
+
+**Upgrading from an earlier version of this example.** This version drops
+three things guard-control no longer uses since guard-control#80, the
+tenant collapse:
+
+- the declared types `guardcontrol.tenant` and `guardcontrol.network`;
+- kit's `access.resourceLinks.*` from the role;
+- the four `guardcontrol.invites.*` permissions, retired in guard-control#83.
+
+guard-control's docs/AUTHORIZATION.md calls these inert. The next apply
+removes them. kit's three link permissions are only taken off the role; the
+permissions themselves stay.
 
 kit's `authwise-guard` preset (kit#727) seeds these entries itself. Apply
 this example on any other install.
@@ -43,8 +50,8 @@ Regenerate it from the version you are deploying and **apply before rolling
 out**:
 
 ```sh
-guard-control authz-permissions          # guard-control's own: 41 at v0.12.0
-guard-control authz-permissions --role   # what the role carries: those and kit's 3
+guard-control authz-permissions --role   # admin_permissions: 52 at v0.27.0
+guard-control authz-permissions          # admin_permissions + user_permissions: 59
 ```
 
 Creating a permission nothing yet requires is harmless. Deploying a binary
@@ -54,7 +61,7 @@ explaining it.
 
 Permissions guard-control has retired stay in the catalog and are inert;
 removing them is optional tidying. A permission cannot be deleted while a role
-still references it, so drop it from the `guardcontrol_permissions` list (which
+still references it, so drop it from `admin_permissions` or `user_permissions` (which
 removes the association) and delete the resource in the same apply.
 
 ## Things that fail silently

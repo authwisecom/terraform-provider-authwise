@@ -9,11 +9,19 @@ DOCUMENTATION:
   describes both shipped sets. It gains an `authwise-strict` example, and the
   refusal example now lists `authwise-baseline, authwise-strict, custom`
   (kit#886, tf#60).
-* **`examples/guard-catalog`.** The example no longer creates the
-  `guardcontrol.invites.*` permissions (`create`, `delete`, `get` and
-  `list`). guard-control retired invites (gc#83). From gc 0.27.0, a Begin
-  with an invite code is refused with `INVITE_RETIRED`. Permissions already
-  applied stay in place until the example is re-applied.
+* **`examples/guard-catalog` is regenerated from guard-control v0.27.0
+  (c9c1034).** It creates 59 permissions, and `guardcontrol.admin` carries 52 of them.
+  The other seven, `networks.enrol` and `self.*`, are a person's own and stay
+  off the role. The hand-kept list had fallen behind guard-control's catalog
+  (gc#81's relay pools, and more), so a customer applying it got a partial
+  catalog.
+  * The comment above the list names the guard-control version it came from.
+  * The four `guardcontrol.invites.*` permissions are gone (gc#83). From gc
+    0.27.0, a Begin with an invite code is refused with `INVITE_RETIRED`.
+  * The declared types `guardcontrol.tenant` and `guardcontrol.network` are
+    gone, and so are kit's `access.resourceLinks.*` on the role. guard-control
+    has not used them since gc#80. Re-applying over an earlier version of the
+    example removes them; kit's permissions themselves stay.
 
 ## 0.31.0 (November 6, 2026)
 
