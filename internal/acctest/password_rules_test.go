@@ -99,7 +99,7 @@ func TestAccRealm_PasswordRuleSetUnknown(t *testing.T) {
 		Steps: []resource.TestStep{{
 			Config: passwordRulesRealm(h, `      password_rule_set = "nist"`),
 			ExpectError: regexp.MustCompile(`(?s)password_rule_set\s+"nist"\s+is\s+not\s+a\s+set\s+this\s+build\s+ships\s+` +
-				`\(authwise-baseline,\s+custom\);\s+omit\s+it\s+for\s+authwise-baseline\.`),
+				`\(authwise-baseline,\s+authwise-strict,\s+custom\);\s+omit\s+it\s+for\s+authwise-baseline\.`),
 		}},
 		CheckDestroy: noneLeft(h),
 	})
