@@ -63,6 +63,9 @@ resource "authwise_guard_tenant_settings" "acme" {
 					resource.TestCheckResourceAttr(guardSettingsAddr, "name", "tenants/t-1"),
 					// The slug is kit's, read back.
 					resource.TestCheckResourceAttr(guardSettingsAddr, "slug", "acme"),
+					resource.TestCheckResourceAttr(guardSettingsAddr, "plan.plan", "TEAM"),
+					resource.TestCheckResourceAttr(guardSettingsAddr, "plan.devices_limit", "100"),
+					resource.TestCheckResourceAttr(guardSettingsAddr, "plan.trial_ends_at", ""),
 					resource.TestCheckResourceAttr(guardSettingsAddr, "config.deprovisioning.enabled", "true"),
 					// Unset, the realms are read back, not written.
 					resource.TestCheckResourceAttr(guardSettingsAddr, "config.users.realms.#", "0"),

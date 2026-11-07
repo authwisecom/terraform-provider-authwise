@@ -3,11 +3,14 @@
 page_title: "authwise_issuer_preferred_domain Resource - Authwise"
 subcategory: "Identity"
 description: |-
+  Deprecated: use authwise_issuer_preferred_binding (kit#911).
   The host an issuer's mailed links use: the invitation accept, the password reset, the address verification (Issuer.preferred_domain_id). Without it they use the issuer's native host. Point it at the custom domain your applications sign in on, so an invitation's one-button accept leaves the person signed in where the application looks.
   It is a resource of its own because a custom domain names its issuer: the issuer naming the domain back would be a cycle. authwise_issuer.preferred_domain_id reads the value back. Destroying this resource sets the issuer back to its native host, and so does releasing the domain, on kit's side; the next refresh then finds this resource gone.
 ---
 
 # authwise_issuer_preferred_domain (Resource)
+
+**Deprecated:** use `authwise_issuer_preferred_binding` (kit#911).
 
 The host an issuer's mailed links use: the invitation accept, the password reset, the address verification (`Issuer.preferred_domain_id`). Without it they use the issuer's native host. Point it at the custom domain your applications sign in on, so an invitation's one-button accept leaves the person signed in where the application looks.
 
@@ -20,17 +23,23 @@ resource "authwise_issuer" "login" {
   domain_id = authwise_domain.native.domain_id
 }
 
-# The custom domain the applications sign in on, attached to the issuer.
+# Deprecated (kit#911): use authwise_issuer_preferred_binding.
+# The custom domain the applications sign in on, bound to the issuer.
 resource "authwise_domain" "custom" {
-  hostname  = "auth.example.com"
+  hostname = "auth.example.com"
+  custom   = true
+}
+
+resource "authwise_issuer_domain_binding" "custom" {
   issuer_id = authwise_issuer.login.issuer_id
+  domain_id = authwise_domain.custom.domain_id
 }
 
 # Mailed links (an invitation's accept, a password reset) use the custom
 # host, so the person ends up signed in where the application looks.
 resource "authwise_issuer_preferred_domain" "login" {
   issuer    = authwise_issuer.login.name
-  domain_id = authwise_domain.custom.domain_id
+  domain_id = authwise_issuer_domain_binding.custom.domain_id
 
   # Optional: switch only once the host serves. kit keeps the native host
   # for links until the custom domain is ACTIVE either way.
@@ -43,7 +52,7 @@ resource "authwise_issuer_preferred_domain" "login" {
 
 ### Required
 
-- `domain_id` (String) One of the issuer's own domains: a custom domain attached to it (`authwise_domain.<name>.domain_id` with `issuer_id` set), or its native domain. kit refuses any other. Until the custom domain is `ACTIVE`, kit keeps building links on the native host.
+- `domain_id` (String) A domain one of the issuer's bindings is on; kit resolves it to that binding. kit refuses any other. Until the custom domain is `ACTIVE`, kit keeps building links on the native host.
 - `issuer` (String) The issuer's full resource name, `authwise_issuer.<name>.name`. Changing it sets the old issuer back to its native host.
 
 ## Import

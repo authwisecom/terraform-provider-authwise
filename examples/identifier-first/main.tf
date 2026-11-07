@@ -45,9 +45,13 @@ resource "authwise_domain" "login" {
   hostname = "login.example.com"
 }
 
-resource "authwise_issuer" "login" {
+# The issuer answers at the root of login.example.com.
+resource "authwise_issuer_domain_binding" "login" {
+  issuer_id = authwise_issuer.login.issuer_id
   domain_id = authwise_domain.login.domain_id
+}
 
+resource "authwise_issuer" "login" {
   # The issuer's config, typed: issuer_config checks the attribute names
   # and enum values at plan and writes the protojson for config. It is the
   # function form of data.authwise_issuer_config, evaluated at plan, so a

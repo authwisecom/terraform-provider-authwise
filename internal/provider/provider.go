@@ -243,7 +243,7 @@ func (p *AuthwiseProvider) Configure(ctx context.Context, req provider.Configure
 
 	providerData := &tfruntime.ProviderData{
 		Clients: map[string]any{
-			"identity": userContactClient{issuerDeleteClient{newAppearanceDefaultClient(identitypb.NewAuthwiseIdentityServiceClient(conn))}},
+			"identity": userContactClient{issuerDeleteClient{bindingRefusalClient{newAppearanceDefaultClient(identitypb.NewAuthwiseIdentityServiceClient(conn))}}},
 			"access":   accesspb.NewAuthwiseAccessServiceClient(conn),
 			// The public tenancy service, on kit's endpoint: service
 			// accounts (#37).
@@ -256,10 +256,8 @@ func (p *AuthwiseProvider) Configure(ctx context.Context, req provider.Configure
 			// Relay pools beyond their CRUD: credentials, access (#66).
 			guardRelayPoolClientKey: guardpb.NewGuardRelayPoolServiceClient(guardConn),
 			guardConfiguredKey:      guardConfigured,
-			// A custom host waits on the controller (#44, #47); the
-			// issuer-domains client serves the deprecated aliases.
-			domainsClientKey:       domainClient{identitypb.NewAuthwiseIdentityServiceClient(conn)},
-			issuerDomainsClientKey: issuerDomainClient{identitypb.NewAuthwiseIdentityServiceClient(conn)},
+			// A custom host waits on the controller (#44, #47).
+			domainsClientKey: domainClient{identitypb.NewAuthwiseIdentityServiceClient(conn)},
 		},
 		Defaults: defaults,
 	}
@@ -273,13 +271,15 @@ func (p *AuthwiseProvider) Configure(ctx context.Context, req provider.Configure
 // not express, plus the resources whose shapes are beyond it.
 func (p *AuthwiseProvider) Resources(ctx context.Context) []func() resource.Resource {
 	return guardWrap(ctx, append(substitute(ctx, generated.Resources(), map[string]func() resource.Resource{
-		accessBindingTypeName:     newAccessBindingResource,
-		realmTypeName:             newRealmResource,
-		factorTypeName:            newFactorResource,
-		appearanceProfileTypeName: newAppearanceProfileResource,
-		guardNodeTypeName:         newGuardNodeResource,
-		guardNetworkTypeName:      newGuardNetworkResource,
-		domainTypeName:            newDomainResource,
+		accessBindingTypeName:       newAccessBindingResource,
+		realmTypeName:               newRealmResource,
+		factorTypeName:              newFactorResource,
+		appearanceProfileTypeName:   newAppearanceProfileResource,
+		guardNodeTypeName:           newGuardNodeResource,
+		guardNetworkTypeName:        newGuardNetworkResource,
+		domainTypeName:              newDomainResource,
+		issuerTypeName:              newIssuerResource,
+		issuerDomainBindingTypeName: newIssuerDomainBindingResource,
 	}),
 		newSecretResource,
 		newRealmAuthenticationPolicyResource,
@@ -294,8 +294,7 @@ func (p *AuthwiseProvider) Resources(ctx context.Context) []func() resource.Reso
 		newGuardRelayPoolAccessResource,
 		newDomainActivationResource,
 		newIssuerPreferredDomainResource,
-		newIssuerDomainResource,
-		newIssuerDomainActivationResource,
+		newIssuerPreferredBindingResource,
 	))
 }
 

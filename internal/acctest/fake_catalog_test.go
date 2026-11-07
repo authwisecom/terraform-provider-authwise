@@ -50,7 +50,14 @@ func (f *fakeIdentityServer) GetDomain(ctx context.Context, in *identitypb.GetDo
 	if !ok {
 		return nil, status.Errorf(codes.NotFound, "domain %q not found", in.GetName())
 	}
-	return proto.Clone(d).(*corepb.Domain), nil
+	out := proto.Clone(d).(*corepb.Domain)
+	// Who answers here (kit#911), filled on Get only.
+	for _, name := range f.bindingOrder {
+		if b := f.bindings[name]; tenantOf(name)+"/domains/"+b.GetDomainId() == in.GetName() {
+			out.Bindings = append(out.Bindings, proto.Clone(b).(*corepb.IssuerDomainBinding))
+		}
+	}
+	return out, nil
 }
 
 func (f *fakeIdentityServer) ListDomains(ctx context.Context, in *identitypb.ListDomainsRequest) (*identitypb.ListDomainsResponse, error) {
@@ -77,17 +84,18 @@ func (f *fakeIdentityServer) CreateDomain(ctx context.Context, in *identitypb.Cr
 	if hostname == "" {
 		return nil, status.Error(codes.InvalidArgument, "hostname is required")
 	}
-	// A custom domain (issuer_id set) stays PENDING_DNS: the fake has no
-	// DNS to verify. It is enough to be an issuer's preferred_domain_id
-	// (kit#857).
-	if id := in.GetDomain().GetIssuerId(); id != "" {
-		if _, ok := f.issuers[in.GetParent()+"/issuers/"+id]; !ok {
-			return nil, status.Errorf(codes.InvalidArgument, "issuer_id: no issuer %q in %s", id, in.GetParent())
+	// A custom domain stays PENDING_DNS: the fake has no DNS to verify.
+	// issuer_id is a deprecated create convenience (kit#911): it claims
+	// the host and binds that issuer at its root.
+	issuerID := in.GetDomain().GetIssuerId()
+	if issuerID != "" {
+		if _, ok := f.issuers[in.GetParent()+"/issuers/"+issuerID]; !ok {
+			return nil, status.Errorf(codes.InvalidArgument, "issuer_id: no issuer %q in %s", issuerID, in.GetParent())
 		}
 	}
 	// A product host (kit#903): guard only, never beside an issuer.
 	switch product := in.GetDomain().GetProduct(); {
-	case product != "" && in.GetDomain().GetIssuerId() != "":
+	case product != "" && issuerID != "":
 		return nil, status.Error(codes.InvalidArgument, "a domain serves an issuer or a product: set issuer_id or product, not both")
 	case product != "" && product != "guard":
 		return nil, status.Errorf(codes.InvalidArgument, "product: %q is not a product with hosts; the one is \"guard\"", product)
@@ -99,12 +107,15 @@ func (f *fakeIdentityServer) CreateDomain(ctx context.Context, in *identitypb.Cr
 	}
 	d := proto.Clone(in.GetDomain()).(*corepb.Domain)
 	d.Name = in.GetParent() + "/domains/" + f.nextID("d")
-	if d.GetIssuerId() != "" || d.GetProduct() != "" {
-		// kit leaves a product host's traffic target empty; its record
-		// points at the tenant's default Guard host.
+	d.IssuerId, d.Bindings = "", nil
+	d.Custom = d.GetCustom() || issuerID != "" || d.GetProduct() != ""
+	if d.GetCustom() {
+		// The traffic CNAME targets the install's edge name (kit#911,
+		// D5); kit leaves a product host's empty, and its record points
+		// at the tenant's default Guard host.
 		target := "acme.guard.authwise.test"
-		if d.GetIssuerId() != "" {
-			d.TrafficTarget = "acme.id.authwise.test"
+		if d.GetProduct() == "" {
+			d.TrafficTarget = "edge.authwise.test"
 			target = d.GetTrafficTarget()
 		}
 		d.State = corepb.IssuerDomainState_ISSUER_DOMAIN_STATE_PENDING_DNS
@@ -114,6 +125,14 @@ func (f *fakeIdentityServer) CreateDomain(ctx context.Context, in *identitypb.Cr
 		}
 	}
 	f.domains[d.GetName()] = d
+	if issuerID != "" {
+		id := d.GetName()[strings.LastIndex(d.GetName(), "/")+1:]
+		if err := f.admitBindingLocked(in.GetParent()+"/issuers/"+issuerID, id, ""); err != nil {
+			delete(f.domains, d.GetName())
+			return nil, err
+		}
+		f.bindLocked(in.GetParent()+"/issuers/"+issuerID, id, "")
+	}
 	return proto.Clone(d).(*corepb.Domain), nil
 }
 
@@ -145,19 +164,18 @@ func (f *fakeIdentityServer) DeleteDomain(ctx context.Context, in *identitypb.De
 	if _, ok := f.domains[in.GetName()]; !ok {
 		return nil, status.Errorf(codes.NotFound, "domain %q not found", in.GetName())
 	}
-	for _, i := range f.issuers {
-		if tenantOf(i.GetName())+"/domains/"+i.GetDomainId() == in.GetName() {
-			return nil, status.Errorf(codes.FailedPrecondition, "domain %q is the host of issuer %q (DOMAIN_HAS_ISSUERS)", in.GetName(), i.GetName())
+	// DOMAIN_IN_USE (kit#911): refused while bound.
+	var bound []string
+	for _, name := range f.bindingOrder {
+		if b := f.bindings[name]; tenantOf(name)+"/domains/"+b.GetDomainId() == in.GetName() {
+			bound = append(bound, b.GetIssuerId())
 		}
+	}
+	if len(bound) > 0 {
+		return nil, refusal(codes.FailedPrecondition, "DOMAIN_IN_USE", map[string]string{"issuers": strings.Join(bound, ",")},
+			"domain %q is bound to issuers %s", in.GetName(), strings.Join(bound, ", "))
 	}
 	delete(f.domains, in.GetName())
-	// issuers.preferred_domain_id is ON DELETE SET NULL (kit#857): the
-	// issuer falls back to its native host.
-	for _, i := range f.issuers {
-		if tenantOf(i.GetName())+"/domains/"+i.GetPreferredDomainId() == in.GetName() {
-			i.PreferredDomainId = ""
-		}
-	}
 	return &emptypb.Empty{}, nil
 }
 

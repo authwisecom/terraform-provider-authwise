@@ -158,6 +158,12 @@ func withCollection(collection string) func(r *gentf.Resource) {
 	return func(r *gentf.Resource) { r.Collection = collection }
 }
 
+// withOps narrows the operations an entry's API exposes; the zero value is
+// all of them.
+func withOps(ops gentf.Ops) func(r *gentf.Resource) {
+	return func(r *gentf.Resource) { r.Ops = ops }
+}
+
 func withRequired(fields ...string) func(r *gentf.Resource) {
 	return func(r *gentf.Resource) { r.Required = fields }
 }
@@ -264,9 +270,9 @@ func main() {
 			// hand-written in internal/provider (the custom host's waits);
 			// the data sources are these.
 			crud[corepb.Domain](scopeTenant,
-				withDescription("A hostname the tenant serves: native (no `issuer_id` or `product`), the host an issuer names; custom with `issuer_id` set, a hostname of yours serving that issuer; or custom with `product = \"guard\"`, a hostname of yours serving the tenant's Guard address."),
-				withRequired("hostname"), withImmutable("hostname", "issuer_id", "product"),
-				withComputed("state", "dns_records", "failure", "certificate_expires_at", "activated_at", "claim_expires_at", "created_at", "traffic_target"),
+				withDescription("A hostname of the tenant: native, an Authwise host; custom (`custom`), a hostname of yours; or custom with `product = \"guard\"`, a hostname of yours serving the tenant's Guard address. Issuers answer at a domain through `authwise_issuer_domain_binding` (kit#911); `bindings` lists them."),
+				withRequired("hostname"), withImmutable("hostname", "issuer_id", "product", "custom"),
+				withComputed("state", "dns_records", "failure", "certificate_expires_at", "activated_at", "claim_expires_at", "created_at", "traffic_target", "bindings"),
 				withJSON("config"),
 				withReferences(map[string]gentf.Reference{"issuer_id": scopeReferences["issuer_id"]})),
 			// domain_id names the issuer's native host (kit#808, D12);
@@ -281,9 +287,17 @@ func main() {
 			// issuer, so the issuer naming it back would be a cycle (#52).
 			// That resource's destroy runs before an update of the issuer
 			// in the same apply, so the issuer plans it unknown: volatile.
+			// kit#911: an issuer reaches hosts through
+			// authwise_issuer_domain_binding. domain_id and path are a
+			// deprecated create-time convenience (the first binding),
+			// output only afterwards; preferred_binding_id replaces
+			// preferred_domain_id, written by authwise_issuer_preferred_binding
+			// for the same cycle reason. bindings and domain_name (the first
+			// binding's host) change with binding resources in the same
+			// apply: volatile too.
 			crud[corepb.Issuer](scopeTenant,
-				withDescription("An OAuth 2.0 / OpenID Connect issuer: the login a set of clients shares, with its domain, token lifetimes and which realm or realms people sign in to (`config`). Its appearance is whichever of its profiles is the default (`authwise_appearance_profile.is_default`)."), withJSON("config"),
-				withRequired("domain_id"), withImmutable("domain_id"), withComputed("domain_name", "account_client_id"), withVolatile("preferred_domain_id"),
+				withDescription("An OAuth 2.0 / OpenID Connect issuer: the login a set of clients shares, with its token lifetimes and which realm or realms people sign in to (`config`). It answers at the hosts its `authwise_issuer_domain_binding`s name (kit#911). Its appearance is whichever of its profiles is the default (`authwise_appearance_profile.is_default`)."), withJSON("config"),
+				withImmutable("domain_id", "path"), withComputed("account_client_id"), withVolatile("preferred_domain_id", "preferred_binding_id", "bindings", "domain_name"),
 				withReferences(map[string]gentf.Reference{"domain_id": refDomain})),
 			crud[corepb.Realm](scopeTenant,
 				withDescription("A realm: a population of users with its own providers, factors and authentication policy."), withJSON("config")),
@@ -345,6 +359,17 @@ func main() {
 				withJSON("config")),
 
 			// Issuer-scoped.
+			// An issuer's host and path (kit#911, TENANT_DOMAINS.md): one
+			// (domain, path) per binding, unique in the install, each its own
+			// iss. There is no update: a binding is replaced. issuer_id is the
+			// parent, read back from the name like every scope parent.
+			crud[corepb.IssuerDomainBinding](scopeIssuer,
+				withDescription("Where an issuer answers: one of the tenant's domains at a path, so the issuer's URL (`iss`) is `https://<hostname><path>`. An issuer may have no binding, one, or several, each its own `iss`; one domain serves several issuers at different paths. There is no update: changing `domain_id` or `path` replaces the binding."),
+				withCollection("issuer-domain-bindings"),
+				withOps(gentf.OpGet|gentf.OpList|gentf.OpCreate|gentf.OpDelete),
+				withRequired("domain_id"), withImmutable("domain_id", "path"),
+				withComputed("hostname", "url", "routable", "created_at"),
+				withReferences(map[string]gentf.Reference{"domain_id": refDomain})),
 			crud[corepb.Client](scopeIssuer,
 				withDescription("An OAuth 2.0 client of an issuer: an application that signs people in or calls an API."), withJSON("config"),
 				// owning_tenant_id marks a service account (kit#756): kit
@@ -410,8 +435,10 @@ func main() {
 				withDescription("A Guard network: a WireGuard mesh in a tenant. `cidr` is its address space inside 100.64.0.0/10, the whole of it when unset; changing it replaces the network."),
 				guard("network"), guardList("networks"),
 				withImmutable("cidr"),
-				withComputed("mesh_domain", "pool_killed", "pool_killed_at"),
-				withVolatile("mesh_domain", "pool_killed", "pool_killed_at"),
+				// pool_capped (guard-control#88): the tenant's plan cap on
+				// relay bytes reached, read only like pool_killed.
+				withComputed("mesh_domain", "pool_killed", "pool_killed_at", "pool_capped", "pool_capped_at"),
+				withVolatile("mesh_domain", "pool_killed", "pool_killed_at", "pool_capped", "pool_capped_at"),
 				withJSON("config")),
 			// A relay's credential (:issueCredential, apis v0.59.0) is the
 			// hand-written wrapper's in internal/provider: issued once and

@@ -37,8 +37,7 @@ func issuerDeleteError(err error) error {
 		}
 		p := st.Proto()
 		p.Message = fmt.Sprintf("refused: ISSUER_HAS_DOMAINS. The issuer still has %s custom domain(s), such as %s, counting any still being deleted. "+
-			"Destroy its authwise_issuer_domain resources first and let them finish: a domain whose issuer_id is set from this issuer is destroyed first "+
-			"and waited for; with a literal issuer_id, add depends_on naming the issuer. (%s)",
+			"kit before kit#911 refuses this; from kit#911 an issuer's bindings go with it. Destroy the domains first, or upgrade kit. (%s)",
 			info.GetMetadata()["count"], info.GetMetadata()["hostname"], st.Message())
 		return status.FromProto(p).Err()
 	}

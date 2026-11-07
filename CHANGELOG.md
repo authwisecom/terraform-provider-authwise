@@ -1,9 +1,64 @@
 ## 0.32.0 (Unreleased)
 
+NOTES:
+
+* **apis v0.61.0.** Tenant domains through bindings (kit#911, tf#69), and
+  guard-control's plan caps (guard-control#88). It needs kit with kit#911;
+  see the upgrade notes on `authwise_domain`'s page.
+
+BREAKING CHANGES:
+
+* **`authwise_domain`: `issuer_id` is gone; set `custom = true`** (kit#911,
+  tf#69). A domain is the tenant's and names no issuer; an issuer answers at
+  a host through `authwise_issuer_domain_binding`. The state upgrades itself
+  (schema version 2), and the plan shows no change to the domain. kit's
+  migration already made the bindings, so import the binding rather than
+  creating it: creating it again is refused with `BINDING_TAKEN`.
+* **`authwise_issuer_domain` and `authwise_issuer_domain_activation` are
+  removed**, and so are the `moved` blocks from them. Move to
+  `authwise_domain` with 0.31 or earlier first.
+* **Two issuers can no longer share a host's root.** kit refuses a second
+  issuer at `(domain, path)` with `BINDING_TAKEN`. Before, the second row was
+  stored but never served. The `authwise_issuer_config` data source and
+  function examples now give each issuer its own host.
+
+FEATURES:
+
+* **`authwise_issuer_domain_binding`** (resource and data sources): one
+  domain of the tenant at a path, where an issuer answers, each its own
+  `iss`. There is no update: a change replaces it. `hostname`, `url` and
+  `routable` are read back. Refusals carry their remedy: `BINDING_TAKEN`
+  names the issuer already there, and `DOMAIN_NOT_BINDABLE` covers a
+  product's host. Only the root path is accepted until kit#876, and
+  `/admin` is reserved.
+* **`authwise_issuer_preferred_binding`**: the binding kit mails links on
+  (`Issuer.preferred_binding_id`). It replaces
+  `authwise_issuer_preferred_domain`, which is deprecated; kit accepts
+  `preferred_domain_id` for one more release.
+* **`authwise_issuer`** gains `bindings` and `preferred_binding_id`, both
+  read only. `domain_id` and `path` are optional and deprecated: on create
+  they make the first binding, and afterwards they keep the values the
+  issuer was created with.
+* **`authwise_domain`** gains `custom`. A delete refused with `DOMAIN_IN_USE`
+  names the bound issuers and says to destroy their bindings first.
+  `traffic_target` is the install's edge name for a host claimed from
+  kit#911 on.
+* **`authwise_guard_network.pool_capped` and `pool_capped_at`** (read only):
+  the tenant's relay-bytes cap reached (guard-control#88).
+* **`authwise_guard_tenant_settings.plan`** (read only): the tenant's plan
+  and its member, device and relay-bytes caps, as guard-control reads them
+  from kit (guard-control#88).
+
+BUG FIXES:
+
+* **`path = ""` round-trips** on `authwise_issuer` and
+  `authwise_issuer_domain_binding`. It used to read back as null, which
+  Terraform reported as an inconsistent result after apply (tf#57).
+
 DOCUMENTATION:
 
-* **`authwise_issuer.path`.** The page now says that `""` (or leaving it
-  out) is the domain's root. kit refuses `"/"` and trailing slashes rather
+* **The issuer path.** The issuer's page, now under "Where the issuer
+  answers", says that `""` (or leaving it out) is the domain's root. kit refuses `"/"` and trailing slashes rather
   than rewriting them, and refuses non-empty paths until kit#876 (tf#57).
 * **`authwise_realm`: `authwise-strict`.** The password rules section
   describes both shipped sets. It gains an `authwise-strict` example, and the

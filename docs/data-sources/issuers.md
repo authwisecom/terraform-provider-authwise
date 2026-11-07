@@ -3,12 +3,12 @@
 page_title: "authwise_issuers Data Source - Authwise"
 subcategory: "Identity"
 description: |-
-  An OAuth 2.0 / OpenID Connect issuer: the login a set of clients shares, with its domain, token lifetimes and which realm or realms people sign in to (config). Its appearance is whichever of its profiles is the default (authwise_appearance_profile.is_default). This data source lists every one under a parent.
+  An OAuth 2.0 / OpenID Connect issuer: the login a set of clients shares, with its token lifetimes and which realm or realms people sign in to (config). It answers at the hosts its authwise_issuer_domain_bindings name (kit#911). Its appearance is whichever of its profiles is the default (authwise_appearance_profile.is_default). This data source lists every one under a parent.
 ---
 
 # authwise_issuers (Data Source)
 
-An OAuth 2.0 / OpenID Connect issuer: the login a set of clients shares, with its domain, token lifetimes and which realm or realms people sign in to (`config`). Its appearance is whichever of its profiles is the default (`authwise_appearance_profile.is_default`). This data source lists every one under a parent.
+An OAuth 2.0 / OpenID Connect issuer: the login a set of clients shares, with its token lifetimes and which realm or realms people sign in to (`config`). It answers at the hosts its `authwise_issuer_domain_binding`s name (kit#911). Its appearance is whichever of its profiles is the default (`authwise_appearance_profile.is_default`). This data source lists every one under a parent.
 
 
 
@@ -29,6 +29,7 @@ An OAuth 2.0 / OpenID Connect issuer: the login a set of clients shares, with it
 Read-Only:
 
 - `account_client_id` (String)
+- `bindings` (Attributes List) (see [below for nested schema](#nestedatt--issuers--bindings))
 - `config` (String)
 - `domain_id` (String)
 - `domain_name` (String)
@@ -36,4 +37,19 @@ Read-Only:
 - `labels` (Map of String)
 - `name` (String) Full resource name.
 - `path` (String)
+- `preferred_binding_id` (String)
 - `preferred_domain_id` (String)
+
+<a id="nestedatt--issuers--bindings"></a>
+### Nested Schema for `issuers.bindings`
+
+Read-Only:
+
+- `created_at` (String)
+- `domain_id` (String)
+- `hostname` (String)
+- `issuer_id` (String)
+- `name` (String)
+- `path` (String)
+- `routable` (Boolean)
+- `url` (String)

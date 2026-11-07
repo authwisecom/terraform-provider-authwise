@@ -1,19 +1,29 @@
-# A native host: the issuer's own Authwise hostname.
+# A native host: an Authwise hostname of the tenant. The issuer answers at
+# its root through a binding.
 resource "authwise_domain" "main" {
   hostname = "acme.id.authwise.com"
 }
 
-resource "authwise_issuer" "main" {
+resource "authwise_issuer" "main" {}
+
+resource "authwise_issuer_domain_binding" "main" {
+  issuer_id = authwise_issuer.main.issuer_id
   domain_id = authwise_domain.main.domain_id
 }
 
-# A custom host: login.acme.com serves the issuer, with its DNS records on
-# Cloudflare, in one apply that follows "challenge first, traffic after
-# PROVISIONING": the challenge record, then the activation waiting for the
-# certificate, then the traffic record.
+# A custom host: login.acme.com, with its DNS records on Cloudflare, in one
+# apply that follows "challenge first, traffic after PROVISIONING": the
+# challenge record, then the activation waiting for the certificate, then
+# the traffic record. The issuer is bound to it as well, so it answers at
+# both hosts, each its own iss.
 resource "authwise_domain" "login" {
+  custom   = true
+  hostname = "login.acme.com"
+}
+
+resource "authwise_issuer_domain_binding" "login" {
   issuer_id = authwise_issuer.main.issuer_id
-  hostname  = "login.acme.com"
+  domain_id = authwise_domain.login.domain_id
 }
 
 locals {
@@ -50,7 +60,8 @@ resource "cloudflare_record" "login_traffic" {
 # A custom Guard address: guard.acme.com is what the tenant's people type
 # into the Guard client, in place of <slug>.guard.<estate>. The same
 # records, in the same order; its traffic record points at the tenant's
-# default Guard address, so the tenant needs a slug first.
+# default Guard address, so the tenant needs a slug first. No issuer is
+# bound to it.
 resource "authwise_domain" "guard" {
   product  = "guard"
   hostname = "guard.acme.com"

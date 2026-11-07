@@ -23,7 +23,6 @@ var (
 	_ resource.Resource                = &domainActivationResource{}
 	_ resource.ResourceWithConfigure   = &domainActivationResource{}
 	_ resource.ResourceWithImportState = &domainActivationResource{}
-	_ resource.ResourceWithMoveState   = &domainActivationResource{}
 )
 
 // domainActivationResource is the point in an apply where a custom host
@@ -35,9 +34,9 @@ var (
 // waiting for it would never end (#46). It owns nothing on the server:
 // create waits, destroy forgets.
 //
-// One implementation serves authwise_domain_activation (#47) and the
-// deprecated authwise_issuer_domain_activation (#45), which differ in the
-// attribute naming the domain and the RPCs reading it.
+// authwise_domain_activation (#47). The deprecated
+// authwise_issuer_domain_activation (#45) shared the implementation, which
+// is why the kind is a value; tf#69 removed it.
 type domainActivationResource struct {
 	domainPoller
 	activationKind
@@ -72,29 +71,8 @@ var domainActivation = activationKind{
 	},
 }
 
-var issuerDomainActivation = activationKind{
-	typeName:    "issuer_domain_activation",
-	attribute:   "issuer_domain",
-	namePattern: issuerDomainNamePattern,
-	nameShape:   "tenants/{t}/issuers/{i}/issuer-domains/{d}",
-	target:      "authwise_issuer_domain",
-	clientKey:   issuerDomainsClientKey,
-	deprecation: "kit merged issuer domains into domains (kit#808): use authwise_domain_activation with domain = authwise_domain.<name>.name. " +
-		"A moved block carries the state across. This resource goes once kit removes the issuer-domains API (kit#810).",
-	configureGet: func(client any) func(context.Context, string) (*domain, error) {
-		if c, ok := client.(issuerDomainAPI); ok {
-			return c.GetIssuerDomain
-		}
-		return nil
-	},
-}
-
 func newDomainActivationResource() resource.Resource {
 	return &domainActivationResource{domainPoller{poll: domainPollInterval}, domainActivation}
-}
-
-func newIssuerDomainActivationResource() resource.Resource {
-	return &domainActivationResource{domainPoller{poll: domainPollInterval}, issuerDomainActivation}
 }
 
 func (r *domainActivationResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -265,53 +243,4 @@ func (r *domainActivationResource) setDomain(ctx context.Context, state *tfsdk.S
 	diags.Append(state.SetAttribute(ctx, path.Root(hostnameAttribute), d.Hostname)...)
 	diags.Append(state.SetAttribute(ctx, path.Root("state"), d.State)...)
 	diags.Append(state.SetAttribute(ctx, path.Root("certificate_expires_at"), timestampValue(d.CertificateExpiresAt))...)
-}
-
-// MoveState takes authwise_issuer_domain_activation's state into
-// authwise_domain_activation in a moved block: issuer_domain becomes
-// domain, the issuer domain's name the domain's.
-func (r *domainActivationResource) MoveState(ctx context.Context) []resource.StateMover {
-
-	if r.attribute != domainActivation.attribute {
-		return nil
-	}
-
-	source := &resource.SchemaResponse{}
-	(&domainActivationResource{activationKind: issuerDomainActivation}).Schema(ctx, resource.SchemaRequest{}, source)
-
-	return []resource.StateMover{{
-		SourceSchema: &source.Schema,
-		StateMover: func(ctx context.Context, req resource.MoveStateRequest, resp *resource.MoveStateResponse) {
-
-			if req.SourceTypeName != "authwise_issuer_domain_activation" {
-				return
-			}
-
-			var prior struct {
-				IssuerDomain         types.String   `tfsdk:"issuer_domain"`
-				Hostname             types.String   `tfsdk:"hostname"`
-				State                types.String   `tfsdk:"state"`
-				CertificateExpiresAt types.String   `tfsdk:"certificate_expires_at"`
-				Timeouts             timeouts.Value `tfsdk:"timeouts"`
-			}
-			resp.Diagnostics.Append(req.SourceState.Get(ctx, &prior)...)
-			if resp.Diagnostics.HasError() {
-				return
-			}
-
-			name, err := domainMovedName(prior.IssuerDomain.ValueString())
-			if err != nil {
-				resp.Diagnostics.AddError("unexpected issuer domain name", err.Error())
-				return
-			}
-
-			resp.Diagnostics.Append(resp.TargetState.Set(ctx, struct {
-				Domain               types.String   `tfsdk:"domain"`
-				Hostname             types.String   `tfsdk:"hostname"`
-				State                types.String   `tfsdk:"state"`
-				CertificateExpiresAt types.String   `tfsdk:"certificate_expires_at"`
-				Timeouts             timeouts.Value `tfsdk:"timeouts"`
-			}{types.StringValue(name), prior.Hostname, prior.State, prior.CertificateExpiresAt, prior.Timeouts})...)
-		},
-	}}
 }

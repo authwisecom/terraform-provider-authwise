@@ -2,59 +2,73 @@
 page_title: "authwise_domain Resource - Authwise"
 subcategory: "Identity"
 description: |-
-  A hostname the tenant serves logins on. A native host (no issuer_id) is an Authwise host such as acme.id.authwise.com, which an issuer names as its host (authwise_issuer.domain_id). A custom host (issuer_id set) is a hostname of yours that serves that issuer, such as login.acme.com: Authwise obtains and renews its certificate, and you add two DNS records, read from dns_records. The issuer keeps answering at its own host as well, and each host is its own issuer URL (iss).
+  A hostname of the tenant. A native host is an Authwise host such as acme.id.authwise.com. A custom host (custom = true) is a hostname of yours, such as login.acme.com: Authwise obtains and renews its certificate, and you add two DNS records, read from dns_records. Nothing on a domain names an issuer: an issuer answers at a host through an authwise_issuer_domain_binding, one per (domain, path), so one host can serve several issuers at different paths and one issuer can answer at several hosts, each its own issuer URL (iss). kit refuses to delete a domain while issuers are bound to it (DOMAIN_IN_USE).
   A custom Guard address (product = "guard") is a hostname of yours, such as guard.acme.com, that people type into the Guard client in place of the tenant's default address (<slug>.guard.<estate>). Its traffic record points at that default address, so the tenant needs a slug first, set on the tenant in kit. It is never an issuer URL: people still sign in at the issuer's own host. It takes the same records, waits and activation as an issuer's custom host.
   For a custom host, create returns once the records are known, so DNS resources can take them in the same apply. Add the challenge record first and point traffic only once state is PROVISIONING or ACTIVE, so the certificate exists before any request arrives: authwise_domain_activation waits for that between the two records, in one apply. Both records must be DNS-only (on Cloudflare, proxied = false), and the challenge record stays for as long as the domain does: renewal depends on it. Destroying a custom host waits until Authwise has released the hostname, which takes the cloud side's teardown.
 ---
 
 # authwise_domain (Resource)
 
-A hostname the tenant serves logins on. There are two kinds, told apart by
-`issuer_id`:
+A hostname of the tenant. There are two kinds, told apart by `custom`:
 
-- **Native** (no `issuer_id`): an Authwise host, such as
-  `acme.id.authwise.com`. An issuer names it as its host
-  (`authwise_issuer.domain_id`), so it exists before the issuer does.
-- **Custom** (`issuer_id` set): a hostname of yours, such as
-  `login.acme.com`, that serves that issuer. Authwise obtains the
-  certificate and renews it on its own edge. You add two DNS records and
-  nothing else.
+- **Native**: an Authwise host, such as `acme.id.authwise.com`.
+- **Custom** (`custom = true`): a hostname of yours, such as
+  `login.acme.com`. Authwise obtains the certificate and renews it on its
+  own edge. You add two DNS records and nothing else.
+
+**A domain names no issuer** (kit#911). An issuer answers at a host through
+an [`authwise_issuer_domain_binding`](issuer_domain_binding): a domain and a
+path. One host can serve several issuers at different paths, and one issuer
+can answer at several hosts. A product's host (`product = "guard"`) takes no
+binding. Before 0.32.0 a custom host named its issuer in `issuer_id`; see
+[Upgrading to 0.32](#upgrading-to-032).
 
 `domain_id` is the domain's id (`d-…`), assigned by Authwise. Before 0.19.0
 it was the hostname itself; see [Upgrading from 0.18](#upgrading-from-018).
 
 About custom hosts:
 
-- **Each host is its own issuer URL.** Tokens minted at `login.acme.com`
-  carry `iss = https://login.acme.com`. The issuer's own host keeps
-  working, with its own `iss`, so relying parties that cached discovery do
-  not break. Neither host redirects to the other.
+- **Each binding is its own issuer URL.** Tokens minted at
+  `login.acme.com` carry `iss = https://login.acme.com`. An issuer bound to
+  its native host as well keeps answering there, with its own `iss`, so
+  relying parties that cached discovery do not break. Neither host
+  redirects to the other.
 - **Passkeys do not follow.** A passkey is bound to the host it was
-  enrolled at, so passkeys enrolled at the issuer's own host do not work at
-  the custom domain. Add the domain before rolling out passkeys, or have
-  people enrol again.
+  enrolled at, so passkeys enrolled at the issuer's native host do not
+  work at the custom domain. Add the domain before rolling out passkeys, or
+  have people enrol again.
 - **Business plan or above.** Where an installation enforces the plan,
   create is refused below it with `PLAN_REQUIRED`.
 
 ## Example Usage
 
 ```terraform
-# A native host: the issuer's own Authwise hostname.
+# A native host: an Authwise hostname of the tenant. The issuer answers at
+# its root through a binding.
 resource "authwise_domain" "main" {
   hostname = "acme.id.authwise.com"
 }
 
-resource "authwise_issuer" "main" {
+resource "authwise_issuer" "main" {}
+
+resource "authwise_issuer_domain_binding" "main" {
+  issuer_id = authwise_issuer.main.issuer_id
   domain_id = authwise_domain.main.domain_id
 }
 
-# A custom host: login.acme.com serves the issuer, with its DNS records on
-# Cloudflare, in one apply that follows "challenge first, traffic after
-# PROVISIONING": the challenge record, then the activation waiting for the
-# certificate, then the traffic record.
+# A custom host: login.acme.com, with its DNS records on Cloudflare, in one
+# apply that follows "challenge first, traffic after PROVISIONING": the
+# challenge record, then the activation waiting for the certificate, then
+# the traffic record. The issuer is bound to it as well, so it answers at
+# both hosts, each its own iss.
 resource "authwise_domain" "login" {
+  custom   = true
+  hostname = "login.acme.com"
+}
+
+resource "authwise_issuer_domain_binding" "login" {
   issuer_id = authwise_issuer.main.issuer_id
-  hostname  = "login.acme.com"
+  domain_id = authwise_domain.login.domain_id
 }
 
 locals {
@@ -91,7 +105,8 @@ resource "cloudflare_record" "login_traffic" {
 # A custom Guard address: guard.acme.com is what the tenant's people type
 # into the Guard client, in place of <slug>.guard.<estate>. The same
 # records, in the same order; its traffic record points at the tenant's
-# default Guard address, so the tenant needs a slug first.
+# default Guard address, so the tenant needs a slug first. No issuer is
+# bound to it.
 resource "authwise_domain" "guard" {
   product  = "guard"
   hostname = "guard.acme.com"
@@ -166,14 +181,12 @@ default). A `FAILED` domain ends the wait with `failure_code` and
 Destroying a custom host waits until Authwise has removed its certificate
 and edge entries and released the hostname, up to `timeouts.delete` (30
 minutes). Until then the hostname cannot be claimed again, by a replacement
-or by anyone else. A native host is deleted at once, and is refused while
-an issuer names it (`DOMAIN_HAS_ISSUERS`).
+or by anyone else. A native host is deleted at once.
 
-An issuer with a custom host on it, including one still being deleted,
-cannot be deleted (`ISSUER_HAS_DOMAINS`). Set `issuer_id` from the issuer
-resource, as in the example, and Terraform destroys the domain, and waits
-for it to be gone, before it deletes the issuer. If `issuer_id` is a
-literal, add `depends_on` naming the issuer.
+kit refuses to delete a domain, native or custom, while issuers are bound
+to it (`DOMAIN_IN_USE`, naming them). Set the binding's `domain_id` from the
+domain resource, as in the example, and Terraform destroys the bindings
+first.
 
 ## States
 
@@ -195,15 +208,60 @@ A native host has no state: `state` is empty and `dns_records` is empty.
 | `CAA` | A CAA record on the hostname or a parent excludes the certificate authority. Allow `pki.goog` and `letsencrypt.org`, or remove the CAA record. |
 | `CONFIG` | A record resolves to something else, or is proxied. |
 | `RATE_LIMITED` | The certificate authority's rate limit. Authwise retries. |
-| `PROBE_FAILED` | The hostname did not answer as the issuer: the traffic record points elsewhere. |
+| `PROBE_FAILED` | The hostname did not answer as Authwise: the traffic record points elsewhere. |
 | `PROVIDER_ERROR` | On Authwise's side. Contact support if it persists. |
 
 Create is refused with an error reason in the diagnostic:
-`HOSTNAME_CLAIMED` (another issuer, another tenant, or a domain still being
-deleted holds it), `HOSTNAME_APEX`, `HOSTNAME_IS_ISSUER` (the hostname is
-already an Authwise issuer host), `PLAN_REQUIRED`, or `DOMAINS_UNAVAILABLE`
+`HOSTNAME_CLAIMED` (another tenant, or a domain still being deleted, holds
+it), `HOSTNAME_APEX`, `HOSTNAME_IS_ISSUER` (the hostname is already an
+Authwise host: bind the issuer to the native domain instead),
+`PLAN_REQUIRED`, or `DOMAINS_UNAVAILABLE`
 (the install has no domain controller, so no custom host on it would get a
 certificate).
+
+## Upgrading to 0.32
+
+0.32.0 needs kit with kit#911 (apis v0.61.0), where a custom domain is the
+tenant's and issuers reach hosts through bindings. kit's migration made a
+binding for every issuer's host and every custom domain it served, so
+nothing moves on the server. Only the configuration changes.
+
+1. **`authwise_domain`**: replace `issuer_id = …` with `custom = true`. The
+   state upgrades itself, and the plan shows no change to the domain.
+   **Never let Terraform destroy and recreate a custom host to migrate it.**
+   That deletes its certificate and edge entries and releases the hostname.
+2. **The binding kit made**: add an `authwise_issuer_domain_binding` for
+   the issuer on that domain, and import it instead of creating it:
+   creating it again is refused with `BINDING_TAKEN`. Its id is in the
+   issuer's `bindings`, which the plan output shows.
+
+```terraform
+resource "authwise_domain" "login" {
+  custom   = true
+  hostname = "login.acme.com"
+}
+
+resource "authwise_issuer_domain_binding" "login" {
+  issuer_id = authwise_issuer.main.issuer_id
+  domain_id = authwise_domain.login.domain_id
+}
+
+import {
+  to = authwise_issuer_domain_binding.login
+  id = "tenants/t-01/issuers/i-01/issuer-domain-bindings/idb-01"
+}
+```
+
+3. **`authwise_issuer_preferred_domain`** is deprecated for
+   `authwise_issuer_preferred_binding`, which names the binding. kit still
+   accepts the old one for one release.
+4. **`authwise_issuer.domain_id` and `path`** still work on create: they make
+   the issuer's first binding. Leave them on an existing issuer, or remove
+   them: either way nothing changes. Changing them replaces the issuer.
+
+`authwise_issuer_domain` and `authwise_issuer_domain_activation` are gone.
+Move them to `authwise_domain` with 0.31 or earlier first (the section
+below), then upgrade.
 
 ## Upgrading from 0.18
 
@@ -257,49 +315,8 @@ terraform import authwise_domain.main tenants/t-01/domains/acme.id.authwise.com
 
 ### `authwise_issuer_domain` and `authwise_issuer_domain_activation`
 
-Both are deprecated: a custom host is an `authwise_domain` with
-`issuer_id`, and the same row in Authwise. Rename the resources in the
-configuration, `issuer_domain` to `domain` in the activation, and add
-`moved` blocks (Terraform 1.8 or later):
-
-```terraform
-resource "authwise_domain" "login" {
-  issuer_id = authwise_issuer.main.issuer_id
-  hostname  = "login.acme.com"
-}
-
-resource "authwise_domain_activation" "login" {
-  domain     = authwise_domain.login.name
-  depends_on = [cloudflare_record.login_challenge]
-}
-
-moved {
-  from = authwise_issuer_domain.login
-  to   = authwise_domain.login
-}
-
-moved {
-  from = authwise_issuer_domain_activation.login
-  to   = authwise_domain_activation.login
-}
-```
-
-The plan should show both as moved with no changes, and the DNS records
-unchanged: the domain keeps its id and its certificate. **Never let
-Terraform destroy and recreate a custom host to migrate it.** That deletes
-its certificate and edge entries and releases the hostname, and logins at
-it fail until a new certificate is issued.
-
-On Terraform older than 1.8, re-import instead:
-
-```shell
-terraform state rm authwise_issuer_domain.login authwise_issuer_domain_activation.login
-terraform import authwise_domain.login tenants/t-01/domains/d-01
-terraform import authwise_domain_activation.login tenants/t-01/domains/d-01
-```
-
-`d-01` is the old resource's `issuer_domain_id`: the id did not change.
-The deprecated resources go once kit removes the API they call (kit#810).
+These were moved to `authwise_domain` and `authwise_domain_activation` with
+`moved` blocks, on 0.19 to 0.31. 0.32 removed them: move on 0.31 first.
 
 <!-- schema generated by tfplugindocs -->
 ## Schema
@@ -310,9 +327,9 @@ The deprecated resources go once kit removes the API they call (kit#810).
 
 ### Optional
 
-- `issuer_id` (String) The issuer a custom host serves (`i-…`); unset for a native host and for a product's host. Changing it replaces the domain. Set it from the issuer resource, so Terraform destroys the domain before the issuer: kit refuses to delete an issuer with a domain on it (`ISSUER_HAS_DOMAINS`).
+- `custom` (Boolean) A hostname of yours, such as `login.acme.com`, rather than an Authwise host: Authwise obtains its certificate, and `dns_records` lists the records to add. Set on create; changing a configured value replaces the domain. A custom Guard address (`product`) is custom without setting it. kit gates custom hosts by plan (`PLAN_REQUIRED`).
 - `labels` (Map of String)
-- `product` (String) The product a custom host serves: `guard`, a custom Guard address. Conflicts with `issuer_id`. Changing it replaces the domain. kit gates it by plan like an issuer's custom host (`PLAN_REQUIRED`); a trial has the default address only.
+- `product` (String) The product a custom host serves: `guard`, a custom Guard address. No issuer can be bound to it. Changing it replaces the domain. kit gates it by plan like an issuer's custom host (`PLAN_REQUIRED`); a trial has the default address only.
 - `tenant_id` (String) Parent identifier `tenant_id`; overrides the provider default, and reads back from the name. Changing a configured one replaces the domain.
 - `timeouts` (Block, Optional) (see [below for nested schema](#nestedblock--timeouts))
 
@@ -320,14 +337,14 @@ The deprecated resources go once kit removes the API they call (kit#810).
 
 - `activated_at` (String) When a custom host first became `ACTIVE`, RFC 3339; empty before then.
 - `certificate_expires_at` (String) When a custom host's current certificate expires, RFC 3339; empty before the first is issued.
-- `dns_records` (Attributes List) A custom host's records to add at your DNS provider, one per `purpose`: `traffic` (the hostname, a CNAME to the issuer's own host, or to the tenant's default Guard address) and `challenge` (the certificate authority's proof of control). Known after create; empty on a native host. Key DNS resources on `purpose`, not on these values, so the keys are known at plan; see the example. (see [below for nested schema](#nestedatt--dns_records))
-- `domain_id` (String) Server-assigned resource id (`d-…`), the last segment of `name`: what `authwise_issuer.domain_id` takes.
-- `failure_code` (String) Why the domain is `FAILED` or `DEGRADED`; empty otherwise. One of `DNS_NOT_FOUND` (a record is missing), `CAA` (a CAA record excludes the certificate authority), `CONFIG` (a record exists with the wrong content, or is proxied), `RATE_LIMITED` (the certificate authority's limit; it retries), `PROBE_FAILED` (the hostname did not answer as the issuer or product) or `PROVIDER_ERROR` (Authwise's side).
+- `dns_records` (Attributes List) A custom host's records to add at your DNS provider, one per `purpose`: `traffic` (the hostname, a CNAME to the install's edge name, or to the tenant's default Guard address) and `challenge` (the certificate authority's proof of control). Known after create; empty on a native host. Key DNS resources on `purpose`, not on these values, so the keys are known at plan; see the example. (see [below for nested schema](#nestedatt--dns_records))
+- `domain_id` (String) Server-assigned resource id (`d-…`), the last segment of `name`: what `authwise_issuer_domain_binding.domain_id` takes.
+- `failure_code` (String) Why the domain is `FAILED` or `DEGRADED`; empty otherwise. One of `DNS_NOT_FOUND` (a record is missing), `CAA` (a CAA record excludes the certificate authority), `CONFIG` (a record exists with the wrong content, or is proxied), `RATE_LIMITED` (the certificate authority's limit; it retries), `PROBE_FAILED` (the hostname did not answer as Authwise or the product) or `PROVIDER_ERROR` (Authwise's side).
 - `failure_message` (String) `failure_code` in words, with the record or setting to fix.
 - `failure_record` (String) The `purpose` of the record the failure is about, `traffic` or `challenge`; empty when it is about neither.
 - `name` (String) Full resource name (`tenants/{t}/domains/{d}`); serves as the Terraform ID.
 - `state` (String) A custom host's state, empty on a native host: `PENDING_DNS` (waiting for the challenge record), `VERIFYING` (issuing the certificate), `PROVISIONING` (attaching it; the hostname routes), `ACTIVE`, `DEGRADED` (serving, but the challenge record is gone and renewal will fail), `FAILED` (see `failure_code`) or `DELETING`.
-- `traffic_target` (String) Where a custom host's `traffic` record points: its issuer's own Authwise host, such as `example.id.authwise.com`. Empty on a custom Guard address, whose target is the `traffic` record's value.
+- `traffic_target` (String) Where a custom host's `traffic` record points: the Authwise install's edge name (kit#911). A host claimed before kit#911 keeps the issuer host it recorded. Empty on a native host and on a custom Guard address, whose target is the `traffic` record's value.
 
 <a id="nestedblock--timeouts"></a>
 ### Nested Schema for `timeouts`

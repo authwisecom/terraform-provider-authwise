@@ -16,6 +16,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
@@ -40,6 +41,7 @@ const (
 	hostnameAttribute = "hostname"
 	issuerIDAttribute = "issuer_id"
 	productAttribute  = "product"
+	customAttribute   = "custom"
 
 	// productGuard is the one product with hosts (kit#903): a custom
 	// Guard address such as guard.acme.com.
@@ -104,8 +106,11 @@ var nativeHostnamePattern = regexp.MustCompile(`^[a-z0-9]([a-z0-9.-]*[a-z0-9])?(
 type domain struct {
 	Name     string
 	Hostname string
-	// IssuerID is set on an issuer's custom host, Product on a product's
-	// (kit#903), never both; a native host has neither.
+	// Custom is a customer's hostname with the DNS tracking (kit#911).
+	// Product is set on a product's custom host (kit#903). IssuerID is
+	// what kit still reads out on a row claimed before kit#911; it names
+	// nothing the provider writes.
+	Custom         bool
 	IssuerID       string
 	Product        string
 	Labels         map[string]string
@@ -126,13 +131,13 @@ type domainRecord struct {
 
 // custom reports whether the domain is a custom host, with the lifecycle:
 // an issuer's or a product's.
-func (d *domain) custom() bool { return d.IssuerID != "" || d.Product != "" }
+func (d *domain) custom() bool { return d.Custom || d.IssuerID != "" || d.Product != "" }
 
 // domainAPI is the slice of the identity service authwise_domain calls.
 // Errors are gRPC statuses, as the identity client's are.
 type domainAPI interface {
 	// CreateDomain creates in.Hostname under parent, a custom host when
-	// in.IssuerID or in.Product is set, with in.Labels.
+	// in.Custom or in.Product is set, with in.Labels.
 	CreateDomain(ctx context.Context, parent string, in *domain) (*domain, error)
 	GetDomain(ctx context.Context, name string) (*domain, error)
 	// FindDomain is the domain under parent with hostname, or NotFound.
@@ -261,7 +266,7 @@ func domainHint(d *domain) string {
 var domainRefusals = map[string]string{
 	"HOSTNAME_CLAIMED":    "The hostname is already claimed in this Authwise install, by another issuer or tenant, or by a domain of yours that is still being deleted (a deleted domain releases its hostname only once its certificate and edge entries are gone).",
 	"HOSTNAME_APEX":       "The hostname is a zone apex, and a CNAME cannot sit at an apex. Use a subdomain such as login.<your domain>, or your DNS provider's CNAME flattening on a subdomain you point at it.",
-	"HOSTNAME_IS_ISSUER":  "The hostname is an Authwise issuer host already; an issuer answers at its own host without a domain.",
+	"HOSTNAME_IS_ISSUER":  "The hostname is an Authwise host already: bind the issuer to its native domain with authwise_issuer_domain_binding instead.",
 	"PLAN_REQUIRED":       "Custom domains need a higher plan.",
 	"DOMAINS_UNAVAILABLE": "This Authwise install has no domain controller, so a domain added to it would never get a certificate. Custom domains are not available on it.",
 }
@@ -291,6 +296,29 @@ func domainCreateError(err error) (summary, detail string) {
 	}
 
 	return summary, strings.TrimSpace(detail + " " + err.Error())
+}
+
+// domainDeleteError words kit's refusal of a domain delete. DOMAIN_IN_USE
+// (kit#911) names the issuers still bound to it.
+func domainDeleteError(err error) (summary, detail string) {
+	for _, d := range status.Convert(err).Details() {
+		info, ok := d.(*errdetails.ErrorInfo)
+		if !ok || info.GetDomain() != authwiseErrorDomain || info.GetReason() != "DOMAIN_IN_USE" {
+			continue
+		}
+		return "delete domain refused: DOMAIN_IN_USE",
+			fmt.Sprintf("Issuers are still bound to the domain (%s). Destroy their authwise_issuer_domain_binding resources first: "+
+				"a binding whose domain_id is set from this domain is destroyed before it. %s", info.GetMetadata()["issuers"], err.Error())
+	}
+	return "delete domain failed", err.Error()
+}
+
+// requiresReplaceIfConfiguredBool replaces the resource when a configured
+// value changes; an unset one follows the server.
+func requiresReplaceIfConfiguredBool() planmodifier.Bool {
+	return boolplanmodifier.RequiresReplaceIf(func(_ context.Context, req planmodifier.BoolRequest, resp *boolplanmodifier.RequiresReplaceIfFuncResponse) {
+		resp.RequiresReplace = !req.ConfigValue.IsNull()
+	}, "Changing a configured value replaces the resource.", "Changing a configured value replaces the resource.")
 }
 
 // enumName is an enum value's name without its prefix; "" when unspecified.
@@ -353,14 +381,13 @@ var (
 	_ resource.ResourceWithImportState    = &domainResource{}
 	_ resource.ResourceWithValidateConfig = &domainResource{}
 	_ resource.ResourceWithUpgradeState   = &domainResource{}
-	_ resource.ResourceWithMoveState      = &domainResource{}
 )
 
 // domainResource is authwise_domain (#47): a hostname the tenant serves.
-// Native (no issuer_id or product), an issuer names it as its host; custom
-// with issuer_id, it is a hostname of the customer's serving that issuer;
-// custom with product = guard (tf#67, kit#903), it serves the tenant's
-// Guard address. A custom host's certificate is obtained and renewed on
+// Native, or custom (a hostname of the customer's, with the DNS tracking);
+// issuers reach either through authwise_issuer_domain_binding (tf#69,
+// kit#911), and nothing on the domain names an issuer. Custom with
+// product = guard (tf#67, kit#903), it serves the tenant's Guard address. A custom host's certificate is obtained and renewed on
 // Authwise's edge. kit merged
 // its IssuerDomain into Domain (kit#808), keyed by an AWID where it was
 // keyed by the hostname. Hand-written because a custom host's Create and
@@ -376,7 +403,7 @@ type domainModel struct {
 	DomainID             types.String   `tfsdk:"domain_id"`
 	TenantID             types.String   `tfsdk:"tenant_id"`
 	Hostname             types.String   `tfsdk:"hostname"`
-	IssuerID             types.String   `tfsdk:"issuer_id"`
+	Custom               types.Bool     `tfsdk:"custom"`
 	Product              types.String   `tfsdk:"product"`
 	Labels               types.Map      `tfsdk:"labels"`
 	DNSRecords           types.List     `tfsdk:"dns_records"`
@@ -409,12 +436,15 @@ func domainSchema(ctx context.Context) schema.Schema {
 	}
 
 	return schema.Schema{
-		// 1 is kit#808's shape: the AWID as domain_id and the hostname
-		// beside it. 0 keyed the domain by its hostname, in domain_id.
-		Version: 1,
-		MarkdownDescription: "A hostname the tenant serves logins on. A native host (no `issuer_id`) is an Authwise host such as `acme.id.authwise.com`, which an issuer names as its host (`authwise_issuer.domain_id`). " +
-			"A custom host (`issuer_id` set) is a hostname of yours that serves that issuer, such as `login.acme.com`: Authwise obtains and renews its certificate, and you add two DNS records, " +
-			"read from `dns_records`. The issuer keeps answering at its own host as well, and each host is its own issuer URL (`iss`).\n\n" +
+		// 2 is kit#911's: custom in place of issuer_id. 1 is kit#808's
+		// shape: the AWID as domain_id and the hostname beside it. 0 keyed
+		// the domain by its hostname, in domain_id.
+		Version: 2,
+		MarkdownDescription: "A hostname of the tenant. A native host is an Authwise host such as `acme.id.authwise.com`. " +
+			"A custom host (`custom = true`) is a hostname of yours, such as `login.acme.com`: Authwise obtains and renews its certificate, and you add two DNS records, " +
+			"read from `dns_records`. Nothing on a domain names an issuer: an issuer answers at a host through an `authwise_issuer_domain_binding`, one per (domain, path), " +
+			"so one host can serve several issuers at different paths and one issuer can answer at several hosts, each its own issuer URL (`iss`). " +
+			"kit refuses to delete a domain while issuers are bound to it (`DOMAIN_IN_USE`).\n\n" +
 			"A custom Guard address (`product = \"guard\"`) is a hostname of yours, such as `guard.acme.com`, that people type into the Guard client in place of the tenant's default address (`<slug>.guard.<estate>`). " +
 			"Its `traffic` record points at that default address, so the tenant needs a slug first, set on the tenant in kit. It is never an issuer URL: people still sign in at the issuer's own host. It takes the same records, waits and activation as an issuer's custom host.\n\n" +
 			"For a custom host, create returns once the records are known, so DNS resources can take them in the same apply. Add the challenge record first and point traffic only once `state` is `PROVISIONING` or `ACTIVE`, " +
@@ -428,7 +458,7 @@ func domainSchema(ctx context.Context) schema.Schema {
 			},
 			domainIDAttribute: schema.StringAttribute{
 				Computed:            true,
-				MarkdownDescription: "Server-assigned resource id (`d-…`), the last segment of `name`: what `authwise_issuer.domain_id` takes.",
+				MarkdownDescription: "Server-assigned resource id (`d-…`), the last segment of `name`: what `authwise_issuer_domain_binding.domain_id` takes.",
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			tenantIDAttribute: schema.StringAttribute{
@@ -444,22 +474,20 @@ func domainSchema(ctx context.Context) schema.Schema {
 					"A custom host must be a fully qualified subdomain, since a CNAME cannot sit at a zone apex; a native one may carry a port.",
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
-			issuerIDAttribute: schema.StringAttribute{
+			customAttribute: schema.BoolAttribute{
 				Optional: true,
-				MarkdownDescription: "The issuer a custom host serves (`i-…`); unset for a native host and for a product's host. Changing it replaces the domain. " +
-					"Set it from the issuer resource, so Terraform destroys the domain before the issuer: kit refuses to delete an issuer with a domain on it (`ISSUER_HAS_DOMAINS`).",
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
-				Validators:    []validator.String{tfruntime.ReferenceID("i", "issuer", "authwise_issuer.<name>.issuer_id")},
+				Computed: true,
+				MarkdownDescription: "A hostname of yours, such as `login.acme.com`, rather than an Authwise host: Authwise obtains its certificate, and `dns_records` lists the records to add. " +
+					"Set on create; changing a configured value replaces the domain. A custom Guard address (`product`) is custom without setting it. " +
+					"kit gates custom hosts by plan (`PLAN_REQUIRED`).",
+				PlanModifiers: []planmodifier.Bool{requiresReplaceIfConfiguredBool(), boolplanmodifier.UseStateForUnknown()},
 			},
 			productAttribute: schema.StringAttribute{
 				Optional: true,
-				MarkdownDescription: "The product a custom host serves: `guard`, a custom Guard address. Conflicts with `issuer_id`. Changing it replaces the domain. " +
+				MarkdownDescription: "The product a custom host serves: `guard`, a custom Guard address. No issuer can be bound to it. Changing it replaces the domain. " +
 					"kit gates it by plan like an issuer's custom host (`PLAN_REQUIRED`); a trial has the default address only.",
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
-				Validators: []validator.String{
-					stringvalidator.OneOf(productGuard),
-					stringvalidator.ConflictsWith(path.MatchRoot(issuerIDAttribute)),
-				},
+				Validators:    []validator.String{stringvalidator.OneOf(productGuard)},
 			},
 			labelsAttribute: schema.MapAttribute{
 				Optional:      true,
@@ -469,7 +497,7 @@ func domainSchema(ctx context.Context) schema.Schema {
 			},
 			"dns_records": schema.ListNestedAttribute{
 				Computed: true,
-				MarkdownDescription: "A custom host's records to add at your DNS provider, one per `purpose`: `traffic` (the hostname, a CNAME to the issuer's own host, or to the tenant's default Guard address) and `challenge` (the certificate authority's proof of control). " +
+				MarkdownDescription: "A custom host's records to add at your DNS provider, one per `purpose`: `traffic` (the hostname, a CNAME to the install's edge name, or to the tenant's default Guard address) and `challenge` (the certificate authority's proof of control). " +
 					"Known after create; empty on a native host. Key DNS resources on `purpose`, not on these values, so the keys are known at plan; see the example.",
 				PlanModifiers: []planmodifier.List{listplanmodifier.UseStateForUnknown()},
 				NestedObject: schema.NestedAttributeObject{
@@ -483,13 +511,13 @@ func domainSchema(ctx context.Context) schema.Schema {
 			},
 			"traffic_target": schema.StringAttribute{
 				Computed:            true,
-				MarkdownDescription: "Where a custom host's `traffic` record points: its issuer's own Authwise host, such as `example.id.authwise.com`. Empty on a custom Guard address, whose target is the `traffic` record's value.",
+				MarkdownDescription: "Where a custom host's `traffic` record points: the Authwise install's edge name (kit#911). A host claimed before kit#911 keeps the issuer host it recorded. Empty on a native host and on a custom Guard address, whose target is the `traffic` record's value.",
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"state": computed("A custom host's state, empty on a native host: `PENDING_DNS` (waiting for the challenge record), `VERIFYING` (issuing the certificate), `PROVISIONING` (attaching it; the hostname routes), `ACTIVE`, " +
 				"`DEGRADED` (serving, but the challenge record is gone and renewal will fail), `FAILED` (see `failure_code`) or `DELETING`."),
 			"failure_code": computed("Why the domain is `FAILED` or `DEGRADED`; empty otherwise. One of `DNS_NOT_FOUND` (a record is missing), `CAA` (a CAA record excludes the certificate authority), " +
-				"`CONFIG` (a record exists with the wrong content, or is proxied), `RATE_LIMITED` (the certificate authority's limit; it retries), `PROBE_FAILED` (the hostname did not answer as the issuer or product) or `PROVIDER_ERROR` (Authwise's side)."),
+				"`CONFIG` (a record exists with the wrong content, or is proxied), `RATE_LIMITED` (the certificate authority's limit; it retries), `PROBE_FAILED` (the hostname did not answer as Authwise or the product) or `PROVIDER_ERROR` (Authwise's side)."),
 			"failure_message":        computed("`failure_code` in words, with the record or setting to fix."),
 			"failure_record":         computed("The `purpose` of the record the failure is about, `traffic` or `challenge`; empty when it is about neither."),
 			"certificate_expires_at": computed("When a custom host's current certificate expires, RFC 3339; empty before the first is issued."),
@@ -509,20 +537,21 @@ func (r *domainResource) Configure(_ context.Context, req resource.ConfigureRequ
 	r.client, r.get, r.defaults = client, client.GetDomain, pd.Defaults
 }
 
-// ValidateConfig holds a custom host (issuer_id or product set) to an FQDN
+// ValidateConfig holds a custom host (custom or product set) to an FQDN
 // without a port, and a native one to a lower-case host.
 func (r *domainResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
 
-	var hostname, issuerID, product types.String
+	var hostname, product types.String
+	var customFlag types.Bool
 	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root(hostnameAttribute), &hostname)...)
-	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root(issuerIDAttribute), &issuerID)...)
+	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root(customAttribute), &customFlag)...)
 	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root(productAttribute), &product)...)
-	if resp.Diagnostics.HasError() || !known(hostname, issuerID, product) || hostname.IsNull() {
+	if resp.Diagnostics.HasError() || !known(hostname, customFlag, product) || hostname.IsNull() {
 		return
 	}
 
 	h := hostname.ValueString()
-	custom := !issuerID.IsNull() || !product.IsNull()
+	custom := customFlag.ValueBool() || !product.IsNull()
 	switch {
 	case custom && !hostnamePattern.MatchString(h):
 		resp.Diagnostics.AddAttributeError(path.Root(hostnameAttribute), "invalid custom hostname",
@@ -569,7 +598,7 @@ func (r *domainResource) Create(ctx context.Context, req resource.CreateRequest,
 		return
 	}
 
-	in := &domain{Hostname: plan.Hostname.ValueString(), IssuerID: plan.IssuerID.ValueString(), Product: plan.Product.ValueString()}
+	in := &domain{Hostname: plan.Hostname.ValueString(), Custom: plan.Custom.ValueBool(), Product: plan.Product.ValueString()}
 	if !plan.Labels.IsUnknown() {
 		resp.Diagnostics.Append(plan.Labels.ElementsAs(ctx, &in.Labels, false)...)
 		if resp.Diagnostics.HasError() {
@@ -662,7 +691,7 @@ func (r *domainResource) read(ctx context.Context, name string) (*domain, error)
 }
 
 // Update sends labels, the one attribute that changes in place; hostname,
-// issuer_id and the tenant replace the domain. With labels unchanged it
+// custom, product and the tenant replace the domain. With labels unchanged it
 // reads the domain back.
 func (r *domainResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 
@@ -711,8 +740,8 @@ func (r *domainResource) Update(ctx context.Context, req resource.UpdateRequest,
 // Delete is two-phase on the server for a custom host: the row goes
 // DELETING and kit removes it once the controller reports the cloud side
 // gone. Waiting for that means a replacement, or another tenant, can claim
-// the hostname when this returns. A native host is gone at once, and kit
-// refuses it while an issuer names it (DOMAIN_HAS_ISSUERS).
+// the hostname when this returns. A native host is gone at once. kit
+// refuses either while an issuer is bound to it (DOMAIN_IN_USE, kit#911).
 func (r *domainResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 
 	if !r.configured(&resp.Diagnostics) {
@@ -739,7 +768,8 @@ func (r *domainResource) Delete(ctx context.Context, req resource.DeleteRequest,
 		if aip.IsNotFound(err) {
 			return
 		}
-		resp.Diagnostics.AddError("delete domain failed", err.Error())
+		summary, detail := domainDeleteError(err)
+		resp.Diagnostics.AddError(summary, detail)
 		return
 	}
 
@@ -772,10 +802,7 @@ func (m *domainModel) fromDomain(d *domain) diag.Diagnostics {
 	m.DomainID = types.StringValue(id)
 	m.TenantID = types.StringValue(ids[tenantIDAttribute])
 	m.Hostname = types.StringValue(d.Hostname)
-	m.IssuerID = types.StringNull()
-	if d.IssuerID != "" {
-		m.IssuerID = types.StringValue(d.IssuerID)
-	}
+	m.Custom = types.BoolValue(d.custom())
 	m.Product = types.StringNull()
 	if d.Product != "" {
 		m.Product = types.StringValue(d.Product)
@@ -805,7 +832,7 @@ func (m *domainModel) fromDomain(d *domain) diag.Diagnostics {
 func emptyDomainModel() domainModel {
 	null := types.StringNull()
 	return domainModel{
-		Name: null, DomainID: null, TenantID: null, Hostname: null, IssuerID: null, Product: null,
+		Name: null, DomainID: null, TenantID: null, Hostname: null, Custom: types.BoolNull(), Product: null,
 		Labels:        types.MapNull(types.StringType),
 		DNSRecords:    types.ListNull(types.ObjectType{AttrTypes: domainRecordAttrTypes()}),
 		TrafficTarget: null, State: null, FailureCode: null, FailureMessage: null, FailureRecord: null,
@@ -828,7 +855,7 @@ type domainModelV0 struct {
 // id. The upgraded state keeps the hostname-keyed name, which the refresh
 // that follows resolves to the AWID (Read), so the upgrade needs no API.
 // config is dropped: DomainConfig has no fields.
-func (r *domainResource) UpgradeState(context.Context) map[int64]resource.StateUpgrader {
+func (r *domainResource) UpgradeState(ctx context.Context) map[int64]resource.StateUpgrader {
 	return map[int64]resource.StateUpgrader{
 		0: {
 			PriorSchema: &schema.Schema{
@@ -854,55 +881,63 @@ func (r *domainResource) UpgradeState(context.Context) map[int64]resource.StateU
 				resp.Diagnostics.Append(resp.State.Set(ctx, &m)...)
 			},
 		},
-	}
-}
+		1: {
+			PriorSchema: domainSchemaV1(ctx),
+			StateUpgrader: func(ctx context.Context, req resource.UpgradeStateRequest, resp *resource.UpgradeStateResponse) {
 
-// MoveState takes authwise_issuer_domain's state in a moved block (Terraform
-// 1.8 and later): the same row, now under tenants/{t}/domains/{d} with the
-// same id. The refresh that follows reads the rest.
-func (r *domainResource) MoveState(ctx context.Context) []resource.StateMover {
+				var prior domainModelV1
+				resp.Diagnostics.Append(req.State.Get(ctx, &prior)...)
+				if resp.Diagnostics.HasError() {
+					return
+				}
 
-	source := &resource.SchemaResponse{}
-	(&issuerDomainResource{}).Schema(ctx, resource.SchemaRequest{}, source)
-
-	return []resource.StateMover{{
-		SourceSchema: &source.Schema,
-		StateMover: func(ctx context.Context, req resource.MoveStateRequest, resp *resource.MoveStateResponse) {
-
-			if req.SourceTypeName != "authwise_issuer_domain" {
-				return
-			}
-
-			var prior issuerDomainModel
-			resp.Diagnostics.Append(req.SourceState.Get(ctx, &prior)...)
-			if resp.Diagnostics.HasError() {
-				return
-			}
-
-			name, err := domainMovedName(prior.Name.ValueString())
-			if err != nil {
-				resp.Diagnostics.AddError("unexpected issuer domain name", err.Error())
-				return
-			}
-
-			m := emptyDomainModel()
-			m.Name = types.StringValue(name)
-			m.DomainID, m.TenantID, m.IssuerID, m.Hostname = prior.IssuerDomainID, prior.TenantID, prior.IssuerID, prior.Hostname
-			m.DNSRecords, m.TrafficTarget, m.State = prior.DNSRecords, prior.TrafficTarget, prior.State
-			m.FailureCode, m.FailureMessage, m.FailureRecord = prior.FailureCode, prior.FailureMessage, prior.FailureRecord
-			m.CertificateExpiresAt = prior.CertificateExpiresAt
-			m.Timeouts = prior.Timeouts
-			resp.Diagnostics.Append(resp.TargetState.Set(ctx, &m)...)
+				// A host claimed with issuer_id was custom; the refresh that
+				// follows reads custom from kit either way.
+				m := domainModel{
+					Name: prior.Name, DomainID: prior.DomainID, TenantID: prior.TenantID, Hostname: prior.Hostname,
+					Custom:  types.BoolValue(!prior.IssuerID.IsNull() || !prior.Product.IsNull() || prior.State.ValueString() != ""),
+					Product: prior.Product, Labels: prior.Labels, DNSRecords: prior.DNSRecords, TrafficTarget: prior.TrafficTarget,
+					State: prior.State, FailureCode: prior.FailureCode, FailureMessage: prior.FailureMessage, FailureRecord: prior.FailureRecord,
+					CertificateExpiresAt: prior.CertificateExpiresAt, ActivatedAt: prior.ActivatedAt, Timeouts: prior.Timeouts,
+				}
+				resp.Diagnostics.Append(resp.State.Set(ctx, &m)...)
+			},
 		},
-	}}
+	}
 }
 
-// domainMovedName is an issuer domain's name as the domain's: the same id
-// under the tenant.
-func domainMovedName(issuerDomainName string) (string, error) {
-	ids, id, err := issuerDomainScope.ParseName(issuerDomainCollection, issuerDomainName)
-	if err != nil {
-		return "", err
+// domainModelV1 is authwise_domain's state from kit#808 to kit#911: issuer_id
+// where custom is now.
+type domainModelV1 struct {
+	Name                 types.String   `tfsdk:"name"`
+	DomainID             types.String   `tfsdk:"domain_id"`
+	TenantID             types.String   `tfsdk:"tenant_id"`
+	Hostname             types.String   `tfsdk:"hostname"`
+	IssuerID             types.String   `tfsdk:"issuer_id"`
+	Product              types.String   `tfsdk:"product"`
+	Labels               types.Map      `tfsdk:"labels"`
+	DNSRecords           types.List     `tfsdk:"dns_records"`
+	TrafficTarget        types.String   `tfsdk:"traffic_target"`
+	State                types.String   `tfsdk:"state"`
+	FailureCode          types.String   `tfsdk:"failure_code"`
+	FailureMessage       types.String   `tfsdk:"failure_message"`
+	FailureRecord        types.String   `tfsdk:"failure_record"`
+	CertificateExpiresAt types.String   `tfsdk:"certificate_expires_at"`
+	ActivatedAt          types.String   `tfsdk:"activated_at"`
+	Timeouts             timeouts.Value `tfsdk:"timeouts"`
+}
+
+// domainSchemaV1 is the schema domainModelV1 was written with: today's,
+// with issuer_id in place of custom.
+func domainSchemaV1(ctx context.Context) *schema.Schema {
+	s := domainSchema(ctx)
+	s.Version = 1
+	attrs := make(map[string]schema.Attribute, len(s.Attributes))
+	for k, v := range s.Attributes {
+		attrs[k] = v
 	}
-	return fmt.Sprintf("tenants/%s/domains/%s", ids[tenantIDAttribute], id), nil
+	delete(attrs, customAttribute)
+	attrs[issuerIDAttribute] = schema.StringAttribute{Optional: true}
+	s.Attributes = attrs
+	return &s
 }

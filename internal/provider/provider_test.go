@@ -70,8 +70,12 @@ func TestProviderSurface(t *testing.T) {
 	// guard_tenant_settings. Relay pools (#66) add the generated
 	// guard_relay_pool and guard_pool_relay and the hand-written
 	// guard_relay_credential and guard_relay_pool_access. Guard's Invite
-	// entity is retired (#67, kit#902 D5): guard_invite goes.
+	// entity is retired (#67, kit#902 D5): guard_invite goes. Tenant
+	// domains through bindings (#69, kit#911) remove issuer_domain and
+	// issuer_domain_activation and add the generated issuer_domain_binding
+	// and the hand-written issuer_preferred_binding.
 	assert.Len(t, resourceTypes, 44)
+	assert.False(t, resourceTypes["authwise_issuer_domain"], "issuer domains are bindings (#69)")
 	assert.False(t, resourceTypes["authwise_guard_tenant"], "there is no Guard tenant (#65)")
 	assert.False(t, resourceTypes["authwise_guard_invite"], "Guard's Invite is retired (#67)")
 	assert.False(t, resourceTypes["authwise_guard_deprovisioning"], "deprovisioning is a tenant setting (#65)")
@@ -133,8 +137,9 @@ func TestProviderSurface(t *testing.T) {
 	// (#65) removes guard_tenant, guard_tenants and guard_deprovisioning.
 	// Relay pools (#66) add a pair each for relay_pool and pool_relay, and
 	// the hand-written guard_allowed_relay_pools. The Invite's retirement
-	// (#67) removes guard_invite and guard_invites.
-	assert.Len(t, dataSourceTypes, 79)
+	// (#67) removes guard_invite and guard_invites. Bindings (#69) add a
+	// pair for issuer_domain_binding.
+	assert.Len(t, dataSourceTypes, 81)
 	for _, gone := range []string{"authwise_guard_tenant", "authwise_guard_tenants", "authwise_guard_deprovisioning"} {
 		assert.False(t, dataSourceTypes[gone], "%s went with the tenant collapse (#65)", gone)
 	}

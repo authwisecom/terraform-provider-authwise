@@ -17,6 +17,7 @@ import (
 	path "github.com/hashicorp/terraform-plugin-framework/path"
 	resource "github.com/hashicorp/terraform-plugin-framework/resource"
 	schema "github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	boolplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	listplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	mapplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
 	objectplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/objectplanmodifier"
@@ -40,6 +41,44 @@ func DomainResourceSchema() schema.Schema {
 				MarkdownDescription: "`activated_at` as an RFC 3339 timestamp.",
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
+			"bindings": schema.ListNestedAttribute{
+				Computed: true,
+				NestedObject: schema.NestedAttributeObject{Attributes: map[string]schema.Attribute{
+					"created_at": schema.StringAttribute{
+						Computed: true,
+						Optional: true,
+					},
+					"domain_id": schema.StringAttribute{
+						Computed: true,
+						Optional: true,
+					},
+					"hostname": schema.StringAttribute{
+						Computed: true,
+						Optional: true,
+					},
+					"issuer_id": schema.StringAttribute{
+						Computed: true,
+						Optional: true,
+					},
+					"name": schema.StringAttribute{
+						Computed: true,
+						Optional: true,
+					},
+					"path": schema.StringAttribute{
+						Computed: true,
+						Optional: true,
+					},
+					"routable": schema.BoolAttribute{
+						Computed: true,
+						Optional: true,
+					},
+					"url": schema.StringAttribute{
+						Computed: true,
+						Optional: true,
+					},
+				}},
+				PlanModifiers: []planmodifier.List{listplanmodifier.UseStateForUnknown()},
+			},
 			"certificate_expires_at": schema.StringAttribute{
 				Computed:            true,
 				MarkdownDescription: "`certificate_expires_at` as an RFC 3339 timestamp.",
@@ -61,6 +100,11 @@ func DomainResourceSchema() schema.Schema {
 				Computed:            true,
 				MarkdownDescription: "`created_at` as an RFC 3339 timestamp.",
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
+			"custom": schema.BoolAttribute{
+				Computed:      true,
+				Optional:      true,
+				PlanModifiers: []planmodifier.Bool{boolplanmodifier.RequiresReplace(), boolplanmodifier.UseStateForUnknown()},
 			},
 			"dns_records": schema.ListNestedAttribute{
 				Computed: true,
@@ -151,7 +195,7 @@ func DomainResourceSchema() schema.Schema {
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 		},
-		MarkdownDescription: "A hostname the tenant serves: native (no `issuer_id` or `product`), the host an issuer names; custom with `issuer_id` set, a hostname of yours serving that issuer; or custom with `product = \"guard\"`, a hostname of yours serving the tenant's Guard address.",
+		MarkdownDescription: "A hostname of the tenant: native, an Authwise host; custom (`custom`), a hostname of yours; or custom with `product = \"guard\"`, a hostname of yours serving the tenant's Guard address. Issuers answer at a domain through `authwise_issuer_domain_binding` (kit#911); `bindings` lists them.",
 	}
 }
 
@@ -189,6 +233,32 @@ func DomainFailureAttrTypes() map[string]attr.Type {
 	}
 }
 
+// DomainBindingsModel is the Terraform model for Domain's "bindings" nested attribute.
+type DomainBindingsModel struct {
+	Name      types.String `tfsdk:"name"`
+	DomainId  types.String `tfsdk:"domain_id"`
+	Path      types.String `tfsdk:"path"`
+	Hostname  types.String `tfsdk:"hostname"`
+	Url       types.String `tfsdk:"url"`
+	Routable  types.Bool   `tfsdk:"routable"`
+	IssuerId  types.String `tfsdk:"issuer_id"`
+	CreatedAt types.String `tfsdk:"created_at"`
+}
+
+// DomainBindingsAttrTypes returns the attribute types of the "bindings" nested attribute.
+func DomainBindingsAttrTypes() map[string]attr.Type {
+	return map[string]attr.Type{
+		"created_at": types.StringType,
+		"domain_id":  types.StringType,
+		"hostname":   types.StringType,
+		"issuer_id":  types.StringType,
+		"name":       types.StringType,
+		"path":       types.StringType,
+		"routable":   types.BoolType,
+		"url":        types.StringType,
+	}
+}
+
 // DomainModel is the Terraform plan/state model for Domain.
 type DomainModel struct {
 	Name                 types.String         `tfsdk:"name"`
@@ -207,16 +277,20 @@ type DomainModel struct {
 	CreatedAt            types.String         `tfsdk:"created_at"`
 	TrafficTarget        types.String         `tfsdk:"traffic_target"`
 	Product              types.String         `tfsdk:"product"`
+	Custom               types.Bool           `tfsdk:"custom"`
+	Bindings             types.List           `tfsdk:"bindings"`
 }
 
 // NewDomainModel returns a model with every attribute set to its typed null; collection types cannot be zero-valued.
 func NewDomainModel() *DomainModel {
 	return &DomainModel{
 		ActivatedAt:          types.StringNull(),
+		Bindings:             types.ListNull(types.ObjectType{AttrTypes: DomainBindingsAttrTypes()}),
 		CertificateExpiresAt: types.StringNull(),
 		ClaimExpiresAt:       types.StringNull(),
 		Config:               jsontypes.NewNormalizedNull(),
 		CreatedAt:            types.StringNull(),
+		Custom:               types.BoolNull(),
 		DnsRecords:           types.ListNull(types.ObjectType{AttrTypes: DomainDnsRecordsAttrTypes()}),
 		DomainId:             types.StringNull(),
 		Failure:              types.ObjectNull(DomainFailureAttrTypes()),
@@ -309,6 +383,30 @@ func (m *DomainModel) ToProto(ctx context.Context) (*v1alpha1.Domain, diag.Diagn
 	}
 	out.TrafficTarget = m.TrafficTarget.ValueString()
 	out.Product = m.Product.ValueString()
+	out.Custom = m.Custom.ValueBool()
+	if !m.Bindings.IsNull() && !m.Bindings.IsUnknown() {
+		var items []DomainBindingsModel
+		diags.Append(m.Bindings.ElementsAs(ctx, &items, false)...)
+		for i, n := range items {
+			v := &v1alpha1.IssuerDomainBinding{}
+			v.Name = n.Name.ValueString()
+			v.DomainId = n.DomainId.ValueString()
+			v.Path = n.Path.ValueString()
+			v.Hostname = n.Hostname.ValueString()
+			v.Url = n.Url.ValueString()
+			v.Routable = n.Routable.ValueBool()
+			v.IssuerId = n.IssuerId.ValueString()
+			if !n.CreatedAt.IsNull() && !n.CreatedAt.IsUnknown() {
+				t, err := time.Parse(time.RFC3339, n.CreatedAt.ValueString())
+				if err != nil {
+					diags.AddAttributeError(path.Root("bindings").AtListIndex(i).AtName("created_at"), "invalid RFC 3339 timestamp", err.Error())
+				} else {
+					v.CreatedAt = timestamppb.New(t)
+				}
+			}
+			out.Bindings = append(out.Bindings, v)
+		}
+	}
 	return out, diags
 }
 
@@ -431,6 +529,60 @@ func (m *DomainModel) FromProto(ctx context.Context, e *v1alpha1.Domain) diag.Di
 	} else {
 		m.Product = types.StringValue(e.Product)
 	}
+	m.Custom = types.BoolValue(e.Custom)
+	if len(e.Bindings) == 0 {
+		if !tf.KeepEmpty(m.Bindings) {
+			m.Bindings = types.ListNull(types.ObjectType{AttrTypes: DomainBindingsAttrTypes()})
+		}
+	} else {
+		var prior []DomainBindingsModel
+		if !m.Bindings.IsNull() && !m.Bindings.IsUnknown() {
+			diags.Append(m.Bindings.ElementsAs(ctx, &prior, false)...)
+		}
+		items := make([]DomainBindingsModel, len(e.Bindings))
+		for i, el := range e.Bindings {
+			var n DomainBindingsModel
+			if i < len(prior) {
+				n = prior[i]
+			}
+			n.Name = types.StringValue(el.Name)
+			if el.DomainId == "" {
+				n.DomainId = types.StringNull()
+			} else {
+				n.DomainId = types.StringValue(el.DomainId)
+			}
+			if el.Path == "" {
+				n.Path = types.StringNull()
+			} else {
+				n.Path = types.StringValue(el.Path)
+			}
+			if el.Hostname == "" {
+				n.Hostname = types.StringNull()
+			} else {
+				n.Hostname = types.StringValue(el.Hostname)
+			}
+			if el.Url == "" {
+				n.Url = types.StringNull()
+			} else {
+				n.Url = types.StringValue(el.Url)
+			}
+			n.Routable = types.BoolValue(el.Routable)
+			if el.IssuerId == "" {
+				n.IssuerId = types.StringNull()
+			} else {
+				n.IssuerId = types.StringValue(el.IssuerId)
+			}
+			if el.CreatedAt == nil {
+				n.CreatedAt = types.StringNull()
+			} else {
+				n.CreatedAt = types.StringValue(el.CreatedAt.AsTime().Format(time.RFC3339))
+			}
+			items[i] = n
+		}
+		list, d := types.ListValueFrom(ctx, types.ObjectType{AttrTypes: DomainBindingsAttrTypes()}, items)
+		diags.Append(d...)
+		m.Bindings = list
+	}
 	return diags
 }
 
@@ -463,6 +615,9 @@ func (m *DomainModel) UpdateMask(ctx context.Context, prior *DomainModel) []stri
 	}
 	if !m.Product.Equal(prior.Product) {
 		paths = append(paths, "product")
+	}
+	if !m.Custom.Equal(prior.Custom) {
+		paths = append(paths, "custom")
 	}
 	return paths
 }
@@ -592,7 +747,20 @@ func (r *domainResource) ImportState(ctx context.Context, req resource.ImportSta
 func DomainDataSourceSchema() schema1.Schema {
 	return schema1.Schema{
 		Attributes: map[string]schema1.Attribute{
-			"activated_at":           schema1.StringAttribute{Computed: true},
+			"activated_at": schema1.StringAttribute{Computed: true},
+			"bindings": schema1.ListNestedAttribute{
+				Computed: true,
+				NestedObject: schema1.NestedAttributeObject{Attributes: map[string]schema1.Attribute{
+					"created_at": schema1.StringAttribute{Computed: true},
+					"domain_id":  schema1.StringAttribute{Computed: true},
+					"hostname":   schema1.StringAttribute{Computed: true},
+					"issuer_id":  schema1.StringAttribute{Computed: true},
+					"name":       schema1.StringAttribute{Computed: true},
+					"path":       schema1.StringAttribute{Computed: true},
+					"routable":   schema1.BoolAttribute{Computed: true},
+					"url":        schema1.StringAttribute{Computed: true},
+				}},
+			},
 			"certificate_expires_at": schema1.StringAttribute{Computed: true},
 			"claim_expires_at":       schema1.StringAttribute{Computed: true},
 			"config": schema1.StringAttribute{
@@ -600,6 +768,7 @@ func DomainDataSourceSchema() schema1.Schema {
 				CustomType: jsontypes.NormalizedType{},
 			},
 			"created_at": schema1.StringAttribute{Computed: true},
+			"custom":     schema1.BoolAttribute{Computed: true},
 			"dns_records": schema1.ListNestedAttribute{
 				Computed: true,
 				NestedObject: schema1.NestedAttributeObject{Attributes: map[string]schema1.Attribute{
@@ -636,7 +805,7 @@ func DomainDataSourceSchema() schema1.Schema {
 			"tenant_id":      schema1.StringAttribute{Computed: true},
 			"traffic_target": schema1.StringAttribute{Computed: true},
 		},
-		MarkdownDescription: "A hostname the tenant serves: native (no `issuer_id` or `product`), the host an issuer names; custom with `issuer_id` set, a hostname of yours serving that issuer; or custom with `product = \"guard\"`, a hostname of yours serving the tenant's Guard address. This data source reads one by its full resource name.",
+		MarkdownDescription: "A hostname of the tenant: native, an Authwise host; custom (`custom`), a hostname of yours; or custom with `product = \"guard\"`, a hostname of yours serving the tenant's Guard address. Issuers answer at a domain through `authwise_issuer_domain_binding` (kit#911); `bindings` lists them. This data source reads one by its full resource name.",
 	}
 }
 
@@ -685,16 +854,20 @@ type DomainItemModel struct {
 	CreatedAt            types.String         `tfsdk:"created_at"`
 	TrafficTarget        types.String         `tfsdk:"traffic_target"`
 	Product              types.String         `tfsdk:"product"`
+	Custom               types.Bool           `tfsdk:"custom"`
+	Bindings             types.List           `tfsdk:"bindings"`
 }
 
 // DomainItemAttrTypes returns the attribute types of one domains list element.
 func DomainItemAttrTypes() map[string]attr.Type {
 	return map[string]attr.Type{
 		"activated_at":           types.StringType,
+		"bindings":               types.ListType{ElemType: types.ObjectType{AttrTypes: DomainBindingsAttrTypes()}},
 		"certificate_expires_at": types.StringType,
 		"claim_expires_at":       types.StringType,
 		"config":                 jsontypes.NormalizedType{},
 		"created_at":             types.StringType,
+		"custom":                 types.BoolType,
 		"dns_records":            types.ListType{ElemType: types.ObjectType{AttrTypes: DomainDnsRecordsAttrTypes()}},
 		"domain_id":              types.StringType,
 		"failure":                types.ObjectType{AttrTypes: DomainFailureAttrTypes()},
@@ -722,7 +895,20 @@ func DomainListDataSourceSchema() schema1.Schema {
 				Computed:            true,
 				MarkdownDescription: "Every domain under the parent, in the order the API lists them.",
 				NestedObject: schema1.NestedAttributeObject{Attributes: map[string]schema1.Attribute{
-					"activated_at":           schema1.StringAttribute{Computed: true},
+					"activated_at": schema1.StringAttribute{Computed: true},
+					"bindings": schema1.ListNestedAttribute{
+						Computed: true,
+						NestedObject: schema1.NestedAttributeObject{Attributes: map[string]schema1.Attribute{
+							"created_at": schema1.StringAttribute{Computed: true},
+							"domain_id":  schema1.StringAttribute{Computed: true},
+							"hostname":   schema1.StringAttribute{Computed: true},
+							"issuer_id":  schema1.StringAttribute{Computed: true},
+							"name":       schema1.StringAttribute{Computed: true},
+							"path":       schema1.StringAttribute{Computed: true},
+							"routable":   schema1.BoolAttribute{Computed: true},
+							"url":        schema1.StringAttribute{Computed: true},
+						}},
+					},
 					"certificate_expires_at": schema1.StringAttribute{Computed: true},
 					"claim_expires_at":       schema1.StringAttribute{Computed: true},
 					"config": schema1.StringAttribute{
@@ -730,6 +916,7 @@ func DomainListDataSourceSchema() schema1.Schema {
 						CustomType: jsontypes.NormalizedType{},
 					},
 					"created_at": schema1.StringAttribute{Computed: true},
+					"custom":     schema1.BoolAttribute{Computed: true},
 					"dns_records": schema1.ListNestedAttribute{
 						Computed: true,
 						NestedObject: schema1.NestedAttributeObject{Attributes: map[string]schema1.Attribute{
@@ -772,7 +959,7 @@ func DomainListDataSourceSchema() schema1.Schema {
 				Validators:          []validator.String{tf.ReferenceID("t", "tenant", "")},
 			},
 		},
-		MarkdownDescription: "A hostname the tenant serves: native (no `issuer_id` or `product`), the host an issuer names; custom with `issuer_id` set, a hostname of yours serving that issuer; or custom with `product = \"guard\"`, a hostname of yours serving the tenant's Guard address. This data source lists every one under a parent.",
+		MarkdownDescription: "A hostname of the tenant: native, an Authwise host; custom (`custom`), a hostname of yours; or custom with `product = \"guard\"`, a hostname of yours serving the tenant's Guard address. Issuers answer at a domain through `authwise_issuer_domain_binding` (kit#911); `bindings` lists them. This data source lists every one under a parent.",
 	}
 }
 
@@ -895,6 +1082,60 @@ func domainItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Domain, *D
 		item.Product = types.StringNull()
 	} else {
 		item.Product = types.StringValue(e.Product)
+	}
+	item.Custom = types.BoolValue(e.Custom)
+	if len(e.Bindings) == 0 {
+		if !tf.KeepEmpty(item.Bindings) {
+			item.Bindings = types.ListNull(types.ObjectType{AttrTypes: DomainBindingsAttrTypes()})
+		}
+	} else {
+		var prior []DomainBindingsModel
+		if !item.Bindings.IsNull() && !item.Bindings.IsUnknown() {
+			diags.Append(item.Bindings.ElementsAs(ctx, &prior, false)...)
+		}
+		items := make([]DomainBindingsModel, len(e.Bindings))
+		for i, el := range e.Bindings {
+			var n DomainBindingsModel
+			if i < len(prior) {
+				n = prior[i]
+			}
+			n.Name = types.StringValue(el.Name)
+			if el.DomainId == "" {
+				n.DomainId = types.StringNull()
+			} else {
+				n.DomainId = types.StringValue(el.DomainId)
+			}
+			if el.Path == "" {
+				n.Path = types.StringNull()
+			} else {
+				n.Path = types.StringValue(el.Path)
+			}
+			if el.Hostname == "" {
+				n.Hostname = types.StringNull()
+			} else {
+				n.Hostname = types.StringValue(el.Hostname)
+			}
+			if el.Url == "" {
+				n.Url = types.StringNull()
+			} else {
+				n.Url = types.StringValue(el.Url)
+			}
+			n.Routable = types.BoolValue(el.Routable)
+			if el.IssuerId == "" {
+				n.IssuerId = types.StringNull()
+			} else {
+				n.IssuerId = types.StringValue(el.IssuerId)
+			}
+			if el.CreatedAt == nil {
+				n.CreatedAt = types.StringNull()
+			} else {
+				n.CreatedAt = types.StringValue(el.CreatedAt.AsTime().Format(time.RFC3339))
+			}
+			items[i] = n
+		}
+		list, d := types.ListValueFrom(ctx, types.ObjectType{AttrTypes: DomainBindingsAttrTypes()}, items)
+		diags.Append(d...)
+		item.Bindings = list
 	}
 	id, err := crud.IDFromName(e.Name)
 	if err != nil {

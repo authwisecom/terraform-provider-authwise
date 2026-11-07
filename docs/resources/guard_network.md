@@ -50,6 +50,8 @@ resource "authwise_guard_network" "office" {
 - `guard_network_id` (String) Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.
 - `mesh_domain` (String)
 - `name` (String) Full resource name; serves as the Terraform ID.
+- `pool_capped` (Boolean)
+- `pool_capped_at` (String) `pool_capped_at` as an RFC 3339 timestamp.
 - `pool_killed` (Boolean)
 - `pool_killed_at` (String) `pool_killed_at` as an RFC 3339 timestamp.
 

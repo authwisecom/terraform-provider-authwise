@@ -3,12 +3,12 @@
 page_title: "authwise_domain Data Source - Authwise"
 subcategory: "Identity"
 description: |-
-  A hostname the tenant serves: native (no issuer_id or product), the host an issuer names; custom with issuer_id set, a hostname of yours serving that issuer; or custom with product = "guard", a hostname of yours serving the tenant's Guard address. This data source reads one by its full resource name.
+  A hostname of the tenant: native, an Authwise host; custom (custom), a hostname of yours; or custom with product = "guard", a hostname of yours serving the tenant's Guard address. Issuers answer at a domain through authwise_issuer_domain_binding (kit#911); bindings lists them. This data source reads one by its full resource name.
 ---
 
 # authwise_domain (Data Source)
 
-A hostname the tenant serves: native (no `issuer_id` or `product`), the host an issuer names; custom with `issuer_id` set, a hostname of yours serving that issuer; or custom with `product = "guard"`, a hostname of yours serving the tenant's Guard address. This data source reads one by its full resource name.
+A hostname of the tenant: native, an Authwise host; custom (`custom`), a hostname of yours; or custom with `product = "guard"`, a hostname of yours serving the tenant's Guard address. Issuers answer at a domain through `authwise_issuer_domain_binding` (kit#911); `bindings` lists them. This data source reads one by its full resource name.
 
 
 
@@ -22,10 +22,12 @@ A hostname the tenant serves: native (no `issuer_id` or `product`), the host an 
 ### Read-Only
 
 - `activated_at` (String)
+- `bindings` (Attributes List) (see [below for nested schema](#nestedatt--bindings))
 - `certificate_expires_at` (String)
 - `claim_expires_at` (String)
 - `config` (String)
 - `created_at` (String)
+- `custom` (Boolean)
 - `dns_records` (Attributes List) (see [below for nested schema](#nestedatt--dns_records))
 - `domain_id` (String) Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.
 - `failure` (Attributes) (see [below for nested schema](#nestedatt--failure))
@@ -36,6 +38,21 @@ A hostname the tenant serves: native (no `issuer_id` or `product`), the host an 
 - `state` (String)
 - `tenant_id` (String)
 - `traffic_target` (String)
+
+<a id="nestedatt--bindings"></a>
+### Nested Schema for `bindings`
+
+Read-Only:
+
+- `created_at` (String)
+- `domain_id` (String)
+- `hostname` (String)
+- `issuer_id` (String)
+- `name` (String)
+- `path` (String)
+- `routable` (Boolean)
+- `url` (String)
+
 
 <a id="nestedatt--dns_records"></a>
 ### Nested Schema for `dns_records`

@@ -26,8 +26,8 @@ var identityTypes = map[string]bool{
 	"client_secret": true, "interactive_client_config": true,
 	"saml_relying_party_config": true, "user": true,
 	"realm_authentication_policy": true, "realm_authentication_context_schema": true,
-	"service_account": true, "service_account_secret": true, "issuer_domain": true,
-	"issuer_domain_activation": true, "domain_activation": true, "issuer_preferred_domain": true, "issuer_config": true, "realm_config": true, "audience_config": true,
+	"service_account": true, "service_account_secret": true, "issuer_domain_binding": true, "issuer_preferred_binding": true,
+	"domain_activation": true, "issuer_preferred_domain": true, "issuer_config": true, "realm_config": true, "audience_config": true,
 	"endpoint_auth": true, "tenant_config": true,
 }
 

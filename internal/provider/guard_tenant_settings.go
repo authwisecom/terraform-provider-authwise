@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"strings"
+	"time"
 
 	guardpb "git.authwise.com/authwise/apis/authwise/guardcontrol/v1alpha1"
 	"github.com/activatedio/tfinfra/pkg/aip"
@@ -77,6 +78,7 @@ type guardTenantSettingsModel struct {
 	Issuer          types.String `tfsdk:"issuer"`
 	Audience        types.String `tfsdk:"audience"`
 	ConsoleClientID types.String `tfsdk:"console_client_id"`
+	Plan            types.Object `tfsdk:"plan"`
 }
 
 type guardTenantConfigModel struct {
@@ -206,6 +208,18 @@ func (r *guardTenantSettingsResource) Schema(_ context.Context, _ resource.Schem
 				Computed:            true,
 				MarkdownDescription: "The Guard console's public client on the tenant's issuer.",
 				PlanModifiers:       keep,
+			},
+			"plan": schema.SingleNestedAttribute{
+				Computed: true,
+				MarkdownDescription: "The tenant's plan and its caps, read from kit's tenant (guard-control#88). guard-control enforces `devices_limit` and `relay_bytes_limit` " +
+					"(a network over its relay cap reads `pool_capped`) and treats an expired trial as read-only; kit enforces `members_limit` at its invitation. 0 is no cap.",
+				Attributes: map[string]schema.Attribute{
+					"plan":              schema.StringAttribute{Computed: true, MarkdownDescription: "`TRIAL`, `FREE`, `TEAM`, `BUSINESS` or `ENTERPRISE`; empty when kit reports none."},
+					"trial_ends_at":     schema.StringAttribute{Computed: true, MarkdownDescription: "When a trial ends, RFC 3339; empty otherwise."},
+					"members_limit":     schema.Int64Attribute{Computed: true, MarkdownDescription: "The most people the tenant may have; 0 is no cap."},
+					"devices_limit":     schema.Int64Attribute{Computed: true, MarkdownDescription: "The most devices the tenant may enrol; 0 is no cap."},
+					"relay_bytes_limit": schema.Int64Attribute{Computed: true, MarkdownDescription: "The relay traffic the tenant may use, in bytes; 0 is no cap."},
+				},
 			},
 		},
 	}
@@ -377,6 +391,27 @@ func fillGuardTenantSettings(ctx context.Context, m *guardTenantSettingsModel, t
 	config, d := types.ObjectValue(guardTenantConfigAttrTypes, map[string]attr.Value{"users": users, "deprovisioning": deprovisioning})
 	diags.Append(d...)
 	m.Config = config
+
+	p := t.GetPlan()
+	trialEnds := ""
+	if p.GetTrialEndsAt() != nil {
+		trialEnds = p.GetTrialEndsAt().AsTime().UTC().Format(time.RFC3339)
+	}
+	plan, d := types.ObjectValue(guardTenantPlanAttrTypes, map[string]attr.Value{
+		"plan":              types.StringValue(p.GetPlan()),
+		"trial_ends_at":     types.StringValue(trialEnds),
+		"members_limit":     types.Int64Value(p.GetMembersLimit()),
+		"devices_limit":     types.Int64Value(p.GetDevicesLimit()),
+		"relay_bytes_limit": types.Int64Value(p.GetRelayBytesLimit()),
+	})
+	diags.Append(d...)
+	m.Plan = plan
+}
+
+// guardTenantPlanAttrTypes are the plan object's attributes.
+var guardTenantPlanAttrTypes = map[string]attr.Type{
+	"plan": types.StringType, "trial_ends_at": types.StringType,
+	"members_limit": types.Int64Type, "devices_limit": types.Int64Type, "relay_bytes_limit": types.Int64Type,
 }
 
 // Read reads the settings back, so a change made elsewhere shows as drift.

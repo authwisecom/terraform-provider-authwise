@@ -84,6 +84,8 @@ func (f *fakeGuardServer) seedTenant(id string) {
 		Issuer:          "https://id.example.com/" + id,
 		Audience:        "a-guard",
 		ConsoleClientId: "c-console",
+		// The plan guard-control reads from kit's tenant (guard-control#88).
+		Plan: &guardpb.TenantPlan{Plan: "TEAM", MembersLimit: 25, DevicesLimit: 100, RelayBytesLimit: 1 << 40},
 	}
 }
 

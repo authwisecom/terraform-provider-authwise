@@ -22,7 +22,7 @@ func TestIssuerDeleteErrorNamesDomains(t *testing.T) {
 	if got.Code() != codes.FailedPrecondition || len(got.Details()) != 1 {
 		t.Fatalf("code and details must survive: %v", got)
 	}
-	for _, want := range []string{"ISSUER_HAS_DOMAINS", "2 custom domain(s), such as login.acme.com", "depends_on", "issuer has domains"} {
+	for _, want := range []string{"ISSUER_HAS_DOMAINS", "2 custom domain(s), such as login.acme.com", "kit#911", "issuer has domains"} {
 		if !strings.Contains(got.Message(), want) {
 			t.Errorf("message %q lacks %q", got.Message(), want)
 		}

@@ -21,8 +21,8 @@ It manages nothing in Authwise. Destroying it only removes it from state; a doma
 ```terraform
 # login.acme.com's activation, between its two DNS records.
 resource "authwise_domain" "login" {
-  issuer_id = authwise_issuer.main.issuer_id
-  hostname  = "login.acme.com"
+  custom   = true
+  hostname = "login.acme.com"
 }
 
 locals {

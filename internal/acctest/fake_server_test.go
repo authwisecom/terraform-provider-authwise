@@ -70,11 +70,10 @@ type fakeIdentityServer struct {
 	contact map[string]string
 	seq     int
 
-	// issuerDomains and their reads since create or delete: the
-	// controller reports the records on the first read, ACTIVE on the
-	// second, and a DELETING row is gone on the second read.
-	issuerDomains     map[string]*corepb.IssuerDomain
-	issuerDomainReads map[string]int
+	// bindings are the issuers' hosts (kit#911), by name, in creation
+	// order through bindingOrder: an issuer's first binding is its home.
+	bindings     map[string]*corepb.IssuerDomainBinding
+	bindingOrder []string
 
 	// blobs holds each asset's content as uploaded, apart from the row,
 	// the way kit keeps it in a bucket. uploads counts completed
@@ -107,29 +106,28 @@ type fakeIdentityServer struct {
 
 func newFakeIdentityServer() *fakeIdentityServer {
 	return &fakeIdentityServer{
-		realms:            map[string]*corepb.Realm{},
-		issuers:           map[string]*corepb.Issuer{},
-		domains:           map[string]*corepb.Domain{},
-		scopes:            map[string]*corepb.Scope{},
-		profiles:          map[string]*corepb.AppearanceProfile{},
-		themes:            map[string]*corepb.Theme{},
-		scopePerms:        map[string]map[string]bool{},
-		audiences:         map[string]*corepb.Audience{},
-		clients:           map[string]*corepb.Client{},
-		clientSecrets:     map[string]*corepb.ClientSecret{},
-		providers:         map[string]*corepb.Provider{},
-		certs:             map[string]*corepb.Certificate{},
-		endpoints:         map[string]*corepb.Endpoint{},
-		factors:           map[string]*corepb.Factor{},
-		secrets:           map[string]*corepb.Secret{},
-		assets:            map[string]*corepb.Asset{},
-		users:             map[string]*corepb.User{},
-		issuerDomains:     map[string]*corepb.IssuerDomain{},
-		issuerDomainReads: map[string]int{},
-		contact:           map[string]string{},
-		blobs:             map[string][]byte{},
-		material:          map[string][]string{},
-		pinned:            map[string]bool{},
+		realms:        map[string]*corepb.Realm{},
+		issuers:       map[string]*corepb.Issuer{},
+		domains:       map[string]*corepb.Domain{},
+		scopes:        map[string]*corepb.Scope{},
+		profiles:      map[string]*corepb.AppearanceProfile{},
+		themes:        map[string]*corepb.Theme{},
+		scopePerms:    map[string]map[string]bool{},
+		audiences:     map[string]*corepb.Audience{},
+		clients:       map[string]*corepb.Client{},
+		clientSecrets: map[string]*corepb.ClientSecret{},
+		providers:     map[string]*corepb.Provider{},
+		certs:         map[string]*corepb.Certificate{},
+		endpoints:     map[string]*corepb.Endpoint{},
+		factors:       map[string]*corepb.Factor{},
+		secrets:       map[string]*corepb.Secret{},
+		assets:        map[string]*corepb.Asset{},
+		users:         map[string]*corepb.User{},
+		bindings:      map[string]*corepb.IssuerDomainBinding{},
+		contact:       map[string]string{},
+		blobs:         map[string][]byte{},
+		material:      map[string][]string{},
+		pinned:        map[string]bool{},
 	}
 }
 
@@ -362,7 +360,7 @@ func (f *fakeIdentityServer) GetIssuer(ctx context.Context, in *identitypb.GetIs
 	if !ok {
 		return nil, status.Errorf(codes.NotFound, "issuer %q not found", in.GetName())
 	}
-	return proto.Clone(i).(*corepb.Issuer), nil
+	return f.renderIssuerLocked(i), nil
 }
 
 func (f *fakeIdentityServer) CreateIssuer(ctx context.Context, in *identitypb.CreateIssuerRequest) (*corepb.Issuer, error) {
@@ -372,27 +370,35 @@ func (f *fakeIdentityServer) CreateIssuer(ctx context.Context, in *identitypb.Cr
 	if err := f.admitSelectorLocked(in.GetParent(), in.GetIssuer().GetConfig().GetMultiRealmProviderSelector()); err != nil {
 		return nil, err
 	}
-	// The issuer's host is a domain of its tenant, by id (kit#808); its
-	// hostname reads back in domain_name.
-	d, ok := f.domains[in.GetParent()+"/domains/"+in.GetIssuer().GetDomainId()]
-	if !ok {
-		return nil, status.Errorf(codes.InvalidArgument, "domain_id: no domain %q in %s", in.GetIssuer().GetDomainId(), in.GetParent())
-	}
-	// No custom domain can be attached to an issuer not yet created, so
-	// the native one is all a create may prefer (kit#857).
-	if p := in.GetIssuer().GetPreferredDomainId(); p != "" && p != in.GetIssuer().GetDomainId() {
-		return nil, status.Errorf(codes.InvalidArgument, "preferred_domain_id: %s is not one of this issuer's domains", p)
-	}
 	if err := admitCimd(in.GetIssuer().GetConfig().GetCimd()); err != nil {
 		return nil, err
 	}
+	// kit#911: an issuer may exist with no binding; domain_id (and path)
+	// on create is a convenience that makes its first one, refused like
+	// any bind.
+	domainID, path := in.GetIssuer().GetDomainId(), in.GetIssuer().GetPath()
+	if domainID == "" && path != "" {
+		return nil, status.Error(codes.InvalidArgument, "path: set only with domain_id, which makes the issuer's first binding")
+	}
+	name := in.GetParent() + "/issuers/" + f.nextID("i")
+	if domainID != "" {
+		if err := f.admitBindingLocked(name, domainID, path); err != nil {
+			return nil, err
+		}
+	}
+	if p := in.GetIssuer().GetPreferredDomainId(); p != "" && p != domainID {
+		return nil, status.Errorf(codes.InvalidArgument, "preferred_domain_id: %s is not one of this issuer's domains", p)
+	}
 	i := proto.Clone(in.GetIssuer()).(*corepb.Issuer)
-	i.Name = in.GetParent() + "/issuers/" + f.nextID("i")
-	i.DomainName = d.GetHostname()
+	i.Name = name
+	i.DomainId, i.Path, i.DomainName, i.PreferredDomainId, i.PreferredBindingId, i.Bindings = "", "", "", "", "", nil
 	// account_client_id is kit's to set (kit#827); a value sent is ignored.
 	i.AccountClientId = ""
-	f.issuers[i.GetName()] = i
-	return proto.Clone(i).(*corepb.Issuer), nil
+	f.issuers[name] = i
+	if domainID != "" {
+		f.bindLocked(name, domainID, path)
+	}
+	return f.renderIssuerLocked(i), nil
 }
 
 func (f *fakeIdentityServer) PatchIssuer(ctx context.Context, in *identitypb.PatchIssuerRequest) (*corepb.Issuer, error) {
@@ -410,18 +416,27 @@ func (f *fakeIdentityServer) PatchIssuer(ctx context.Context, in *identitypb.Pat
 		switch path {
 		case "labels":
 			existing.Labels = in.GetIssuer().GetLabels()
-		case "path":
-			existing.Path = in.GetIssuer().GetPath()
+		case "path", "domain_id", "domainId", "domain_name", "domainName", "bindings":
+			// kit#911: output only after create, in either spelling.
+			return nil, status.Errorf(codes.InvalidArgument, "update_mask path %q is output only: an issuer's hosts are its bindings", path)
+		case "preferred_binding_id", "preferredBindingId":
+			if b := in.GetIssuer().GetPreferredBindingId(); b != "" && f.bindingOfLocked(in.GetName(), b) == nil {
+				return nil, status.Errorf(codes.InvalidArgument, "preferred_binding_id: %s is not one of this issuer's bindings", b)
+			}
+			existing.PreferredBindingId = in.GetIssuer().GetPreferredBindingId()
 		case "config":
 			if err := f.admitSelectorLocked(tenantOf(in.GetName()), in.GetIssuer().GetConfig().GetMultiRealmProviderSelector()); err != nil {
 				return nil, err
 			}
 			existing.Config = in.GetIssuer().GetConfig()
 		case "preferred_domain_id":
-			if err := f.admitPreferredDomainLocked(existing, in.GetIssuer().GetPreferredDomainId()); err != nil {
+			// Deprecated (kit#911): resolved to the issuer's binding on
+			// that domain.
+			b, err := f.bindingOnDomainLocked(existing, in.GetIssuer().GetPreferredDomainId())
+			if err != nil {
 				return nil, err
 			}
-			existing.PreferredDomainId = in.GetIssuer().GetPreferredDomainId()
+			existing.PreferredBindingId = b
 		default:
 			if strings.HasPrefix(path, "config.multiRealmProviderSelector.") || strings.HasPrefix(path, "config.multi_realm_provider_selector.") {
 				return nil, status.Errorf(codes.InvalidArgument,
@@ -434,7 +449,7 @@ func (f *fakeIdentityServer) PatchIssuer(ctx context.Context, in *identitypb.Pat
 		return nil, err
 	}
 	f.issuers[in.GetName()] = existing
-	return proto.Clone(existing).(*corepb.Issuer), nil
+	return f.renderIssuerLocked(existing), nil
 }
 
 // admitCimd is kit#413's fail-closed rule, in kit's words: while enabled,
@@ -446,20 +461,6 @@ func admitCimd(c *corepb.CimdConfig) error {
 		return status.Error(codes.InvalidArgument, "cimd.allow_any_host and cimd.trusted_domains are exclusive: name the hosts, or allow any host")
 	case c.GetEnabled() && !c.GetAllowAnyHost() && len(c.GetTrustedDomains()) == 0:
 		return status.Error(codes.InvalidArgument, "cimd.trusted_domains is required while cimd.enabled; set cimd.allow_any_host to accept a document from any https host")
-	}
-	return nil
-}
-
-// admitPreferredDomainLocked is kit#857's write rule: empty, the issuer's
-// native domain, or a custom domain attached to it; anything else is
-// InvalidArgument.
-func (f *fakeIdentityServer) admitPreferredDomainLocked(i *corepb.Issuer, preferred string) error {
-	if preferred == "" || preferred == i.GetDomainId() {
-		return nil
-	}
-	d, ok := f.domains[tenantOf(i.GetName())+"/domains/"+preferred]
-	if !ok || d.GetIssuerId() != i.GetName()[strings.LastIndex(i.GetName(), "/")+1:] {
-		return status.Errorf(codes.InvalidArgument, "preferred_domain_id: %s is not one of this issuer's domains", preferred)
 	}
 	return nil
 }
@@ -478,6 +479,10 @@ func (f *fakeIdentityServer) DeleteIssuer(ctx context.Context, in *identitypb.De
 		}
 	}
 	delete(f.issuers, in.GetName())
+	// Bindings cascade from the issuer (kit#911).
+	for _, b := range f.bindingsOfLocked(in.GetName()) {
+		f.unbindLocked(b.GetName())
+	}
 	return &emptypb.Empty{}, nil
 }
 

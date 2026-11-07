@@ -73,10 +73,10 @@ func (f *fakeDomains) CreateDomain(_ context.Context, parent string, in *domain)
 	}
 	f.seq++
 	id := fmt.Sprintf("d-%d", f.seq)
-	d := &domain{Name: parent + "/domains/" + id, Hostname: in.Hostname, IssuerID: in.IssuerID, Product: in.Product, Labels: maps.Clone(in.Labels)}
+	d := &domain{Name: parent + "/domains/" + id, Hostname: in.Hostname, Custom: in.Custom, Product: in.Product, Labels: maps.Clone(in.Labels)}
 	switch {
-	case d.IssuerID != "":
-		d.State, d.TrafficTarget = domainPendingDNS, "acme.id.authwise.test"
+	case d.Custom:
+		d.State, d.TrafficTarget = domainPendingDNS, "edge.authwise.test"
 	case d.Product != "":
 		// kit leaves a product host's traffic target empty: the product's
 		// default host is the product's to know (kit#903).
@@ -169,45 +169,14 @@ func (f *fakeDomains) DeleteDomain(_ context.Context, name string) error {
 	return nil
 }
 
-// issuerDomainName is a custom row's name through the alias RPCs.
-func issuerDomainName(d *domain) *domain {
-	tenant := strings.TrimSuffix(d.Name, "/domains/"+lastSegment(d.Name))
-	d.Name = fmt.Sprintf("%s/issuers/%s/issuer-domains/%s", tenant, d.IssuerID, lastSegment(d.Name))
-	return d
-}
-
-func (f *fakeDomains) CreateIssuerDomain(ctx context.Context, parent, hostname string) (*domain, error) {
-	tenant, issuer, _ := strings.Cut(parent, "/issuers/")
-	d, err := f.CreateDomain(ctx, tenant, &domain{Hostname: hostname, IssuerID: issuer})
-	if err != nil {
-		return nil, err
-	}
-	return issuerDomainName(d), nil
-}
-
-func (f *fakeDomains) GetIssuerDomain(ctx context.Context, name string) (*domain, error) {
-	d, err := f.GetDomain(ctx, name)
-	if err != nil {
-		return nil, err
-	}
-	if !d.custom() {
-		return nil, status.Errorf(codes.NotFound, "%s not found", name)
-	}
-	return issuerDomainName(d), nil
-}
-
-func (f *fakeDomains) DeleteIssuerDomain(ctx context.Context, name string) error {
-	return f.DeleteDomain(ctx, name)
-}
-
 func (f *fakeDomains) count() int {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return len(f.rows)
 }
 
-// domainTestProvider serves the domain resources, their activations and the
-// deprecated aliases over the fake, with the tenant as a provider default as
+// domainTestProvider serves the domain resource and its activation over
+// the fake, with the tenant as a provider default as
 // the real provider takes it.
 type domainTestProvider struct{ fake *fakeDomains }
 
@@ -220,7 +189,7 @@ func (p *domainTestProvider) Schema(context.Context, provider.SchemaRequest, *pr
 
 func (p *domainTestProvider) Configure(_ context.Context, _ provider.ConfigureRequest, resp *provider.ConfigureResponse) {
 	resp.ResourceData = &tfruntime.ProviderData{
-		Clients:  map[string]any{domainsClientKey: p.fake, issuerDomainsClientKey: p.fake},
+		Clients:  map[string]any{domainsClientKey: p.fake},
 		Defaults: map[string]string{tenantIDAttribute: "t-1"},
 	}
 }
@@ -230,8 +199,6 @@ func (p *domainTestProvider) Resources(context.Context) []func() resource.Resour
 	return []func() resource.Resource{
 		func() resource.Resource { return &domainResource{domainPoller: poller} },
 		func() resource.Resource { return &domainActivationResource{poller, domainActivation} },
-		func() resource.Resource { return &issuerDomainResource{domainPoller: poller} },
-		func() resource.Resource { return &domainActivationResource{poller, issuerDomainActivation} },
 	}
 }
 
@@ -254,11 +221,11 @@ const (
 )
 
 // customDomainConfig is the documented one-apply pattern over
-// authwise_domain, as issuerDomainConfig is over the deprecated alias.
+// authwise_domain.
 const customDomainConfig = `
 resource "authwise_domain" "login" {
-  issuer_id = "i-1"
-  hostname  = "login.acme.com"
+  custom   = true
+  hostname = "login.acme.com"
 }
 
 locals {
@@ -315,7 +282,7 @@ func TestDomainNativeLifecycle(t *testing.T) {
 					statecheck.ExpectKnownValue(nativeDomainAddr, tfjsonpath.New(tfruntime.NameAttribute), knownvalue.StringExact("tenants/t-1/domains/d-1")),
 					statecheck.ExpectKnownValue(nativeDomainAddr, tfjsonpath.New("domain_id"), knownvalue.StringExact("d-1")),
 					statecheck.ExpectKnownValue(nativeDomainAddr, tfjsonpath.New("hostname"), knownvalue.StringExact("acme.id.authwise.test")),
-					statecheck.ExpectKnownValue(nativeDomainAddr, tfjsonpath.New("issuer_id"), knownvalue.Null()),
+					statecheck.ExpectKnownValue(nativeDomainAddr, tfjsonpath.New("custom"), knownvalue.Bool(false)),
 					statecheck.ExpectKnownValue(nativeDomainAddr, tfjsonpath.New("state"), knownvalue.StringExact("")),
 					statecheck.ExpectKnownValue(nativeDomainAddr, tfjsonpath.New("dns_records"), knownvalue.ListSizeExact(0)),
 				},
@@ -354,9 +321,9 @@ func TestDomainCustomLifecycle(t *testing.T) {
 			ConfigStateChecks: []statecheck.StateCheck{
 				statecheck.ExpectKnownValue(domainAddr, tfjsonpath.New(tfruntime.NameAttribute), knownvalue.StringExact("tenants/t-1/domains/d-1")),
 				statecheck.ExpectKnownValue(domainAddr, tfjsonpath.New("domain_id"), knownvalue.StringExact("d-1")),
-				statecheck.ExpectKnownValue(domainAddr, tfjsonpath.New("issuer_id"), knownvalue.StringExact("i-1")),
+				statecheck.ExpectKnownValue(domainAddr, tfjsonpath.New("custom"), knownvalue.Bool(true)),
 				statecheck.ExpectKnownValue(domainAddr, tfjsonpath.New("dns_records"), knownvalue.ListSizeExact(2)),
-				statecheck.ExpectKnownValue(domainAddr, tfjsonpath.New("traffic_target"), knownvalue.StringExact("acme.id.authwise.test")),
+				statecheck.ExpectKnownValue(domainAddr, tfjsonpath.New("traffic_target"), knownvalue.StringExact("edge.authwise.test")),
 				statecheck.ExpectKnownValue(domainActivationAddr, tfjsonpath.New("state"), knownvalue.StringExact(domainActive)),
 				statecheck.ExpectKnownValue(domainActivationAddr, tfjsonpath.New("hostname"), knownvalue.StringExact("login.acme.com")),
 				statecheck.ExpectKnownValue(domainActivationAddr, tfjsonpath.New("certificate_expires_at"), knownvalue.StringExact("2027-01-19T00:00:00Z")),
@@ -418,7 +385,7 @@ func TestDomainGuardLifecycle(t *testing.T) {
 				Config: guardDomainConfig,
 				ConfigStateChecks: []statecheck.StateCheck{
 					statecheck.ExpectKnownValue(addr, tfjsonpath.New("product"), knownvalue.StringExact("guard")),
-					statecheck.ExpectKnownValue(addr, tfjsonpath.New("issuer_id"), knownvalue.Null()),
+					statecheck.ExpectKnownValue(addr, tfjsonpath.New("custom"), knownvalue.Bool(true)),
 					statecheck.ExpectKnownValue(addr, tfjsonpath.New("dns_records"), knownvalue.ListSizeExact(2)),
 					statecheck.ExpectKnownValue(addr, tfjsonpath.New("traffic_target"), knownvalue.StringExact("")),
 					statecheck.ExpectKnownValue("authwise_domain_activation.guard", tfjsonpath.New("state"), knownvalue.StringExact(domainActive)),
@@ -438,8 +405,8 @@ func TestDomainGuardLifecycle(t *testing.T) {
 	})
 }
 
-// TestDomainProductValidated: product is guard or unset, never beside
-// issuer_id, and a product host is a custom hostname.
+// TestDomainProductValidated: product is guard or unset, and a product
+// host is a custom hostname.
 func TestDomainProductValidated(t *testing.T) {
 
 	p := &domainTestProvider{fake: newFakeDomains()}
@@ -449,11 +416,6 @@ func TestDomainProductValidated(t *testing.T) {
   product  = "vpn"
   hostname = "vpn.acme.com"
 }`: `value must be one of`,
-		`resource "authwise_domain" "x" {
-  product   = "guard"
-  issuer_id = "i-1"
-  hostname  = "guard.acme.com"
-}`: `cannot be specified when "product" is specified`,
 		`resource "authwise_domain" "x" {
   product  = "guard"
   hostname = "guard.acme.com:8443"
@@ -543,16 +505,12 @@ func TestDomainHostnameValidated(t *testing.T) {
 
 	for config, want := range map[string]string{
 		`resource "authwise_domain" "x" {
-  issuer_id = "i-1"
-  hostname  = "login.acme.com:8443"
+  custom   = true
+  hostname = "login.acme.com:8443"
 }`: `invalid custom hostname`,
 		`resource "authwise_domain" "x" {
   hostname = "Acme.id.authwise.com"
 }`: `invalid hostname`,
-		`resource "authwise_domain" "x" {
-  issuer_id = "tenants/t-1/issuers/i-1"
-  hostname  = "login.acme.com"
-}`: `authwise_issuer.<name>.issuer_id`,
 	} {
 		tfresource.UnitTest(t, tfresource.TestCase{
 			ProtoV6ProviderFactories: p.factories(),
@@ -572,48 +530,6 @@ func TestDomainHostnameValidated(t *testing.T) {
   hostname = "localhost:8080"
 }`,
 		}},
-	})
-}
-
-// TestDomainMovedFromIssuerDomain: moved blocks carry the deprecated
-// resources' state to authwise_domain and authwise_domain_activation with
-// nothing to change, on the server or in the DNS records.
-func TestDomainMovedFromIssuerDomain(t *testing.T) {
-
-	fake := newFakeDomains()
-	p := &domainTestProvider{fake: fake}
-
-	moved := customDomainConfig + `
-moved {
-  from = authwise_issuer_domain.login
-  to   = authwise_domain.login
-}
-
-moved {
-  from = authwise_issuer_domain_activation.login
-  to   = authwise_domain_activation.login
-}
-`
-
-	tfresource.UnitTest(t, tfresource.TestCase{
-		ProtoV6ProviderFactories: p.factories(),
-		Steps: []tfresource.TestStep{
-			{Config: issuerDomainConfig},
-			{
-				Config: moved,
-				ConfigPlanChecks: tfresource.ConfigPlanChecks{PreApply: []plancheck.PlanCheck{
-					plancheck.ExpectResourceAction(domainAddr, plancheck.ResourceActionNoop),
-					plancheck.ExpectResourceAction(domainActivationAddr, plancheck.ResourceActionNoop),
-					plancheck.ExpectResourceAction("terraform_data.challenge", plancheck.ResourceActionNoop),
-					plancheck.ExpectResourceAction("terraform_data.traffic", plancheck.ResourceActionNoop),
-				}},
-				ConfigStateChecks: []statecheck.StateCheck{
-					statecheck.ExpectKnownValue(domainAddr, tfjsonpath.New(tfruntime.NameAttribute), knownvalue.StringExact("tenants/t-1/domains/d-1")),
-					statecheck.ExpectKnownValue(domainAddr, tfjsonpath.New("issuer_id"), knownvalue.StringExact("i-1")),
-					statecheck.ExpectKnownValue(domainActivationAddr, tfjsonpath.New("domain"), knownvalue.StringExact("tenants/t-1/domains/d-1")),
-				},
-			},
-		},
 	})
 }
 
@@ -648,6 +564,44 @@ func TestDomainUpgradeFromHostnameKeyed(t *testing.T) {
 		t.Fatal(d)
 	}
 	if got.Name.ValueString() != "tenants/t-1/domains/acme.id.authwise.com" || got.Hostname.ValueString() != "acme.id.authwise.com" || got.TenantID.ValueString() != "t-1" {
+		t.Fatalf("got %+v", got)
+	}
+}
+
+// TestDomainUpgradeFromIssuerID: state written with issuer_id (kit#808 to
+// kit#911) upgrades to custom, true for a host claimed with issuer_id.
+func TestDomainUpgradeFromIssuerID(t *testing.T) {
+
+	ctx := t.Context()
+	r := &domainResource{}
+	upgrader := r.UpgradeState(ctx)[1]
+
+	priorType := upgrader.PriorSchema.Type().TerraformType(ctx)
+	attrs := map[string]tftypes.Value{}
+	for name, typ := range priorType.(tftypes.Object).AttributeTypes {
+		attrs[name] = tftypes.NewValue(typ, nil)
+	}
+	attrs[tfruntime.NameAttribute] = tftypes.NewValue(tftypes.String, "tenants/t-1/domains/d-1")
+	attrs["domain_id"] = tftypes.NewValue(tftypes.String, "d-1")
+	attrs["tenant_id"] = tftypes.NewValue(tftypes.String, "t-1")
+	attrs["hostname"] = tftypes.NewValue(tftypes.String, "login.acme.com")
+	attrs["issuer_id"] = tftypes.NewValue(tftypes.String, "i-1")
+	attrs["state"] = tftypes.NewValue(tftypes.String, domainActive)
+	prior := tftypes.NewValue(priorType, attrs)
+
+	target := domainSchema(ctx)
+	req := resource.UpgradeStateRequest{State: &tfsdk.State{Schema: *upgrader.PriorSchema, Raw: prior}}
+	resp := &resource.UpgradeStateResponse{State: tfsdk.State{Schema: target, Raw: tftypes.NewValue(target.Type().TerraformType(ctx), nil)}}
+	upgrader.StateUpgrader(ctx, req, resp)
+	if resp.Diagnostics.HasError() {
+		t.Fatal(resp.Diagnostics)
+	}
+
+	var got domainModel
+	if d := resp.State.Get(ctx, &got); d.HasError() {
+		t.Fatal(d)
+	}
+	if got.Name.ValueString() != "tenants/t-1/domains/d-1" || got.Hostname.ValueString() != "login.acme.com" || !got.Custom.ValueBool() {
 		t.Fatalf("got %+v", got)
 	}
 }

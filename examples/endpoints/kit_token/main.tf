@@ -11,9 +11,11 @@ resource "authwise_domain" "internal" {
   hostname = "auth.example.com"
 }
 
-resource "authwise_issuer" "internal" {
+resource "authwise_issuer" "internal" {}
+
+resource "authwise_issuer_domain_binding" "internal" {
+  issuer_id = authwise_issuer.internal.issuer_id
   domain_id = authwise_domain.internal.domain_id
-  path      = "/internal"
 }
 
 resource "authwise_endpoint" "ledger" {

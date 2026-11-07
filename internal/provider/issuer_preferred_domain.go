@@ -61,7 +61,8 @@ func (r *issuerPreferredDomainResource) Metadata(_ context.Context, req resource
 
 func (r *issuerPreferredDomainResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		MarkdownDescription: "The host an issuer's mailed links use: the invitation accept, the password reset, the address verification (`Issuer.preferred_domain_id`). " +
+		DeprecationMessage: "kit#911: use authwise_issuer_preferred_binding, which names one of the issuer's bindings. kit accepts preferred_domain_id one more release, resolved to the issuer's binding on that domain.",
+		MarkdownDescription: "**Deprecated:** use `authwise_issuer_preferred_binding` (kit#911).\n\nThe host an issuer's mailed links use: the invitation accept, the password reset, the address verification (`Issuer.preferred_domain_id`). " +
 			"Without it they use the issuer's native host. Point it at the custom domain your applications sign in on, so an invitation's one-button accept " +
 			"leaves the person signed in where the application looks.\n\n" +
 			"It is a resource of its own because a custom domain names its issuer: the issuer naming the domain back would be a cycle. " +
@@ -76,10 +77,9 @@ func (r *issuerPreferredDomainResource) Schema(_ context.Context, _ resource.Sch
 					"must be an issuer's name, tenants/{t}/issuers/{i}: use authwise_issuer.<name>.name")},
 			},
 			"domain_id": schema.StringAttribute{
-				Required: true,
-				MarkdownDescription: "One of the issuer's own domains: a custom domain attached to it (`authwise_domain.<name>.domain_id` with `issuer_id` set), " +
-					"or its native domain. kit refuses any other. Until the custom domain is `ACTIVE`, kit keeps building links on the native host.",
-				Validators: []validator.String{tfruntime.ReferenceID("d", "domain", "authwise_domain.<name>.domain_id"), stringvalidator.LengthAtLeast(1)},
+				Required:            true,
+				MarkdownDescription: "A domain one of the issuer's bindings is on; kit resolves it to that binding. kit refuses any other. Until the custom domain is `ACTIVE`, kit keeps building links on the native host.",
+				Validators:          []validator.String{tfruntime.ReferenceID("d", "domain", "authwise_domain.<name>.domain_id"), stringvalidator.LengthAtLeast(1)},
 			},
 		},
 	}

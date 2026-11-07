@@ -59,6 +59,7 @@ resource "authwise_guard_tenant_settings" "acme" {
 - `display_name` (String) The kit tenant's display name.
 - `issuer` (String) The issuer the tenant's people sign in at, exactly as their tokens' `iss`.
 - `name` (String) The tenant's resource name at guard-control, `tenants/t-…`.
+- `plan` (Attributes) The tenant's plan and its caps, read from kit's tenant (guard-control#88). guard-control enforces `devices_limit` and `relay_bytes_limit` (a network over its relay cap reads `pool_capped`) and treats an expired trial as read-only; kit enforces `members_limit` at its invitation. 0 is no cap. (see [below for nested schema](#nestedatt--plan))
 - `slug` (String) The kit tenant's slug, which names it in mesh DNS (`<node>.<network>.<slug>.guard.<estate>`). It is kit's, set on the tenant in kit (`awtenant tenants update --slug`, kit 1.83.0 or later); guard-control refuses to write it (`SLUG_MANAGED_BY_IDENTITY`).
 - `status` (String) The kit tenant's state (`ACTIVE`, `SUSPENDED`). Suspension is kit's.
 
@@ -84,6 +85,19 @@ Optional:
 Optional:
 
 - `realms` (List of String) The realm ids (`r-…`) whose people are the tenant's. Empty means every realm the tenant's issuer routes to.
+
+
+
+<a id="nestedatt--plan"></a>
+### Nested Schema for `plan`
+
+Read-Only:
+
+- `devices_limit` (Number) The most devices the tenant may enrol; 0 is no cap.
+- `members_limit` (Number) The most people the tenant may have; 0 is no cap.
+- `plan` (String) `TRIAL`, `FREE`, `TEAM`, `BUSINESS` or `ENTERPRISE`; empty when kit reports none.
+- `relay_bytes_limit` (Number) The relay traffic the tenant may use, in bytes; 0 is no cap.
+- `trial_ends_at` (String) When a trial ends, RFC 3339; empty otherwise.
 
 ## Import
 

@@ -66,6 +66,11 @@ func NetworkResourceSchema() schema.Schema {
 				MarkdownDescription: "Full resource name; serves as the Terraform ID.",
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
+			"pool_capped": schema.BoolAttribute{Computed: true},
+			"pool_capped_at": schema.StringAttribute{
+				Computed:            true,
+				MarkdownDescription: "`pool_capped_at` as an RFC 3339 timestamp.",
+			},
 			"pool_fallback": schema.BoolAttribute{
 				Computed:      true,
 				Optional:      true,
@@ -113,6 +118,8 @@ type NetworkModel struct {
 	PoolFallback   types.Bool           `tfsdk:"pool_fallback"`
 	PoolKilled     types.Bool           `tfsdk:"pool_killed"`
 	PoolKilledAt   types.String         `tfsdk:"pool_killed_at"`
+	PoolCapped     types.Bool           `tfsdk:"pool_capped"`
+	PoolCappedAt   types.String         `tfsdk:"pool_capped_at"`
 }
 
 // NewNetworkModel returns a model with every attribute set to its typed null; collection types cannot be zero-valued.
@@ -125,6 +132,8 @@ func NewNetworkModel() *NetworkModel {
 		Labels:         types.MapNull(types.StringType),
 		MeshDomain:     types.StringNull(),
 		Name:           types.StringNull(),
+		PoolCapped:     types.BoolNull(),
+		PoolCappedAt:   types.StringNull(),
 		PoolFallback:   types.BoolNull(),
 		PoolKilled:     types.BoolNull(),
 		PoolKilledAt:   types.StringNull(),
@@ -163,6 +172,15 @@ func (m *NetworkModel) ToProto(ctx context.Context) (*v1alpha1.Network, diag.Dia
 			diags.AddAttributeError(path.Root("pool_killed_at"), "invalid RFC 3339 timestamp", err.Error())
 		} else {
 			out.PoolKilledAt = timestamppb.New(t)
+		}
+	}
+	out.PoolCapped = m.PoolCapped.ValueBool()
+	if !m.PoolCappedAt.IsNull() && !m.PoolCappedAt.IsUnknown() {
+		t, err := time.Parse(time.RFC3339, m.PoolCappedAt.ValueString())
+		if err != nil {
+			diags.AddAttributeError(path.Root("pool_capped_at"), "invalid RFC 3339 timestamp", err.Error())
+		} else {
+			out.PoolCappedAt = timestamppb.New(t)
 		}
 	}
 	return out, diags
@@ -222,6 +240,12 @@ func (m *NetworkModel) FromProto(ctx context.Context, e *v1alpha1.Network) diag.
 		m.PoolKilledAt = types.StringNull()
 	} else {
 		m.PoolKilledAt = types.StringValue(e.PoolKilledAt.AsTime().Format(time.RFC3339))
+	}
+	m.PoolCapped = types.BoolValue(e.PoolCapped)
+	if e.PoolCappedAt == nil {
+		m.PoolCappedAt = types.StringNull()
+	} else {
+		m.PoolCappedAt = types.StringValue(e.PoolCappedAt.AsTime().Format(time.RFC3339))
 	}
 	return diags
 }
@@ -409,6 +433,8 @@ func NetworkDataSourceSchema() schema1.Schema {
 				MarkdownDescription: "Full resource name of the object to read.",
 				Required:            true,
 			},
+			"pool_capped":    schema1.BoolAttribute{Computed: true},
+			"pool_capped_at": schema1.StringAttribute{Computed: true},
 			"pool_fallback":  schema1.BoolAttribute{Computed: true},
 			"pool_killed":    schema1.BoolAttribute{Computed: true},
 			"pool_killed_at": schema1.StringAttribute{Computed: true},
@@ -462,6 +488,8 @@ type NetworkItemModel struct {
 	PoolFallback   types.Bool           `tfsdk:"pool_fallback"`
 	PoolKilled     types.Bool           `tfsdk:"pool_killed"`
 	PoolKilledAt   types.String         `tfsdk:"pool_killed_at"`
+	PoolCapped     types.Bool           `tfsdk:"pool_capped"`
+	PoolCappedAt   types.String         `tfsdk:"pool_capped_at"`
 }
 
 // NetworkItemAttrTypes returns the attribute types of one guard_networks list element.
@@ -474,6 +502,8 @@ func NetworkItemAttrTypes() map[string]attr.Type {
 		"labels":           types.MapType{ElemType: types.StringType},
 		"mesh_domain":      types.StringType,
 		"name":             types.StringType,
+		"pool_capped":      types.BoolType,
+		"pool_capped_at":   types.StringType,
 		"pool_fallback":    types.BoolType,
 		"pool_killed":      types.BoolType,
 		"pool_killed_at":   types.StringType,
@@ -515,6 +545,8 @@ func NetworkListDataSourceSchema() schema1.Schema {
 						Computed:            true,
 						MarkdownDescription: "Full resource name.",
 					},
+					"pool_capped":    schema1.BoolAttribute{Computed: true},
+					"pool_capped_at": schema1.StringAttribute{Computed: true},
 					"pool_fallback":  schema1.BoolAttribute{Computed: true},
 					"pool_killed":    schema1.BoolAttribute{Computed: true},
 					"pool_killed_at": schema1.StringAttribute{Computed: true},
@@ -587,6 +619,12 @@ func networkItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Network, 
 		item.PoolKilledAt = types.StringNull()
 	} else {
 		item.PoolKilledAt = types.StringValue(e.PoolKilledAt.AsTime().Format(time.RFC3339))
+	}
+	item.PoolCapped = types.BoolValue(e.PoolCapped)
+	if e.PoolCappedAt == nil {
+		item.PoolCappedAt = types.StringNull()
+	} else {
+		item.PoolCappedAt = types.StringValue(e.PoolCappedAt.AsTime().Format(time.RFC3339))
 	}
 	id, err := crud.IDFromName(e.Name)
 	if err != nil {

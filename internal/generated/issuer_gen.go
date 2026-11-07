@@ -23,6 +23,8 @@ import (
 	types "github.com/hashicorp/terraform-plugin-framework/types"
 	protojson "google.golang.org/protobuf/encoding/protojson"
 	fieldmaskpb "google.golang.org/protobuf/types/known/fieldmaskpb"
+	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
+	"time"
 )
 
 // IssuerResourceSchema returns the Terraform schema for the Issuer resource.
@@ -33,6 +35,43 @@ func IssuerResourceSchema() schema.Schema {
 				Computed:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
+			"bindings": schema.ListNestedAttribute{
+				Computed: true,
+				NestedObject: schema.NestedAttributeObject{Attributes: map[string]schema.Attribute{
+					"created_at": schema.StringAttribute{
+						Computed: true,
+						Optional: true,
+					},
+					"domain_id": schema.StringAttribute{
+						Computed: true,
+						Optional: true,
+					},
+					"hostname": schema.StringAttribute{
+						Computed: true,
+						Optional: true,
+					},
+					"issuer_id": schema.StringAttribute{
+						Computed: true,
+						Optional: true,
+					},
+					"name": schema.StringAttribute{
+						Computed: true,
+						Optional: true,
+					},
+					"path": schema.StringAttribute{
+						Computed: true,
+						Optional: true,
+					},
+					"routable": schema.BoolAttribute{
+						Computed: true,
+						Optional: true,
+					},
+					"url": schema.StringAttribute{
+						Computed: true,
+						Optional: true,
+					},
+				}},
+			},
 			"config": schema.StringAttribute{
 				Computed:            true,
 				CustomType:          jsontypes.NormalizedType{},
@@ -41,14 +80,12 @@ func IssuerResourceSchema() schema.Schema {
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"domain_id": schema.StringAttribute{
-				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
-				Required:      true,
+				Computed:      true,
+				Optional:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace(), stringplanmodifier.UseStateForUnknown()},
 				Validators:    []validator.String{tf.ReferenceID("d", "domain", "authwise_domain.<name>.domain_id")},
 			},
-			"domain_name": schema.StringAttribute{
-				Computed:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
-			},
+			"domain_name": schema.StringAttribute{Computed: true},
 			"issuer_id": schema.StringAttribute{
 				Computed:            true,
 				MarkdownDescription: "Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.",
@@ -68,9 +105,10 @@ func IssuerResourceSchema() schema.Schema {
 			"path": schema.StringAttribute{
 				Computed:      true,
 				Optional:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace(), stringplanmodifier.UseStateForUnknown()},
 			},
-			"preferred_domain_id": schema.StringAttribute{Computed: true},
+			"preferred_binding_id": schema.StringAttribute{Computed: true},
+			"preferred_domain_id":  schema.StringAttribute{Computed: true},
 			"tenant_id": schema.StringAttribute{
 				Computed:            true,
 				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default, and reads back from the name. Changing a configured one replaces the resource.",
@@ -79,37 +117,67 @@ func IssuerResourceSchema() schema.Schema {
 				Validators:          []validator.String{tf.ReferenceID("t", "tenant", "")},
 			},
 		},
-		MarkdownDescription: "An OAuth 2.0 / OpenID Connect issuer: the login a set of clients shares, with its domain, token lifetimes and which realm or realms people sign in to (`config`). Its appearance is whichever of its profiles is the default (`authwise_appearance_profile.is_default`).",
+		MarkdownDescription: "An OAuth 2.0 / OpenID Connect issuer: the login a set of clients shares, with its token lifetimes and which realm or realms people sign in to (`config`). It answers at the hosts its `authwise_issuer_domain_binding`s name (kit#911). Its appearance is whichever of its profiles is the default (`authwise_appearance_profile.is_default`).",
+	}
+}
+
+// IssuerBindingsModel is the Terraform model for Issuer's "bindings" nested attribute.
+type IssuerBindingsModel struct {
+	Name      types.String `tfsdk:"name"`
+	DomainId  types.String `tfsdk:"domain_id"`
+	Path      types.String `tfsdk:"path"`
+	Hostname  types.String `tfsdk:"hostname"`
+	Url       types.String `tfsdk:"url"`
+	Routable  types.Bool   `tfsdk:"routable"`
+	IssuerId  types.String `tfsdk:"issuer_id"`
+	CreatedAt types.String `tfsdk:"created_at"`
+}
+
+// IssuerBindingsAttrTypes returns the attribute types of the "bindings" nested attribute.
+func IssuerBindingsAttrTypes() map[string]attr.Type {
+	return map[string]attr.Type{
+		"created_at": types.StringType,
+		"domain_id":  types.StringType,
+		"hostname":   types.StringType,
+		"issuer_id":  types.StringType,
+		"name":       types.StringType,
+		"path":       types.StringType,
+		"routable":   types.BoolType,
+		"url":        types.StringType,
 	}
 }
 
 // IssuerModel is the Terraform plan/state model for Issuer.
 type IssuerModel struct {
-	Name              types.String         `tfsdk:"name"`
-	IssuerId          types.String         `tfsdk:"issuer_id"`
-	TenantId          types.String         `tfsdk:"tenant_id"`
-	Labels            types.Map            `tfsdk:"labels"`
-	DomainName        types.String         `tfsdk:"domain_name"`
-	Path              types.String         `tfsdk:"path"`
-	Config            jsontypes.Normalized `tfsdk:"config"`
-	DomainId          types.String         `tfsdk:"domain_id"`
-	AccountClientId   types.String         `tfsdk:"account_client_id"`
-	PreferredDomainId types.String         `tfsdk:"preferred_domain_id"`
+	Name               types.String         `tfsdk:"name"`
+	IssuerId           types.String         `tfsdk:"issuer_id"`
+	TenantId           types.String         `tfsdk:"tenant_id"`
+	Labels             types.Map            `tfsdk:"labels"`
+	DomainName         types.String         `tfsdk:"domain_name"`
+	Path               types.String         `tfsdk:"path"`
+	Config             jsontypes.Normalized `tfsdk:"config"`
+	DomainId           types.String         `tfsdk:"domain_id"`
+	AccountClientId    types.String         `tfsdk:"account_client_id"`
+	PreferredDomainId  types.String         `tfsdk:"preferred_domain_id"`
+	PreferredBindingId types.String         `tfsdk:"preferred_binding_id"`
+	Bindings           types.List           `tfsdk:"bindings"`
 }
 
 // NewIssuerModel returns a model with every attribute set to its typed null; collection types cannot be zero-valued.
 func NewIssuerModel() *IssuerModel {
 	return &IssuerModel{
-		AccountClientId:   types.StringNull(),
-		Config:            jsontypes.NewNormalizedNull(),
-		DomainId:          types.StringNull(),
-		DomainName:        types.StringNull(),
-		IssuerId:          types.StringNull(),
-		Labels:            types.MapNull(types.StringType),
-		Name:              types.StringNull(),
-		Path:              types.StringNull(),
-		PreferredDomainId: types.StringNull(),
-		TenantId:          types.StringNull(),
+		AccountClientId:    types.StringNull(),
+		Bindings:           types.ListNull(types.ObjectType{AttrTypes: IssuerBindingsAttrTypes()}),
+		Config:             jsontypes.NewNormalizedNull(),
+		DomainId:           types.StringNull(),
+		DomainName:         types.StringNull(),
+		IssuerId:           types.StringNull(),
+		Labels:             types.MapNull(types.StringType),
+		Name:               types.StringNull(),
+		Path:               types.StringNull(),
+		PreferredBindingId: types.StringNull(),
+		PreferredDomainId:  types.StringNull(),
+		TenantId:           types.StringNull(),
 	}
 }
 
@@ -134,6 +202,30 @@ func (m *IssuerModel) ToProto(ctx context.Context) (*v1alpha1.Issuer, diag.Diagn
 	out.DomainId = m.DomainId.ValueString()
 	out.AccountClientId = m.AccountClientId.ValueString()
 	out.PreferredDomainId = m.PreferredDomainId.ValueString()
+	out.PreferredBindingId = m.PreferredBindingId.ValueString()
+	if !m.Bindings.IsNull() && !m.Bindings.IsUnknown() {
+		var items []IssuerBindingsModel
+		diags.Append(m.Bindings.ElementsAs(ctx, &items, false)...)
+		for i, n := range items {
+			v := &v1alpha1.IssuerDomainBinding{}
+			v.Name = n.Name.ValueString()
+			v.DomainId = n.DomainId.ValueString()
+			v.Path = n.Path.ValueString()
+			v.Hostname = n.Hostname.ValueString()
+			v.Url = n.Url.ValueString()
+			v.Routable = n.Routable.ValueBool()
+			v.IssuerId = n.IssuerId.ValueString()
+			if !n.CreatedAt.IsNull() && !n.CreatedAt.IsUnknown() {
+				t, err := time.Parse(time.RFC3339, n.CreatedAt.ValueString())
+				if err != nil {
+					diags.AddAttributeError(path.Root("bindings").AtListIndex(i).AtName("created_at"), "invalid RFC 3339 timestamp", err.Error())
+				} else {
+					v.CreatedAt = timestamppb.New(t)
+				}
+			}
+			out.Bindings = append(out.Bindings, v)
+		}
+	}
 	return out, diags
 }
 
@@ -170,7 +262,11 @@ func (m *IssuerModel) FromProto(ctx context.Context, e *v1alpha1.Issuer) diag.Di
 			m.Config = jsontypes.NewNormalizedValue(string(b))
 		}
 	}
-	m.DomainId = types.StringValue(e.DomainId)
+	if e.DomainId == "" {
+		m.DomainId = types.StringNull()
+	} else {
+		m.DomainId = types.StringValue(e.DomainId)
+	}
 	if e.AccountClientId == "" {
 		m.AccountClientId = types.StringNull()
 	} else {
@@ -180,6 +276,64 @@ func (m *IssuerModel) FromProto(ctx context.Context, e *v1alpha1.Issuer) diag.Di
 		m.PreferredDomainId = types.StringNull()
 	} else {
 		m.PreferredDomainId = types.StringValue(e.PreferredDomainId)
+	}
+	if e.PreferredBindingId == "" {
+		m.PreferredBindingId = types.StringNull()
+	} else {
+		m.PreferredBindingId = types.StringValue(e.PreferredBindingId)
+	}
+	if len(e.Bindings) == 0 {
+		if !tf.KeepEmpty(m.Bindings) {
+			m.Bindings = types.ListNull(types.ObjectType{AttrTypes: IssuerBindingsAttrTypes()})
+		}
+	} else {
+		var prior []IssuerBindingsModel
+		if !m.Bindings.IsNull() && !m.Bindings.IsUnknown() {
+			diags.Append(m.Bindings.ElementsAs(ctx, &prior, false)...)
+		}
+		items := make([]IssuerBindingsModel, len(e.Bindings))
+		for i, el := range e.Bindings {
+			var n IssuerBindingsModel
+			if i < len(prior) {
+				n = prior[i]
+			}
+			n.Name = types.StringValue(el.Name)
+			if el.DomainId == "" {
+				n.DomainId = types.StringNull()
+			} else {
+				n.DomainId = types.StringValue(el.DomainId)
+			}
+			if el.Path == "" {
+				n.Path = types.StringNull()
+			} else {
+				n.Path = types.StringValue(el.Path)
+			}
+			if el.Hostname == "" {
+				n.Hostname = types.StringNull()
+			} else {
+				n.Hostname = types.StringValue(el.Hostname)
+			}
+			if el.Url == "" {
+				n.Url = types.StringNull()
+			} else {
+				n.Url = types.StringValue(el.Url)
+			}
+			n.Routable = types.BoolValue(el.Routable)
+			if el.IssuerId == "" {
+				n.IssuerId = types.StringNull()
+			} else {
+				n.IssuerId = types.StringValue(el.IssuerId)
+			}
+			if el.CreatedAt == nil {
+				n.CreatedAt = types.StringNull()
+			} else {
+				n.CreatedAt = types.StringValue(el.CreatedAt.AsTime().Format(time.RFC3339))
+			}
+			items[i] = n
+		}
+		list, d := types.ListValueFrom(ctx, types.ObjectType{AttrTypes: IssuerBindingsAttrTypes()}, items)
+		diags.Append(d...)
+		m.Bindings = list
 	}
 	return diags
 }
@@ -340,6 +494,19 @@ func IssuerDataSourceSchema() schema1.Schema {
 	return schema1.Schema{
 		Attributes: map[string]schema1.Attribute{
 			"account_client_id": schema1.StringAttribute{Computed: true},
+			"bindings": schema1.ListNestedAttribute{
+				Computed: true,
+				NestedObject: schema1.NestedAttributeObject{Attributes: map[string]schema1.Attribute{
+					"created_at": schema1.StringAttribute{Computed: true},
+					"domain_id":  schema1.StringAttribute{Computed: true},
+					"hostname":   schema1.StringAttribute{Computed: true},
+					"issuer_id":  schema1.StringAttribute{Computed: true},
+					"name":       schema1.StringAttribute{Computed: true},
+					"path":       schema1.StringAttribute{Computed: true},
+					"routable":   schema1.BoolAttribute{Computed: true},
+					"url":        schema1.StringAttribute{Computed: true},
+				}},
+			},
 			"config": schema1.StringAttribute{
 				Computed:   true,
 				CustomType: jsontypes.NormalizedType{},
@@ -358,11 +525,12 @@ func IssuerDataSourceSchema() schema1.Schema {
 				MarkdownDescription: "Full resource name of the object to read.",
 				Required:            true,
 			},
-			"path":                schema1.StringAttribute{Computed: true},
-			"preferred_domain_id": schema1.StringAttribute{Computed: true},
-			"tenant_id":           schema1.StringAttribute{Computed: true},
+			"path":                 schema1.StringAttribute{Computed: true},
+			"preferred_binding_id": schema1.StringAttribute{Computed: true},
+			"preferred_domain_id":  schema1.StringAttribute{Computed: true},
+			"tenant_id":            schema1.StringAttribute{Computed: true},
 		},
-		MarkdownDescription: "An OAuth 2.0 / OpenID Connect issuer: the login a set of clients shares, with its domain, token lifetimes and which realm or realms people sign in to (`config`). Its appearance is whichever of its profiles is the default (`authwise_appearance_profile.is_default`). This data source reads one by its full resource name.",
+		MarkdownDescription: "An OAuth 2.0 / OpenID Connect issuer: the login a set of clients shares, with its token lifetimes and which realm or realms people sign in to (`config`). It answers at the hosts its `authwise_issuer_domain_binding`s name (kit#911). Its appearance is whichever of its profiles is the default (`authwise_appearance_profile.is_default`). This data source reads one by its full resource name.",
 	}
 }
 
@@ -396,29 +564,33 @@ func (d *issuerDataSource) Read(ctx context.Context, req datasource.ReadRequest,
 
 // IssuerItemModel is one element of the issuers data source's "issuers" list.
 type IssuerItemModel struct {
-	IssuerId          types.String         `tfsdk:"issuer_id"`
-	Name              types.String         `tfsdk:"name"`
-	Labels            types.Map            `tfsdk:"labels"`
-	DomainName        types.String         `tfsdk:"domain_name"`
-	Path              types.String         `tfsdk:"path"`
-	Config            jsontypes.Normalized `tfsdk:"config"`
-	DomainId          types.String         `tfsdk:"domain_id"`
-	AccountClientId   types.String         `tfsdk:"account_client_id"`
-	PreferredDomainId types.String         `tfsdk:"preferred_domain_id"`
+	IssuerId           types.String         `tfsdk:"issuer_id"`
+	Name               types.String         `tfsdk:"name"`
+	Labels             types.Map            `tfsdk:"labels"`
+	DomainName         types.String         `tfsdk:"domain_name"`
+	Path               types.String         `tfsdk:"path"`
+	Config             jsontypes.Normalized `tfsdk:"config"`
+	DomainId           types.String         `tfsdk:"domain_id"`
+	AccountClientId    types.String         `tfsdk:"account_client_id"`
+	PreferredDomainId  types.String         `tfsdk:"preferred_domain_id"`
+	PreferredBindingId types.String         `tfsdk:"preferred_binding_id"`
+	Bindings           types.List           `tfsdk:"bindings"`
 }
 
 // IssuerItemAttrTypes returns the attribute types of one issuers list element.
 func IssuerItemAttrTypes() map[string]attr.Type {
 	return map[string]attr.Type{
-		"account_client_id":   types.StringType,
-		"config":              jsontypes.NormalizedType{},
-		"domain_id":           types.StringType,
-		"domain_name":         types.StringType,
-		"issuer_id":           types.StringType,
-		"labels":              types.MapType{ElemType: types.StringType},
-		"name":                types.StringType,
-		"path":                types.StringType,
-		"preferred_domain_id": types.StringType,
+		"account_client_id":    types.StringType,
+		"bindings":             types.ListType{ElemType: types.ObjectType{AttrTypes: IssuerBindingsAttrTypes()}},
+		"config":               jsontypes.NormalizedType{},
+		"domain_id":            types.StringType,
+		"domain_name":          types.StringType,
+		"issuer_id":            types.StringType,
+		"labels":               types.MapType{ElemType: types.StringType},
+		"name":                 types.StringType,
+		"path":                 types.StringType,
+		"preferred_binding_id": types.StringType,
+		"preferred_domain_id":  types.StringType,
 	}
 }
 
@@ -437,6 +609,19 @@ func IssuerListDataSourceSchema() schema1.Schema {
 				MarkdownDescription: "Every issuer under the parent, in the order the API lists them.",
 				NestedObject: schema1.NestedAttributeObject{Attributes: map[string]schema1.Attribute{
 					"account_client_id": schema1.StringAttribute{Computed: true},
+					"bindings": schema1.ListNestedAttribute{
+						Computed: true,
+						NestedObject: schema1.NestedAttributeObject{Attributes: map[string]schema1.Attribute{
+							"created_at": schema1.StringAttribute{Computed: true},
+							"domain_id":  schema1.StringAttribute{Computed: true},
+							"hostname":   schema1.StringAttribute{Computed: true},
+							"issuer_id":  schema1.StringAttribute{Computed: true},
+							"name":       schema1.StringAttribute{Computed: true},
+							"path":       schema1.StringAttribute{Computed: true},
+							"routable":   schema1.BoolAttribute{Computed: true},
+							"url":        schema1.StringAttribute{Computed: true},
+						}},
+					},
 					"config": schema1.StringAttribute{
 						Computed:   true,
 						CustomType: jsontypes.NormalizedType{},
@@ -455,8 +640,9 @@ func IssuerListDataSourceSchema() schema1.Schema {
 						Computed:            true,
 						MarkdownDescription: "Full resource name.",
 					},
-					"path":                schema1.StringAttribute{Computed: true},
-					"preferred_domain_id": schema1.StringAttribute{Computed: true},
+					"path":                 schema1.StringAttribute{Computed: true},
+					"preferred_binding_id": schema1.StringAttribute{Computed: true},
+					"preferred_domain_id":  schema1.StringAttribute{Computed: true},
 				}},
 			},
 			"tenant_id": schema1.StringAttribute{
@@ -465,7 +651,7 @@ func IssuerListDataSourceSchema() schema1.Schema {
 				Validators:          []validator.String{tf.ReferenceID("t", "tenant", "")},
 			},
 		},
-		MarkdownDescription: "An OAuth 2.0 / OpenID Connect issuer: the login a set of clients shares, with its domain, token lifetimes and which realm or realms people sign in to (`config`). Its appearance is whichever of its profiles is the default (`authwise_appearance_profile.is_default`). This data source lists every one under a parent.",
+		MarkdownDescription: "An OAuth 2.0 / OpenID Connect issuer: the login a set of clients shares, with its token lifetimes and which realm or realms people sign in to (`config`). It answers at the hosts its `authwise_issuer_domain_binding`s name (kit#911). Its appearance is whichever of its profiles is the default (`authwise_appearance_profile.is_default`). This data source lists every one under a parent.",
 	}
 }
 
@@ -503,7 +689,11 @@ func issuerItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Issuer, *I
 			item.Config = jsontypes.NewNormalizedValue(string(b))
 		}
 	}
-	item.DomainId = types.StringValue(e.DomainId)
+	if e.DomainId == "" {
+		item.DomainId = types.StringNull()
+	} else {
+		item.DomainId = types.StringValue(e.DomainId)
+	}
 	if e.AccountClientId == "" {
 		item.AccountClientId = types.StringNull()
 	} else {
@@ -513,6 +703,64 @@ func issuerItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Issuer, *I
 		item.PreferredDomainId = types.StringNull()
 	} else {
 		item.PreferredDomainId = types.StringValue(e.PreferredDomainId)
+	}
+	if e.PreferredBindingId == "" {
+		item.PreferredBindingId = types.StringNull()
+	} else {
+		item.PreferredBindingId = types.StringValue(e.PreferredBindingId)
+	}
+	if len(e.Bindings) == 0 {
+		if !tf.KeepEmpty(item.Bindings) {
+			item.Bindings = types.ListNull(types.ObjectType{AttrTypes: IssuerBindingsAttrTypes()})
+		}
+	} else {
+		var prior []IssuerBindingsModel
+		if !item.Bindings.IsNull() && !item.Bindings.IsUnknown() {
+			diags.Append(item.Bindings.ElementsAs(ctx, &prior, false)...)
+		}
+		items := make([]IssuerBindingsModel, len(e.Bindings))
+		for i, el := range e.Bindings {
+			var n IssuerBindingsModel
+			if i < len(prior) {
+				n = prior[i]
+			}
+			n.Name = types.StringValue(el.Name)
+			if el.DomainId == "" {
+				n.DomainId = types.StringNull()
+			} else {
+				n.DomainId = types.StringValue(el.DomainId)
+			}
+			if el.Path == "" {
+				n.Path = types.StringNull()
+			} else {
+				n.Path = types.StringValue(el.Path)
+			}
+			if el.Hostname == "" {
+				n.Hostname = types.StringNull()
+			} else {
+				n.Hostname = types.StringValue(el.Hostname)
+			}
+			if el.Url == "" {
+				n.Url = types.StringNull()
+			} else {
+				n.Url = types.StringValue(el.Url)
+			}
+			n.Routable = types.BoolValue(el.Routable)
+			if el.IssuerId == "" {
+				n.IssuerId = types.StringNull()
+			} else {
+				n.IssuerId = types.StringValue(el.IssuerId)
+			}
+			if el.CreatedAt == nil {
+				n.CreatedAt = types.StringNull()
+			} else {
+				n.CreatedAt = types.StringValue(el.CreatedAt.AsTime().Format(time.RFC3339))
+			}
+			items[i] = n
+		}
+		list, d := types.ListValueFrom(ctx, types.ObjectType{AttrTypes: IssuerBindingsAttrTypes()}, items)
+		diags.Append(d...)
+		item.Bindings = list
 	}
 	id, err := crud.IDFromName(e.Name)
 	if err != nil {
