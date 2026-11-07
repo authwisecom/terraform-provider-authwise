@@ -177,6 +177,14 @@ resource "authwise_issuer_preferred_domain" "login" {
 }
 ```
 
+## `path`
+
+Leave `path` out, or set it to `""`: an empty path is the root of the
+issuer's domain, and it is the only value kit accepts today. kit stores the
+path exactly as written and converts nothing, so it refuses `"/"` and any
+trailing slash at apply rather than rewriting them. A non-empty path such
+as `"/app"` is refused too until kit routes path-prefixed issuers (kit#876).
+
 ## Writing `config`
 
 `config` is the protojson encoding of `IssuerConfig`.

@@ -1,3 +1,15 @@
+## 0.32.0 (Unreleased)
+
+DOCUMENTATION:
+
+* **`authwise_issuer.path`.** The page now says that `""` (or leaving it
+  out) is the domain's root. kit refuses `"/"` and trailing slashes rather
+  than rewriting them, and refuses non-empty paths until kit#876 (tf#57).
+* **`authwise_realm`: `authwise-strict`.** The password rules section
+  describes both shipped sets. It gains an `authwise-strict` example, and the
+  refusal example now lists `authwise-baseline, authwise-strict, custom`
+  (kit#886, tf#60).
+
 ## 0.31.0 (November 6, 2026)
 
 NOTES:

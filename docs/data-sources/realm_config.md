@@ -93,7 +93,7 @@ Optional:
 - `invitations` (Boolean)
 - `jit_federated` (Boolean)
 - `password_hash_spec` (String)
-- `password_rule_set` (String) The catalog set of password rules the realm follows (kit#890). Unset or empty is `authwise-baseline`; `custom` is kit's built-in floor plus `password_validators` alone; any other value must name a set the kit build ships, or kit refuses the write at apply. A name, never a version: a shipped set only strengthens, and only passwords set after a change are checked against it.
+- `password_rule_set` (String) The catalog set of password rules the realm follows (kit#890). Unset or empty is `authwise-baseline`; `authwise-strict` is the baseline at 15 characters plus a breached-password check and the last 5 passwords refused (kit#886); `custom` is kit's built-in floor plus `password_validators` alone; any other value must name a set the kit build ships, or kit refuses the write at apply. A name, never a version: a shipped set only strengthens, and only passwords set after a change are checked against it.
 - `password_validators` (Attributes List) The realm's own password rules. With a catalog set they are extras that can only tighten it, merged per type with the strongest winning: the larger `min_length`, the smaller `max_length`, and every `regexp` and `entropy` rule kept. Under `custom` they are the whole policy above the built-in floor. (see [below for nested schema](#nestedatt--provisioning--password_validators))
 - `provisioning_integration_config` (Attributes) (see [below for nested schema](#nestedatt--provisioning--provisioning_integration_config))
 - `require_email_verification` (Boolean)

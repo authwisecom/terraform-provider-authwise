@@ -32,13 +32,13 @@ func (f *fakeIdentityServer) admitRealmConfigLocked(r *corepb.Realm) error {
 		}
 	}
 
-	// kit#890: a rule set must be one this build ships, refused in kit
-	// v1.75.0's words.
+	// kit#890: a rule set must be one this build ships, refused in kit's
+	// words (authwise-strict since kit#886).
 	switch rs := r.GetConfig().GetProvisioning().GetPasswordRuleSet(); rs {
-	case "", "authwise-baseline", "custom":
+	case "", "authwise-baseline", "authwise-strict", "custom":
 	default:
 		return status.Errorf(codes.InvalidArgument,
-			"provisioning policy sets password_rule_set %q is not a set this build ships (authwise-baseline, custom); omit it for authwise-baseline. Fix them in the request.", rs)
+			"provisioning policy sets password_rule_set %q is not a set this build ships (authwise-baseline, authwise-strict, custom); omit it for authwise-baseline. Fix them in the request.", rs)
 	}
 
 	var problems []string

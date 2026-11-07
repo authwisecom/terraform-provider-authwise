@@ -18,6 +18,13 @@ description: |-
 A realm's password rules come from a catalog set, named in
 `provisioning.password_rule_set` in its config. Leave it out and the realm
 follows `authwise-baseline`. A realm that never set it plans no change.
+kit ships two sets (kit 1.76.0 and later):
+
+- `authwise-baseline`: at least 12 characters, not a common password, and
+  not the account's username, e-mail name or display name.
+- `authwise-strict`: the baseline at 15 characters, plus a breached-password
+  check and a refusal of the account's last 5 passwords. A password is
+  refused while the breach check is unavailable.
 
 `password_validators` are extras added on top of the set. They can only
 tighten it: per type, the larger `min_length` and the smaller `max_length`
@@ -25,6 +32,14 @@ win, and every `regexp` and `entropy` rule is kept. `custom` drops the set
 and leaves kit's built-in floor plus `password_validators` alone.
 
 ```terraform
+# authwise-strict: 15 characters, breached passwords and the last 5 refused.
+resource "authwise_realm" "staff" {
+  display_name = "Staff"
+  config = provider::authwise::realm_config({
+    provisioning = { password_rule_set = "authwise-strict" }
+  })
+}
+
 # The baseline, with a digit required on top of it.
 resource "authwise_realm" "customers" {
   display_name = "Customers"
@@ -62,7 +77,7 @@ resource "authwise_realm" "legacy" {
 
 kit refuses a set its build does not ship, at apply, with its own message:
 `password_rule_set "nist" is not a set this build ships (authwise-baseline,
-custom); omit it for authwise-baseline.` A set is named, never versioned: a
+authwise-strict, custom); omit it for authwise-baseline.` A set is named, never versioned: a
 shipped set only ever strengthens, and only passwords set after a change
 are checked against it.
 
