@@ -2,6 +2,8 @@
 
 NOTES:
 
+* **Breaking (!).** It removes `authwise_issuer_domain` and its activation,
+  and replaces `authwise_domain.issuer_id` with `custom`; see BREAKING CHANGES.
 * **apis v0.61.0.** Tenant domains through bindings (kit#911, tf#69), home
   administration (kit#916, tf#70), and guard-control's plan caps
   (guard-control#88). It needs kit with kit#911;
@@ -15,9 +17,31 @@ BREAKING CHANGES:
   (schema version 2), and the plan shows no change to the domain. kit's
   migration already made the bindings, so import the binding rather than
   creating it: creating it again is refused with `BINDING_TAKEN`.
-* **`authwise_issuer_domain` and `authwise_issuer_domain_activation` are
-  removed**, and so are the `moved` blocks from them. Move to
-  `authwise_domain` with 0.31 or earlier first.
+* **! `authwise_issuer_domain` and `authwise_issuer_domain_activation` are
+  removed** (tf#69), and so are the `moved` blocks from them. This is the
+  release's breaking change. Migrate in two steps:
+  1. On 0.31 or earlier, move them to `authwise_domain` and
+     `authwise_domain_activation` with `moved` blocks.
+  2. On 0.32, replace `issuer_id` with `custom = true` on the domain, and
+     import the binding kit's migration made as an
+     `authwise_issuer_domain_binding`:
+
+  ```terraform
+  resource "authwise_domain" "login" {
+    custom   = true
+    hostname = "login.acme.com"
+  }
+
+  resource "authwise_issuer_domain_binding" "login" {
+    issuer_id = authwise_issuer.main.issuer_id
+    domain_id = authwise_domain.login.domain_id
+  }
+
+  import {
+    to = authwise_issuer_domain_binding.login
+    id = "tenants/t-01/issuers/i-01/issuer-domain-bindings/idb-01"
+  }
+  ```
 * **Two issuers can no longer share a host's root.** kit refuses a second
   issuer at `(domain, path)` with `BINDING_TAKEN`. Before, the second row was
   stored but never served. The `authwise_issuer_config` data source and
