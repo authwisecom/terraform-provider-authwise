@@ -228,7 +228,7 @@ func TestAccGuardCatalogExample(t *testing.T) {
 	}
 	h.access.mu.Unlock()
 
-	// guard-control's 41 and kit's 3, which were there already.
+	// guard-control's 37 and kit's 3, which were there already.
 	if permissions != 40 {
 		t.Errorf("%d access permissions on the server, want 40", permissions)
 	}
