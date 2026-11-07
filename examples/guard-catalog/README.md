@@ -28,17 +28,19 @@ other seven, `guardcontrol.networks.enrol` and `guardcontrol.self.*`, are a
 person's own. The catalog declares them, but the admin role does not carry
 them.
 
-**Upgrading from an earlier version of this example.** This version drops
-three things guard-control no longer uses since guard-control#80, the
-tenant collapse:
+**Applying over a copy from before guard-control v0.27.0.** The apply
+removes three things guard-control no longer uses:
 
-- the declared types `guardcontrol.tenant` and `guardcontrol.network`;
-- kit's `access.resourceLinks.*` from the role;
-- the four `guardcontrol.invites.*` permissions, retired in guard-control#83.
+- the declared types `guardcontrol.tenant` and `guardcontrol.network`, which
+  are destroyed (unused since guard-control#80, the tenant collapse);
+- kit's three `access.resourceLinks.*` permissions, which are taken off
+  `guardcontrol.admin` (also unused since guard-control#80);
+- the four `guardcontrol.invites.*` permissions, which are destroyed
+  (retired in guard-control#83).
 
-guard-control's docs/AUTHORIZATION.md calls these inert. The next apply
-removes them. kit's three link permissions are only taken off the role; the
-permissions themselves stay.
+guard-control's docs/AUTHORIZATION.md calls all of these inert. kit's link
+permissions themselves stay: they are kit's, so the example never deletes
+them.
 
 kit's `authwise-guard` preset (kit#727) seeds these entries itself. Apply
 this example on any other install.
