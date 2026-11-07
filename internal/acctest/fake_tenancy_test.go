@@ -37,6 +37,9 @@ type fakeTenancyServer struct {
 	mints    int
 	roleSets int
 	seq      int
+	// denyAdministration refuses EnableHomeAdministration as kit refuses a
+	// caller without tenancy.administration.enable.
+	denyAdministration bool
 }
 
 func newFakeTenancyServer(access *fakeAccessServer, identity *fakeIdentityServer) *fakeTenancyServer {

@@ -73,8 +73,9 @@ func TestProviderSurface(t *testing.T) {
 	// entity is retired (#67, kit#902 D5): guard_invite goes. Tenant
 	// domains through bindings (#69, kit#911) remove issuer_domain and
 	// issuer_domain_activation and add the generated issuer_domain_binding
-	// and the hand-written issuer_preferred_binding.
-	assert.Len(t, resourceTypes, 44)
+	// and the hand-written issuer_preferred_binding. Home administration
+	// (#70, kit#916) adds the hand-written tenant_home_administration.
+	assert.Len(t, resourceTypes, 45)
 	assert.False(t, resourceTypes["authwise_issuer_domain"], "issuer domains are bindings (#69)")
 	assert.False(t, resourceTypes["authwise_guard_tenant"], "there is no Guard tenant (#65)")
 	assert.False(t, resourceTypes["authwise_guard_invite"], "Guard's Invite is retired (#67)")

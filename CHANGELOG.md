@@ -2,8 +2,9 @@
 
 NOTES:
 
-* **apis v0.61.0.** Tenant domains through bindings (kit#911, tf#69), and
-  guard-control's plan caps (guard-control#88). It needs kit with kit#911;
+* **apis v0.61.0.** Tenant domains through bindings (kit#911, tf#69), home
+  administration (kit#916, tf#70), and guard-control's plan caps
+  (guard-control#88). It needs kit with kit#911;
   see the upgrade notes on `authwise_domain`'s page.
 
 BREAKING CHANGES:
@@ -43,6 +44,17 @@ FEATURES:
   names the bound issuers and says to destroy their bindings first.
   `traffic_target` is the install's edge name for a host claimed from
   kit#911 on.
+* **`authwise_tenant_home_administration`** (kit#916, tf#70) turns on the
+  tenant's home administration at one of its issuers, whose host then
+  serves the console at `/admin/`. It calls `EnableHomeAdministration`,
+  which is idempotent. There is no disable on the public service: destroy
+  only drops it from state, with a warning, and an operator's
+  `DisableProduct("administration")` is the only way off. The call needs
+  `tenancy.administration.enable`, which only `tenancy.owner` holds, so a
+  service account with `tenant.admin` is refused and the error says so.
+* **`authwise_tenant_config.administration`** (read only): the tenant's
+  administration entry (`issuer_id`, `audience_id`, `console_client_id`),
+  null until it is enabled (tf#70).
 * **`authwise_guard_network.pool_capped` and `pool_capped_at`** (read only):
   the tenant's relay-bytes cap reached (guard-control#88).
 * **`authwise_guard_tenant_settings.plan`** (read only): the tenant's plan

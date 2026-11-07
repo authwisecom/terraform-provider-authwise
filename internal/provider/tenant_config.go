@@ -53,6 +53,9 @@ type tenantConfigModel struct {
 	TenantID types.String         `tfsdk:"tenant_id"`
 	Config   jsontypes.Normalized `tfsdk:"config"`
 	Labels   types.Map            `tfsdk:"labels"`
+	// Administration is the tenant's home administration entry (kit#916,
+	// tf#70), read only; null until it is enabled.
+	Administration types.Object `tfsdk:"administration"`
 }
 
 func newTenantConfigResource() resource.Resource {
@@ -89,6 +92,7 @@ func (r *tenantConfigResource) Schema(_ context.Context, _ resource.SchemaReques
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace(), stringplanmodifier.UseStateForUnknown()},
 				Validators:          []validator.String{tfruntime.ReferenceID("t", "tenant", "")},
 			},
+			administrationAttribute: administrationSchema(),
 			configAttribute: schema.StringAttribute{
 				Required:   true,
 				CustomType: jsontypes.NormalizedType{},
@@ -197,13 +201,16 @@ func (r *tenantConfigResource) write(ctx context.Context, plan *tenantConfigMode
 		paths = append(paths, labelsAttribute)
 	}
 
-	_, err := r.client.PatchTenant(ctx, &tenancypb.PatchTenantRequest{
+	out, err := r.client.PatchTenant(ctx, &tenancypb.PatchTenantRequest{
 		Name:       plan.Name.ValueString(),
 		Tenant:     tenant,
 		UpdateMask: &fieldmaskpb.FieldMask{Paths: paths},
 	})
 	switch {
 	case err == nil:
+		var d diag.Diagnostics
+		plan.Administration, d = administrationValue(out)
+		diags.Append(d...)
 	case status.Code(err) == codes.InvalidArgument:
 		diags.AddAttributeError(path.Root(configAttribute), "kit refused the tenant config", err.Error())
 	case status.Code(err) == codes.PermissionDenied:
@@ -268,6 +275,9 @@ func (m *tenantConfigModel) fromProto(ctx context.Context, t *corepb.Tenant) dia
 
 	m.Name = types.StringValue(t.GetName())
 	m.TenantID = types.StringValue(strings.TrimPrefix(t.GetName(), tenantsCollection+"/"))
+	var d diag.Diagnostics
+	m.Administration, d = administrationValue(t)
+	diags.Append(d...)
 
 	if !m.Labels.IsNull() || (imported && len(t.GetLabels()) > 0) {
 		labels, d := types.MapValueFrom(ctx, types.StringType, t.GetLabels())

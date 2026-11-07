@@ -57,7 +57,17 @@ resource "authwise_tenant_config" "this" {
 
 ### Read-Only
 
+- `administration` (Attributes) The tenant's home administration entry (kit#916), read only: null until it is enabled with `authwise_tenant_home_administration`. Its host serves the administration console at `/admin/`. (see [below for nested schema](#nestedatt--administration))
 - `name` (String) The tenant's full resource name (`tenants/{t}`); serves as the Terraform ID.
+
+<a id="nestedatt--administration"></a>
+### Nested Schema for `administration`
+
+Read-Only:
+
+- `audience_id` (String) The administration audience (`a-…`) kit created on it.
+- `console_client_id` (String) The console's public client (`c-…`) on the issuer.
+- `issuer_id` (String) The issuer (`i-…`) the tenant's administrators sign in at.
 
 ## Import
 
