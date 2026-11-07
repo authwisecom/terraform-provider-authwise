@@ -7,7 +7,9 @@ NOTES:
 * **apis v0.61.0.** Tenant domains through bindings (kit#911, tf#69), home
   administration (kit#916, tf#70), and guard-control's plan caps
   (guard-control#88). It needs kit with kit#911;
-  see the upgrade notes on `authwise_domain`'s page.
+  see the upgrade notes on `authwise_domain`'s page. A binding or issuer
+  path other than the root needs kit with kit#876 (kit develop d9a781b1 or
+  later); an older kit refuses it.
 
 BREAKING CHANGES:
 
@@ -54,8 +56,9 @@ FEATURES:
   `iss`. There is no update: a change replaces it. `hostname`, `url` and
   `routable` are read back. Refusals carry their remedy: `BINDING_TAKEN`
   names the issuer already there, and `DOMAIN_NOT_BINDABLE` covers a
-  product's host. Only the root path is accepted until kit#876, and
-  `/admin` is reserved.
+  product's host. Paths route since kit#876, so two issuers can share a host
+  at different paths. A path's form is checked at plan, and a reserved
+  first segment such as `/admin` or `/login` is refused by kit.
 * **`authwise_issuer_preferred_binding`**: the binding kit mails links on
   (`Issuer.preferred_binding_id`). It replaces
   `authwise_issuer_preferred_domain`, which is deprecated; kit accepts
@@ -95,7 +98,8 @@ DOCUMENTATION:
 
 * **The issuer path.** The issuer's page, now under "Where the issuer
   answers", says that `""` (or leaving it out) is the domain's root. kit refuses `"/"` and trailing slashes rather
-  than rewriting them, and refuses non-empty paths until kit#876 (tf#57).
+  than rewriting them. A non-empty path routes from kit#876 unless its
+  first segment is reserved (tf#57).
 * **`authwise_realm`: `authwise-strict`.** The password rules section
   describes both shipped sets. It gains an `authwise-strict` example, and the
   refusal example now lists `authwise-baseline, authwise-strict, custom`

@@ -304,6 +304,7 @@ resource "authwise_domain" "internal" {
 
 resource "authwise_issuer" "internal" {
   domain_id = authwise_domain.internal.domain_id
+  path      = "/internal"
 }
 
 resource "authwise_certificate" "kit_client" {

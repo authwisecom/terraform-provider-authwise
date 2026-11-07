@@ -3,6 +3,7 @@ package acctest_test
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strings"
 
 	identitypb "git.authwise.com/authwise/apis/authwise/identity/v1alpha1"
@@ -16,8 +17,9 @@ import (
 )
 
 // IssuerDomainBinding (kit#911, TENANT_DOMAINS.md): where an issuer
-// answers. (domain, path) is unique in the install; only the root path is
-// accepted until kit#876, and /admin and below are reserved. An issuer's
+// answers. (domain, path) is unique in the install. The path is "" or
+// canonical segments, and its first segment must not be one kit serves on
+// every host (kit#876, model.ValidateIssuerPath). An issuer's
 // domain_id, path and domain_name are its first binding's, output only
 // after create; preferred_binding_id names one of its bindings.
 
@@ -32,14 +34,27 @@ func refusal(code codes.Code, reason string, metadata map[string]string, format 
 
 func lastSegment(name string) string { return name[strings.LastIndex(name, "/")+1:] }
 
+// issuerPathForm is kit's canonical non-empty issuer path.
+var issuerPathForm = regexp.MustCompile(`^(/[^/?#\s]+)+$`)
+
+// reservedIssuerPaths are the first segments kit serves on every host
+// (kit d9a781b1, pkg/lib/model/issuer_path.go).
+var reservedIssuerPaths = []string{
+	"/admin", "/.well-known", "/authorize", "/oauth", "/userinfo", "/api", "/_ui",
+	"/assets", "/account", "/login", "/logout", "/recover-password", "/health",
+	"/saml", "/recovery", "/magic-link", "/forgot-password", "/uiassets",
+}
+
 // admitBindingLocked is kit's bind check for issuer (a full name) on
 // domainID at path.
 func (f *fakeIdentityServer) admitBindingLocked(issuer, domainID, path string) error {
-	switch {
-	case path == "/admin" || strings.HasPrefix(path, "/admin/"):
-		return status.Errorf(codes.InvalidArgument, "path: %q is reserved for the tenant's administration console", path)
-	case path != "":
-		return status.Errorf(codes.InvalidArgument, "path: only the domain's root (\"\") is routed until kit#876; got %q", path)
+	if path != "" && !issuerPathForm.MatchString(path) {
+		return status.Errorf(codes.InvalidArgument, "path: not a canonical issuer path %q", path)
+	}
+	for _, r := range reservedIssuerPaths {
+		if path == r || strings.HasPrefix(path, r+"/") {
+			return status.Errorf(codes.InvalidArgument, "path: issuer path reserved %q: its first segment is served on every host", path)
+		}
 	}
 	d, ok := f.domains[tenantOf(issuer)+"/domains/"+domainID]
 	if !ok {

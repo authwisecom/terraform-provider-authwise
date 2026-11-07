@@ -52,7 +52,7 @@ output "customers_issuer_url" {
 ### Optional
 
 - `issuer_id` (String) The issuer (`i-…`), `authwise_issuer.<name>.issuer_id`; overrides the provider default. Changing it replaces the binding.
-- `path` (String) `""` (or unset) for the domain's root, else a path such as `/customers`. kit accepts only the root until path-prefixed issuers route (kit#876), and `/admin` and below are reserved for the tenant's administration console. One (domain, path) serves one issuer: another issuer there is refused (`BINDING_TAKEN`). Changing it replaces the binding.
+- `path` (String) `""` (or unset) for the domain's root, else one or more segments such as `/customers` or `/a/b`: each starts with `/`, none is empty, no trailing `/`, no `?` or `#`. kit stores it exactly as written; `"/"` is not the root and is refused. A path whose first segment kit serves on every host is reserved (`issuer path reserved`, kit#876): `/.well-known`, `/authorize`, `/oauth`, `/userinfo`, `/api`, `/_ui`, `/assets`, `/account`, `/login`, `/logout`, `/recover-password`, `/health`, `/saml`, `/recovery`, `/magic-link`, `/forgot-password`, `/uiassets` and `/admin`. One (domain, path) serves one issuer: another issuer there is refused (`BINDING_TAKEN`). Changing it replaces the binding.
 - `tenant_id` (String) Parent identifier `tenant_id`; overrides the provider default, and reads back from the name. Changing a configured one replaces the resource.
 
 ### Read-Only

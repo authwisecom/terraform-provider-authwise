@@ -162,13 +162,18 @@ may have none (it is unreachable until bound), one, or several, and one
 domain serves several issuers at different paths. One host and path serve
 one issuer: binding a second there is refused with `BINDING_TAKEN`.
 
-Leave the binding's `path` out, or set it to `""`: an empty path is the root
-of the domain, and it is the only value kit accepts today. kit stores the
-path exactly as written and converts nothing, so it refuses `"/"` and any
-trailing slash at apply rather than rewriting them. A non-empty path such
-as `"/app"` is refused too until kit routes path-prefixed issuers (kit#876),
-and `/admin` and below are reserved for the tenant's administration
-console.
+A binding's `path` is `""` (or left out), the root of the domain, or one or
+more segments such as `/customers` or `/a/b`, which kit routes since
+kit#876: `https://login.acme.com/customers` is an issuer of its own beside
+the host's root. kit stores the path exactly as written and converts
+nothing, so it refuses `"/"`, a trailing slash, an empty segment, `?` and
+`#` at apply rather than rewriting them; the provider checks that form at
+plan.
+
+A path whose first segment kit serves on every host is reserved, and kit
+refuses it with `issuer path reserved`:
+`/.well-known`, `/authorize`, `/oauth`, `/userinfo`, `/api`, `/_ui`, `/assets`, `/account`, `/login`, `/logout`, `/recover-password`, `/health`, `/saml`, `/recovery`, `/magic-link`, `/forgot-password`, `/uiassets` and `/admin`. `/admin` is the tenant's home
+administration console.
 
 `domain_id` and `path` on the issuer are deprecated. On create they make
 the issuer's first binding, which kit then holds, and they keep the values

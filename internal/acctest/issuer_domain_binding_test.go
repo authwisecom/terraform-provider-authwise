@@ -163,7 +163,8 @@ func TestAccIssuerDomainBinding(t *testing.T) {
 }
 
 // TestAccIssuerDomainBinding_Refusals: one host and path serve one issuer
-// (BINDING_TAKEN); only the root is routed and /admin is reserved; a
+// (BINDING_TAKEN), at the root or at a path; a path routes (kit#876) unless
+// its first segment is reserved; a non-canonical path fails at plan; a
 // product's host takes no issuer.
 func TestAccIssuerDomainBinding_Refusals(t *testing.T) {
 	h := newHarness(t)
@@ -183,15 +184,17 @@ resource "authwise_issuer" "first" {
 }
 
 resource "authwise_issuer" "second" {}
+
+resource "authwise_issuer" "third" {}
 `
-	bind := func(domain, path string) string {
-		return base + fmt.Sprintf(`
-resource "authwise_issuer_domain_binding" "second" {
-  issuer_id = authwise_issuer.second.issuer_id
-  domain_id = authwise_domain.%s.domain_id
-  path      = %q
+	bind := func(issuer, domain, path string) string {
+		return fmt.Sprintf(`
+resource "authwise_issuer_domain_binding" "%[1]s" {
+  issuer_id = authwise_issuer.%[1]s.issuer_id
+  domain_id = authwise_domain.%[2]s.domain_id
+  path      = %[3]q
 }
-`, domain, path)
+`, issuer, domain, path)
 	}
 
 	resource.Test(t, resource.TestCase{
@@ -201,19 +204,33 @@ resource "authwise_issuer_domain_binding" "second" {
 			{
 				// The first issuer's convenience domain_id made its
 				// binding at the root; a second issuer there is refused.
-				Config:      bind("login", ""),
+				Config:      base + bind("second", "login", ""),
 				ExpectError: regexp.MustCompile(`(?s)BINDING_TAKEN.*already answers at\s+login\.example\.com\s+at\s+its\s+root`),
 			},
 			{
-				Config:      bind("login", "/admin"),
-				ExpectError: regexp.MustCompile(`reserved`),
+				// A path is an issuer of its own beside the root (kit#876).
+				Config: base + bind("second", "login", "/customers"),
+				Check:  resource.TestCheckResourceAttr("authwise_issuer_domain_binding.second", "url", "https://login.example.com/customers"),
 			},
 			{
-				Config:      bind("login", "/customers"),
-				ExpectError: regexp.MustCompile(`kit#876`),
+				Config:      base + bind("second", "login", "/customers") + bind("third", "login", "/customers"),
+				ExpectError: regexp.MustCompile(`(?s)BINDING_TAKEN.*already answers at\s+login\.example\.com/customers`),
 			},
 			{
-				Config:      bind("guard", ""),
+				Config:      base + bind("second", "login", "/customers") + bind("third", "login", "/admin"),
+				ExpectError: regexp.MustCompile(`issuer path reserved`),
+			},
+			{
+				Config:      base + bind("second", "login", "/customers") + bind("third", "login", "/login/staff"),
+				ExpectError: regexp.MustCompile(`issuer path reserved`),
+			},
+			{
+				Config:      base + bind("second", "login", "/customers") + bind("third", "login", "/staff/"),
+				PlanOnly:    true,
+				ExpectError: regexp.MustCompile(`no trailing`),
+			},
+			{
+				Config:      base + bind("second", "login", "/customers") + bind("third", "guard", ""),
 				ExpectError: regexp.MustCompile(`DOMAIN_NOT_BINDABLE`),
 			},
 		},

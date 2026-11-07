@@ -44,7 +44,7 @@ func bindingCreateError(err error) error {
 				where = m["hostname"] + " at its root"
 			}
 			remedy = fmt.Sprintf("refused: BINDING_TAKEN. Issuer %s already answers at %s, and one host and path serve one issuer. "+
-				"Give this issuer its own domain, or, once kit routes path-prefixed issuers (kit#876), its own path. "+
+				"Give this issuer its own domain, or its own path on that one (kit#876). "+
 				"If the binding is the one kit made for an issuer created with domain_id, import it rather than creating it again.", m["issuer"], where)
 		case "DOMAIN_NOT_BINDABLE":
 			remedy = "refused: DOMAIN_NOT_BINDABLE. The domain is a product's host (product = \"guard\") or another tenant's; an issuer can be bound only to the tenant's own native or custom domains."
