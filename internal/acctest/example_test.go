@@ -229,8 +229,8 @@ func TestAccGuardCatalogExample(t *testing.T) {
 	h.access.mu.Unlock()
 
 	// guard-control's 41 and kit's 3, which were there already.
-	if permissions != 44 {
-		t.Errorf("%d access permissions on the server, want 44", permissions)
+	if permissions != 40 {
+		t.Errorf("%d access permissions on the server, want 40", permissions)
 	}
 	if want := map[string]string{"guardcontrol.tenant": "tenant PUSH", "guardcontrol.network": "guardcontrol.tenant PUSH"}; !maps.Equal(types, want) {
 		t.Errorf("declared types = %v, want %v", types, want)
@@ -240,8 +240,8 @@ func TestAccGuardCatalogExample(t *testing.T) {
 	}
 
 	members := h.access.rolePermissions(accessPrefix + "/access-roles/guardcontrol.admin")
-	if len(members) != 44 {
-		t.Errorf("the role carries %d permissions, want 44", len(members))
+	if len(members) != 40 {
+		t.Errorf("the role carries %d permissions, want 40", len(members))
 	}
 	for _, p := range kitLinkPermissions {
 		if !slices.Contains(members, accessPrefix+"/access-permissions/"+p) {
@@ -321,8 +321,8 @@ func TestAccGuardExample(t *testing.T) {
 			t.Errorf("the office LAN is served by %v, want the gateway", r.GetServingNodeIds())
 		}
 	}
-	if len(h.access.permissions) != 44 {
-		t.Errorf("%d access permissions beside the network, want 44", len(h.access.permissions))
+	if len(h.access.permissions) != 40 {
+		t.Errorf("%d access permissions beside the network, want 40", len(h.access.permissions))
 	}
 }
 

@@ -9,6 +9,11 @@ DOCUMENTATION:
   describes both shipped sets. It gains an `authwise-strict` example, and the
   refusal example now lists `authwise-baseline, authwise-strict, custom`
   (kit#886, tf#60).
+* **`examples/guard-catalog`.** The example no longer creates the
+  `guardcontrol.invites.*` permissions (`create`, `delete`, `get` and
+  `list`). guard-control retired invites (gc#83). From gc 0.27.0, a Begin
+  with an invite code is refused with `INVITE_RETIRED`. Permissions already
+  applied stay in place until the example is re-applied.
 
 ## 0.31.0 (November 6, 2026)
 

@@ -33,10 +33,6 @@ locals {
     "guardcontrol.events.get",
     "guardcontrol.events.list",
     "guardcontrol.events.search",
-    "guardcontrol.invites.create",
-    "guardcontrol.invites.delete",
-    "guardcontrol.invites.get",
-    "guardcontrol.invites.list",
     "guardcontrol.networks.create",
     "guardcontrol.networks.delete",
     "guardcontrol.networks.enrol",
@@ -76,7 +72,7 @@ locals {
   # kit's own permissions the role carries beside guard-control's: the link
   # writes guard-control makes with the caller's bearer, and the list an
   # unlink finds the link with. kit declares them, so they are read, not
-  # created (`guard-control authz-permissions --role` prints all 44).
+  # created (`guard-control authz-permissions --role` prints all 40 from gc 0.27.0).
   kit_permissions = [
     "access.resourceLinks.create",
     "access.resourceLinks.delete",
