@@ -1,6 +1,11 @@
-## 0.32.0 (Unreleased)
+## 0.32.0 (November 7, 2026)
 
 NOTES:
+
+* **Release train 2026-11.** Pairs with apis v0.61.0, kit v1.84.0,
+  guard-control v0.27.0 and authwise-operator v0.45.0. It needs kit v1.84.0
+  or later: tenant domains through bindings (kit#911), routed issuer paths
+  (kit#876) and home administration (kit#916).
 
 * **Breaking (!).** It removes `authwise_issuer_domain` and its activation,
   and replaces `authwise_domain.issuer_id` with `custom`; see BREAKING CHANGES.
