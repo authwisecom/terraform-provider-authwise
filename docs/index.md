@@ -122,14 +122,14 @@ or a narrower role of the tenant's), with no condition: the step-up condition
 tests a person's sign-in, which a client never has.
 
 **What it reaches.** Identity providers, SAML, audiences, clients and their
-secrets, certificates, secrets, endpoints, factors, themes, assets, message
-templates, domains and their issuer bindings, and access bindings in the
-tenant's own audiences, Guard's administrative roles among them. Realms,
-users and groups are reached through the tenant's issuer: a home account
-manages the realms that issuer signs people in to, and kit refuses the
-others ("issuer … does not route to realm …"). Do not create realms with a
-home account for now: kit lets it create one that it then cannot read or
-delete (reported to kit; the fix is coming).
+secrets, certificates, secrets, endpoints, realms, factors, users, groups,
+themes, assets, message templates, domains and their issuer bindings, and
+access bindings in the tenant's own audiences, Guard's administrative roles
+among them. Realms and their people are reached through the tenant's own
+sign-in issuer. A home account manages a realm that issuer signs people in
+to, or one no issuer signs in to yet, such as a realm it has just created.
+A realm behind another issuer is refused ("issuer … does not route to realm
+…"). Realms need kit with kit#939's realm rule (develop aca155cd or later).
 
 **Issuers.** A home account reads and updates the tenant's own sign-in
 issuer, the one its token comes from, and no other. It never creates or
