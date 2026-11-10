@@ -33,13 +33,13 @@ One field decides which lane `authwise_certificate` takes:
 - **`import_certificate_pem` set** — import a partner's public certificate.
   `origin` comes back `CERTIFICATE_ORIGIN_IMPORTED` and `has_private_key` is
   false. There is no `ImportCertificate` RPC; the field is the switch.
-- **`import_certificate_pem` empty** — mint a key pair. `subject_common_name`,
+- **`import_certificate_pem` empty** — create a key pair. `subject_common_name`,
   `validity_days` and `key_size` steer it and default to `display_name`, 825
   days and RSA-2048.
 
 `certificate_pem` is the read-only public certificate of either kind.
 
-### Mint parameters do not come back
+### Create parameters do not come back
 
 `subject_common_name`, `validity_days`, `key_size` and
 `import_certificate_pem` are **input only**: kit consumes them on create and
@@ -102,7 +102,7 @@ Pick one owner per connection:
   A half-managed connection is the bad case.
 
 A principal calling import also needs `identity.certificates.create`, since
-import mints Certificate rows. The two import permissions
+import creates Certificate rows. The two import permissions
 (`identity.providers.importSamlMetadata`,
 `identity.clients.importSamlMetadata`) are separate precisely so granting
 metadata import is not a side door into adding a trust anchor — grant them

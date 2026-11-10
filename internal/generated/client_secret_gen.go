@@ -84,7 +84,7 @@ func ClientSecretResourceSchema() schema.Schema {
 				Validators:          []validator.String{tf.ReferenceID("t", "tenant", "")},
 			},
 		},
-		MarkdownDescription: "A client's secret, for authenticating it to the token endpoint. kit mints it and returns it once, so the secret is kept in state: treat the state as sensitive.",
+		MarkdownDescription: "A client's secret, for authenticating it to the token endpoint. kit creates it and returns it once, so the secret is kept in state: treat the state as sensitive.",
 	}
 }
 
@@ -356,7 +356,7 @@ func ClientSecretListDataSourceSchema() schema1.Schema {
 				Validators:          []validator.String{tf.ReferenceID("t", "tenant", "")},
 			},
 		},
-		MarkdownDescription: "A client's secret, for authenticating it to the token endpoint. kit mints it and returns it once, so the secret is kept in state: treat the state as sensitive. This data source lists every one under a parent.",
+		MarkdownDescription: "A client's secret, for authenticating it to the token endpoint. kit creates it and returns it once, so the secret is kept in state: treat the state as sensitive. This data source lists every one under a parent.",
 	}
 }
 

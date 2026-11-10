@@ -3,12 +3,12 @@
 page_title: "authwise_certificate Resource - Authwise"
 subcategory: "Identity"
 description: |-
-  A certificate and, when kit minted it, its private key. The trust anchor SAML connections verify signatures against, and the client certificate an endpoint presents for mTLS.
+  A certificate and, when kit created it, its private key. The trust anchor SAML connections verify signatures against, and the client certificate an endpoint presents for mTLS.
 ---
 
 # authwise_certificate (Resource)
 
-A certificate and, when kit minted it, its private key. The trust anchor SAML connections verify signatures against, and the client certificate an endpoint presents for mTLS.
+A certificate and, when kit created it, its private key. The trust anchor SAML connections verify signatures against, and the client certificate an endpoint presents for mTLS.
 
 
 
@@ -51,6 +51,6 @@ The [`terraform import` command](https://developer.hashicorp.com/terraform/cli/c
 
 ```shell
 # Import by full resource name.
-# The mint and import parameters are input-only, so an imported certificate has no value for them.
+# The create and import parameters are input-only, so an imported certificate has no value for them.
 terraform import authwise_certificate.example tenants/t-01/certificates/cert-01
 ```

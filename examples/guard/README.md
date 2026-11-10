@@ -20,7 +20,7 @@ suite applies the two.
 # main.tf (the kit tenant Guard is on), then:
 terraform init
 terraform apply
-terraform output -raw gateway_auth_code   # enrol the gateway with it
+terraform output -raw gateway_auth_code   # enroll the gateway with it
 ```
 
 ## What terraform does not own
@@ -31,9 +31,9 @@ terraform output -raw gateway_auth_code   # enrol the gateway with it
   `authwise_guard_tenant_settings` holds Guard's settings for the tenant,
   and destroying it leaves them in place.
 - **People's nodes.** A person types the tenant's Guard address into the
-  client and signs in; their node joins the networks they may enrol in
+  client and signs in; their node joins the networks they may enroll in
   (`authwise_guard_enrolment_grant`). A server's node is declared
-  (`authwise_guard_node`) and enrols with its auth code; what it may reach
+  (`authwise_guard_node`) and enrolls with its auth code; what it may reach
   is `authwise_guard_node_grants`.
 - **People.** Guard's users mirror the people who joined.
 

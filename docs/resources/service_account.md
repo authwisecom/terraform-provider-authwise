@@ -3,13 +3,13 @@
 page_title: "authwise_service_account Resource - Authwise"
 subcategory: "Identity"
 description: |-
-  A service account: a machine principal the tenant owns, for CI and automation. It is a client of the admin issuer, made with a member seat at the tenant and no secret: mint a secret with authwise_service_account_secret. Its token, asked for at the estate audience, is accepted by kit's admin API.
+  A service account: a machine principal the tenant owns, for CI and automation. It is a client of the admin issuer, made with a member seat at the tenant and no secret: create a secret with authwise_service_account_secret. Its token, asked for at the estate audience, is accepted by kit's admin API.
   roles are what it may do at its tenant, and change in place; every other argument replaces the account. Destroying it unbinds its roles first. kit refuses to delete it while any other binding names it. Service accounts are served at central only: against a satellite, kit refuses and names central.
 ---
 
 # authwise_service_account (Resource)
 
-A service account: a machine principal the tenant owns, for CI and automation. It is a client of the admin issuer, made with a member seat at the tenant and no secret: mint a secret with `authwise_service_account_secret`. Its token, asked for at the estate audience, is accepted by kit's admin API.
+A service account: a machine principal the tenant owns, for CI and automation. It is a client of the admin issuer, made with a member seat at the tenant and no secret: create a secret with `authwise_service_account_secret`. Its token, asked for at the estate audience, is accepted by kit's admin API.
 
 `roles` are what it may do at its tenant, and change in place; every other argument replaces the account. Destroying it unbinds its `roles` first. kit refuses to delete it while any other binding names it. Service accounts are served at central only: against a satellite, kit refuses and names central.
 
@@ -55,7 +55,7 @@ Read-Only:
 
 - `created_at` (String)
 - `expires_at` (String) Unset: the secret does not expire.
-- `id` (String) The secret's id: the part of the minted secret before the underscore.
+- `id` (String) The secret's id: the part of the created secret before the underscore.
 
 ## Import
 

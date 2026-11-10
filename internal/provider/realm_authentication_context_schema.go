@@ -114,7 +114,7 @@ func (d *realmAuthenticationContextSchemaDataSource) Schema(_ context.Context, _
 					"phishing_resistant":  schema.BoolAttribute{Computed: true},
 					"restricted":          schema.BoolAttribute{Computed: true, MarkdownDescription: "NIST's restricted class (SMS): offered only beside an unrestricted method."},
 					"recovery":            schema.BoolAttribute{Computed: true, MarkdownDescription: "A look-up secret; never the method a requirement is met by."},
-					"supports_enrollment": schema.BoolAttribute{Computed: true, MarkdownDescription: "False where enrolment happens elsewhere (Duo)."},
+					"supports_enrollment": schema.BoolAttribute{Computed: true, MarkdownDescription: "False where enrollment happens elsewhere (Duo)."},
 					"amr":                 strings,
 					"config_message":      schema.StringAttribute{Computed: true, MarkdownDescription: "The message the factor's `config` carries for this type; empty for none."},
 				}},

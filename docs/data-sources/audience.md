@@ -3,12 +3,12 @@
 page_title: "authwise_audience Data Source - Authwise"
 subcategory: "Identity"
 description: |-
-  An API an issuer mints access tokens for, and the audience its Access catalog hangs off. This data source reads one by its full resource name.
+  An API an issuer issues access tokens for, and the audience its Access catalog hangs off. This data source reads one by its full resource name.
 ---
 
 # authwise_audience (Data Source)
 
-An API an issuer mints access tokens for, and the audience its Access catalog hangs off. This data source reads one by its full resource name.
+An API an issuer issues access tokens for, and the audience its Access catalog hangs off. This data source reads one by its full resource name.
 
 
 

@@ -122,7 +122,7 @@ func CertificateResourceSchema() schema.Schema {
 				PlanModifiers:       []planmodifier.Int64{int64planmodifier.RequiresReplace()},
 			},
 		},
-		MarkdownDescription: "A certificate and, when kit minted it, its private key. The trust anchor SAML connections verify signatures against, and the client certificate an endpoint presents for mTLS.",
+		MarkdownDescription: "A certificate and, when kit created it, its private key. The trust anchor SAML connections verify signatures against, and the client certificate an endpoint presents for mTLS.",
 	}
 }
 
@@ -477,7 +477,7 @@ func CertificateDataSourceSchema() schema1.Schema {
 				MarkdownDescription: "`validity_days` is input only: the API consumes it and never returns it, so this data source always reads it as null.",
 			},
 		},
-		MarkdownDescription: "A certificate and, when kit minted it, its private key. The trust anchor SAML connections verify signatures against, and the client certificate an endpoint presents for mTLS. This data source reads one by its full resource name.",
+		MarkdownDescription: "A certificate and, when kit created it, its private key. The trust anchor SAML connections verify signatures against, and the client certificate an endpoint presents for mTLS. This data source reads one by its full resource name.",
 	}
 }
 
@@ -592,7 +592,7 @@ func CertificateListDataSourceSchema() schema1.Schema {
 				Validators:          []validator.String{tf.ReferenceID("t", "tenant", "")},
 			},
 		},
-		MarkdownDescription: "A certificate and, when kit minted it, its private key. The trust anchor SAML connections verify signatures against, and the client certificate an endpoint presents for mTLS. This data source lists every one under a parent.",
+		MarkdownDescription: "A certificate and, when kit created it, its private key. The trust anchor SAML connections verify signatures against, and the client certificate an endpoint presents for mTLS. This data source lists every one under a parent.",
 	}
 }
 

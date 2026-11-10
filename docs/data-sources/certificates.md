@@ -3,12 +3,12 @@
 page_title: "authwise_certificates Data Source - Authwise"
 subcategory: "Identity"
 description: |-
-  A certificate and, when kit minted it, its private key. The trust anchor SAML connections verify signatures against, and the client certificate an endpoint presents for mTLS. This data source lists every one under a parent.
+  A certificate and, when kit created it, its private key. The trust anchor SAML connections verify signatures against, and the client certificate an endpoint presents for mTLS. This data source lists every one under a parent.
 ---
 
 # authwise_certificates (Data Source)
 
-A certificate and, when kit minted it, its private key. The trust anchor SAML connections verify signatures against, and the client certificate an endpoint presents for mTLS. This data source lists every one under a parent.
+A certificate and, when kit created it, its private key. The trust anchor SAML connections verify signatures against, and the client certificate an endpoint presents for mTLS. This data source lists every one under a parent.
 
 
 

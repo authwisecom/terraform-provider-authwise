@@ -141,7 +141,7 @@ func (r *serviceAccountResource) Schema(_ context.Context, _ resource.SchemaRequ
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "A service account: a machine principal the tenant owns, for CI and automation. " +
 			"It is a client of the admin issuer, made with a member seat at the tenant and no secret: " +
-			"mint a secret with `authwise_service_account_secret`. Its token, asked for at the estate audience, is accepted by kit's admin API.\n\n" +
+			"create a secret with `authwise_service_account_secret`. Its token, asked for at the estate audience, is accepted by kit's admin API.\n\n" +
 			"`roles` are what it may do at its tenant, and change in place; every other argument replaces the account. " +
 			"Destroying it unbinds its `roles` first. kit refuses to delete it while any other binding names it. " +
 			"Service accounts are served at central only: against a satellite, kit refuses and names central.",
@@ -179,7 +179,7 @@ func (r *serviceAccountResource) Schema(_ context.Context, _ resource.SchemaRequ
 				MarkdownDescription: "The live secrets, newest last: unexpired, and never the plaintext.",
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
-						"id":               schema.StringAttribute{Computed: true, MarkdownDescription: "The secret's id: the part of the minted secret before the underscore."},
+						"id":               schema.StringAttribute{Computed: true, MarkdownDescription: "The secret's id: the part of the created secret before the underscore."},
 						createdAtAttribute: schema.StringAttribute{Computed: true},
 						expiresAtAttribute: schema.StringAttribute{Computed: true, MarkdownDescription: "Unset: the secret does not expire."},
 					},
@@ -477,43 +477,43 @@ func (r *serviceAccountSecretResource) Schema(_ context.Context, _ resource.Sche
 
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "A service account's secret, for the client credentials grant. " +
-			"kit mints it and returns it once, so the secret is kept in state: treat the state as sensitive.\n\n" +
-			"**Rotation.** Replace the resource to rotate, for example by changing `keepers`. With `rotate` (the default), the mint gives the account's other live secrets `grace` to keep working, then they lapse, so a pipeline holding the old secret has that long to pick up the new one. " +
+			"kit creates it and returns it once, so the secret is kept in state: treat the state as sensitive.\n\n" +
+			"**Rotation.** Replace the resource to rotate, for example by changing `keepers`. With `rotate` (the default), creating it gives the account's other live secrets `grace` to keep working, then they lapse, so a pipeline holding the old secret has that long to pick up the new one. " +
 			"Two of these resources on one account with `rotate` left on would rotate each other out: set `rotate = false` on all but one.\n\n" +
-			"**Destroying it does not revoke the secret.** The tenancy service has no revoke of one secret: the secret stops working when it expires, when a later mint rotates it, or when the account is deleted.",
+			"**Destroying it does not revoke the secret.** The tenancy service has no revoke of one secret: the secret stops working when it expires, when a later create rotates it, or when the account is deleted.",
 		Attributes: map[string]schema.Attribute{
 			"service_account": schema.StringAttribute{
 				Required:            true,
-				MarkdownDescription: "The account's full resource name, `authwise_service_account.<name>.name`. Changing it mints a new secret.",
+				MarkdownDescription: "The account's full resource name, `authwise_service_account.<name>.name`. Changing it creates a new secret.",
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			expiresAtAttribute: schema.StringAttribute{
 				Optional:            true,
-				MarkdownDescription: "When the secret stops authenticating (RFC 3339, in the future). Unset: it does not expire. Changing it mints a new secret.",
+				MarkdownDescription: "When the secret stops authenticating (RFC 3339, in the future). Unset: it does not expire. Changing it creates a new secret.",
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 			},
 			"rotate": schema.BoolAttribute{
 				Optional:            true,
 				Computed:            true,
 				Default:             booldefault.StaticBool(true),
-				MarkdownDescription: "Whether the mint gives the account's other live secrets `grace`, after which they lapse. Defaults to true. Only the mint reads it.",
+				MarkdownDescription: "Whether creating the secret gives the account's other live secrets `grace`, after which they lapse. Defaults to true. Only the create reads it.",
 				PlanModifiers:       []planmodifier.Bool{boolplanmodifier.UseStateForUnknown()},
 			},
 			"grace": schema.StringAttribute{
 				Optional:            true,
-				MarkdownDescription: "With `rotate`, how long the other secrets keep working, as a Go duration (`24h`, `72h`). Unset is 24 hours; kit allows at most 30 days. Only the mint reads it.",
+				MarkdownDescription: "With `rotate`, how long the other secrets keep working, as a Go duration (`24h`, `72h`). Unset is 24 hours; kit allows at most 30 days. Only the create reads it.",
 			},
 			"keepers": schema.MapAttribute{
 				Optional:            true,
 				ElementType:         types.StringType,
-				MarkdownDescription: "Arbitrary values that mint a new secret when any of them changes: the rotation trigger.",
+				MarkdownDescription: "Arbitrary values that create a new secret when any of them changes: the rotation trigger.",
 				PlanModifiers:       []planmodifier.Map{mapplanmodifier.RequiresReplace()},
 			},
 			"secret_id": computed("The secret's id, the part of `secret` before the underscore; it is listed in the account's `secrets`."),
 			"secret": schema.StringAttribute{
 				Computed:            true,
 				Sensitive:           true,
-				MarkdownDescription: "The client secret, from the mint. No read returns it again.",
+				MarkdownDescription: "The client secret, from the create. No read returns it again.",
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"token_url":        computed("Where to exchange it: the admin issuer's token endpoint."),
@@ -565,7 +565,7 @@ func (r *serviceAccountSecretResource) Create(ctx context.Context, req resource.
 
 	out, err := r.client.MintServiceAccountSecret(ctx, mint)
 	if err != nil {
-		resp.Diagnostics.AddError("mint service account secret failed", err.Error())
+		resp.Diagnostics.AddError("create service account secret failed", err.Error())
 		return
 	}
 

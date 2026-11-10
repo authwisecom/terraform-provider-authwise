@@ -1,5 +1,5 @@
 # A server registered ahead of time. With no public_key it is PENDING: run
-# the agent on the server with the auth code to enrol it. Enrolment writes
+# the agent on the server with the auth code to enroll it. Enrollment writes
 # public_key and endpoint, which read back without a diff.
 resource "authwise_guard_node" "gateway" {
   tenant_id    = "t-01" # the kit tenant Guard is on

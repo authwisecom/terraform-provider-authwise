@@ -3,12 +3,12 @@
 page_title: "authwise_audiences Data Source - Authwise"
 subcategory: "Identity"
 description: |-
-  An API an issuer mints access tokens for, and the audience its Access catalog hangs off. This data source lists every one under a parent.
+  An API an issuer issues access tokens for, and the audience its Access catalog hangs off. This data source lists every one under a parent.
 ---
 
 # authwise_audiences (Data Source)
 
-An API an issuer mints access tokens for, and the audience its Access catalog hangs off. This data source lists every one under a parent.
+An API an issuer issues access tokens for, and the audience its Access catalog hangs off. This data source lists every one under a parent.
 
 
 

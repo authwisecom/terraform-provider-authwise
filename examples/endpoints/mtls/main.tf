@@ -1,7 +1,7 @@
 # A gRPC service on a private CA that authenticates kit by its client
 # certificate (mutual TLS):
 #
-#   - a key pair kit mints and keeps — the private key never leaves kit;
+#   - a key pair kit creates and keeps — the private key never leaves kit;
 #     give the certificate_pem output to the service to trust;
 #   - the endpoint, trusting the service's CA and presenting that
 #     certificate.

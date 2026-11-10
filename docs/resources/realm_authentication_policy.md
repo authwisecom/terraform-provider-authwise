@@ -63,7 +63,7 @@ Optional:
 Optional:
 
 - `grace` (String) A Go duration string, e.g. `90s`, `15m`, `12h`.
-- `in_flow` (Boolean) Whether a person may enrol a factor inside the login flow when a rule demands one they lack.
+- `in_flow` (Boolean) Whether a person may enroll a factor inside the login flow when a rule demands one they lack.
 - `offer_recovery_codes` (Boolean) Whether recovery codes are offered after the first factor is enrolled.
 - `self_service_types` (List of String) Factor types a person may add from the account page. Empty means every factor enabled on the realm.
 

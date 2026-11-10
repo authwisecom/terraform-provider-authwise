@@ -1,3 +1,16 @@
+## 0.33.0 (Unreleased)
+
+NOTES:
+
+* **Release train 2026.11.2** (devops#160). One development batch; not
+  tagged until the batch is whole.
+* **Wording (WD0).** Descriptions, error text, docs and examples say
+  "create" (never "mint") and "enroll" (never "enrol"). Resource and
+  attribute names, permission names and API identifiers keep their spelling
+  until 2026.11.3 (`authwise_guard_enrolment_grant`,
+  `guardcontrol.networks.enrol`). Two error summaries change text:
+  "create service account secret failed" and "granting enrollment failed".
+
 ## 0.32.0 (November 7, 2026)
 
 NOTES:

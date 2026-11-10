@@ -139,7 +139,7 @@ func NodeResourceSchema() schema.Schema {
 				Validators:          []validator.String{tf.ReferenceID("t", "tenant", "")},
 			},
 		},
-		MarkdownDescription: "A server's node in a Guard network, registered ahead of time. Created without a `public_key`, it is `PENDING` and its one-time `auth_code` enrols the server; created with one, it is `ACTIVE` at once. The auth code is shown once, so it is kept in state: treat the state as sensitive. People's nodes join when they sign in and are not managed here.",
+		MarkdownDescription: "A server's node in a Guard network, registered ahead of time. Created without a `public_key`, it is `PENDING` and its one-time `auth_code` enrolls the server; created with one, it is `ACTIVE` at once. The auth code is shown once, so it is kept in state: treat the state as sensitive. People's nodes join when they sign in and are not managed here.",
 	}
 }
 
@@ -558,7 +558,7 @@ func NodeDataSourceSchema() schema1.Schema {
 			"state":     schema1.StringAttribute{Computed: true},
 			"tenant_id": schema1.StringAttribute{Computed: true},
 		},
-		MarkdownDescription: "A server's node in a Guard network, registered ahead of time. Created without a `public_key`, it is `PENDING` and its one-time `auth_code` enrols the server; created with one, it is `ACTIVE` at once. The auth code is shown once, so it is kept in state: treat the state as sensitive. People's nodes join when they sign in and are not managed here. This data source reads one by its full resource name.",
+		MarkdownDescription: "A server's node in a Guard network, registered ahead of time. Created without a `public_key`, it is `PENDING` and its one-time `auth_code` enrolls the server; created with one, it is `ACTIVE` at once. The auth code is shown once, so it is kept in state: treat the state as sensitive. People's nodes join when they sign in and are not managed here. This data source reads one by its full resource name.",
 	}
 }
 
@@ -703,7 +703,7 @@ func NodeListDataSourceSchema() schema1.Schema {
 				Validators:          []validator.String{tf.ReferenceID("t", "tenant", "")},
 			},
 		},
-		MarkdownDescription: "A server's node in a Guard network, registered ahead of time. Created without a `public_key`, it is `PENDING` and its one-time `auth_code` enrols the server; created with one, it is `ACTIVE` at once. The auth code is shown once, so it is kept in state: treat the state as sensitive. People's nodes join when they sign in and are not managed here. This data source lists every one under a parent.",
+		MarkdownDescription: "A server's node in a Guard network, registered ahead of time. Created without a `public_key`, it is `PENDING` and its one-time `auth_code` enrolls the server; created with one, it is `ACTIVE` at once. The auth code is shown once, so it is kept in state: treat the state as sensitive. People's nodes join when they sign in and are not managed here. This data source lists every one under a parent.",
 	}
 }
 

@@ -3,18 +3,18 @@
 page_title: "authwise_guard_node Resource - Authwise"
 subcategory: "Guard"
 description: |-
-  A server's node in a Guard network, registered ahead of time. Created without a public_key, it is PENDING and its one-time auth_code enrols the server; created with one, it is ACTIVE at once. The auth code is shown once, so it is kept in state: treat the state as sensitive. People's nodes join when they sign in and are not managed here.
+  A server's node in a Guard network, registered ahead of time. Created without a public_key, it is PENDING and its one-time auth_code enrolls the server; created with one, it is ACTIVE at once. The auth code is shown once, so it is kept in state: treat the state as sensitive. People's nodes join when they sign in and are not managed here.
 ---
 
 # authwise_guard_node (Resource)
 
-A server's node in a Guard network, registered ahead of time. Created without a `public_key`, it is `PENDING` and its one-time `auth_code` enrols the server; created with one, it is `ACTIVE` at once. The auth code is shown once, so it is kept in state: treat the state as sensitive. People's nodes join when they sign in and are not managed here.
+A server's node in a Guard network, registered ahead of time. Created without a `public_key`, it is `PENDING` and its one-time `auth_code` enrolls the server; created with one, it is `ACTIVE` at once. The auth code is shown once, so it is kept in state: treat the state as sensitive. People's nodes join when they sign in and are not managed here.
 
 ## Example Usage
 
 ```terraform
 # A server registered ahead of time. With no public_key it is PENDING: run
-# the agent on the server with the auth code to enrol it. Enrolment writes
+# the agent on the server with the auth code to enroll it. Enrollment writes
 # public_key and endpoint, which read back without a diff.
 resource "authwise_guard_node" "gateway" {
   tenant_id    = "t-01" # the kit tenant Guard is on

@@ -3,29 +3,29 @@
 page_title: "authwise_service_account_secret Resource - Authwise"
 subcategory: "Identity"
 description: |-
-  A service account's secret, for the client credentials grant. kit mints it and returns it once, so the secret is kept in state: treat the state as sensitive.
-  Rotation. Replace the resource to rotate, for example by changing keepers. With rotate (the default), the mint gives the account's other live secrets grace to keep working, then they lapse, so a pipeline holding the old secret has that long to pick up the new one. Two of these resources on one account with rotate left on would rotate each other out: set rotate = false on all but one.
-  Destroying it does not revoke the secret. The tenancy service has no revoke of one secret: the secret stops working when it expires, when a later mint rotates it, or when the account is deleted.
+  A service account's secret, for the client credentials grant. kit creates it and returns it once, so the secret is kept in state: treat the state as sensitive.
+  Rotation. Replace the resource to rotate, for example by changing keepers. With rotate (the default), creating it gives the account's other live secrets grace to keep working, then they lapse, so a pipeline holding the old secret has that long to pick up the new one. Two of these resources on one account with rotate left on would rotate each other out: set rotate = false on all but one.
+  Destroying it does not revoke the secret. The tenancy service has no revoke of one secret: the secret stops working when it expires, when a later create rotates it, or when the account is deleted.
 ---
 
 # authwise_service_account_secret (Resource)
 
-A service account's secret, for the client credentials grant. kit mints it and returns it once, so the secret is kept in state: treat the state as sensitive.
+A service account's secret, for the client credentials grant. kit creates it and returns it once, so the secret is kept in state: treat the state as sensitive.
 
-**Rotation.** Replace the resource to rotate, for example by changing `keepers`. With `rotate` (the default), the mint gives the account's other live secrets `grace` to keep working, then they lapse, so a pipeline holding the old secret has that long to pick up the new one. Two of these resources on one account with `rotate` left on would rotate each other out: set `rotate = false` on all but one.
+**Rotation.** Replace the resource to rotate, for example by changing `keepers`. With `rotate` (the default), creating it gives the account's other live secrets `grace` to keep working, then they lapse, so a pipeline holding the old secret has that long to pick up the new one. Two of these resources on one account with `rotate` left on would rotate each other out: set `rotate = false` on all but one.
 
-**Destroying it does not revoke the secret.** The tenancy service has no revoke of one secret: the secret stops working when it expires, when a later mint rotates it, or when the account is deleted.
+**Destroying it does not revoke the secret.** The tenancy service has no revoke of one secret: the secret stops working when it expires, when a later create rotates it, or when the account is deleted.
 
 ## Example Usage
 
 ```terraform
-# The account's secret. kit mints it and returns it once; Terraform keeps it
+# The account's secret. kit creates it and returns it once; Terraform keeps it
 # in state and hands it on from there.
 resource "authwise_service_account_secret" "ci" {
   service_account = authwise_service_account.ci.name
   expires_at      = "2027-01-01T00:00:00Z"
 
-  # Change a keeper to rotate: the new secret is minted and the old one keeps
+  # Change a keeper to rotate: the new secret is created and the old one keeps
   # working for the grace (24 hours unless set), so the pipeline has that long
   # to pick up the new one. Destroying this resource does not revoke the
   # secret: it lapses at its expiry, at a rotation, or with the account.
@@ -53,19 +53,19 @@ output "ci_credential" {
 
 ### Required
 
-- `service_account` (String) The account's full resource name, `authwise_service_account.<name>.name`. Changing it mints a new secret.
+- `service_account` (String) The account's full resource name, `authwise_service_account.<name>.name`. Changing it creates a new secret.
 
 ### Optional
 
-- `expires_at` (String) When the secret stops authenticating (RFC 3339, in the future). Unset: it does not expire. Changing it mints a new secret.
-- `grace` (String) With `rotate`, how long the other secrets keep working, as a Go duration (`24h`, `72h`). Unset is 24 hours; kit allows at most 30 days. Only the mint reads it.
-- `keepers` (Map of String) Arbitrary values that mint a new secret when any of them changes: the rotation trigger.
-- `rotate` (Boolean) Whether the mint gives the account's other live secrets `grace`, after which they lapse. Defaults to true. Only the mint reads it.
+- `expires_at` (String) When the secret stops authenticating (RFC 3339, in the future). Unset: it does not expire. Changing it creates a new secret.
+- `grace` (String) With `rotate`, how long the other secrets keep working, as a Go duration (`24h`, `72h`). Unset is 24 hours; kit allows at most 30 days. Only the create reads it.
+- `keepers` (Map of String) Arbitrary values that create a new secret when any of them changes: the rotation trigger.
+- `rotate` (Boolean) Whether creating the secret gives the account's other live secrets `grace`, after which they lapse. Defaults to true. Only the create reads it.
 
 ### Read-Only
 
 - `audience` (String) The audience to ask for: the estate audience kit's admin API accepts.
 - `created_at` (String)
-- `secret` (String, Sensitive) The client secret, from the mint. No read returns it again.
+- `secret` (String, Sensitive) The client secret, from the create. No read returns it again.
 - `secret_id` (String) The secret's id, the part of `secret` before the underscore; it is listed in the account's `secrets`.
 - `token_url` (String) Where to exchange it: the admin issuer's token endpoint.

@@ -109,7 +109,7 @@ locals {
   # non-wildcard redirect URIs exactly, so the trailing slash is required.
   console_redirect_uri = "https://guard-admin.example.com/"
 
-  # The audience AWID kit minted, which the client and any token request
+  # The audience AWID kit created, which the client and any token request
   # reference.
   console_audience_id = authwise_audience.console.audience_id
 }

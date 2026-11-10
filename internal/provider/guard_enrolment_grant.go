@@ -97,13 +97,13 @@ func (r *guardEnrolmentGrantResource) Schema(_ context.Context, _ resource.Schem
 
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Binds one Guard role to a user or group of a kit tenant, in kit, through guard-control. " +
-			"By default the role is `guardcontrol.user` at the tenant: the subject may enrol devices. " +
+			"By default the role is `guardcontrol.user` at the tenant: the subject may enroll devices. " +
 			"`guardcontrol.tenantAdmin` (at the tenant), `guardcontrol.networkAdmin` (at a network, `network_id`) and `guardcontrol.viewer` (either) let the subject administer the tenant's Guard, or part of it.\n\n" +
 			"**One way, not both.** This is the same binding an `authwise_access_binding` with that role in the Guard audience would write. Declare a grant one way only, or the two will fight.\n\n" +
 			"**Who may apply it.** Each call is admitted at guard-control, then by kit on the same bearer, so the provider's credential must administer the tenant's bindings in kit; otherwise it is refused with PermissionDenied.\n\n" +
 			"**Versions.** A role other than `guardcontrol.user`, or a grant at a network, needs guard-control with role grants (guard-control#59); an older one refuses it with Unimplemented. " +
 			"`guardcontrol.tenantAdmin` and `guardcontrol.networkAdmin` carry the Guard audience's step-up condition (`condition_id`), and are refused while it has none.\n\n" +
-			"**Revoking does not deprovision.** Destroying a grant stops new enrolments; a device already enrolled keeps working until it is revoked by hand or by the deprovisioning sweep (`authwise_guard_tenant_settings`, `config.deprovisioning.enabled`).",
+			"**Revoking does not deprovision.** Destroying a grant stops new enrollments; a device already enrolled keeps working until it is revoked by hand or by the deprovisioning sweep (`authwise_guard_tenant_settings`, `config.deprovisioning.enabled`).",
 		Attributes: map[string]schema.Attribute{
 			"binding": schema.StringAttribute{
 				Computed:            true,
@@ -124,7 +124,7 @@ func (r *guardEnrolmentGrantResource) Schema(_ context.Context, _ resource.Schem
 				Optional: true,
 				Computed: true,
 				Default:  stringdefault.StaticString(guardRoleUser),
-				MarkdownDescription: "`guardcontrol.user` (the default: may enrol), `guardcontrol.tenantAdmin`, `guardcontrol.networkAdmin` or `guardcontrol.viewer`. " +
+				MarkdownDescription: "`guardcontrol.user` (the default: may enroll), `guardcontrol.tenantAdmin`, `guardcontrol.networkAdmin` or `guardcontrol.viewer`. " +
 					"Changing it replaces the grant.",
 				// A grant from before role existed has none in state; it is
 				// the default, so filling it in replaces nothing.
@@ -241,7 +241,7 @@ func (r *guardEnrolmentGrantResource) Create(ctx context.Context, req resource.C
 			Subject: subject,
 		})
 		if err != nil {
-			addGuardPeopleError(&resp.Diagnostics, "granting enrolment failed", err)
+			addGuardPeopleError(&resp.Diagnostics, "granting enrollment failed", err)
 			return
 		}
 		plan.fromProto(out)
@@ -275,7 +275,7 @@ func (r *guardEnrolmentGrantResource) Read(ctx context.Context, req resource.Rea
 
 	var found bool
 	var err error
-	read := "enrolment grants"
+	read := "enrollment grants"
 	if state.isEnrolment() {
 		found, err = r.readEnrolment(ctx, &state)
 	} else {
@@ -284,7 +284,7 @@ func (r *guardEnrolmentGrantResource) Read(ctx context.Context, req resource.Rea
 		// An import has no role yet: from a guard-control without role
 		// grants, it can only be an enrolment grant.
 		if state.Role.IsNull() && status.Code(err) == codes.Unimplemented {
-			read = "enrolment grants"
+			read = "enrollment grants"
 			found, err = r.readEnrolment(ctx, &state)
 		}
 	}
@@ -316,7 +316,7 @@ func (r *guardEnrolmentGrantResource) readEnrolment(ctx context.Context, state *
 		// resource writes enrolment grants at the tenant, never at a
 		// network.
 		if g.GetResourceType() != enrolmentAnchorTenant {
-			return false, fmt.Errorf("binding %s grants enrolment at %s/%s; this guard-control has no role grants (guard-control#59), "+
+			return false, fmt.Errorf("binding %s grants enrollment at %s/%s; this guard-control has no role grants (guard-control#59), "+
 				"so authwise_guard_enrolment_grant manages grants at the tenant only. Manage it as an authwise_access_binding instead",
 				g.GetBinding(), g.GetResourceType(), g.GetResourceId())
 		}
@@ -398,7 +398,7 @@ func (r *guardEnrolmentGrantResource) ImportState(ctx context.Context, req resou
 
 	tenantID, binding, ok := strings.Cut(req.ID, "/")
 	if !ok || !strings.HasPrefix(tenantID, "t-") || binding == "" {
-		resp.Diagnostics.AddError("invalid import ID for enrolment grant",
+		resp.Diagnostics.AddError("invalid import ID for enrollment grant",
 			"expected <tenant id>/<binding>, e.g. t-01/<the binding's name in kit>, got "+req.ID+guardTenantUpgradeHint(tenantID))
 		return
 	}

@@ -217,7 +217,7 @@ func (r *guardTenantSettingsResource) Schema(_ context.Context, _ resource.Schem
 					"plan":              schema.StringAttribute{Computed: true, MarkdownDescription: "`TRIAL`, `FREE`, `TEAM`, `BUSINESS` or `ENTERPRISE`; empty when kit reports none."},
 					"trial_ends_at":     schema.StringAttribute{Computed: true, MarkdownDescription: "When a trial ends, RFC 3339; empty otherwise."},
 					"members_limit":     schema.Int64Attribute{Computed: true, MarkdownDescription: "The most people the tenant may have; 0 is no cap."},
-					"devices_limit":     schema.Int64Attribute{Computed: true, MarkdownDescription: "The most devices the tenant may enrol; 0 is no cap."},
+					"devices_limit":     schema.Int64Attribute{Computed: true, MarkdownDescription: "The most devices the tenant may enroll; 0 is no cap."},
 					"relay_bytes_limit": schema.Int64Attribute{Computed: true, MarkdownDescription: "The relay traffic the tenant may use, in bytes; 0 is no cap."},
 				},
 			},

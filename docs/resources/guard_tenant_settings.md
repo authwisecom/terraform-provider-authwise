@@ -93,7 +93,7 @@ Optional:
 
 Read-Only:
 
-- `devices_limit` (Number) The most devices the tenant may enrol; 0 is no cap.
+- `devices_limit` (Number) The most devices the tenant may enroll; 0 is no cap.
 - `members_limit` (Number) The most people the tenant may have; 0 is no cap.
 - `plan` (String) `TRIAL`, `FREE`, `TEAM`, `BUSINESS` or `ENTERPRISE`; empty when kit reports none.
 - `relay_bytes_limit` (Number) The relay traffic the tenant may use, in bytes; 0 is no cap.

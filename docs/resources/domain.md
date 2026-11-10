@@ -28,7 +28,7 @@ it was the hostname itself; see [Upgrading from 0.18](#upgrading-from-018).
 
 About custom hosts:
 
-- **Each binding is its own issuer URL.** Tokens minted at
+- **Each binding is its own issuer URL.** Tokens issued at
   `login.acme.com` carry `iss = https://login.acme.com`. An issuer bound to
   its native host as well keeps answering there, with its own `iss`, so
   relying parties that cached discovery do not break. Neither host
@@ -36,7 +36,7 @@ About custom hosts:
 - **Passkeys do not follow.** A passkey is bound to the host it was
   enrolled at, so passkeys enrolled at the issuer's native host do not
   work at the custom domain. Add the domain before rolling out passkeys, or
-  have people enrol again.
+  have people enroll again.
 - **Business plan or above.** Where an installation enforces the plan,
   create is refused below it with `PLAN_REQUIRED`.
 

@@ -1,4 +1,4 @@
-# Everyone in the engineering group may enrol devices in the tenant's Guard.
+# Everyone in the engineering group may enroll devices in the tenant's Guard.
 # The group is in one of the tenant's realms.
 resource "authwise_guard_enrolment_grant" "engineering" {
   tenant_id    = "t-01"

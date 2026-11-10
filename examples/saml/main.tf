@@ -29,7 +29,7 @@ locals {
 # ---------------------------------------------------------------------------
 
 # The partner's signing certificate, handed over out of band. A non-empty
-# import_certificate_pem imports; leaving it empty mints. There is no
+# import_certificate_pem imports; leaving it empty creates one. There is no
 # separate import RPC — the field is the switch.
 #
 # It is create-only: a partner who rotates gets a new Certificate row, and
@@ -46,10 +46,10 @@ resource "authwise_certificate" "partner_idp_signing" {
 }
 
 # Ours: what we sign AuthnRequests with, and decrypt encrypted assertions
-# with. Minted here — no PEM in, so kit generates the key pair and answers
+# with. Created here — no PEM in, so kit generates the key pair and answers
 # with what it actually produced (subject, not_before, not_after).
 #
-# The mint parameters are input-only: kit consumes them on create and never
+# The create parameters are input-only: kit consumes them on create and never
 # returns them, so they stay in state exactly as written here and never
 # appear in a refresh. An imported resource has no value for them.
 resource "authwise_certificate" "sp_signing" {

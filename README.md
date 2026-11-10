@@ -121,10 +121,10 @@ resource fails at plan.
 
 `examples/guard` is a network on a kit tenant down to a gateway server,
 applied by the acceptance suite together with `examples/guard-catalog`. A
-server's node is declared and enrols itself with its one-time `auth_code`;
-the key and endpoint enrolment writes read back without a diff. People's
+server's node is declared and enrolls itself with its one-time `auth_code`;
+the key and endpoint enrollment writes read back without a diff. People's
 nodes and Guard's users are not terraform's: a person signs in at the
-tenant's Guard address and enrols in the networks they are granted
+tenant's Guard address and enrolls in the networks they are granted
 (`authwise_guard_enrolment_grant`). Guard has no invites of its own (#67): a
 person is invited by kit's invitation. That matters on destroy, since
 guard-control refuses to delete a network that still has nodes.
@@ -188,7 +188,7 @@ so reference it by expression, as above: Terraform then destroys or
 repoints the referrer first.
 
 A client's own secret works the other way around. You don't supply it:
-kit mints it and returns it exactly once. So `authwise_client_secret` keeps
+kit creates it and returns it exactly once. So `authwise_client_secret` keeps
 its `secret` in state, as a sensitive attribute, which makes the state
 itself sensitive. Rotate it by changing a value in `keepers`:
 
@@ -243,7 +243,7 @@ Two lanes, the same bearer credentials as awctl:
   plus optional `audience`). Partial configuration is an error naming the
   gaps. For CI, the credential is a service account (#37):
   `authwise_service_account`, a client of the admin issuer the tenant
-  owns, with the `roles` it holds there, and `authwise_service_account_secret`, its secret, minted once and
+  owns, with the `roles` it holds there, and `authwise_service_account_secret`, its secret, created once and
   kept in state like a client secret. Both go through the public tenancy
   service on `endpoint`, at central only. Replacing the secret rotates it,
   and the old one keeps working for `grace`. Destroying it does not revoke

@@ -75,7 +75,7 @@ A pipeline's credential is a service account: a machine principal the
 tenant owns, so its access is the roles bound to it and its actions are
 audited as its own `c-…`, not as a person's. A tenant administrator creates
 one with `authwise_service_account`, gives it `roles = ["tenant.admin"]`,
-and mints a secret with `authwise_service_account_secret`. The pipeline
+and creates a secret with `authwise_service_account_secret`. The pipeline
 then sets `AUTHWISE_TOKEN_URL`, `AUTHWISE_CLIENT_ID`,
 `AUTHWISE_CLIENT_SECRET` and `AUTHWISE_AUDIENCE="a-01"`. The secret's
 `token_url` and `audience` attributes give the first and last of these.

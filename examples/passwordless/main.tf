@@ -79,7 +79,7 @@ locals {
 # with the credentials of the realm's webauthn factor. Without an enabled
 # one, kit refuses the first sign-in ("realm offers no webauthn factor").
 data "authwise_factor_webauthn" "passkeys" {
-  # Set once, before anybody enrols: changing rp_id orphans every credential.
+  # Set once, before anybody enrolls: changing rp_id orphans every credential.
   rp_id           = "login.example.com"
   rp_display_name = "Example"
   resident_key    = "required" # a passkey is a discoverable credential

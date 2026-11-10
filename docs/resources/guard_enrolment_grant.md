@@ -3,16 +3,16 @@
 page_title: "authwise_guard_enrolment_grant Resource - Authwise"
 subcategory: "Guard"
 description: |-
-  Binds one Guard role to a user or group of a kit tenant, in kit, through guard-control. By default the role is guardcontrol.user at the tenant: the subject may enrol devices. guardcontrol.tenantAdmin (at the tenant), guardcontrol.networkAdmin (at a network, network_id) and guardcontrol.viewer (either) let the subject administer the tenant's Guard, or part of it.
+  Binds one Guard role to a user or group of a kit tenant, in kit, through guard-control. By default the role is guardcontrol.user at the tenant: the subject may enroll devices. guardcontrol.tenantAdmin (at the tenant), guardcontrol.networkAdmin (at a network, network_id) and guardcontrol.viewer (either) let the subject administer the tenant's Guard, or part of it.
   One way, not both. This is the same binding an authwise_access_binding with that role in the Guard audience would write. Declare a grant one way only, or the two will fight.
   Who may apply it. Each call is admitted at guard-control, then by kit on the same bearer, so the provider's credential must administer the tenant's bindings in kit; otherwise it is refused with PermissionDenied.
   Versions. A role other than guardcontrol.user, or a grant at a network, needs guard-control with role grants (guard-control#59); an older one refuses it with Unimplemented. guardcontrol.tenantAdmin and guardcontrol.networkAdmin carry the Guard audience's step-up condition (condition_id), and are refused while it has none.
-  Revoking does not deprovision. Destroying a grant stops new enrolments; a device already enrolled keeps working until it is revoked by hand or by the deprovisioning sweep (authwise_guard_tenant_settings, config.deprovisioning.enabled).
+  Revoking does not deprovision. Destroying a grant stops new enrollments; a device already enrolled keeps working until it is revoked by hand or by the deprovisioning sweep (authwise_guard_tenant_settings, config.deprovisioning.enabled).
 ---
 
 # authwise_guard_enrolment_grant (Resource)
 
-Binds one Guard role to a user or group of a kit tenant, in kit, through guard-control. By default the role is `guardcontrol.user` at the tenant: the subject may enrol devices. `guardcontrol.tenantAdmin` (at the tenant), `guardcontrol.networkAdmin` (at a network, `network_id`) and `guardcontrol.viewer` (either) let the subject administer the tenant's Guard, or part of it.
+Binds one Guard role to a user or group of a kit tenant, in kit, through guard-control. By default the role is `guardcontrol.user` at the tenant: the subject may enroll devices. `guardcontrol.tenantAdmin` (at the tenant), `guardcontrol.networkAdmin` (at a network, `network_id`) and `guardcontrol.viewer` (either) let the subject administer the tenant's Guard, or part of it.
 
 **One way, not both.** This is the same binding an `authwise_access_binding` with that role in the Guard audience would write. Declare a grant one way only, or the two will fight.
 
@@ -20,12 +20,12 @@ Binds one Guard role to a user or group of a kit tenant, in kit, through guard-c
 
 **Versions.** A role other than `guardcontrol.user`, or a grant at a network, needs guard-control with role grants (guard-control#59); an older one refuses it with Unimplemented. `guardcontrol.tenantAdmin` and `guardcontrol.networkAdmin` carry the Guard audience's step-up condition (`condition_id`), and are refused while it has none.
 
-**Revoking does not deprovision.** Destroying a grant stops new enrolments; a device already enrolled keeps working until it is revoked by hand or by the deprovisioning sweep (`authwise_guard_tenant_settings`, `config.deprovisioning.enabled`).
+**Revoking does not deprovision.** Destroying a grant stops new enrollments; a device already enrolled keeps working until it is revoked by hand or by the deprovisioning sweep (`authwise_guard_tenant_settings`, `config.deprovisioning.enabled`).
 
 ## Example Usage
 
 ```terraform
-# Everyone in the engineering group may enrol devices in the tenant's Guard.
+# Everyone in the engineering group may enroll devices in the tenant's Guard.
 # The group is in one of the tenant's realms.
 resource "authwise_guard_enrolment_grant" "engineering" {
   tenant_id    = "t-01"
@@ -71,7 +71,7 @@ resource "authwise_guard_enrolment_grant" "office_admin" {
 ### Optional
 
 - `network_id` (String) A network of the tenant (`n-…`) to bind the role at, instead of the tenant itself. Required for `guardcontrol.networkAdmin`; not allowed for `guardcontrol.tenantAdmin`. Changing it replaces the grant.
-- `role` (String) `guardcontrol.user` (the default: may enrol), `guardcontrol.tenantAdmin`, `guardcontrol.networkAdmin` or `guardcontrol.viewer`. Changing it replaces the grant.
+- `role` (String) `guardcontrol.user` (the default: may enroll), `guardcontrol.tenantAdmin`, `guardcontrol.networkAdmin` or `guardcontrol.viewer`. Changing it replaces the grant.
 
 ### Read-Only
 
@@ -90,6 +90,6 @@ The [`terraform import` command](https://developer.hashicorp.com/terraform/cli/c
 # Import by the kit tenant's id and the binding's name in kit,
 # joined by a slash. The role and the network are read from guard-control.
 # Against a guard-control without role grants (guard-control#59), only an
-# enrolment grant at the tenant itself can be imported.
+# enrollment grant at the tenant itself can be imported.
 terraform import authwise_guard_enrolment_grant.ada t-01/audiences/a-01/access-bindings/ab-01
 ```

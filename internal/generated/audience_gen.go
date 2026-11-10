@@ -78,7 +78,7 @@ func AudienceResourceSchema() schema.Schema {
 				Validators:          []validator.String{tf.ReferenceID("t", "tenant", "")},
 			},
 		},
-		MarkdownDescription: "An API an issuer mints access tokens for, and the audience its Access catalog hangs off.",
+		MarkdownDescription: "An API an issuer issues access tokens for, and the audience its Access catalog hangs off.",
 	}
 }
 
@@ -344,7 +344,7 @@ func AudienceDataSourceSchema() schema1.Schema {
 			},
 			"tenant_id": schema1.StringAttribute{Computed: true},
 		},
-		MarkdownDescription: "An API an issuer mints access tokens for, and the audience its Access catalog hangs off. This data source reads one by its full resource name.",
+		MarkdownDescription: "An API an issuer issues access tokens for, and the audience its Access catalog hangs off. This data source reads one by its full resource name.",
 	}
 }
 
@@ -444,7 +444,7 @@ func AudienceListDataSourceSchema() schema1.Schema {
 				Validators:          []validator.String{tf.ReferenceID("t", "tenant", "")},
 			},
 		},
-		MarkdownDescription: "An API an issuer mints access tokens for, and the audience its Access catalog hangs off. This data source lists every one under a parent.",
+		MarkdownDescription: "An API an issuer issues access tokens for, and the audience its Access catalog hangs off. This data source lists every one under a parent.",
 	}
 }
 

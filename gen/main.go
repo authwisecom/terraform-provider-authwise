@@ -223,7 +223,7 @@ func clientSecret() gentf.Entry {
 	r.Collection = "client-secrets"
 	r.Computed = []string{"hash_enabled"}
 	r.Description = "A client's secret, for authenticating it to the token endpoint. " +
-		"kit mints it and returns it once, so the secret is kept in state: treat the state as sensitive."
+		"kit creates it and returns it once, so the secret is kept in state: treat the state as sensitive."
 	r.Mint = &gentf.Mint{Method: "MintClientSecret", Once: []string{"secret"}}
 	return gentf.Entry{
 		Type:            reflect.TypeFor[corepb.ClientSecret](),
@@ -322,7 +322,7 @@ func main() {
 			// read-only; importing a partner's PEM is a separate input-only
 			// field on create, not an RPC of its own.
 			crud[corepb.Certificate](scopeTenant,
-				withDescription("A certificate and, when kit minted it, its private key. The trust anchor SAML connections verify signatures against, and the client certificate an endpoint presents for mTLS."),
+				withDescription("A certificate and, when kit created it, its private key. The trust anchor SAML connections verify signatures against, and the client certificate an endpoint presents for mTLS."),
 				withRequired("display_name", "use"),
 				withComputed("key_id", "origin", "subject", "not_before", "not_after",
 					"fingerprint_sha256", "certificate_pem", "has_private_key"),
@@ -378,7 +378,7 @@ func main() {
 				withReferences(map[string]gentf.Reference{"audience_id": refAudience, "appearance_profile_id": refAppearanceProfile})),
 			clientSecret(),
 			crud[corepb.Audience](scopeIssuer,
-				withDescription("An API an issuer mints access tokens for, and the audience its Access catalog hangs off."), withJSON("config"),
+				withDescription("An API an issuer issues access tokens for, and the audience its Access catalog hangs off."), withJSON("config"),
 				withReferences(map[string]gentf.Reference{"appearance_profile_id": refAppearanceProfile})),
 			crud[corepb.AppearanceProfile](scopeIssuer,
 				// is_default is the issuer's appearance (kit#680, apis v0.18.0).
@@ -489,7 +489,7 @@ func main() {
 			// are not modelled, and a person's node (owner_id set) is never
 			// terraform's.
 			crud[guardpb.Node](scopeGuardNetwork,
-				withDescription("A server's node in a Guard network, registered ahead of time. Created without a `public_key`, it is `PENDING` and its one-time `auth_code` enrols the server; created with one, it is `ACTIVE` at once. The auth code is shown once, so it is kept in state: treat the state as sensitive. People's nodes join when they sign in and are not managed here."),
+				withDescription("A server's node in a Guard network, registered ahead of time. Created without a `public_key`, it is `PENDING` and its one-time `auth_code` enrolls the server; created with one, it is `ACTIVE` at once. The auth code is shown once, so it is kept in state: treat the state as sensitive. People's nodes join when they sign in and are not managed here."),
 				guard("node"), guardList("nodes"),
 				withImmutable("address"),
 				withComputed("allowed_ips", "owner_id", "state", "roles", "auth_code", "auth_code_expires_at", "last_seen_at", "platform"),

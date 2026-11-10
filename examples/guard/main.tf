@@ -57,7 +57,7 @@ resource "authwise_guard_resource" "wiki" {
 }
 
 # 4. The gateway: a server in the office that routes to the LAN. It is
-#    registered here and enrols itself with the auth code, which writes its
+#    registered here and enrolls itself with the auth code, which writes its
 #    key and endpoint; those read back without a diff.
 resource "authwise_guard_node" "gateway" {
   tenant_id    = local.guard_tenant_id
@@ -71,7 +71,7 @@ resource "authwise_guard_resource_nodes" "office_lan" {
 }
 
 output "gateway_auth_code" {
-  description = "Enrols the gateway: run the agent on it with this code. Shown once by guard-control; kept in state."
+  description = "Enrolls the gateway: run the agent on it with this code. Shown once by guard-control; kept in state."
   value       = authwise_guard_node.gateway.auth_code
   sensitive   = true
 }

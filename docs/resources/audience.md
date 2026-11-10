@@ -3,12 +3,12 @@
 page_title: "authwise_audience Resource - Authwise"
 subcategory: "Identity"
 description: |-
-  An API an issuer mints access tokens for, and the audience its Access catalog hangs off.
+  An API an issuer issues access tokens for, and the audience its Access catalog hangs off.
 ---
 
 # authwise_audience (Resource)
 
-An API an issuer mints access tokens for, and the audience its Access catalog hangs off.
+An API an issuer issues access tokens for, and the audience its Access catalog hangs off.
 
 
 

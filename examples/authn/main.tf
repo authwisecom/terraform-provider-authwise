@@ -56,7 +56,7 @@ resource "authwise_factor" "totp" {
 }
 
 data "authwise_factor_webauthn" "passkeys" {
-  # Set once, before anybody enrols: changing rp_id orphans every credential.
+  # Set once, before anybody enrolls: changing rp_id orphans every credential.
   rp_id             = "login.example.com"
   rp_display_name   = "Example"
   user_verification = "required"

@@ -3,12 +3,12 @@
 page_title: "authwise_client_secrets Data Source - Authwise"
 subcategory: "Identity"
 description: |-
-  A client's secret, for authenticating it to the token endpoint. kit mints it and returns it once, so the secret is kept in state: treat the state as sensitive. This data source lists every one under a parent.
+  A client's secret, for authenticating it to the token endpoint. kit creates it and returns it once, so the secret is kept in state: treat the state as sensitive. This data source lists every one under a parent.
 ---
 
 # authwise_client_secrets (Data Source)
 
-A client's secret, for authenticating it to the token endpoint. kit mints it and returns it once, so the secret is kept in state: treat the state as sensitive. This data source lists every one under a parent.
+A client's secret, for authenticating it to the token endpoint. kit creates it and returns it once, so the secret is kept in state: treat the state as sensitive. This data source lists every one under a parent.
 
 
 

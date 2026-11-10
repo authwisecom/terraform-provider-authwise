@@ -77,7 +77,7 @@ var authenticationPolicyDescriptions = func() map[string]string {
 		"rules.require":                   "What the rule requires; raised to the floor.",
 		"floor":                           "The least any rule may require: every outcome is raised to it, so a misjudged rule can only ask for more.",
 		"enrollment":                      "Setting this block at all switches kit from its defaults to the values here, `in_flow` included: kit reads an absent enrollment policy as in-flow enrollment on, and a present one at face value.",
-		"enrollment.in_flow":              "Whether a person may enrol a factor inside the login flow when a rule demands one they lack.",
+		"enrollment.in_flow":              "Whether a person may enroll a factor inside the login flow when a rule demands one they lack.",
 		"enrollment.self_service_types":   "Factor types a person may add from the account page. Empty means every factor enabled on the realm.",
 		"enrollment.offer_recovery_codes": "Whether recovery codes are offered after the first factor is enrolled.",
 		"acr_levels":                      "The acr vocabulary this realm can emit, weakest first: the last satisfied entry is the emitted acr.",

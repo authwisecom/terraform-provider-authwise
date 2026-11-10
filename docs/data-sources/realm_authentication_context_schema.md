@@ -38,7 +38,7 @@ Read-Only:
 - `phishing_resistant` (Boolean)
 - `recovery` (Boolean) A look-up secret; never the method a requirement is met by.
 - `restricted` (Boolean) NIST's restricted class (SMS): offered only beside an unrestricted method.
-- `supports_enrollment` (Boolean) False where enrolment happens elsewhere (Duo).
+- `supports_enrollment` (Boolean) False where enrollment happens elsewhere (Duo).
 
 
 <a id="nestedatt--variables"></a>

@@ -3,17 +3,17 @@
 page_title: "authwise_client_secret Resource - Authwise"
 subcategory: "Identity"
 description: |-
-  A client's secret, for authenticating it to the token endpoint. kit mints it and returns it once, so the secret is kept in state: treat the state as sensitive.
+  A client's secret, for authenticating it to the token endpoint. kit creates it and returns it once, so the secret is kept in state: treat the state as sensitive.
 ---
 
 # authwise_client_secret (Resource)
 
-A client's secret, for authenticating it to the token endpoint. kit mints it and returns it once, so the secret is kept in state: treat the state as sensitive.
+A client's secret, for authenticating it to the token endpoint. kit creates it and returns it once, so the secret is kept in state: treat the state as sensitive.
 
 ## Example Usage
 
 ```terraform
-# Client-scoped: a secret for a machine client. kit mints it and returns it
+# Client-scoped: a secret for a machine client. kit creates it and returns it
 # once; Terraform keeps it in state and hands it on from there.
 resource "authwise_client" "ci" {
   display_name = "CI"
@@ -24,7 +24,7 @@ resource "authwise_client_secret" "ci" {
   client_id  = authwise_client.ci.client_id
   expires_at = "2027-01-01T00:00:00Z"
 
-  # kit has no rotate verb: change a keeper to mint a successor. With
+  # kit has no rotate verb: change a keeper to create a successor. With
   # create_before_destroy the new secret exists before the old one goes.
   keepers = {
     rotation = "2026-09"
@@ -67,6 +67,6 @@ The [`terraform import` command](https://developer.hashicorp.com/terraform/cli/c
 
 ```shell
 # Import by full resource name. The secret cannot be recovered: an imported
-# client secret has no `secret` until a keepers change mints a new one.
+# client secret has no `secret` until a keepers change creates a new one.
 terraform import authwise_client_secret.example tenants/t-01/issuers/i-01/clients/c-01/client-secrets/cs-01
 ```
