@@ -73,14 +73,19 @@ func (f *fakeDomains) CreateDomain(_ context.Context, parent string, in *domain)
 	}
 	f.seq++
 	id := fmt.Sprintf("d-%d", f.seq)
-	d := &domain{Name: parent + "/domains/" + id, Hostname: in.Hostname, Custom: in.Custom, Product: in.Product, Labels: maps.Clone(in.Labels)}
+	if in.Purpose == purposeConsole && !in.Custom {
+		return nil, status.Error(codes.InvalidArgument, "CONSOLE_DOMAIN_NOT_CUSTOM")
+	}
+	d := &domain{Name: parent + "/domains/" + id, Hostname: in.Hostname, Custom: in.Custom, Purpose: in.Purpose, Labels: maps.Clone(in.Labels)}
 	switch {
-	case d.Custom:
-		d.State, d.TrafficTarget = domainPendingDNS, "edge.authwise.test"
-	case d.Product != "":
-		// kit leaves a product host's traffic target empty: the product's
+	case d.Purpose == purposeGuard:
+		// kit leaves a Guard address's traffic target empty: the product's
 		// default host is the product's to know (kit#903).
 		d.State = domainPendingDNS
+	case d.Purpose == purposeConsole:
+		d.State, d.TrafficTarget = domainPendingDNS, "console-edge.authwise.test"
+	case d.Custom:
+		d.State, d.TrafficTarget = domainPendingDNS, "edge.authwise.test"
 	}
 	f.rows[id] = d
 	return copyDomain(d), nil
@@ -111,8 +116,11 @@ func (f *fakeDomains) advance(id string) (*domain, error) {
 		}
 	case n >= f.recordsAfter && len(d.DNSRecords) == 0:
 		target := "acme.id.authwise.com"
-		if d.Product == productGuard {
+		switch d.Purpose {
+		case purposeGuard:
 			target = "acme.guard.authwise.com"
+		case purposeConsole:
+			target = "console-edge.authwise.test"
 		}
 		d.DNSRecords = []domainRecord{
 			{Name: d.Hostname, Type: "CNAME", Value: target, Purpose: "traffic"},
@@ -338,7 +346,7 @@ func TestDomainCustomLifecycle(t *testing.T) {
 // (tf#67, kit#903).
 const guardDomainConfig = `
 resource "authwise_domain" "guard" {
-  product  = "guard"
+  purpose  = "guard"
   hostname = "guard.acme.com"
 }
 
@@ -384,7 +392,7 @@ func TestDomainGuardLifecycle(t *testing.T) {
 			{
 				Config: guardDomainConfig,
 				ConfigStateChecks: []statecheck.StateCheck{
-					statecheck.ExpectKnownValue(addr, tfjsonpath.New("product"), knownvalue.StringExact("guard")),
+					statecheck.ExpectKnownValue(addr, tfjsonpath.New("purpose"), knownvalue.StringExact("guard")),
 					statecheck.ExpectKnownValue(addr, tfjsonpath.New("custom"), knownvalue.Bool(true)),
 					statecheck.ExpectKnownValue(addr, tfjsonpath.New("dns_records"), knownvalue.ListSizeExact(2)),
 					statecheck.ExpectKnownValue(addr, tfjsonpath.New("traffic_target"), knownvalue.StringExact("")),
@@ -405,21 +413,66 @@ func TestDomainGuardLifecycle(t *testing.T) {
 	})
 }
 
-// TestDomainProductValidated: product is guard or unset, and a product
-// host is a custom hostname.
-func TestDomainProductValidated(t *testing.T) {
+// TestDomainConsoleLifecycle: a console address (tf#73, kit#942) is a custom
+// host without setting custom, its traffic record pointing at the console
+// edge; it plans clean after, and imports with no change.
+func TestDomainConsoleLifecycle(t *testing.T) {
+
+	fake := newFakeDomains()
+	p := &domainTestProvider{fake: fake}
+	const addr = "authwise_domain.console"
+	config := strings.NewReplacer("authwise_domain.guard", "authwise_domain.console", `"guard"`, `"console"`,
+		"guard.acme.com", "admin.acme.com", "authwise_domain_activation.guard", "authwise_domain_activation.console").Replace(guardDomainConfig)
+
+	tfresource.UnitTest(t, tfresource.TestCase{
+		ProtoV6ProviderFactories: p.factories(),
+		Steps: []tfresource.TestStep{
+			{
+				Config: config,
+				ConfigStateChecks: []statecheck.StateCheck{
+					statecheck.ExpectKnownValue(addr, tfjsonpath.New("purpose"), knownvalue.StringExact("console")),
+					statecheck.ExpectKnownValue(addr, tfjsonpath.New("custom"), knownvalue.Bool(true)),
+					statecheck.ExpectKnownValue(addr, tfjsonpath.New("traffic_target"), knownvalue.StringExact("console-edge.authwise.test")),
+					statecheck.ExpectKnownValue("terraform_data.traffic",
+						tfjsonpath.New("output").AtMapKey("content"), knownvalue.StringExact("console-edge.authwise.test")),
+				},
+			},
+			{Config: config, PlanOnly: true},
+			{
+				ResourceName:    addr,
+				ImportState:     true,
+				ImportStateKind: tfresource.ImportBlockWithID,
+				ImportStateId:   "tenants/t-1/domains/d-1",
+				Config:          config,
+			},
+		},
+	})
+}
+
+// TestDomainPurposeValidated: purpose is issuer, guard or console; a Guard or
+// console address is a custom hostname, and never custom = false.
+func TestDomainPurposeValidated(t *testing.T) {
 
 	p := &domainTestProvider{fake: newFakeDomains()}
 
 	for config, want := range map[string]string{
 		`resource "authwise_domain" "x" {
-  product  = "vpn"
+  purpose  = "vpn"
   hostname = "vpn.acme.com"
 }`: `value must be one of`,
 		`resource "authwise_domain" "x" {
-  product  = "guard"
+  purpose  = "guard"
   hostname = "guard.acme.com:8443"
 }`: `invalid custom hostname`,
+		`resource "authwise_domain" "x" {
+  purpose  = "console"
+  custom   = false
+  hostname = "admin.acme.com"
+}`: `a console address is a custom host`,
+		`resource "authwise_domain" "x" {
+  product  = "guard"
+  hostname = "guard.acme.com"
+}`: `An argument named "product" is not expected here`,
 	} {
 		tfresource.UnitTest(t, tfresource.TestCase{
 			ProtoV6ProviderFactories: p.factories(),
@@ -601,7 +654,54 @@ func TestDomainUpgradeFromIssuerID(t *testing.T) {
 	if d := resp.State.Get(ctx, &got); d.HasError() {
 		t.Fatal(d)
 	}
-	if got.Name.ValueString() != "tenants/t-1/domains/d-1" || got.Hostname.ValueString() != "login.acme.com" || !got.Custom.ValueBool() {
+	if got.Name.ValueString() != "tenants/t-1/domains/d-1" || got.Hostname.ValueString() != "login.acme.com" || !got.Custom.ValueBool() ||
+		got.Purpose.ValueString() != purposeIssuer {
 		t.Fatalf("got %+v", got)
+	}
+}
+
+// TestDomainUpgradeFromProduct: state written with product (kit#911 to
+// kit#942) upgrades to purpose: guard stays guard, none is issuer.
+func TestDomainUpgradeFromProduct(t *testing.T) {
+
+	for product, want := range map[string]string{"guard": purposeGuard, "": purposeIssuer} {
+		t.Run(want, func(t *testing.T) {
+
+			ctx := t.Context()
+			r := &domainResource{}
+			upgrader := r.UpgradeState(ctx)[2]
+
+			priorType := upgrader.PriorSchema.Type().TerraformType(ctx)
+			attrs := map[string]tftypes.Value{}
+			for name, typ := range priorType.(tftypes.Object).AttributeTypes {
+				attrs[name] = tftypes.NewValue(typ, nil)
+			}
+			attrs[tfruntime.NameAttribute] = tftypes.NewValue(tftypes.String, "tenants/t-1/domains/d-1")
+			attrs["domain_id"] = tftypes.NewValue(tftypes.String, "d-1")
+			attrs["tenant_id"] = tftypes.NewValue(tftypes.String, "t-1")
+			attrs["hostname"] = tftypes.NewValue(tftypes.String, "guard.acme.com")
+			attrs["custom"] = tftypes.NewValue(tftypes.Bool, true)
+			if product != "" {
+				attrs["product"] = tftypes.NewValue(tftypes.String, product)
+			}
+			attrs["state"] = tftypes.NewValue(tftypes.String, domainActive)
+			prior := tftypes.NewValue(priorType, attrs)
+
+			target := domainSchema(ctx)
+			req := resource.UpgradeStateRequest{State: &tfsdk.State{Schema: *upgrader.PriorSchema, Raw: prior}}
+			resp := &resource.UpgradeStateResponse{State: tfsdk.State{Schema: target, Raw: tftypes.NewValue(target.Type().TerraformType(ctx), nil)}}
+			upgrader.StateUpgrader(ctx, req, resp)
+			if resp.Diagnostics.HasError() {
+				t.Fatal(resp.Diagnostics)
+			}
+
+			var got domainModel
+			if d := resp.State.Get(ctx, &got); d.HasError() {
+				t.Fatal(d)
+			}
+			if got.Purpose.ValueString() != want || !got.Custom.ValueBool() || got.State.ValueString() != domainActive || got.Name.ValueString() != "tenants/t-1/domains/d-1" {
+				t.Fatalf("got %+v", got)
+			}
+		})
 	}
 }

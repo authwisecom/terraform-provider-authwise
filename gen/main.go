@@ -264,14 +264,14 @@ func main() {
 		ScopeReferences:  scopeReferences,
 		Entries: []gentf.Entry{
 			// Tenant-scoped.
-			// A hostname the tenant serves, native or custom (issuer_id or
-			// product set), keyed by an AWID since kit#808; product (guard)
-			// since kit#903. The resource is
+			// A hostname the tenant serves, native or custom, keyed by an
+			// AWID since kit#808; purpose (issuer, guard, console) since
+			// kit#942, where product (guard, kit#903) was. The resource is
 			// hand-written in internal/provider (the custom host's waits);
 			// the data sources are these.
 			crud[corepb.Domain](scopeTenant,
-				withDescription("A hostname of the tenant: native, an Authwise host; custom (`custom`), a hostname of yours; or custom with `product = \"guard\"`, a hostname of yours serving the tenant's Guard address. Issuers answer at a domain through `authwise_issuer_domain_binding` (kit#911); `bindings` lists them."),
-				withRequired("hostname"), withImmutable("hostname", "issuer_id", "product", "custom"),
+				withDescription("A hostname of the tenant: native, an Authwise host; custom (`custom`), a hostname of yours; or custom with `purpose = \"guard\"` or `\"console\"`, a hostname of yours serving the tenant's Guard address or its console. `product` is its predecessor, read out for one release (kit#942). Issuers answer at a domain through `authwise_issuer_domain_binding` (kit#911); `bindings` lists them."),
+				withRequired("hostname"), withImmutable("hostname", "issuer_id", "product", "purpose", "custom"),
 				withComputed("state", "dns_records", "failure", "certificate_expires_at", "activated_at", "claim_expires_at", "created_at", "traffic_target", "bindings"),
 				withJSON("config"),
 				withReferences(map[string]gentf.Reference{"issuer_id": scopeReferences["issuer_id"]})),

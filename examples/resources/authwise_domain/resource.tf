@@ -63,7 +63,7 @@ resource "cloudflare_record" "login_traffic" {
 # default Guard address, so the tenant needs a slug first. No issuer is
 # bound to it.
 resource "authwise_domain" "guard" {
-  product  = "guard"
+  purpose  = "guard"
   hostname = "guard.acme.com"
 }
 
@@ -92,4 +92,42 @@ resource "cloudflare_record" "guard_traffic" {
   proxied = false
 
   depends_on = [authwise_domain_activation.guard]
+}
+
+# The tenant's own console address: admin.acme.com is where its
+# administrators open the Authwise console, signing in at the tenant's own
+# issuer, without the tenant's slug in the path. The same records, in the same
+# order; its traffic record points at the install's console edge. No issuer is
+# bound to it, and it is of use once the tenant has home administration
+# (authwise_tenant_home_administration).
+resource "authwise_domain" "console" {
+  purpose  = "console"
+  hostname = "admin.acme.com"
+}
+
+locals {
+  console_records = { for r in authwise_domain.console.dns_records : r.purpose => r }
+}
+
+resource "cloudflare_record" "console_challenge" {
+  zone_id = var.zone_id
+  name    = local.console_records["challenge"].name
+  type    = local.console_records["challenge"].type
+  content = local.console_records["challenge"].value
+  proxied = false
+}
+
+resource "authwise_domain_activation" "console" {
+  domain     = authwise_domain.console.name
+  depends_on = [cloudflare_record.console_challenge]
+}
+
+resource "cloudflare_record" "console_traffic" {
+  zone_id = var.zone_id
+  name    = local.console_records["traffic"].name
+  type    = local.console_records["traffic"].type
+  content = local.console_records["traffic"].value
+  proxied = false
+
+  depends_on = [authwise_domain_activation.console]
 }

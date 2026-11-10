@@ -178,6 +178,11 @@ func DomainResourceSchema() schema.Schema {
 				Optional:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace(), stringplanmodifier.UseStateForUnknown()},
 			},
+			"purpose": schema.StringAttribute{
+				Computed:      true,
+				Optional:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace(), stringplanmodifier.UseStateForUnknown()},
+			},
 			"state": schema.StringAttribute{
 				Computed:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
@@ -195,7 +200,7 @@ func DomainResourceSchema() schema.Schema {
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 		},
-		MarkdownDescription: "A hostname of the tenant: native, an Authwise host; custom (`custom`), a hostname of yours; or custom with `product = \"guard\"`, a hostname of yours serving the tenant's Guard address. Issuers answer at a domain through `authwise_issuer_domain_binding` (kit#911); `bindings` lists them.",
+		MarkdownDescription: "A hostname of the tenant: native, an Authwise host; custom (`custom`), a hostname of yours; or custom with `purpose = \"guard\"` or `\"console\"`, a hostname of yours serving the tenant's Guard address or its console. `product` is its predecessor, read out for one release (kit#942). Issuers answer at a domain through `authwise_issuer_domain_binding` (kit#911); `bindings` lists them.",
 	}
 }
 
@@ -279,6 +284,7 @@ type DomainModel struct {
 	Product              types.String         `tfsdk:"product"`
 	Custom               types.Bool           `tfsdk:"custom"`
 	Bindings             types.List           `tfsdk:"bindings"`
+	Purpose              types.String         `tfsdk:"purpose"`
 }
 
 // NewDomainModel returns a model with every attribute set to its typed null; collection types cannot be zero-valued.
@@ -299,6 +305,7 @@ func NewDomainModel() *DomainModel {
 		Labels:               types.MapNull(types.StringType),
 		Name:                 types.StringNull(),
 		Product:              types.StringNull(),
+		Purpose:              types.StringNull(),
 		State:                types.StringNull(),
 		TenantId:             types.StringNull(),
 		TrafficTarget:        types.StringNull(),
@@ -407,6 +414,7 @@ func (m *DomainModel) ToProto(ctx context.Context) (*v1alpha1.Domain, diag.Diagn
 			out.Bindings = append(out.Bindings, v)
 		}
 	}
+	out.Purpose = m.Purpose.ValueString()
 	return out, diags
 }
 
@@ -583,6 +591,11 @@ func (m *DomainModel) FromProto(ctx context.Context, e *v1alpha1.Domain) diag.Di
 		diags.Append(d...)
 		m.Bindings = list
 	}
+	if e.Purpose == "" {
+		m.Purpose = types.StringNull()
+	} else {
+		m.Purpose = types.StringValue(e.Purpose)
+	}
 	return diags
 }
 
@@ -618,6 +631,9 @@ func (m *DomainModel) UpdateMask(ctx context.Context, prior *DomainModel) []stri
 	}
 	if !m.Custom.Equal(prior.Custom) {
 		paths = append(paths, "custom")
+	}
+	if !m.Purpose.Equal(prior.Purpose) {
+		paths = append(paths, "purpose")
 	}
 	return paths
 }
@@ -801,11 +817,12 @@ func DomainDataSourceSchema() schema1.Schema {
 				Required:            true,
 			},
 			"product":        schema1.StringAttribute{Computed: true},
+			"purpose":        schema1.StringAttribute{Computed: true},
 			"state":          schema1.StringAttribute{Computed: true},
 			"tenant_id":      schema1.StringAttribute{Computed: true},
 			"traffic_target": schema1.StringAttribute{Computed: true},
 		},
-		MarkdownDescription: "A hostname of the tenant: native, an Authwise host; custom (`custom`), a hostname of yours; or custom with `product = \"guard\"`, a hostname of yours serving the tenant's Guard address. Issuers answer at a domain through `authwise_issuer_domain_binding` (kit#911); `bindings` lists them. This data source reads one by its full resource name.",
+		MarkdownDescription: "A hostname of the tenant: native, an Authwise host; custom (`custom`), a hostname of yours; or custom with `purpose = \"guard\"` or `\"console\"`, a hostname of yours serving the tenant's Guard address or its console. `product` is its predecessor, read out for one release (kit#942). Issuers answer at a domain through `authwise_issuer_domain_binding` (kit#911); `bindings` lists them. This data source reads one by its full resource name.",
 	}
 }
 
@@ -856,6 +873,7 @@ type DomainItemModel struct {
 	Product              types.String         `tfsdk:"product"`
 	Custom               types.Bool           `tfsdk:"custom"`
 	Bindings             types.List           `tfsdk:"bindings"`
+	Purpose              types.String         `tfsdk:"purpose"`
 }
 
 // DomainItemAttrTypes returns the attribute types of one domains list element.
@@ -876,6 +894,7 @@ func DomainItemAttrTypes() map[string]attr.Type {
 		"labels":                 types.MapType{ElemType: types.StringType},
 		"name":                   types.StringType,
 		"product":                types.StringType,
+		"purpose":                types.StringType,
 		"state":                  types.StringType,
 		"traffic_target":         types.StringType,
 	}
@@ -949,6 +968,7 @@ func DomainListDataSourceSchema() schema1.Schema {
 						MarkdownDescription: "Full resource name.",
 					},
 					"product":        schema1.StringAttribute{Computed: true},
+					"purpose":        schema1.StringAttribute{Computed: true},
 					"state":          schema1.StringAttribute{Computed: true},
 					"traffic_target": schema1.StringAttribute{Computed: true},
 				}},
@@ -959,7 +979,7 @@ func DomainListDataSourceSchema() schema1.Schema {
 				Validators:          []validator.String{tf.ReferenceID("t", "tenant", "")},
 			},
 		},
-		MarkdownDescription: "A hostname of the tenant: native, an Authwise host; custom (`custom`), a hostname of yours; or custom with `product = \"guard\"`, a hostname of yours serving the tenant's Guard address. Issuers answer at a domain through `authwise_issuer_domain_binding` (kit#911); `bindings` lists them. This data source lists every one under a parent.",
+		MarkdownDescription: "A hostname of the tenant: native, an Authwise host; custom (`custom`), a hostname of yours; or custom with `purpose = \"guard\"` or `\"console\"`, a hostname of yours serving the tenant's Guard address or its console. `product` is its predecessor, read out for one release (kit#942). Issuers answer at a domain through `authwise_issuer_domain_binding` (kit#911); `bindings` lists them. This data source lists every one under a parent.",
 	}
 }
 
@@ -1136,6 +1156,11 @@ func domainItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Domain, *D
 		list, d := types.ListValueFrom(ctx, types.ObjectType{AttrTypes: DomainBindingsAttrTypes()}, items)
 		diags.Append(d...)
 		item.Bindings = list
+	}
+	if e.Purpose == "" {
+		item.Purpose = types.StringNull()
+	} else {
+		item.Purpose = types.StringValue(e.Purpose)
 	}
 	id, err := crud.IDFromName(e.Name)
 	if err != nil {

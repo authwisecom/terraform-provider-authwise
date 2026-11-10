@@ -3,7 +3,7 @@ page_title: "authwise_domain Resource - Authwise"
 subcategory: "Identity"
 description: |-
   A hostname of the tenant. A native host is an Authwise host such as acme.id.authwise.com. A custom host (custom = true) is a hostname of yours, such as login.acme.com: Authwise obtains and renews its certificate, and you add two DNS records, read from dns_records. Nothing on a domain names an issuer: an issuer answers at a host through an authwise_issuer_domain_binding, one per (domain, path), so one host can serve several issuers at different paths and one issuer can answer at several hosts, each its own issuer URL (iss). kit refuses to delete a domain while issuers are bound to it (DOMAIN_IN_USE).
-  A custom Guard address (product = "guard") is a hostname of yours, such as guard.acme.com, that people type into the Guard client in place of the tenant's default address (<slug>.guard.<estate>). Its traffic record points at that default address, so the tenant needs a slug first, set on the tenant in kit. It is never an issuer URL: people still sign in at the issuer's own host. It takes the same records, waits and activation as an issuer's custom host.
+  purpose says what the host serves. An issuer's host (issuer, the default) is where issuers answer. A custom Guard address (purpose = "guard") is a hostname of yours, such as guard.acme.com, that people type into the Guard client in place of the tenant's default address (<slug>.guard.<estate>). Its traffic record points at that default address, so the tenant needs a slug first, set on the tenant in kit. It is never an issuer URL: people still sign in at the issuer's own host. A console address (purpose = "console") is a hostname of yours, such as admin.acme.com, where the tenant's administrators open the Authwise console; the host names the tenant, so no slug is needed in the path. Its traffic record points at the install's console edge (traffic_target). People sign in there at the tenant's own issuer, so the tenant needs home administration (authwise_tenant_home_administration) for it to be of use. No issuer can be bound to a Guard or console address, and an issuer's host never serves the console. Both are custom hosts without setting custom, and take the same records, waits and activation as an issuer's custom host.
   For a custom host, create returns once the records are known, so DNS resources can take them in the same apply. Add the challenge record first and point traffic only once state is PROVISIONING or ACTIVE, so the certificate exists before any request arrives: authwise_domain_activation waits for that between the two records, in one apply. Both records must be DNS-only (on Cloudflare, proxied = false), and the challenge record stays for as long as the domain does: renewal depends on it. Destroying a custom host waits until Authwise has released the hostname, which takes the cloud side's teardown.
 ---
 
@@ -19,8 +19,8 @@ A hostname of the tenant. There are two kinds, told apart by `custom`:
 **A domain names no issuer** (kit#911). An issuer answers at a host through
 an [`authwise_issuer_domain_binding`](issuer_domain_binding): a domain and a
 path. One host can serve several issuers at different paths, and one issuer
-can answer at several hosts. A product's host (`product = "guard"`) takes no
-binding. Before 0.32.0 a custom host named its issuer in `issuer_id`; see
+can answer at several hosts. A Guard address (`purpose = "guard"`) and a
+console address (`purpose = "console"`) take no binding. Before 0.32.0 a custom host named its issuer in `issuer_id`; see
 [Upgrading to 0.32](#upgrading-to-032).
 
 `domain_id` is the domain's id (`d-…`), assigned by Authwise. Before 0.19.0
@@ -108,7 +108,7 @@ resource "cloudflare_record" "login_traffic" {
 # default Guard address, so the tenant needs a slug first. No issuer is
 # bound to it.
 resource "authwise_domain" "guard" {
-  product  = "guard"
+  purpose  = "guard"
   hostname = "guard.acme.com"
 }
 
@@ -137,6 +137,44 @@ resource "cloudflare_record" "guard_traffic" {
   proxied = false
 
   depends_on = [authwise_domain_activation.guard]
+}
+
+# The tenant's own console address: admin.acme.com is where its
+# administrators open the Authwise console, signing in at the tenant's own
+# issuer, without the tenant's slug in the path. The same records, in the same
+# order; its traffic record points at the install's console edge. No issuer is
+# bound to it, and it is of use once the tenant has home administration
+# (authwise_tenant_home_administration).
+resource "authwise_domain" "console" {
+  purpose  = "console"
+  hostname = "admin.acme.com"
+}
+
+locals {
+  console_records = { for r in authwise_domain.console.dns_records : r.purpose => r }
+}
+
+resource "cloudflare_record" "console_challenge" {
+  zone_id = var.zone_id
+  name    = local.console_records["challenge"].name
+  type    = local.console_records["challenge"].type
+  content = local.console_records["challenge"].value
+  proxied = false
+}
+
+resource "authwise_domain_activation" "console" {
+  domain     = authwise_domain.console.name
+  depends_on = [cloudflare_record.console_challenge]
+}
+
+resource "cloudflare_record" "console_traffic" {
+  zone_id = var.zone_id
+  name    = local.console_records["traffic"].name
+  type    = local.console_records["traffic"].type
+  content = local.console_records["traffic"].value
+  proxied = false
+
+  depends_on = [authwise_domain_activation.console]
 }
 ```
 
@@ -218,6 +256,30 @@ Authwise host: bind the issuer to the native domain instead),
 `PLAN_REQUIRED`, or `DOMAINS_UNAVAILABLE`
 (the install has no domain controller, so no custom host on it would get a
 certificate).
+
+## Upgrading to 0.33
+
+**`product` is gone; set `purpose`** (kit#942, tf#73). A domain says what it
+serves in `purpose`: `issuer` (the default), `guard` or `console`. kit no
+longer takes `product` (`DOMAIN_PRODUCT_RETIRED`), and this provider no
+longer has it. Rename the attribute:
+
+```terraform
+resource "authwise_domain" "guard" {
+  purpose  = "guard" # was: product = "guard"
+  hostname = "guard.acme.com"
+}
+```
+
+The state upgrades itself (schema version 3): `product = "guard"` becomes
+`purpose = "guard"`, and a domain without one becomes `purpose = "issuer"`.
+After the rename the plan shows no change. Leaving `product` in the
+configuration is an error (`An argument named "product" is not expected
+here`). Leaving `purpose` unset on an issuer's host is fine: it reads back
+`issuer`.
+
+A console address needs kit with kit#942 and, to be of use, home
+administration on the tenant.
 
 ## Upgrading to 0.32
 
@@ -327,9 +389,9 @@ These were moved to `authwise_domain` and `authwise_domain_activation` with
 
 ### Optional
 
-- `custom` (Boolean) A hostname of yours, such as `login.acme.com`, rather than an Authwise host: Authwise obtains its certificate, and `dns_records` lists the records to add. Set on create; changing a configured value replaces the domain. A custom Guard address (`product`) is custom without setting it. kit gates custom hosts by plan (`PLAN_REQUIRED`).
+- `custom` (Boolean) A hostname of yours, such as `login.acme.com`, rather than an Authwise host: Authwise obtains its certificate, and `dns_records` lists the records to add. Set on create; changing a configured value replaces the domain. A Guard or console address (`purpose`) is custom without setting it. kit gates custom hosts by plan (`PLAN_REQUIRED`).
 - `labels` (Map of String)
-- `product` (String) The product a custom host serves: `guard`, a custom Guard address. No issuer can be bound to it. Changing it replaces the domain. kit gates it by plan like an issuer's custom host (`PLAN_REQUIRED`); a trial has the default address only.
+- `purpose` (String) What the host serves: `issuer` (the default; issuers answer at it through `authwise_issuer_domain_binding`), `guard` (a custom Guard address) or `console` (a console address of the tenant's own, such as `admin.acme.com`). No issuer can be bound to a `guard` or `console` host (`DOMAIN_NOT_BINDABLE`, `CONSOLE_DOMAIN_NOT_BINDABLE`), and both are custom hosts. Changing a configured value replaces the domain. kit gates them by plan like an issuer's custom host (`PLAN_REQUIRED`). Replaces `product` (kit#942): `product = "guard"` is `purpose = "guard"`.
 - `tenant_id` (String) Parent identifier `tenant_id`; overrides the provider default, and reads back from the name. Changing a configured one replaces the domain.
 - `timeouts` (Block, Optional) (see [below for nested schema](#nestedblock--timeouts))
 
@@ -344,7 +406,7 @@ These were moved to `authwise_domain` and `authwise_domain_activation` with
 - `failure_record` (String) The `purpose` of the record the failure is about, `traffic` or `challenge`; empty when it is about neither.
 - `name` (String) Full resource name (`tenants/{t}/domains/{d}`); serves as the Terraform ID.
 - `state` (String) A custom host's state, empty on a native host: `PENDING_DNS` (waiting for the challenge record), `VERIFYING` (issuing the certificate), `PROVISIONING` (attaching it; the hostname routes), `ACTIVE`, `DEGRADED` (serving, but the challenge record is gone and renewal will fail), `FAILED` (see `failure_code`) or `DELETING`.
-- `traffic_target` (String) Where a custom host's `traffic` record points: the Authwise install's edge name (kit#911). A host claimed before kit#911 keeps the issuer host it recorded. Empty on a native host and on a custom Guard address, whose target is the `traffic` record's value.
+- `traffic_target` (String) Where a custom host's `traffic` record points: the Authwise install's edge name (kit#911), or for a console address the install's console edge (kit#942). A host claimed before kit#911 keeps the issuer host it recorded. Empty on a native host and on a custom Guard address, whose target is the `traffic` record's value.
 
 <a id="nestedblock--timeouts"></a>
 ### Nested Schema for `timeouts`

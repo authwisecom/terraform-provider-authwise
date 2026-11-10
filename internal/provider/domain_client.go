@@ -20,7 +20,7 @@ type domainClient struct {
 func (c domainClient) CreateDomain(ctx context.Context, parent string, in *domain) (*domain, error) {
 	out, err := c.client.CreateDomain(ctx, &identitypb.CreateDomainRequest{
 		Parent: parent,
-		Domain: &corepb.Domain{Hostname: in.Hostname, Custom: in.Custom, Product: in.Product, Labels: in.Labels},
+		Domain: &corepb.Domain{Hostname: in.Hostname, Custom: in.Custom, Purpose: in.Purpose, Labels: in.Labels},
 	})
 	if err != nil {
 		return nil, err
@@ -82,7 +82,7 @@ func domainFromProto(e *corepb.Domain) *domain {
 		Hostname:      e.GetHostname(),
 		Custom:        e.GetCustom(),
 		IssuerID:      e.GetIssuerId(),
-		Product:       e.GetProduct(),
+		Purpose:       domainPurpose(e),
 		Labels:        e.GetLabels(),
 		TrafficTarget: e.GetTrafficTarget(),
 		ActivatedAt:   timeOf(e.GetActivatedAt()),
@@ -112,4 +112,14 @@ func timeOf(ts *timestamppb.Timestamp) *time.Time {
 	}
 	t := ts.AsTime()
 	return &t
+}
+
+// domainPurpose is the domain's purpose. For one release kit also reads out
+// product on a Guard or console row (kit#942); a row from a kit before
+// purpose has only product.
+func domainPurpose(e *corepb.Domain) string {
+	if p := e.GetPurpose(); p != "" {
+		return p
+	}
+	return e.GetProduct()
 }

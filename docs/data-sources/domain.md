@@ -3,12 +3,12 @@
 page_title: "authwise_domain Data Source - Authwise"
 subcategory: "Identity"
 description: |-
-  A hostname of the tenant: native, an Authwise host; custom (custom), a hostname of yours; or custom with product = "guard", a hostname of yours serving the tenant's Guard address. Issuers answer at a domain through authwise_issuer_domain_binding (kit#911); bindings lists them. This data source reads one by its full resource name.
+  A hostname of the tenant: native, an Authwise host; custom (custom), a hostname of yours; or custom with purpose = "guard" or "console", a hostname of yours serving the tenant's Guard address or its console. product is its predecessor, read out for one release (kit#942). Issuers answer at a domain through authwise_issuer_domain_binding (kit#911); bindings lists them. This data source reads one by its full resource name.
 ---
 
 # authwise_domain (Data Source)
 
-A hostname of the tenant: native, an Authwise host; custom (`custom`), a hostname of yours; or custom with `product = "guard"`, a hostname of yours serving the tenant's Guard address. Issuers answer at a domain through `authwise_issuer_domain_binding` (kit#911); `bindings` lists them. This data source reads one by its full resource name.
+A hostname of the tenant: native, an Authwise host; custom (`custom`), a hostname of yours; or custom with `purpose = "guard"` or `"console"`, a hostname of yours serving the tenant's Guard address or its console. `product` is its predecessor, read out for one release (kit#942). Issuers answer at a domain through `authwise_issuer_domain_binding` (kit#911); `bindings` lists them. This data source reads one by its full resource name.
 
 
 
@@ -35,6 +35,7 @@ A hostname of the tenant: native, an Authwise host; custom (`custom`), a hostnam
 - `issuer_id` (String)
 - `labels` (Map of String)
 - `product` (String)
+- `purpose` (String)
 - `state` (String)
 - `tenant_id` (String)
 - `traffic_target` (String)

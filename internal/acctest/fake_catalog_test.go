@@ -93,12 +93,19 @@ func (f *fakeIdentityServer) CreateDomain(ctx context.Context, in *identitypb.Cr
 			return nil, status.Errorf(codes.InvalidArgument, "issuer_id: no issuer %q in %s", issuerID, in.GetParent())
 		}
 	}
-	// A product host (kit#903): guard only, never beside an issuer.
-	switch product := in.GetDomain().GetProduct(); {
-	case product != "" && issuerID != "":
-		return nil, status.Error(codes.InvalidArgument, "a domain serves an issuer or a product: set issuer_id or product, not both")
-	case product != "" && product != "guard":
-		return nil, status.Errorf(codes.InvalidArgument, "product: %q is not a product with hosts; the one is \"guard\"", product)
+	// purpose (kit#942) replaced product (kit#903), which is refused.
+	// A Guard or console address is a custom host, never beside an issuer.
+	if in.GetDomain().GetProduct() != "" {
+		return nil, refusal(codes.InvalidArgument, "DOMAIN_PRODUCT_RETIRED", nil, "product is retired: set purpose")
+	}
+	purpose := in.GetDomain().GetPurpose()
+	switch {
+	case purpose != "" && purpose != "issuer" && purpose != "guard" && purpose != "console":
+		return nil, status.Errorf(codes.InvalidArgument, "purpose: %q is not issuer, guard or console", purpose)
+	case (purpose == "guard" || purpose == "console") && issuerID != "":
+		return nil, status.Error(codes.InvalidArgument, "a Guard or console address serves no issuer: issuer_id is not allowed")
+	case purpose == "console" && !in.GetDomain().GetCustom():
+		return nil, refusal(codes.InvalidArgument, "CONSOLE_DOMAIN_NOT_CUSTOM", nil, "a console domain is a custom host")
 	}
 	for _, d := range f.domains {
 		if d.GetHostname() == hostname {
@@ -108,14 +115,26 @@ func (f *fakeIdentityServer) CreateDomain(ctx context.Context, in *identitypb.Cr
 	d := proto.Clone(in.GetDomain()).(*corepb.Domain)
 	d.Name = in.GetParent() + "/domains/" + f.nextID("d")
 	d.IssuerId, d.Bindings = "", nil
-	d.Custom = d.GetCustom() || issuerID != "" || d.GetProduct() != ""
+	if d.GetPurpose() == "" {
+		d.Purpose = "issuer"
+	}
+	// For one release kit also reads product out on a Guard or console row.
+	if d.GetPurpose() != "issuer" {
+		d.Product = d.GetPurpose()
+	}
+	d.Custom = d.GetCustom() || issuerID != "" || d.GetPurpose() != "issuer"
 	if d.GetCustom() {
 		// The traffic CNAME targets the install's edge name (kit#911,
-		// D5); kit leaves a product host's empty, and its record points
-		// at the tenant's default Guard host.
+		// D5), or its console edge (kit#942); kit leaves a Guard
+		// address's empty, and its record points at the tenant's default
+		// Guard host.
 		target := "acme.guard.authwise.test"
-		if d.GetProduct() == "" {
+		switch d.GetPurpose() {
+		case "issuer":
 			d.TrafficTarget = "edge.authwise.test"
+			target = d.GetTrafficTarget()
+		case "console":
+			d.TrafficTarget = "console-edge.authwise.test"
 			target = d.GetTrafficTarget()
 		}
 		d.State = corepb.IssuerDomainState_ISSUER_DOMAIN_STATE_PENDING_DNS

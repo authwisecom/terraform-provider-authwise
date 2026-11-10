@@ -60,8 +60,11 @@ func (f *fakeIdentityServer) admitBindingLocked(issuer, domainID, path string) e
 	if !ok {
 		return status.Errorf(codes.InvalidArgument, "domain_id: no domain %q in %s", domainID, tenantOf(issuer))
 	}
-	if d.GetProduct() != "" {
-		return refusal(codes.FailedPrecondition, "DOMAIN_NOT_BINDABLE", nil, "domain %q is a product's host", domainID)
+	switch d.GetPurpose() {
+	case "guard":
+		return refusal(codes.FailedPrecondition, "DOMAIN_NOT_BINDABLE", nil, "domain %q is a Guard address", domainID)
+	case "console":
+		return refusal(codes.FailedPrecondition, "CONSOLE_DOMAIN_NOT_BINDABLE", nil, "domain %q is a console domain", domainID)
 	}
 	for _, name := range f.bindingOrder {
 		b := f.bindings[name]

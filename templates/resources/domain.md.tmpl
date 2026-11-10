@@ -17,8 +17,8 @@ A hostname of the tenant. There are two kinds, told apart by `custom`:
 **A domain names no issuer** (kit#911). An issuer answers at a host through
 an [`authwise_issuer_domain_binding`](issuer_domain_binding): a domain and a
 path. One host can serve several issuers at different paths, and one issuer
-can answer at several hosts. A product's host (`product = "guard"`) takes no
-binding. Before 0.32.0 a custom host named its issuer in `issuer_id`; see
+can answer at several hosts. A Guard address (`purpose = "guard"`) and a
+console address (`purpose = "console"`) take no binding. Before 0.32.0 a custom host named its issuer in `issuer_id`; see
 [Upgrading to 0.32](#upgrading-to-032).
 
 `domain_id` is the domain's id (`d-…`), assigned by Authwise. Before 0.19.0
@@ -120,6 +120,30 @@ Authwise host: bind the issuer to the native domain instead),
 `PLAN_REQUIRED`, or `DOMAINS_UNAVAILABLE`
 (the install has no domain controller, so no custom host on it would get a
 certificate).
+
+## Upgrading to 0.33
+
+**`product` is gone; set `purpose`** (kit#942, tf#73). A domain says what it
+serves in `purpose`: `issuer` (the default), `guard` or `console`. kit no
+longer takes `product` (`DOMAIN_PRODUCT_RETIRED`), and this provider no
+longer has it. Rename the attribute:
+
+```terraform
+resource "authwise_domain" "guard" {
+  purpose  = "guard" # was: product = "guard"
+  hostname = "guard.acme.com"
+}
+```
+
+The state upgrades itself (schema version 3): `product = "guard"` becomes
+`purpose = "guard"`, and a domain without one becomes `purpose = "issuer"`.
+After the rename the plan shows no change. Leaving `product` in the
+configuration is an error (`An argument named "product" is not expected
+here`). Leaving `purpose` unset on an issuer's host is fine: it reads back
+`issuer`.
+
+A console address needs kit with kit#942 and, to be of use, home
+administration on the tenant.
 
 ## Upgrading to 0.32
 

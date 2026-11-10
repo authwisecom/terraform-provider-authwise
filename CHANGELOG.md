@@ -1,6 +1,20 @@
 ## 0.33.0 (Unreleased)
 
+BREAKING CHANGES:
+
+* **! `authwise_domain`: `product` is gone; set `purpose`** (kit#942, tf#73).
+  `purpose` is `issuer` (the default), `guard` or `console`, and changing a
+  configured value replaces the domain. kit refuses `product`
+  (`DOMAIN_PRODUCT_RETIRED`). Rename `product = "guard"` to
+  `purpose = "guard"`. The state upgrades itself (schema version 3), so the
+  renamed configuration plans no change. A domain that had no `product`
+  reads back `purpose = "issuer"`. See "Upgrading to 0.33" on
+  `authwise_domain`'s page.
+
 NOTES:
+
+* **apis v0.62.0** (from v0.61.0): `Domain.purpose` and the console domain
+  (kit#942). Needs kit with kit#942.
 
 * **Release train 2026.11.2** (devops#160). One development batch; not
   tagged until the batch is whole.
@@ -37,6 +51,16 @@ ENHANCEMENTS:
   and `binding` takes the new name. Nothing is created twice or replaced.
   On a tenant without home administration the old grant no longer lists, so
   the plan creates it and guard-control refuses with its reason.
+
+* **`authwise_domain`: a console address** (`purpose = "console"`, tf#73,
+  kit#942). This is a hostname of the tenant's, such as `admin.acme.com`,
+  where its administrators open the Authwise console. It is a custom host
+  with the same records, waits and activation as the others, and its
+  traffic record points at the install's console edge. The page has an
+  example.
+* **`authwise_issuer_domain_binding`: a console address is refused**
+  (`CONSOLE_DOMAIN_NOT_BINDABLE`), with the remedy: bind the issuer to an
+  issuer host instead. `DOMAIN_NOT_BINDABLE` now speaks of `purpose`.
 
 BUILD:
 

@@ -165,7 +165,7 @@ func TestAccIssuerDomainBinding(t *testing.T) {
 // TestAccIssuerDomainBinding_Refusals: one host and path serve one issuer
 // (BINDING_TAKEN), at the root or at a path; a path routes (kit#876) unless
 // its first segment is reserved; a non-canonical path fails at plan; a
-// product's host takes no issuer.
+// Guard or console address takes no issuer.
 func TestAccIssuerDomainBinding_Refusals(t *testing.T) {
 	h := newHarness(t)
 
@@ -176,7 +176,12 @@ resource "authwise_domain" "login" {
 
 resource "authwise_domain" "guard" {
   hostname = "guard.acme.com"
-  product  = "guard"
+  purpose  = "guard"
+}
+
+resource "authwise_domain" "console" {
+  hostname = "admin.acme.com"
+  purpose  = "console"
 }
 
 resource "authwise_issuer" "first" {
@@ -232,6 +237,12 @@ resource "authwise_issuer_domain_binding" "%[1]s" {
 			{
 				Config:      base + bind("second", "login", "/customers") + bind("third", "guard", ""),
 				ExpectError: regexp.MustCompile(`DOMAIN_NOT_BINDABLE`),
+			},
+			{
+				// A console address serves the console, never an issuer
+				// (tf#73, kit#942): refused with the remedy.
+				Config:      base + bind("second", "login", "/customers") + bind("third", "console", ""),
+				ExpectError: regexp.MustCompile(`(?s)CONSOLE_DOMAIN_NOT_BINDABLE.*console\s+address.*Bind\s+the\s+issuer\s+to\s+an\s+issuer\s+host`),
 			},
 		},
 	})

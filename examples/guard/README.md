@@ -45,4 +45,4 @@ still has nodes.
 Guard has no invites of its own. Invite a person with kit's invitation
 (the console's "Invite a person"), and grant them a network with
 `authwise_guard_enrolment_grant`. A custom Guard address such as
-`guard.acme.com` is an `authwise_domain` with `product = "guard"`.
+`guard.acme.com` is an `authwise_domain` with `purpose = "guard"`.

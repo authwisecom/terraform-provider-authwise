@@ -47,7 +47,10 @@ func bindingCreateError(err error) error {
 				"Give this issuer its own domain, or its own path on that one (kit#876). "+
 				"If the binding is the one kit made for an issuer created with domain_id, import it rather than creating it again.", m["issuer"], where)
 		case "DOMAIN_NOT_BINDABLE":
-			remedy = "refused: DOMAIN_NOT_BINDABLE. The domain is a product's host (product = \"guard\") or another tenant's; an issuer can be bound only to the tenant's own native or custom domains."
+			remedy = "refused: DOMAIN_NOT_BINDABLE. The domain is a Guard address (purpose = \"guard\") or another tenant's; an issuer can be bound only to the tenant's own issuer hosts (purpose = \"issuer\"), native or custom."
+		case "CONSOLE_DOMAIN_NOT_BINDABLE":
+			remedy = "refused: CONSOLE_DOMAIN_NOT_BINDABLE. The domain is a console address (purpose = \"console\"): it serves the tenant's console, never an issuer, and an issuer's host never serves the console (kit#942). " +
+				"Bind the issuer to an issuer host (purpose = \"issuer\", the default) instead, such as login.acme.com beside admin.acme.com."
 		default:
 			continue
 		}
