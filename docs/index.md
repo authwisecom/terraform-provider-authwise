@@ -129,7 +129,7 @@ among them. Realms and their people are reached through the tenant's own
 sign-in issuer. A home account manages a realm that issuer signs people in
 to, or one no issuer signs in to yet, such as a realm it has just created.
 A realm behind another issuer is refused ("issuer … does not route to realm
-…"). Realms need kit with kit#939's realm rule (develop aca155cd or later).
+…"). This needs kit 1.85.0 or later.
 
 **Issuers.** A home account reads and updates the tenant's own sign-in
 issuer, the one its token comes from, and no other. It never creates or
@@ -149,7 +149,7 @@ account whatever the tenant's catalog says, with `PermissionDenied`:
 
 A refused destroy leaves the resource in state, so remove it from the
 configuration with a `removed` block (`lifecycle { destroy = false }`), not
-by deleting it. These refusals need kit develop 4907e8dd or later.
+by deleting it. These refusals need kit 1.85.0 or later.
 
 **What it does not, by design** (HA-D5). The tenant record and everything
 the owner holds: `authwise_tenant_config` (branding, labels, settings),

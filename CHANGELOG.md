@@ -14,16 +14,17 @@ BREAKING CHANGES:
 NOTES:
 
 * **apis v0.63.0** (from v0.61.0). v0.62.0 adds `Domain.purpose` and the
-  console domain (kit#942), so this release needs kit with kit#942. v0.63.0
+  console domain (kit#942), so this release needs kit 1.85.0. v0.63.0
   brings kit's WD0 wording to the descriptions generated from its comments,
   such as `authwise_provider_apple` and `authwise_factor_webauthn`. It also
   adds `PurgeAudience`, which the provider does not use.
 
 * **Release train 2026.11.2** (devops#160). Pairs with apis v0.63.0. It
-  needs kit develop 4907e8dd or later: domain purpose (kit#942), Guard
+  needs kit 1.85.0 or later: domain purpose (kit#942), Guard
   administration in the administration audience (kit#940), home service
   accounts with the realm rule and the issuer refusals (kit#939), and
-  guard-control with guard-control#95 for Guard's administrative roles.
+  guard-control 0.28.0 or later (guard-control#95) for Guard's
+  administrative roles.
 * **Wording (WD0).** Descriptions, error text, docs and examples say
   "create" (never "mint") and "enroll" (never "enrol"). Resource and
   attribute names, permission names and API identifiers keep their spelling
@@ -35,8 +36,8 @@ NOTES:
   `guardcontrol.networkAdmin`, `guardcontrol.viewer`) live in the tenant's
   administration audience, so the tenant needs home administration. A
   tenant's central administrators get Guard's tenant administrator role from
-  kit, from their seat, with no binding. Needs guard-control with
-  guard-control#95 and kit with kit#940.
+  kit, from their seat, with no binding. Needs guard-control 0.28.0
+  and kit 1.85.0.
 
 ENHANCEMENTS:
 
@@ -76,10 +77,10 @@ ENHANCEMENTS:
   index page lists what such an account reaches. The tenant record, home
   administration and service accounts are out of its reach by design
   (HA-D5). It manages its own sign-in issuer's realms, and new realms that
-  no issuer signs in to yet (kit develop aca155cd or later). It never
+  no issuer signs in to yet (kit 1.85.0 or later). It never
   creates or deletes an issuer, and never deletes the administration or
   Guard audience. kit refuses those with `PermissionDenied` and a stated
-  reason (kit develop 4907e8dd or later). Verified against kit
+  reason (kit 1.85.0 or later). Verified against kit
   1.84.4-67a52d37, 1.84.4-aca155cd and 1.84.4-4907e8dd.
 * **Tenancy refusals say why** (tf#71). When the tenancy service refuses
   the credential (`Unauthenticated` or `PermissionDenied`),
