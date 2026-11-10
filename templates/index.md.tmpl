@@ -101,11 +101,13 @@ others ("issuer … does not route to realm …"). Do not create realms with a
 home account for now: kit lets it create one that it then cannot read or
 delete (reported to kit; the fix is coming).
 
-**Issuers.** A home account reads and updates the tenant's administration
-issuer, the one its token comes from, and no other. Creating or deleting an
-issuer is the tenant owner's, from central: kit refuses it to a home account
-whatever the tenant's catalog says. So does deleting the administration
-audience or Guard's.
+**Issuers.** A home account reads and updates the tenant's own sign-in
+issuer, the one its token comes from, and no other. It never creates or
+deletes an issuer: another issuer is a new front door for signing people in,
+so that stays the tenant owner's, from central. kit refuses it to a home
+account whatever the tenant's catalog says, with `PermissionDenied`, and so
+it does deleting the administration audience or Guard's. Declare
+`authwise_issuer` in a configuration run with a central service account.
 
 **What it does not, by design** (HA-D5). The tenant record and everything
 the owner holds: `authwise_tenant_config` (branding, labels, settings),
