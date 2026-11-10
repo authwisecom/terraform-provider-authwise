@@ -1,4 +1,4 @@
-## 0.33.0 (Unreleased)
+## 0.33.0 (November 10, 2026)
 
 BREAKING CHANGES:
 
@@ -19,8 +19,11 @@ NOTES:
   such as `authwise_provider_apple` and `authwise_factor_webauthn`. It also
   adds `PurgeAudience`, which the provider does not use.
 
-* **Release train 2026.11.2** (devops#160). One development batch; not
-  tagged until the batch is whole.
+* **Release train 2026.11.2** (devops#160). Pairs with apis v0.63.0. It
+  needs kit develop 4907e8dd or later: domain purpose (kit#942), Guard
+  administration in the administration audience (kit#940), home service
+  accounts with the realm rule and the issuer refusals (kit#939), and
+  guard-control with guard-control#95 for Guard's administrative roles.
 * **Wording (WD0).** Descriptions, error text, docs and examples say
   "create" (never "mint") and "enroll" (never "enrol"). Resource and
   attribute names, permission names and API identifiers keep their spelling
