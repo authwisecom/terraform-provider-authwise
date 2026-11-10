@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	accesspb "git.authwise.com/authwise/apis/authwise/access/v1alpha1"
+	tenancypb "git.authwise.com/authwise/apis/authwise/tenancy/v1alpha1"
 	"git.authwise.com/authwise/terraform-provider-authwise/internal/generated"
 	"github.com/activatedio/tfinfra/pkg/aip"
 	tfruntime "github.com/activatedio/tfinfra/pkg/tf"
@@ -25,7 +26,16 @@ var (
 	_ resource.Resource                = &accessBindingResource{}
 	_ resource.ResourceWithConfigure   = &accessBindingResource{}
 	_ resource.ResourceWithImportState = &accessBindingResource{}
+	_ resource.ResourceWithModifyPlan  = &accessBindingResource{}
 )
+
+// guardAdministrativeRoles are Guard's roles that live in the tenant's
+// administration audience, never its Guard audience (kit#940, tf#72).
+var guardAdministrativeRoles = map[string]bool{
+	guardRoleTenantAdmin:  true,
+	guardRoleNetworkAdmin: true,
+	guardRoleViewer:       true,
+}
 
 // accessBindingResource wraps the generated authwise_access_binding resource
 // with the reference check kit does not perform on this write path: a binding
@@ -39,6 +49,7 @@ var (
 type accessBindingResource struct {
 	inner    resource.Resource
 	client   accesspb.AuthwiseAccessServiceClient
+	tenancy  tenancypb.AuthwiseTenancyServiceClient
 	defaults map[string]string
 }
 
@@ -63,6 +74,9 @@ func (r *accessBindingResource) Configure(ctx context.Context, req resource.Conf
 	if pd, ok := req.ProviderData.(*tfruntime.ProviderData); ok {
 		if client, ok := pd.Clients["access"].(accesspb.AuthwiseAccessServiceClient); ok {
 			r.client = client
+		}
+		if tenancy, ok := pd.Clients[tenancyClientKey].(tenancypb.AuthwiseTenancyServiceClient); ok {
+			r.tenancy = tenancy
 		}
 		r.defaults = pd.Defaults
 	}
@@ -104,6 +118,62 @@ func (r *accessBindingResource) ImportState(ctx context.Context, req resource.Im
 	if inner, ok := r.inner.(resource.ResourceWithImportState); ok {
 		inner.ImportState(ctx, req, resp)
 	}
+}
+
+// ModifyPlan refuses one of Guard's administrative roles bound in the
+// tenant's Guard audience (tf#72). Those roles live in the tenant's
+// administration audience; in the Guard audience they grant nothing, and kit
+// refuses the write too. The plan says so rather than rewriting the audience.
+//
+// The Guard audience is read off the tenant record. A credential that cannot
+// read it (a home service account: the tenant record is out of its reach) is
+// left to kit's own refusal.
+func (r *accessBindingResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+
+	if r.tenancy == nil || req.Plan.Raw.IsNull() {
+		return
+	}
+
+	var role, tenant, audience types.String
+	resp.Diagnostics.Append(req.Plan.GetAttribute(ctx, path.Root("role_name"), &role)...)
+	resp.Diagnostics.Append(req.Plan.GetAttribute(ctx, path.Root("tenant_id"), &tenant)...)
+	resp.Diagnostics.Append(req.Plan.GetAttribute(ctx, path.Root("audience_id"), &audience)...)
+	if resp.Diagnostics.HasError() || !guardAdministrativeRoles[role.ValueString()] || audience.IsUnknown() || tenant.IsUnknown() {
+		return
+	}
+
+	tenantID := tenant.ValueString()
+	if tenantID == "" {
+		tenantID = r.defaults["tenant_id"]
+	}
+	audienceID := audience.ValueString()
+	if audienceID == "" {
+		audienceID = r.defaults["audience_id"]
+	}
+	if tenantID == "" || audienceID == "" {
+		return
+	}
+
+	t, err := r.tenancy.GetTenant(ctx, &tenancypb.GetTenantRequest{Name: "tenants/" + tenantID})
+	if err != nil {
+		return
+	}
+	guard := t.GetProducts()["guard"].GetAudienceId()
+	if guard == "" || guard != audienceID {
+		return
+	}
+
+	administration := "the tenant's administration audience"
+	if a := t.GetProducts()["administration"].GetAudienceId(); a != "" {
+		administration = fmt.Sprintf("the tenant's administration audience (%s)", a)
+	}
+	resp.Diagnostics.AddAttributeError(path.Root("audience_id"),
+		"Guard administrative role bound in the Guard audience",
+		fmt.Sprintf("%s is one of Guard's administrative roles, and %s is the tenant's Guard audience, which keeps devices only: the agent client, nodes and %s. "+
+			"Bind it in %s instead, which needs home administration on the tenant (authwise_tenant_home_administration), "+
+			"or with authwise_guard_enrolment_grant, which binds it there for you. "+
+			"The tenant's central administrators hold Guard's tenant administrator role through kit, from their seat, and need no binding (kit#940, tf#72).",
+			role.ValueString(), audienceID, guardRoleUser, administration))
 }
 
 // validateRole resolves the planned role_name in the binding's own audience

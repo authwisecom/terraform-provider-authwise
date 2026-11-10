@@ -4,9 +4,11 @@ page_title: "authwise_guard_enrolment_grant Resource - Authwise"
 subcategory: "Guard"
 description: |-
   Binds one Guard role to a user or group of a kit tenant, in kit, through guard-control. By default the role is guardcontrol.user at the tenant: the subject may enroll devices. guardcontrol.tenantAdmin (at the tenant), guardcontrol.networkAdmin (at a network, network_id) and guardcontrol.viewer (either) let the subject administer the tenant's Guard, or part of it.
-  One way, not both. This is the same binding an authwise_access_binding with that role in the Guard audience would write. Declare a grant one way only, or the two will fight.
+  Where the roles land. guardcontrol.user is bound in the tenant's Guard audience. The administrative roles are bound in the tenant's administration audience, beside its own people's identity roles, so the tenant needs home administration (authwise_tenant_home_administration); without it guard-control refuses the grant with FAILED_PRECONDITION and its reason. A tenant's central administrators (its owner and tenant.admin seats) hold Guard's tenant administrator role through kit, from their seat; they need no grant here.
+  One way, not both. This is the same binding an authwise_access_binding with that role writes: in the administration audience for an administrative role, in the Guard audience for guardcontrol.user. Declare a grant one way only, or the two will fight.
   Who may apply it. Each call is admitted at guard-control, then by kit on the same bearer, so the provider's credential must administer the tenant's bindings in kit; otherwise it is refused with PermissionDenied.
-  Versions. A role other than guardcontrol.user, or a grant at a network, needs guard-control with role grants (guard-control#59); an older one refuses it with Unimplemented. guardcontrol.tenantAdmin and guardcontrol.networkAdmin carry the Guard audience's step-up condition (condition_id), and are refused while it has none.
+  Versions. A role other than guardcontrol.user, or a grant at a network, needs guard-control with role grants (guard-control#59); an older one refuses it with Unimplemented. An administrative role in the administration audience needs guard-control with guard-control#95; an older one binds it in the Guard audience. guardcontrol.tenantAdmin and guardcontrol.networkAdmin carry the administration audience's step-up condition (administration.stepUp, condition_id); guardcontrol.viewer carries none.
+  Moved grants. When home administration is turned on, kit moves the tenant's existing administrative Guard bindings into the administration audience as new bindings. A grant in state is found again by its subject, role and anchor, so the plan shows no change and binding takes the new name.
   Revoking does not deprovision. Destroying a grant stops new enrollments; a device already enrolled keeps working until it is revoked by hand or by the deprovisioning sweep (authwise_guard_tenant_settings, config.deprovisioning.enabled).
 ---
 
@@ -14,11 +16,15 @@ description: |-
 
 Binds one Guard role to a user or group of a kit tenant, in kit, through guard-control. By default the role is `guardcontrol.user` at the tenant: the subject may enroll devices. `guardcontrol.tenantAdmin` (at the tenant), `guardcontrol.networkAdmin` (at a network, `network_id`) and `guardcontrol.viewer` (either) let the subject administer the tenant's Guard, or part of it.
 
-**One way, not both.** This is the same binding an `authwise_access_binding` with that role in the Guard audience would write. Declare a grant one way only, or the two will fight.
+**Where the roles land.** `guardcontrol.user` is bound in the tenant's Guard audience. The administrative roles are bound in the tenant's **administration audience**, beside its own people's identity roles, so the tenant needs home administration (`authwise_tenant_home_administration`); without it guard-control refuses the grant with FAILED_PRECONDITION and its reason. A tenant's central administrators (its owner and `tenant.admin` seats) hold Guard's tenant administrator role through kit, from their seat; they need no grant here.
+
+**One way, not both.** This is the same binding an `authwise_access_binding` with that role writes: in the administration audience for an administrative role, in the Guard audience for `guardcontrol.user`. Declare a grant one way only, or the two will fight.
 
 **Who may apply it.** Each call is admitted at guard-control, then by kit on the same bearer, so the provider's credential must administer the tenant's bindings in kit; otherwise it is refused with PermissionDenied.
 
-**Versions.** A role other than `guardcontrol.user`, or a grant at a network, needs guard-control with role grants (guard-control#59); an older one refuses it with Unimplemented. `guardcontrol.tenantAdmin` and `guardcontrol.networkAdmin` carry the Guard audience's step-up condition (`condition_id`), and are refused while it has none.
+**Versions.** A role other than `guardcontrol.user`, or a grant at a network, needs guard-control with role grants (guard-control#59); an older one refuses it with Unimplemented. An administrative role in the administration audience needs guard-control with guard-control#95; an older one binds it in the Guard audience. `guardcontrol.tenantAdmin` and `guardcontrol.networkAdmin` carry the administration audience's step-up condition (`administration.stepUp`, `condition_id`); `guardcontrol.viewer` carries none.
+
+**Moved grants.** When home administration is turned on, kit moves the tenant's existing administrative Guard bindings into the administration audience as new bindings. A grant in state is found again by its subject, role and anchor, so the plan shows no change and `binding` takes the new name.
 
 **Revoking does not deprovision.** Destroying a grant stops new enrollments; a device already enrolled keeps working until it is revoked by hand or by the deprovisioning sweep (`authwise_guard_tenant_settings`, `config.deprovisioning.enabled`).
 
@@ -40,8 +46,12 @@ resource "authwise_guard_enrolment_grant" "ada" {
   subject_id   = "u-01"
 }
 
-# A group administers the tenant's Guard. The Guard audience must carry a
-# step-up condition for administrative roles.
+# A group of the tenant's own people administers the tenant's Guard. The
+# role is bound in the tenant's administration audience, under its step-up
+# condition, so the tenant needs home administration first
+# (authwise_tenant_home_administration); without it guard-control refuses the
+# grant. The tenant's central administrators need no grant: kit gives them
+# Guard's tenant administrator role from their seat.
 resource "authwise_guard_enrolment_grant" "it_admins" {
   tenant_id    = "t-01"
   role         = "guardcontrol.tenantAdmin"
@@ -76,7 +86,7 @@ resource "authwise_guard_enrolment_grant" "office_admin" {
 ### Read-Only
 
 - `binding` (String) The binding's name in kit; serves as the Terraform ID.
-- `condition_id` (String) The access condition the binding carries: the Guard audience's step-up condition on an administrative role; empty on the others.
+- `condition_id` (String) The access condition the binding carries: the administration audience's step-up condition on `guardcontrol.tenantAdmin` and `guardcontrol.networkAdmin`; empty on the others.
 - `display_name` (String) The subject's display name in kit; empty when kit no longer has it in the tenant's realms.
 - `email` (String) The user's email in kit; empty for a group.
 

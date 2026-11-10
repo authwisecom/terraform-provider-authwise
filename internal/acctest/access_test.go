@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	corepb "git.authwise.com/authwise/apis/authwise/types/core/v1alpha1"
+
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/plancheck"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
@@ -185,6 +187,53 @@ resource "authwise_access_binding" "typo" {
 	if n := len(h.access.bindings); n != 0 {
 		t.Fatalf("the rejected binding reached the server: %d stored", n)
 	}
+}
+
+// TestAccAccessBinding_GuardAdministrativeRoleInGuardAudience: Guard's
+// administrative roles live in the tenant's administration audience
+// (kit#940, tf#72). One bound in the Guard audience is refused at plan with
+// the reason, never rewritten, and the same role elsewhere applies.
+func TestAccAccessBinding_GuardAdministrativeRoleInGuardAudience(t *testing.T) {
+
+	h := newHarness(t)
+	setProducts := func(guard string) {
+		h.tenancy.mu.Lock()
+		defer h.tenancy.mu.Unlock()
+		h.tenancy.tenants["tenants/t-1"].Products = map[string]*corepb.TenantProduct{
+			"guard":          {AudienceId: guard},
+			"administration": {AudienceId: "a-adm"},
+		}
+	}
+
+	config := h.providerConfig() + `
+resource "authwise_access_role" "tenant_admin" {
+  access_role_id = "guardcontrol.tenantAdmin"
+}
+
+resource "authwise_access_binding" "admin" {
+  subject_type = "user"
+  subject_id   = "u-01"
+  role_name    = authwise_access_role.tenant_admin.access_role_id
+}
+`
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: protoFactories(),
+		Steps: []resource.TestStep{
+			{
+				// a-1, the provider's default audience, is the Guard audience.
+				PreConfig:   func() { setProducts("a-1") },
+				Config:      config,
+				ExpectError: regexp.MustCompile(`(?s)Guard administrative role bound in the Guard audience.*administration\s+audience\s+\(a-adm\)`),
+			},
+			{
+				// a-1 is not the Guard audience: nothing to refuse.
+				PreConfig: func() { setProducts("a-guard") },
+				Config:    config,
+				Check:     resource.TestCheckResourceAttr("authwise_access_binding.admin", "role_name", "guardcontrol.tenantAdmin"),
+			},
+		},
+	})
 }
 
 // TestAccAccessPermission_IDCollision proves a duplicate caller-assigned id

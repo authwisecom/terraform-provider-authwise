@@ -4,11 +4,14 @@ page_title: "authwise_access_binding Resource - Authwise"
 subcategory: "Access"
 description: |-
   A binding that grants a subject a role in an audience's Access catalog.
+  Guard's administrative roles (guardcontrol.tenantAdmin, guardcontrol.networkAdmin, guardcontrol.viewer) are bound in the tenant's administration audience, which needs home administration on the tenant (authwise_tenant_home_administration). One of them in the tenant's Guard audience is refused at plan with the reason, and by kit; the Guard audience keeps guardcontrol.user and devices only. The tenant's central administrators (its owner and tenant.admin seats) get Guard's tenant administrator role from kit, from their seat, not from a binding (kit#940, tf#72).
 ---
 
 # authwise_access_binding (Resource)
 
 A binding that grants a subject a role in an audience's Access catalog.
+
+**Guard's administrative roles** (`guardcontrol.tenantAdmin`, `guardcontrol.networkAdmin`, `guardcontrol.viewer`) are bound in the tenant's administration audience, which needs home administration on the tenant (`authwise_tenant_home_administration`). One of them in the tenant's Guard audience is refused at plan with the reason, and by kit; the Guard audience keeps `guardcontrol.user` and devices only. The tenant's central administrators (its owner and `tenant.admin` seats) get Guard's tenant administrator role from kit, from their seat, not from a binding (kit#940, tf#72).
 
 
 

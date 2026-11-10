@@ -10,6 +10,36 @@ NOTES:
   until 2026.11.3 (`authwise_guard_enrolment_grant`,
   `guardcontrol.networks.enrol`). Two error summaries change text:
   "create service account secret failed" and "granting enrollment failed".
+* **Guard administration follows identity** (kit#940, guard-control#95,
+  tf#72). Guard's administrative roles (`guardcontrol.tenantAdmin`,
+  `guardcontrol.networkAdmin`, `guardcontrol.viewer`) live in the tenant's
+  administration audience, so the tenant needs home administration. A
+  tenant's central administrators get Guard's tenant administrator role from
+  kit, from their seat, with no binding. Needs guard-control with
+  guard-control#95 and kit with kit#940.
+
+ENHANCEMENTS:
+
+* **`authwise_access_binding`: a Guard administrative role in the Guard
+  audience is refused at plan** (tf#72), with the reason and the tenant's
+  administration audience. The audience is not rewritten. The check reads
+  the tenant record, so a credential that cannot read it, such as a home
+  service account, gets kit's refusal at apply instead.
+* **`authwise_guard_enrolment_grant`: administrative roles land in the
+  administration audience** (tf#72). guard-control writes them there and
+  refuses them with FAILED_PRECONDITION and its reason when the tenant has
+  no home administration. `condition_id` is the administration audience's
+  step-up condition on `tenantAdmin` and `networkAdmin`.
+* **`authwise_guard_enrolment_grant`: a moved grant is found again** (tf#72).
+  kit moves existing administrative Guard bindings into the administration
+  audience as new bindings. Read finds the grant by its subject, role and
+  anchor when its binding name no longer lists, so the plan shows no change
+  and `binding` takes the new name. Nothing is created twice or replaced.
+  On a tenant without home administration the old grant no longer lists, so
+  the plan creates it and guard-control refuses with its reason.
+
+BUILD:
+
 * **tfinfra v0.0.23** (from v0.0.22): the `keepers` description on
   `authwise_client_secret` says the successor is created. No other change.
 

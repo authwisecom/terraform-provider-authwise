@@ -4,6 +4,8 @@ import (
 	"context"
 	"testing"
 
+	"google.golang.org/protobuf/proto"
+
 	guardpb "git.authwise.com/authwise/apis/authwise/guardcontrol/v1alpha1"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
@@ -270,6 +272,17 @@ func TestRoleGrantRead(t *testing.T) {
 
 	found := &guardpb.RoleGrant{Binding: grantBinding, Subject: &guardpb.EnrolmentSubject{Type: enrolmentSubjectUser, Id: "u-1"},
 		Role: guardRoleNetworkAdmin, ResourceType: enrolmentAnchorNetwork, ResourceId: "n-1", Email: "ada@example.com"}
+	movedTo := func(binding string, edit func(g *guardpb.RoleGrant)) *guardpb.RoleGrant {
+		g := proto.Clone(found).(*guardpb.RoleGrant)
+		g.Binding = binding
+		edit(g)
+		return g
+	}
+	moved := movedTo("tenants/t-1/issuers/i-adm/audiences/a-adm/access-bindings/b-new", func(*guardpb.RoleGrant) {})
+	otherSubject := movedTo("b-x", func(g *guardpb.RoleGrant) {
+		g.Subject = &guardpb.EnrolmentSubject{Type: enrolmentSubjectUser, Id: "u-2"}
+	})
+	otherNetwork := movedTo("b-y", func(g *guardpb.RoleGrant) { g.ResourceId = "n-2" })
 
 	cases := map[string]struct {
 		state   *guardEnrolmentGrantModel
@@ -278,10 +291,18 @@ func TestRoleGrantRead(t *testing.T) {
 		fails   bool
 		role    string
 		network string
+		binding string
 	}{
 		"found":   {state: networkAdminModel(grantBinding), stub: &stubTenantAdmin{roleGrants: []*guardpb.RoleGrant{{Binding: "other"}, found}}, role: guardRoleNetworkAdmin, network: "n-1"},
 		"gone":    {state: networkAdminModel(grantBinding), stub: &stubTenantAdmin{roleGrants: []*guardpb.RoleGrant{{Binding: "other"}}}, removed: true},
 		"refused": {state: networkAdminModel(grantBinding), stub: &stubTenantAdmin{roleListErr: status.Error(codes.PermissionDenied, "no")}, fails: true},
+		// kit moved the binding into the administration audience as a new
+		// row (kit#940): the same subject, role and anchor is the same grant.
+		"moved": {state: networkAdminModel(grantBinding), stub: &stubTenantAdmin{roleGrants: []*guardpb.RoleGrant{{Binding: "other"}, moved}},
+			role: guardRoleNetworkAdmin, network: "n-1", binding: moved.GetBinding()},
+		// Another subject, or another network, is not.
+		"moved, other subject": {state: networkAdminModel(grantBinding), stub: &stubTenantAdmin{roleGrants: []*guardpb.RoleGrant{otherSubject}}, removed: true},
+		"moved, other network": {state: networkAdminModel(grantBinding), stub: &stubTenantAdmin{roleGrants: []*guardpb.RoleGrant{otherNetwork}}, removed: true},
 		// An import has no role: it is read from the role grants...
 		"imported": {state: importedModel(), stub: &stubTenantAdmin{roleGrants: []*guardpb.RoleGrant{found}}, role: guardRoleNetworkAdmin, network: "n-1"},
 		// ...or, from a guard-control without them, from the enrolment grants.
@@ -315,6 +336,9 @@ func TestRoleGrantRead(t *testing.T) {
 			require.False(t, resp.State.Get(ctx, &got).HasError())
 			assert.Equal(t, c.role, got.Role.ValueString())
 			assert.Equal(t, c.network, got.NetworkID.ValueString())
+			if c.binding != "" {
+				assert.Equal(t, c.binding, got.Binding.ValueString())
+			}
 		})
 	}
 }

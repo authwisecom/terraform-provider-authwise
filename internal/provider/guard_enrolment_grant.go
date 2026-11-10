@@ -99,10 +99,14 @@ func (r *guardEnrolmentGrantResource) Schema(_ context.Context, _ resource.Schem
 		MarkdownDescription: "Binds one Guard role to a user or group of a kit tenant, in kit, through guard-control. " +
 			"By default the role is `guardcontrol.user` at the tenant: the subject may enroll devices. " +
 			"`guardcontrol.tenantAdmin` (at the tenant), `guardcontrol.networkAdmin` (at a network, `network_id`) and `guardcontrol.viewer` (either) let the subject administer the tenant's Guard, or part of it.\n\n" +
-			"**One way, not both.** This is the same binding an `authwise_access_binding` with that role in the Guard audience would write. Declare a grant one way only, or the two will fight.\n\n" +
+			"**Where the roles land.** `guardcontrol.user` is bound in the tenant's Guard audience. The administrative roles are bound in the tenant's **administration audience**, beside its own people's identity roles, so the tenant needs home administration (`authwise_tenant_home_administration`); without it guard-control refuses the grant with FAILED_PRECONDITION and its reason. " +
+			"A tenant's central administrators (its owner and `tenant.admin` seats) hold Guard's tenant administrator role through kit, from their seat; they need no grant here.\n\n" +
+			"**One way, not both.** This is the same binding an `authwise_access_binding` with that role writes: in the administration audience for an administrative role, in the Guard audience for `guardcontrol.user`. Declare a grant one way only, or the two will fight.\n\n" +
 			"**Who may apply it.** Each call is admitted at guard-control, then by kit on the same bearer, so the provider's credential must administer the tenant's bindings in kit; otherwise it is refused with PermissionDenied.\n\n" +
 			"**Versions.** A role other than `guardcontrol.user`, or a grant at a network, needs guard-control with role grants (guard-control#59); an older one refuses it with Unimplemented. " +
-			"`guardcontrol.tenantAdmin` and `guardcontrol.networkAdmin` carry the Guard audience's step-up condition (`condition_id`), and are refused while it has none.\n\n" +
+			"An administrative role in the administration audience needs guard-control with guard-control#95; an older one binds it in the Guard audience. " +
+			"`guardcontrol.tenantAdmin` and `guardcontrol.networkAdmin` carry the administration audience's step-up condition (`administration.stepUp`, `condition_id`); `guardcontrol.viewer` carries none.\n\n" +
+			"**Moved grants.** When home administration is turned on, kit moves the tenant's existing administrative Guard bindings into the administration audience as new bindings. A grant in state is found again by its subject, role and anchor, so the plan shows no change and `binding` takes the new name.\n\n" +
 			"**Revoking does not deprovision.** Destroying a grant stops new enrollments; a device already enrolled keeps working until it is revoked by hand or by the deprovisioning sweep (`authwise_guard_tenant_settings`, `config.deprovisioning.enabled`).",
 		Attributes: map[string]schema.Attribute{
 			"binding": schema.StringAttribute{
@@ -134,7 +138,7 @@ func (r *guardEnrolmentGrantResource) Schema(_ context.Context, _ resource.Schem
 			},
 			"condition_id": schema.StringAttribute{
 				Computed:            true,
-				MarkdownDescription: "The access condition the binding carries: the Guard audience's step-up condition on an administrative role; empty on the others.",
+				MarkdownDescription: "The access condition the binding carries: the administration audience's step-up condition on `guardcontrol.tenantAdmin` and `guardcontrol.networkAdmin`; empty on the others.",
 			},
 			"subject_type": schema.StringAttribute{
 				Required:            true,
@@ -341,7 +345,40 @@ func (r *guardEnrolmentGrantResource) readRole(ctx context.Context, state *guard
 			return true, nil
 		}
 	}
+
+	// The grant's identity is its subject, role and anchor, not the binding's
+	// name. kit moves a Guard administrative binding into the tenant's
+	// administration audience as a new row when home administration is turned
+	// on (kit#940, guard-control#95), so the name in state stops listing while
+	// the grant itself is still there. Adopt it rather than create a duplicate.
+	for _, g := range out.GetGrants() {
+		if state.sameGrant(g) {
+			state.fromRoleProto(g)
+			return true, nil
+		}
+	}
 	return false, nil
+}
+
+// sameGrant is whether g grants the role in state to the subject in state at
+// the anchor in state. An import knows only the binding, so it never matches
+// here.
+func (m *guardEnrolmentGrantModel) sameGrant(g *guardpb.RoleGrant) bool {
+
+	for _, v := range []types.String{m.Role, m.SubjectType, m.SubjectID} {
+		if v.IsNull() || v.IsUnknown() || v.ValueString() == "" {
+			return false
+		}
+	}
+	anchorType, anchorID := enrolmentAnchorTenant, m.TenantID.ValueString()
+	if !m.NetworkID.IsNull() && m.NetworkID.ValueString() != "" {
+		anchorType, anchorID = enrolmentAnchorNetwork, m.NetworkID.ValueString()
+	}
+	return g.GetRole() == m.Role.ValueString() &&
+		g.GetSubject().GetType() == m.SubjectType.ValueString() &&
+		g.GetSubject().GetId() == m.SubjectID.ValueString() &&
+		g.GetResourceType() == anchorType &&
+		g.GetResourceId() == anchorID
 }
 
 // Update only fills in what a grant from before role and network_id were

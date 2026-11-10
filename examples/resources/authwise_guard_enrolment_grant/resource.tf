@@ -13,8 +13,12 @@ resource "authwise_guard_enrolment_grant" "ada" {
   subject_id   = "u-01"
 }
 
-# A group administers the tenant's Guard. The Guard audience must carry a
-# step-up condition for administrative roles.
+# A group of the tenant's own people administers the tenant's Guard. The
+# role is bound in the tenant's administration audience, under its step-up
+# condition, so the tenant needs home administration first
+# (authwise_tenant_home_administration); without it guard-control refuses the
+# grant. The tenant's central administrators need no grant: kit gives them
+# Guard's tenant administrator role from their seat.
 resource "authwise_guard_enrolment_grant" "it_admins" {
   tenant_id    = "t-01"
   role         = "guardcontrol.tenantAdmin"

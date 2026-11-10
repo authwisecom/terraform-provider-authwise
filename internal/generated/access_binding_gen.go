@@ -89,7 +89,7 @@ func AccessBindingResourceSchema() schema.Schema {
 				Validators:          []validator.String{tf.ReferenceID("t", "tenant", "")},
 			},
 		},
-		MarkdownDescription: "A binding that grants a subject a role in an audience's Access catalog.",
+		MarkdownDescription: "A binding that grants a subject a role in an audience's Access catalog.\n\n**Guard's administrative roles** (`guardcontrol.tenantAdmin`, `guardcontrol.networkAdmin`, `guardcontrol.viewer`) are bound in the tenant's administration audience, which needs home administration on the tenant (`authwise_tenant_home_administration`). One of them in the tenant's Guard audience is refused at plan with the reason, and by kit; the Guard audience keeps `guardcontrol.user` and devices only. The tenant's central administrators (its owner and `tenant.admin` seats) get Guard's tenant administrator role from kit, from their seat, not from a binding (kit#940, tf#72).",
 	}
 }
 
@@ -373,7 +373,7 @@ func AccessBindingDataSourceSchema() schema1.Schema {
 			"subject_type":  schema1.StringAttribute{Computed: true},
 			"tenant_id":     schema1.StringAttribute{Computed: true},
 		},
-		MarkdownDescription: "A binding that grants a subject a role in an audience's Access catalog. This data source reads one by its full resource name.",
+		MarkdownDescription: "A binding that grants a subject a role in an audience's Access catalog.\n\n**Guard's administrative roles** (`guardcontrol.tenantAdmin`, `guardcontrol.networkAdmin`, `guardcontrol.viewer`) are bound in the tenant's administration audience, which needs home administration on the tenant (`authwise_tenant_home_administration`). One of them in the tenant's Guard audience is refused at plan with the reason, and by kit; the Guard audience keeps `guardcontrol.user` and devices only. The tenant's central administrators (its owner and `tenant.admin` seats) get Guard's tenant administrator role from kit, from their seat, not from a binding (kit#940, tf#72). This data source reads one by its full resource name.",
 	}
 }
 
@@ -485,7 +485,7 @@ func AccessBindingListDataSourceSchema() schema1.Schema {
 				Validators:          []validator.String{tf.ReferenceID("t", "tenant", "")},
 			},
 		},
-		MarkdownDescription: "A binding that grants a subject a role in an audience's Access catalog. This data source lists every one under a parent.",
+		MarkdownDescription: "A binding that grants a subject a role in an audience's Access catalog.\n\n**Guard's administrative roles** (`guardcontrol.tenantAdmin`, `guardcontrol.networkAdmin`, `guardcontrol.viewer`) are bound in the tenant's administration audience, which needs home administration on the tenant (`authwise_tenant_home_administration`). One of them in the tenant's Guard audience is refused at plan with the reason, and by kit; the Guard audience keeps `guardcontrol.user` and devices only. The tenant's central administrators (its owner and `tenant.admin` seats) get Guard's tenant administrator role from kit, from their seat, not from a binding (kit#940, tf#72). This data source lists every one under a parent.",
 	}
 }
 
