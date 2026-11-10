@@ -97,9 +97,9 @@ resource "cloudflare_record" "guard_traffic" {
 # The tenant's own console address: admin.acme.com is where its
 # administrators open the Authwise console, signing in at the tenant's own
 # issuer, without the tenant's slug in the path. The same records, in the same
-# order; its traffic record points at the install's console edge. No issuer is
-# bound to it, and it is of use once the tenant has home administration
-# (authwise_tenant_home_administration).
+# order; its traffic record points at the install's edge, the same target as
+# login.acme.com's. No issuer is bound to it, and it is of use once the tenant
+# has home administration (authwise_tenant_home_administration).
 resource "authwise_domain" "console" {
   purpose  = "console"
   hostname = "admin.acme.com"

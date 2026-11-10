@@ -83,7 +83,7 @@ func (f *fakeDomains) CreateDomain(_ context.Context, parent string, in *domain)
 		// default host is the product's to know (kit#903).
 		d.State = domainPendingDNS
 	case d.Purpose == purposeConsole:
-		d.State, d.TrafficTarget = domainPendingDNS, "console-edge.authwise.test"
+		d.State, d.TrafficTarget = domainPendingDNS, "edge.authwise.test"
 	case d.Custom:
 		d.State, d.TrafficTarget = domainPendingDNS, "edge.authwise.test"
 	}
@@ -120,7 +120,7 @@ func (f *fakeDomains) advance(id string) (*domain, error) {
 		case purposeGuard:
 			target = "acme.guard.authwise.com"
 		case purposeConsole:
-			target = "console-edge.authwise.test"
+			target = "edge.authwise.test"
 		}
 		d.DNSRecords = []domainRecord{
 			{Name: d.Hostname, Type: "CNAME", Value: target, Purpose: "traffic"},
@@ -432,9 +432,9 @@ func TestDomainConsoleLifecycle(t *testing.T) {
 				ConfigStateChecks: []statecheck.StateCheck{
 					statecheck.ExpectKnownValue(addr, tfjsonpath.New("purpose"), knownvalue.StringExact("console")),
 					statecheck.ExpectKnownValue(addr, tfjsonpath.New("custom"), knownvalue.Bool(true)),
-					statecheck.ExpectKnownValue(addr, tfjsonpath.New("traffic_target"), knownvalue.StringExact("console-edge.authwise.test")),
+					statecheck.ExpectKnownValue(addr, tfjsonpath.New("traffic_target"), knownvalue.StringExact("edge.authwise.test")),
 					statecheck.ExpectKnownValue("terraform_data.traffic",
-						tfjsonpath.New("output").AtMapKey("content"), knownvalue.StringExact("console-edge.authwise.test")),
+						tfjsonpath.New("output").AtMapKey("content"), knownvalue.StringExact("edge.authwise.test")),
 				},
 			},
 			{Config: config, PlanOnly: true},

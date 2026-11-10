@@ -125,7 +125,7 @@ func (f *fakeIdentityServer) CreateDomain(ctx context.Context, in *identitypb.Cr
 	d.Custom = d.GetCustom() || issuerID != "" || d.GetPurpose() != "issuer"
 	if d.GetCustom() {
 		// The traffic CNAME targets the install's edge name (kit#911,
-		// D5), or its console edge (kit#942); kit leaves a Guard
+		// D5), for a console address too (kit#942); kit leaves a Guard
 		// address's empty, and its record points at the tenant's default
 		// Guard host.
 		target := "acme.guard.authwise.test"
@@ -134,7 +134,7 @@ func (f *fakeIdentityServer) CreateDomain(ctx context.Context, in *identitypb.Cr
 			d.TrafficTarget = "edge.authwise.test"
 			target = d.GetTrafficTarget()
 		case "console":
-			d.TrafficTarget = "console-edge.authwise.test"
+			d.TrafficTarget = "edge.authwise.test"
 			target = d.GetTrafficTarget()
 		}
 		d.State = corepb.IssuerDomainState_ISSUER_DOMAIN_STATE_PENDING_DNS

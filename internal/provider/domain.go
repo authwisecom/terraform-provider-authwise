@@ -475,7 +475,7 @@ func domainSchema(ctx context.Context) schema.Schema {
 			"A custom Guard address (`purpose = \"guard\"`) is a hostname of yours, such as `guard.acme.com`, that people type into the Guard client in place of the tenant's default address (`<slug>.guard.<estate>`). " +
 			"Its `traffic` record points at that default address, so the tenant needs a slug first, set on the tenant in kit. It is never an issuer URL: people still sign in at the issuer's own host. " +
 			"A console address (`purpose = \"console\"`) is a hostname of yours, such as `admin.acme.com`, where the tenant's administrators open the Authwise console; the host names the tenant, so no slug is needed in the path. " +
-			"Its `traffic` record points at the install's console edge (`traffic_target`). People sign in there at the tenant's own issuer, so the tenant needs home administration (`authwise_tenant_home_administration`) for it to be of use. " +
+			"Its `traffic` record points at the install's edge (`traffic_target`), the same target as a sign-in host's. People sign in there at the tenant's own issuer, so the tenant needs home administration (`authwise_tenant_home_administration`) for it to be of use. " +
 			"No issuer can be bound to a Guard or console address, and an issuer's host never serves the console. Both are custom hosts without setting `custom`, and take the same records, waits and activation as an issuer's custom host.\n\n" +
 			"For a custom host, create returns once the records are known, so DNS resources can take them in the same apply. Add the challenge record first and point traffic only once `state` is `PROVISIONING` or `ACTIVE`, " +
 			"so the certificate exists before any request arrives: `authwise_domain_activation` waits for that between the two records, in one apply. Both records must be DNS-only (on Cloudflare, `proxied = false`), and the challenge record stays for as long as the domain does: renewal depends on it. " +
@@ -544,7 +544,7 @@ func domainSchema(ctx context.Context) schema.Schema {
 			},
 			"traffic_target": schema.StringAttribute{
 				Computed:            true,
-				MarkdownDescription: "Where a custom host's `traffic` record points: the Authwise install's edge name (kit#911), or for a console address the install's console edge (kit#942). A host claimed before kit#911 keeps the issuer host it recorded. Empty on a native host and on a custom Guard address, whose target is the `traffic` record's value.",
+				MarkdownDescription: "Where a custom host's `traffic` record points: the Authwise install's edge name (kit#911), for a sign-in host and a console address alike (kit#942). A host claimed before kit#911 keeps the issuer host it recorded. Empty on a native host and on a custom Guard address, whose target is the `traffic` record's value.",
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"state": computed("A custom host's state, empty on a native host: `PENDING_DNS` (waiting for the challenge record), `VERIFYING` (issuing the certificate), `PROVISIONING` (attaching it; the hostname routes), `ACTIVE`, " +

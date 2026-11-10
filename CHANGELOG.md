@@ -56,7 +56,8 @@ ENHANCEMENTS:
   kit#942). This is a hostname of the tenant's, such as `admin.acme.com`,
   where its administrators open the Authwise console. It is a custom host
   with the same records, waits and activation as the others, and its
-  traffic record points at the install's console edge. The page has an
+  traffic record points at the install's edge, the same target as a sign-in
+  host's. The page has an
   example.
 * **`authwise_issuer_domain_binding`: a console address is refused**
   (`CONSOLE_DOMAIN_NOT_BINDABLE`), with the remedy: bind the issuer to an
