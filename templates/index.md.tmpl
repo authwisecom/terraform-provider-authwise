@@ -97,9 +97,10 @@ templates, domains and their issuer bindings, and access bindings in the
 tenant's own audiences, Guard's administrative roles among them. Realms,
 users and groups are reached through the tenant's issuer: a home account
 manages the realms that issuer signs people in to, and kit refuses the
-others ("issuer … does not route to realm …"). Do not create realms with a
-home account for now: kit lets it create one that its issuer does not sign
-in to, and then refuses to read or delete it (reported to kit).
+others ("issuer … does not route to realm …"). Do not create realms or
+issuers with a home account for now: kit lets it create one that it then
+cannot read or delete (reported to kit). The home door reaches only the
+tenant's administration issuer.
 
 **What it does not, by design** (HA-D5). The tenant record and everything
 the owner holds: `authwise_tenant_config` (branding, labels, settings),

@@ -64,7 +64,7 @@ func ProviderAppleDataSourceSchema() schema.Schema {
 					MarkdownDescription: "tenants/{tenant}/secrets/{secret}. The tenant must be the tenant of the object holding the reference; the writer must hold identity.secrets.use.",
 					Optional:            true,
 				}},
-				MarkdownDescription: "The .p8 private key, PEM. Minted into an ES256 client-secret JWT per exchange (iss=team_id, sub=client_id, aud=https://appleid.apple.com, exp=5 min); the key never leaves the process and never sits in interaction state.",
+				MarkdownDescription: "The .p8 private key, PEM. It signs a new ES256 client-secret JWT on each exchange (iss=team_id, sub=client_id, aud=https://appleid.apple.com, exp=5 min); the key never leaves the process and never sits in interaction state.",
 				Optional:            true,
 			},
 			"scopes": schema.ListAttribute{

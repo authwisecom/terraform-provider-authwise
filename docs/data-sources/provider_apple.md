@@ -22,7 +22,7 @@ Builds a ProviderApple config and exposes its google.protobuf.Any encoding as `a
 - `client_id` (String) The Services ID.
 - `identifier_claim` (String) Default: sub.
 - `key_id` (String)
-- `private_key_ref` (Attributes) The .p8 private key, PEM. Minted into an ES256 client-secret JWT per exchange (iss=team_id, sub=client_id, aud=https://appleid.apple.com, exp=5 min); the key never leaves the process and never sits in interaction state. (see [below for nested schema](#nestedatt--private_key_ref))
+- `private_key_ref` (Attributes) The .p8 private key, PEM. It signs a new ES256 client-secret JWT on each exchange (iss=team_id, sub=client_id, aud=https://appleid.apple.com, exp=5 min); the key never leaves the process and never sits in interaction state. (see [below for nested schema](#nestedatt--private_key_ref))
 - `scopes` (List of String) Default: name email.
 - `team_id` (String)
 

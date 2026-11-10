@@ -50,7 +50,7 @@ func FactorWebAuthnDataSourceSchema() schema.Schema {
 				Optional:            true,
 			},
 			"rp_id": schema.StringAttribute{
-				MarkdownDescription: "The relying party id every credential is scoped to. Default the issuer's host. CHANGING IT ORPHANS EVERY CREDENTIAL enrolled under the old one — the browser will not offer them to a different rp_id — which is why a realm sets it once, before anybody enrols.",
+				MarkdownDescription: "The relying party id every credential is scoped to. Default the issuer's host. CHANGING IT ORPHANS EVERY CREDENTIAL enrolled under the old one — the browser will not offer them to a different rp_id — which is why a realm sets it once, before anybody enrolls.",
 				Optional:            true,
 			},
 			"user_verification": schema.StringAttribute{

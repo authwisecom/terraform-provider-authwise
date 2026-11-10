@@ -23,7 +23,7 @@ Builds a FactorWebAuthn config and exposes its google.protobuf.Any encoding as `
 - `hints` (List of String) L3 hints, passed through: security-key | client-device | hybrid.
 - `resident_key` (String) required | preferred | discouraged. Default preferred, so a credential enrolled as a factor can later sign in as a passkey.
 - `rp_display_name` (String) What the browser's passkey sheet names. Default the issuer's host.
-- `rp_id` (String) The relying party id every credential is scoped to. Default the issuer's host. CHANGING IT ORPHANS EVERY CREDENTIAL enrolled under the old one — the browser will not offer them to a different rp_id — which is why a realm sets it once, before anybody enrols.
+- `rp_id` (String) The relying party id every credential is scoped to. Default the issuer's host. CHANGING IT ORPHANS EVERY CREDENTIAL enrolled under the old one — the browser will not offer them to a different rp_id — which is why a realm sets it once, before anybody enrolls.
 - `user_verification` (String) required | preferred | discouraged. Default preferred. A realm that wants a passkey to count as two kinds of proof alone sets required.
 
 ### Read-Only

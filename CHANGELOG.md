@@ -13,8 +13,11 @@ BREAKING CHANGES:
 
 NOTES:
 
-* **apis v0.62.0** (from v0.61.0): `Domain.purpose` and the console domain
-  (kit#942). Needs kit with kit#942.
+* **apis v0.63.0** (from v0.61.0). v0.62.0 adds `Domain.purpose` and the
+  console domain (kit#942), so this release needs kit with kit#942. v0.63.0
+  brings kit's WD0 wording to the descriptions generated from its comments,
+  such as `authwise_provider_apple` and `authwise_factor_webauthn`. It also
+  adds `PurgeAudience`, which the provider does not use.
 
 * **Release train 2026.11.2** (devops#160). One development batch; not
   tagged until the batch is whole.
