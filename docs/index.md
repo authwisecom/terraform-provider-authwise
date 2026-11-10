@@ -134,10 +134,22 @@ A realm behind another issuer is refused ("issuer … does not route to realm
 **Issuers.** A home account reads and updates the tenant's own sign-in
 issuer, the one its token comes from, and no other. It never creates or
 deletes an issuer: another issuer is a new front door for signing people in,
-so that stays the tenant owner's, from central. kit refuses it to a home
-account whatever the tenant's catalog says, with `PermissionDenied`, and so
-it does deleting the administration audience or Guard's. Declare
-`authwise_issuer` in a configuration run with a central service account.
+so that stays the tenant owner's, from central. Declare `authwise_issuer` in
+a configuration run with a central service account. kit refuses a home
+account whatever the tenant's catalog says, with `PermissionDenied`:
+
+- creating an issuer: "home administration: creating an issuer is the
+  tenant owner's, from central: a second issuer is a new sign-in front door";
+- destroying the tenant's sign-in issuer: "home administration: deleting an
+  issuer is the tenant owner's, from central: the administration issuer is
+  how its administrators sign in";
+- destroying the administration audience or Guard's: "home administration:
+  audience a-… is the administration entry's and is never deleted by a home
+  administrator".
+
+A refused destroy leaves the resource in state, so remove it from the
+configuration with a `removed` block (`lifecycle { destroy = false }`), not
+by deleting it. These refusals need kit develop 4907e8dd or later.
 
 **What it does not, by design** (HA-D5). The tenant record and everything
 the owner holds: `authwise_tenant_config` (branding, labels, settings),

@@ -72,7 +72,12 @@ ENHANCEMENTS:
   administration audience and `tenant_id` to the tenant. The provider's
   index page lists what such an account reaches. The tenant record, home
   administration and service accounts are out of its reach by design
-  (HA-D5). Verified against kit 1.84.4-67a52d37.
+  (HA-D5). It manages its own sign-in issuer's realms, and new realms that
+  no issuer signs in to yet (kit develop aca155cd or later). It never
+  creates or deletes an issuer, and never deletes the administration or
+  Guard audience. kit refuses those with `PermissionDenied` and a stated
+  reason (kit develop 4907e8dd or later). Verified against kit
+  1.84.4-67a52d37, 1.84.4-aca155cd and 1.84.4-4907e8dd.
 * **Tenancy refusals say why** (tf#71). When the tenancy service refuses
   the credential (`Unauthenticated` or `PermissionDenied`),
   `authwise_tenant_config`, `authwise_tenant_home_administration`,
