@@ -594,14 +594,18 @@ func (r *domainResource) ValidateConfig(ctx context.Context, req resource.Valida
 		return
 	}
 
-	h := hostname.ValueString()
-	custom := customFlag.ValueBool() || customPurpose(purpose.ValueString())
+	validateDomainHostname(hostname.ValueString(), customFlag.ValueBool() || customPurpose(purpose.ValueString()), &resp.Diagnostics)
+}
+
+// validateDomainHostname holds a custom host to an FQDN without a port, and a
+// native one to a lower-case host that may carry a port.
+func validateDomainHostname(h string, custom bool, diags *diag.Diagnostics) {
 	switch {
 	case custom && !hostnamePattern.MatchString(h):
-		resp.Diagnostics.AddAttributeError(path.Root(hostnameAttribute), "invalid custom hostname",
+		diags.AddAttributeError(path.Root(hostnameAttribute), "invalid custom hostname",
 			"must be a lower-case fully qualified hostname such as login.acme.com or guard.acme.com, without a scheme, port, path or trailing dot")
 	case !custom && !nativeHostnamePattern.MatchString(h):
-		resp.Diagnostics.AddAttributeError(path.Root(hostnameAttribute), "invalid hostname",
+		diags.AddAttributeError(path.Root(hostnameAttribute), "invalid hostname",
 			"must be a lower-case hostname such as acme.id.authwise.com, optionally with a port, without a scheme, path or trailing dot")
 	}
 }
@@ -642,16 +646,9 @@ func (r *domainResource) Create(ctx context.Context, req resource.CreateRequest,
 		return
 	}
 
-	purpose := ""
-	if !plan.Purpose.IsUnknown() {
-		purpose = plan.Purpose.ValueString()
-	}
-	in := &domain{Hostname: plan.Hostname.ValueString(), Custom: plan.Custom.ValueBool() || customPurpose(purpose), Purpose: purpose}
-	if !plan.Labels.IsUnknown() {
-		resp.Diagnostics.Append(plan.Labels.ElementsAs(ctx, &in.Labels, false)...)
-		if resp.Diagnostics.HasError() {
-			return
-		}
+	in := plan.toDomain(ctx, &resp.Diagnostics)
+	if resp.Diagnostics.HasError() {
+		return
 	}
 
 	out, err := r.client.CreateDomain(ctx, parent, in)
@@ -834,6 +831,20 @@ func (r *domainResource) ImportState(ctx context.Context, req resource.ImportSta
 	}
 
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root(tfruntime.NameAttribute), req.ID)...)
+}
+
+// toDomain is the domain a create sends: a Guard or console purpose is
+// always a custom host; an unknown purpose or labels is left to kit.
+func (m *domainModel) toDomain(ctx context.Context, diags *diag.Diagnostics) *domain {
+	purpose := ""
+	if !m.Purpose.IsUnknown() {
+		purpose = m.Purpose.ValueString()
+	}
+	in := &domain{Hostname: m.Hostname.ValueString(), Custom: m.Custom.ValueBool() || customPurpose(purpose), Purpose: purpose}
+	if !m.Labels.IsUnknown() {
+		diags.Append(m.Labels.ElementsAs(ctx, &in.Labels, false)...)
+	}
+	return in
 }
 
 func (m *domainModel) fromDomain(d *domain) diag.Diagnostics {

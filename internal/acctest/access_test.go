@@ -8,7 +8,6 @@ import (
 	"time"
 
 	corepb "git.authwise.com/authwise/apis/authwise/types/core/v1alpha1"
-
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/plancheck"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"

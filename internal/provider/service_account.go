@@ -648,8 +648,7 @@ func liveSecret(sa *tenancypb.ServiceAccount, id string) *tenancypb.ServiceAccou
 // kit answers it Unauthenticated or PermissionDenied without saying so
 // (tf#71).
 func tenancyErrorDetail(err error) string {
-	switch status.Code(err) {
-	case codes.Unauthenticated, codes.PermissionDenied:
+	if c := status.Code(err); c == codes.Unauthenticated || c == codes.PermissionDenied {
 		return err.Error() + "\n\nThe tenant record, home administration and service accounts are served at central only. " +
 			"If the provider runs with a home service account (a client of the tenant's own issuer), they are out of its reach by design: " +
 			"manage them in a configuration run with a central service account the tenant owner created. " +

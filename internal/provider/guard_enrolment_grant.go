@@ -370,15 +370,20 @@ func (m *guardEnrolmentGrantModel) sameGrant(g *guardpb.RoleGrant) bool {
 			return false
 		}
 	}
-	anchorType, anchorID := enrolmentAnchorTenant, m.TenantID.ValueString()
-	if !m.NetworkID.IsNull() && m.NetworkID.ValueString() != "" {
-		anchorType, anchorID = enrolmentAnchorNetwork, m.NetworkID.ValueString()
-	}
+	anchorType, anchorID := m.anchor()
 	return g.GetRole() == m.Role.ValueString() &&
 		g.GetSubject().GetType() == m.SubjectType.ValueString() &&
 		g.GetSubject().GetId() == m.SubjectID.ValueString() &&
-		g.GetResourceType() == anchorType &&
-		g.GetResourceId() == anchorID
+		g.GetResourceType() == anchorType && g.GetResourceId() == anchorID
+}
+
+// anchor is the resource type and id the grant is bound at: the network
+// when network_id is set, otherwise the tenant.
+func (m *guardEnrolmentGrantModel) anchor() (string, string) {
+	if !m.NetworkID.IsNull() && m.NetworkID.ValueString() != "" {
+		return enrolmentAnchorNetwork, m.NetworkID.ValueString()
+	}
+	return enrolmentAnchorTenant, m.TenantID.ValueString()
 }
 
 // Update only fills in what a grant from before role and network_id were

@@ -134,23 +134,8 @@ func (r *accessBindingResource) ModifyPlan(ctx context.Context, req resource.Mod
 		return
 	}
 
-	var role, tenant, audience types.String
-	resp.Diagnostics.Append(req.Plan.GetAttribute(ctx, path.Root("role_name"), &role)...)
-	resp.Diagnostics.Append(req.Plan.GetAttribute(ctx, path.Root("tenant_id"), &tenant)...)
-	resp.Diagnostics.Append(req.Plan.GetAttribute(ctx, path.Root("audience_id"), &audience)...)
-	if resp.Diagnostics.HasError() || !guardAdministrativeRoles[role.ValueString()] || audience.IsUnknown() || tenant.IsUnknown() {
-		return
-	}
-
-	tenantID := tenant.ValueString()
-	if tenantID == "" {
-		tenantID = r.defaults["tenant_id"]
-	}
-	audienceID := audience.ValueString()
-	if audienceID == "" {
-		audienceID = r.defaults["audience_id"]
-	}
-	if tenantID == "" || audienceID == "" {
+	role, tenantID, audienceID, ok := r.guardRoleTarget(ctx, req.Plan, &resp.Diagnostics)
+	if !ok {
 		return
 	}
 
@@ -173,7 +158,33 @@ func (r *accessBindingResource) ModifyPlan(ctx context.Context, req resource.Mod
 			"Bind it in %s instead, which needs home administration on the tenant (authwise_tenant_home_administration), "+
 			"or with authwise_guard_enrolment_grant, which binds it there for you. "+
 			"The tenant's central administrators hold Guard's tenant administrator role through kit, from their seat, and need no binding (kit#940, tf#72).",
-			role.ValueString(), audienceID, guardRoleUser, administration))
+			role, audienceID, guardRoleUser, administration))
+}
+
+// guardRoleTarget is the planned role, tenant and audience when the role is
+// one of Guard's administrative roles and both ids are known, over the
+// provider defaults; ok is false when there is nothing to check.
+func (r *accessBindingResource) guardRoleTarget(ctx context.Context, plan tfsdk.Plan, diags *diag.Diagnostics) (role, tenantID, audienceID string, ok bool) {
+
+	var roleV, tenantV, audienceV types.String
+	diags.Append(plan.GetAttribute(ctx, path.Root("role_name"), &roleV)...)
+	diags.Append(plan.GetAttribute(ctx, path.Root("tenant_id"), &tenantV)...)
+	diags.Append(plan.GetAttribute(ctx, path.Root("audience_id"), &audienceV)...)
+	if diags.HasError() || !guardAdministrativeRoles[roleV.ValueString()] || audienceV.IsUnknown() || tenantV.IsUnknown() {
+		return "", "", "", false
+	}
+
+	tenantID = valueOrDefault(tenantV, r.defaults["tenant_id"])
+	audienceID = valueOrDefault(audienceV, r.defaults["audience_id"])
+	return roleV.ValueString(), tenantID, audienceID, tenantID != "" && audienceID != ""
+}
+
+// valueOrDefault is v's value, or fallback when v is null or empty.
+func valueOrDefault(v types.String, fallback string) string {
+	if s := v.ValueString(); s != "" {
+		return s
+	}
+	return fallback
 }
 
 // validateRole resolves the planned role_name in the binding's own audience
