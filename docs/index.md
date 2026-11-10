@@ -122,12 +122,14 @@ or a narrower role of the tenant's), with no condition: the step-up condition
 tests a person's sign-in, which a client never has.
 
 **What it reaches.** Identity providers, SAML, audiences, clients and their
-secrets, certificates, secrets, endpoints, realms, factors, users, groups,
-themes, assets, message templates, domains and their issuer bindings, and
-access bindings in the tenant's own audiences, Guard's administrative roles
-among them. People and their realms are reached through the tenant's issuer:
-a home account manages users in the realms that issuer signs people in to,
-and kit refuses the others ("issuer … does not route to realm …").
+secrets, certificates, secrets, endpoints, factors, themes, assets, message
+templates, domains and their issuer bindings, and access bindings in the
+tenant's own audiences, Guard's administrative roles among them. Realms,
+users and groups are reached through the tenant's issuer: a home account
+manages the realms that issuer signs people in to, and kit refuses the
+others ("issuer … does not route to realm …"). Do not create realms with a
+home account for now: kit lets it create one that its issuer does not sign
+in to, and then refuses to read or delete it (reported to kit).
 
 **What it does not, by design** (HA-D5). The tenant record and everything
 the owner holds: `authwise_tenant_config` (branding, labels, settings),
