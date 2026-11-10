@@ -10,6 +10,8 @@ NOTES:
   until 2026.11.3 (`authwise_guard_enrolment_grant`,
   `guardcontrol.networks.enrol`). Two error summaries change text:
   "create service account secret failed" and "granting enrollment failed".
+* **tfinfra v0.0.23** (from v0.0.22): the `keepers` description on
+  `authwise_client_secret` says the successor is created. No other change.
 
 ## 0.32.0 (November 7, 2026)
 

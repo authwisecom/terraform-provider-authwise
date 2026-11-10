@@ -61,7 +61,7 @@ func ClientSecretResourceSchema() schema.Schema {
 			},
 			"keepers": schema.MapAttribute{
 				ElementType:         types.StringType,
-				MarkdownDescription: "Arbitrary values that replace the resource when any of them changes, never sent to the API. Change one to rotate: with `create_before_destroy`, the successor is minted before this one is deleted.",
+				MarkdownDescription: "Arbitrary values that replace the resource when any of them changes, never sent to the API. Change one to rotate: with `create_before_destroy`, the successor is created before this one is deleted.",
 				Optional:            true,
 				PlanModifiers:       []planmodifier.Map{mapplanmodifier.RequiresReplace()},
 			},

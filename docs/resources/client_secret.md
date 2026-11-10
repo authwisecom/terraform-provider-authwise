@@ -49,7 +49,7 @@ output "ci_client_secret" {
 - `client_id` (String) Parent identifier `client_id`; overrides the provider default, and reads back from the name. Changing a configured one replaces the resource.
 - `expires_at` (String) `expires_at` as an RFC 3339 timestamp.
 - `issuer_id` (String) Parent identifier `issuer_id`; overrides the provider default, and reads back from the name. Changing a configured one replaces the resource.
-- `keepers` (Map of String) Arbitrary values that replace the resource when any of them changes, never sent to the API. Change one to rotate: with `create_before_destroy`, the successor is minted before this one is deleted.
+- `keepers` (Map of String) Arbitrary values that replace the resource when any of them changes, never sent to the API. Change one to rotate: with `create_before_destroy`, the successor is created before this one is deleted.
 - `tenant_id` (String) Parent identifier `tenant_id`; overrides the provider default, and reads back from the name. Changing a configured one replaces the resource.
 
 ### Read-Only
