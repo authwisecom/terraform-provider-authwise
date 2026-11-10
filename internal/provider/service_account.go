@@ -226,7 +226,7 @@ func (r *serviceAccountResource) Create(ctx context.Context, req resource.Create
 
 	out, err := r.client.CreateServiceAccount(ctx, in)
 	if err != nil {
-		resp.Diagnostics.AddError("create service account failed", err.Error())
+		resp.Diagnostics.AddError("create service account failed", tenancyErrorDetail(err))
 		return
 	}
 
@@ -286,9 +286,9 @@ func (r *serviceAccountResource) setRoles(ctx context.Context, name string, role
 		return out
 	case status.Code(err) == codes.InvalidArgument:
 		diags.AddAttributeError(path.Root("roles"), "kit refused the service account's roles",
-			err.Error()+"\n\nA service account may hold only tenant.admin, tenant.viewer and guardcontrol.admin, and only those the estate's catalog declares.")
+			tenancyErrorDetail(err)+"\n\nA service account may hold only tenant.admin, tenant.viewer and guardcontrol.admin, and only those the estate's catalog declares.")
 	default:
-		diags.AddError("setting the service account's roles failed", err.Error())
+		diags.AddError("setting the service account's roles failed", tenancyErrorDetail(err))
 	}
 	return nil
 }
@@ -311,7 +311,7 @@ func (r *serviceAccountResource) Read(ctx context.Context, req resource.ReadRequ
 			resp.State.RemoveResource(ctx)
 			return
 		}
-		resp.Diagnostics.AddError("read service account failed", err.Error())
+		resp.Diagnostics.AddError("read service account failed", tenancyErrorDetail(err))
 		return
 	}
 
@@ -366,7 +366,7 @@ func (r *serviceAccountResource) Delete(ctx context.Context, req resource.Delete
 	if len(state.Roles.Elements()) > 0 {
 		_, err := r.client.SetServiceAccountRoles(ctx, &tenancypb.SetServiceAccountRolesRequest{Name: state.Name.ValueString()})
 		if err != nil && !aip.IsNotFound(err) {
-			resp.Diagnostics.AddError("unbinding the service account's roles failed", err.Error())
+			resp.Diagnostics.AddError("unbinding the service account's roles failed", tenancyErrorDetail(err))
 			return
 		}
 	}
@@ -379,7 +379,7 @@ func (r *serviceAccountResource) Delete(ctx context.Context, req resource.Delete
 			err.Error()+"\n\nkit refuses to delete a service account while a binding other than its roles names it. "+
 				"Remove the binding first: referencing the account by expression (authwise_service_account.x.client_id) makes Terraform destroy the binding before the account.")
 	default:
-		resp.Diagnostics.AddError("delete service account failed", err.Error())
+		resp.Diagnostics.AddError("delete service account failed", tenancyErrorDetail(err))
 	}
 }
 
@@ -565,7 +565,7 @@ func (r *serviceAccountSecretResource) Create(ctx context.Context, req resource.
 
 	out, err := r.client.MintServiceAccountSecret(ctx, mint)
 	if err != nil {
-		resp.Diagnostics.AddError("create service account secret failed", err.Error())
+		resp.Diagnostics.AddError("create service account secret failed", tenancyErrorDetail(err))
 		return
 	}
 
@@ -603,7 +603,7 @@ func (r *serviceAccountSecretResource) Read(ctx context.Context, req resource.Re
 			resp.State.RemoveResource(ctx)
 			return
 		}
-		resp.Diagnostics.AddError("read service account failed", err.Error())
+		resp.Diagnostics.AddError("read service account failed", tenancyErrorDetail(err))
 		return
 	}
 
@@ -639,4 +639,21 @@ func liveSecret(sa *tenancypb.ServiceAccount, id string) *tenancypb.ServiceAccou
 		}
 	}
 	return nil
+}
+
+// tenancyErrorDetail is a tenancy service error with what a refusal of the
+// credential most often means. The tenant record, home administration and
+// service accounts are central's: a home service account (a client of the
+// tenant's own issuer, kit#939) never reaches them, by design (HA-D5), and
+// kit answers it Unauthenticated or PermissionDenied without saying so
+// (tf#71).
+func tenancyErrorDetail(err error) string {
+	switch status.Code(err) {
+	case codes.Unauthenticated, codes.PermissionDenied:
+		return err.Error() + "\n\nThe tenant record, home administration and service accounts are served at central only. " +
+			"If the provider runs with a home service account (a client of the tenant's own issuer), they are out of its reach by design: " +
+			"manage them in a configuration run with a central service account the tenant owner created. " +
+			"Otherwise, check that the credential is current and holds the permission."
+	}
+	return err.Error()
 }

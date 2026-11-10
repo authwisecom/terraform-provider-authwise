@@ -285,14 +285,14 @@ func domainHint(d *domain) string {
 // domainRefusals is the remedy for each ErrorInfo reason create is
 // refused with.
 var domainRefusals = map[string]string{
-	"HOSTNAME_CLAIMED":    "The hostname is already claimed in this Authwise install, by another issuer or tenant, or by a domain of yours that is still being deleted (a deleted domain releases its hostname only once its certificate and edge entries are gone).",
-	"HOSTNAME_APEX":       "The hostname is a zone apex, and a CNAME cannot sit at an apex. Use a subdomain such as login.<your domain>, or your DNS provider's CNAME flattening on a subdomain you point at it.",
-	"HOSTNAME_IS_ISSUER":  "The hostname is an Authwise host already: bind the issuer to its native domain with authwise_issuer_domain_binding instead.",
-	"PLAN_REQUIRED":       "Custom domains need a higher plan.",
+	"HOSTNAME_CLAIMED":   "The hostname is already claimed in this Authwise install, by another issuer or tenant, or by a domain of yours that is still being deleted (a deleted domain releases its hostname only once its certificate and edge entries are gone).",
+	"HOSTNAME_APEX":      "The hostname is a zone apex, and a CNAME cannot sit at an apex. Use a subdomain such as login.<your domain>, or your DNS provider's CNAME flattening on a subdomain you point at it.",
+	"HOSTNAME_IS_ISSUER": "The hostname is an Authwise host already: bind the issuer to its native domain with authwise_issuer_domain_binding instead.",
+	"PLAN_REQUIRED":      "Custom domains need a higher plan.",
 	"CONSOLE_DOMAIN_NOT_CUSTOM": "A console address is a hostname of yours, such as admin.acme.com: set custom = true, or leave custom unset. " +
 		"The tenant's people already reach the console at the install's console host with the tenant's slug in the path.",
 	"DOMAIN_PRODUCT_RETIRED": "kit no longer takes product on a domain: purpose replaces it (kit#942). This provider sends purpose, so a kit asking for it is older than the provider expects.",
-	"DOMAINS_UNAVAILABLE": "This Authwise install has no domain controller, so a domain added to it would never get a certificate. Custom domains are not available on it.",
+	"DOMAINS_UNAVAILABLE":    "This Authwise install has no domain controller, so a domain added to it would never get a certificate. Custom domains are not available on it.",
 }
 
 // domainCreateError words kit's refusal of a domain create by its

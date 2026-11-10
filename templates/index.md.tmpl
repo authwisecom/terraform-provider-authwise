@@ -68,6 +68,46 @@ included, are served at central only, from kit v1.43.0.
 The credential's permissions bound what Terraform can do. Setting a secret
 reference, for example, needs `identity.secrets.use`.
 
+### A home service account
+
+A tenant with home administration (`authwise_tenant_home_administration`)
+can also run Terraform with a **home service account**: a service client of
+the tenant's own issuer, created by one of the tenant's own administrators
+in the console's Access page, with no Authwise owner involved (kit#939). Its
+token comes from the tenant's issuer, for the tenant's administration
+audience, and it reaches exactly what a home administrator with the same
+roles reaches:
+
+| attribute | value |
+| --- | --- |
+| `token_url` | the tenant's issuer's token endpoint, `<issuer URL>/oauth/token` |
+| `client_id`, `client_secret` | the account's, from the console (the secret is shown once) |
+| `audience` | the administration audience's id (`a-…`), from the issuer's `/.well-known/authwise-configuration` |
+| `endpoint` | the install's admin API, as for a central account |
+| `tenant_id` | the tenant: a home account reaches only its own |
+
+Its roles are bindings in the administration audience at the tenant
+(`administration.admin`, `administration.identity`, `administration.viewer`
+or a narrower role of the tenant's), with no condition: the step-up condition
+tests a person's sign-in, which a client never has.
+
+**What it reaches.** Identity providers, SAML, audiences, clients and their
+secrets, certificates, secrets, endpoints, realms, factors, users, groups,
+themes, assets, message templates, domains and their issuer bindings, and
+access bindings in the tenant's own audiences, Guard's administrative roles
+among them. People and their realms are reached through the tenant's issuer:
+a home account manages users in the realms that issuer signs people in to,
+and kit refuses the others ("issuer … does not route to realm …").
+
+**What it does not, by design** (HA-D5). The tenant record and everything
+the owner holds: `authwise_tenant_config` (branding, labels, settings),
+`authwise_tenant_home_administration`, `authwise_service_account` and
+`authwise_service_account_secret`, and the estate. kit refuses them with
+`Unauthenticated` or `PermissionDenied`, and the provider adds why. Keep those in a configuration run with a central service
+account the tenant owner created. Guard's own API (`authwise_guard_*` other
+than the grants) is a separate audience and is out of a home account's
+reach for now.
+
 ## Guard
 
 The Guard resources talk to guard-control rather than kit. Set

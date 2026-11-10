@@ -212,13 +212,13 @@ func (r *tenantConfigResource) write(ctx context.Context, plan *tenantConfigMode
 		plan.Administration, d = administrationValue(out)
 		diags.Append(d...)
 	case status.Code(err) == codes.InvalidArgument:
-		diags.AddAttributeError(path.Root(configAttribute), "kit refused the tenant config", err.Error())
+		diags.AddAttributeError(path.Root(configAttribute), "kit refused the tenant config", tenancyErrorDetail(err))
 	case status.Code(err) == codes.PermissionDenied:
-		diags.AddError("writing the tenant config was refused", err.Error()+
+		diags.AddError("writing the tenant config was refused", tenancyErrorDetail(err)+
 			"\n\nWriting a tenant needs tenancy.tenants.update at the tenant. A service account holds it through tenant.admin, "+
 			"from kit v1.45.0 (on an estate that was already running, once the role is updated at central); earlier kit grants it only to the tenant's owners and the platform's tenancy roles.")
 	default:
-		diags.AddError("writing the tenant config failed", err.Error())
+		diags.AddError("writing the tenant config failed", tenancyErrorDetail(err))
 	}
 }
 
@@ -240,7 +240,7 @@ func (r *tenantConfigResource) Read(ctx context.Context, req resource.ReadReques
 			resp.State.RemoveResource(ctx)
 			return
 		}
-		resp.Diagnostics.AddError("read tenant failed", err.Error())
+		resp.Diagnostics.AddError("read tenant failed", tenancyErrorDetail(err))
 		return
 	}
 
@@ -314,7 +314,7 @@ func (r *tenantConfigResource) Delete(ctx context.Context, req resource.DeleteRe
 		UpdateMask: &fieldmaskpb.FieldMask{Paths: paths},
 	})
 	if err != nil && !aip.IsNotFound(err) {
-		resp.Diagnostics.AddError("clearing the tenant config failed", err.Error())
+		resp.Diagnostics.AddError("clearing the tenant config failed", tenancyErrorDetail(err))
 	}
 }
 

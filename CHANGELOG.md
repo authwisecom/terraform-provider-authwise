@@ -63,6 +63,20 @@ ENHANCEMENTS:
   (`CONSOLE_DOMAIN_NOT_BINDABLE`), with the remedy: bind the issuer to an
   issuer host instead. `DOMAIN_NOT_BINDABLE` now speaks of `purpose`.
 
+* **Running with a home service account** (kit#939, tf#71). The provider
+  works with a service client of a tenant's own issuer, for the tenant's
+  administration audience. Set `token_url` to that issuer, `audience` to the
+  administration audience and `tenant_id` to the tenant. The provider's
+  index page lists what such an account reaches. The tenant record, home
+  administration and service accounts are out of its reach by design
+  (HA-D5). Verified against kit 1.84.4-67a52d37.
+* **Tenancy refusals say why** (tf#71). When the tenancy service refuses
+  the credential (`Unauthenticated` or `PermissionDenied`),
+  `authwise_tenant_config`, `authwise_tenant_home_administration`,
+  `authwise_service_account` and `authwise_service_account_secret` now
+  explain it: a home service account never reaches them, so use a central
+  account the owner created.
+
 BUILD:
 
 * **tfinfra v0.0.23** (from v0.0.22): the `keepers` description on

@@ -184,7 +184,7 @@ func (r *tenantHomeAdministrationResource) Create(ctx context.Context, req resou
 		IssuerId: plan.IssuerID.ValueString(),
 	})
 	if err != nil {
-		summary, detail := "enabling home administration failed", err.Error()
+		summary, detail := "enabling home administration failed", tenancyErrorDetail(err)
 		if status.Code(err) == codes.PermissionDenied {
 			summary = "enabling home administration was refused"
 			detail += "\n\nIt needs tenancy.administration.enable at the tenant, which only tenancy.owner holds; a service account with tenant.admin is refused. " +
@@ -235,7 +235,7 @@ func (r *tenantHomeAdministrationResource) Read(ctx context.Context, req resourc
 			resp.State.RemoveResource(ctx)
 			return
 		}
-		resp.Diagnostics.AddError("read tenant failed", err.Error())
+		resp.Diagnostics.AddError("read tenant failed", tenancyErrorDetail(err))
 		return
 	}
 	if !state.fromTenant(t, &resp.Diagnostics) {
