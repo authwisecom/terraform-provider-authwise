@@ -132,6 +132,25 @@ lint:
     - if: '$CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/'
     - if: '$CI_COMMIT_BRANCH'
 
+# A Go or dependency advisory that the code reaches turns the pipeline red
+# (govulncheck exits non-zero only on a called vulnerability), so the next
+# one is found here, not by hand: including on the tag pipeline, where
+# release needs it, so a release cannot ship over one. Like kit's and
+# awctl's job: no needs on test, the scan takes seconds. Fix a finding by a
+# bump (the Go image, or the module); never exclude one without telling
+# plan. The release binaries are built in this same image, so what this
+# scans is the Go they ship with.
+vuln:
+  stage: lint
+  extends: .go-cache
+  needs: []
+  script:
+    - go install golang.org/x/vuln/cmd/govulncheck@latest
+    - "$GOPATH/bin/govulncheck ./..."
+  rules:
+    - if: '$CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/'
+    - if: '$CI_COMMIT_BRANCH'
+
 # The stamped multi-platform build, shared by the tag release and the dev
 # publish so both ship identical artifacts.
 .dist:
@@ -165,7 +184,7 @@ lint:
 publish-dev:
   stage: release
   extends: .go-cache
-  needs: [version, test, acceptance, docs, lint]
+  needs: [version, test, acceptance, docs, lint, vuln]
   script:
     - !reference [.dist, script]
     - !reference [.registry-upload, script]
@@ -178,7 +197,7 @@ publish-dev:
 release:
   stage: release
   extends: .go-cache
-  needs: [version, test, acceptance, docs, lint]
+  needs: [version, test, acceptance, docs, lint, vuln]
   script:
     - !reference [.dist, script]
     - !reference [.registry-upload, script]
