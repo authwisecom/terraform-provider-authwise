@@ -15,7 +15,7 @@ variables:
 
 default:
   tags: ['pub-amd64']
-  image: registry.authwise.com/authwise/build-containers/go-build:18
+  image: registry.authwise.com/authwise/build-containers/go-build:20
 
 stages:
   - test

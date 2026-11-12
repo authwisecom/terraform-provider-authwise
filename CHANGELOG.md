@@ -88,6 +88,11 @@ NOTES:
   `theme_id`. v0.64.0 removed self-service tenancy RPCs, which the
   provider does not use.
 
+* **Built with Go 1.26.11** (CI image `go-build:20`), which fixes
+  GO-2026-6859 in the standard library. `golang.org/x/net` moves to
+  v0.60.0 for four HTTP/2 server advisories (GO-2026-6603, -6611, -6612,
+  -6617), and the module now needs Go 1.26 to build.
+
 ## 0.33.0 (November 10, 2026)
 
 BREAKING CHANGES:
