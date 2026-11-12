@@ -2,6 +2,7 @@ package acctest_test
 
 import (
 	"context"
+	"maps"
 	"slices"
 	"strings"
 	"time"
@@ -19,22 +20,51 @@ import (
 // v0.65.0): a copy per key, channel and locale. :apply writes it live in
 // one call, with its managed_by mark; Create and Patch write drafts only;
 // :publish takes a draft live and clears the mark; Delete is the reset to
-// the built-in. Unlike kit before its part catalog lands, the fake takes
-// texts, checked against the parts kit described.
+// the built-in. texts are checked against each key's parts, as kit#953's
+// part catalog checks them (apis v0.66.0).
 
 // fakeMessagePublisher is who the fake records as publishing.
 const fakeMessagePublisher = "c-acc"
 
-// fakeMessageKeys are the keys the fake's catalog offers; anything else is
-// refused at save, as kit refuses it.
-var fakeMessageKeys = []string{"tenant-invitation", "password-recovery"}
+// fakeMessageParts are each key's email parts and their cases, as kit
+// lists them (kit#953): not the same on every key. The fake ships wording
+// in en only.
+var fakeMessageParts = map[string]map[string][]string{
+	"tenant-invitation": {
+		"subject": {"administration", "join"}, "greeting": nil, "body": {"administration", "join"},
+		"button": nil, "instructions": {"link_only", "password"}, "details": nil, "note": nil,
+	},
+	"mfa-otp": {
+		"subject": {"enrolment", "sign_in"}, "greeting": nil, "body": {"enrolment", "sign_in"},
+		"details": nil, "note": {"enrolment", "sign_in"},
+	},
+}
 
-// fakeMessageParts are the email parts every key has (kit#953), and the
-// invitation body's cases.
-var (
-	fakeMessageParts    = []string{"subject", "greeting", "body", "button", "details", "note"}
-	fakeMessageVariants = map[string][]string{"body": {"administration", "join"}}
-)
+// fakeShippedLocale is the one locale the fake ships wording in.
+const fakeShippedLocale = "en"
+
+// ListMessageKeys lists the fake's keys with their parts.
+func (f *fakeIdentityServer) ListMessageKeys(_ context.Context, _ *identitypb.ListMessageKeysRequest) (*identitypb.ListMessageKeysResponse, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.listKeys++
+	if f.keysUnavailable {
+		return nil, status.Error(codes.Unavailable, "message keys unavailable")
+	}
+	out := &identitypb.ListMessageKeysResponse{}
+	for _, key := range slices.Sorted(maps.Keys(fakeMessageParts)) {
+		mk := &identitypb.MessageKeyMetadata{Key: key, Channels: []string{"email"}, Locales: []string{fakeShippedLocale}}
+		for _, name := range slices.Sorted(maps.Keys(fakeMessageParts[key])) {
+			p := &identitypb.MessagePart{Name: name, Channel: "email"}
+			for _, v := range fakeMessageParts[key][name] {
+				p.Variants = append(p.Variants, &identitypb.MessagePartVariant{Name: v})
+			}
+			mk.Parts = append(mk.Parts, p)
+		}
+		out.MessageKeys = append(out.MessageKeys, mk)
+	}
+	return out, nil
+}
 
 func (f *fakeIdentityServer) ListMessageTemplates(ctx context.Context, req *identitypb.ListMessageTemplatesRequest) (*identitypb.ListMessageTemplatesResponse, error) {
 	f.mu.Lock()
@@ -74,7 +104,7 @@ func (f *fakeIdentityServer) ApplyMessageTemplate(ctx context.Context, req *iden
 	if len(req.GetTexts()) > 0 && whole {
 		return nil, status.Error(codes.InvalidArgument, "texts: set texts, or subject, text_body and html_body; not both")
 	}
-	if err := admitMessageTexts(req.GetTexts()); err != nil {
+	if err := admitMessageTexts(req.GetKey(), req.GetLocale(), req.GetTexts()); err != nil {
 		return nil, err
 	}
 	if err := admitMessageValues(req.GetSubject(), req.GetHtmlBody(), req.GetTextBody()); err != nil {
@@ -203,7 +233,7 @@ func (f *fakeIdentityServer) findMessage(parent, key, channel, locale string) *c
 }
 
 func admitMessageIdentity(key, channel string) error {
-	if !slices.Contains(fakeMessageKeys, key) {
+	if _, ok := fakeMessageParts[key]; !ok {
 		return status.Errorf(codes.InvalidArgument, "key %q is not a message kit sends", key)
 	}
 	if channel != "email" {
@@ -212,18 +242,36 @@ func admitMessageIdentity(key, channel string) error {
 	return nil
 }
 
-// admitMessageTexts refuses an unknown part or variant by name.
-func admitMessageTexts(texts map[string]string) error {
+// admitMessageTexts is kit's check of a copy's parts: an unknown part or
+// case is refused by name, a subject is one line, and a locale kit ships no
+// wording for needs every part.
+func admitMessageTexts(key, locale string, texts map[string]string) error {
+	if len(texts) == 0 {
+		return nil
+	}
+	parts := fakeMessageParts[key]
+	set := map[string]bool{}
 	for name, v := range texts {
 		part, variant, cased := strings.Cut(name, ".")
-		if !slices.Contains(fakeMessageParts, part) {
-			return status.Errorf(codes.InvalidArgument, "texts: %q is not a part of this message", name)
-		}
-		if cased && !slices.Contains(fakeMessageVariants[part], variant) {
+		cases, ok := parts[part]
+		switch {
+		case !ok:
+			return status.Errorf(codes.InvalidArgument, "texts: %q is not a part of %s", name, key)
+		case cased && !slices.Contains(cases, variant):
 			return status.Errorf(codes.InvalidArgument, "texts: %q: part %s has no case %q", name, part, variant)
+		case part == "subject" && strings.ContainsAny(v, "\r\n"):
+			return status.Errorf(codes.InvalidArgument, "texts: %q: a subject is one line", name)
 		}
 		if err := admitMessageValues(v); err != nil {
 			return err
+		}
+		set[part] = true
+	}
+	if locale != fakeShippedLocale {
+		for part := range parts {
+			if !set[part] {
+				return status.Errorf(codes.InvalidArgument, "texts: %q: kit ships no %s wording for %s, so every part must be set", part, locale, key)
+			}
 		}
 	}
 	return nil

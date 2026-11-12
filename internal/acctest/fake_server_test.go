@@ -48,8 +48,12 @@ type fakeIdentityServer struct {
 	themes   map[string]*corepb.Theme
 	// messages are the tenants' message templates (tf#75), by name.
 	messages map[string]*corepb.MessageTemplate
-	// applies counts ApplyMessageTemplate calls.
-	applies int
+	// applies counts ApplyMessageTemplate calls; listKeys counts
+	// ListMessageKeys. keysUnavailable fails ListMessageKeys, as a kit
+	// that cannot be asked at plan.
+	applies         int
+	listKeys        int
+	keysUnavailable bool
 	// scopePerms holds each scope's access-permission set, by name.
 	scopePerms map[string]map[string]bool
 	audiences  map[string]*corepb.Audience

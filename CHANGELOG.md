@@ -34,6 +34,16 @@ BEHAVIOUR CHANGES:
   `{}`, owns it as before. To clear branding that a config no longer
   sets, apply once with `branding = {}`.
 
+* **`authwise_appearance_profile`: destroying the issuer's default hands
+  the default to the one profile left** (kit#953). A new issuer of a
+  tenant whose brand names a theme now starts with kit's own "Default"
+  appearance profile. A configuration that made its own profile the
+  default could not be destroyed: kit refuses deleting the default while
+  another profile stays, so the delete waited a minute and failed. When
+  exactly one other profile is left, the provider now makes it the
+  default and deletes. With several left, the choice is the
+  configuration's, and the delete still waits and then refuses.
+
 DEPRECATIONS:
 
 * **`branding` in `authwise_tenant_config` is deprecated** in favour of
@@ -44,14 +54,31 @@ DEPRECATIONS:
 
 NOTES:
 
-* **apis v0.65.0** (from v0.63.0), kit#953. It needs a kit that serves it
-  (kit develop b74e4ac5 or a later release). `authwise_message` writes
+* **kit#953 changes that reach a configuration.**
+  * A new issuer of a tenant whose brand names a theme (`theme_id`) gets
+    a "Default" appearance profile, and that profile is the default. A
+    configuration's own profile on that issuer is no longer the default
+    by being first: set `is_default = true` on it, or import kit's
+    "Default" and manage it.
+  * Deleting an issuer deletes its appearance profiles with it.
+  * A tenant created on kit#953 or later starts with a theme "Brand",
+    named in its brand's `theme_id`. `authwise_tenant_branding` owns the
+    whole brand, so leaving `theme_id` out of it clears that look. So
+    does an `authwise_tenant_config` whose `config` still sets `branding`
+    without `themeId`. Name the theme, or import it as `authwise_theme`.
+  * The brand name in mail is now `branding.display_name`, then the
+    tenant's display name. An appearance profile's `display_name` is a
+    label only.
+
+* **apis v0.66.0** (from v0.63.0), kit#953. It needs a kit that serves it
+  (kit develop 0c27140e or a later release). `authwise_message` writes
   through `ApplyMessageTemplate`: one call that writes, publishes, clears
   any draft and sets the configuration mark (`managed_by`, `terraform` by
-  default). kit refuses `texts` until its part catalog lands; the whole
-  mail works now. `data.authwise_tenant_config`'s `branding` gains
-  `display_name` and `theme_id`. v0.64.0 removed self-service tenancy
-  RPCs, which the provider does not use.
+  default). `texts` are checked at plan against the parts kit lists for
+  the message (`ListMessageKeys`), which differ from message to message.
+  `data.authwise_tenant_config`'s `branding` gains `display_name` and
+  `theme_id`. v0.64.0 removed self-service tenancy RPCs, which the
+  provider does not use.
 
 ## 0.33.0 (November 10, 2026)
 

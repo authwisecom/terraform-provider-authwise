@@ -200,7 +200,7 @@ func TestAccMessage_WholeMailLifecycle(t *testing.T) {
 
 // TestAccMessage_Texts: named parts, a part set per case, read back as
 // written; moving between the two shapes is an update in place; an unknown
-// part is refused by kit, by name.
+// part is refused at plan, by name.
 func TestAccMessage_Texts(t *testing.T) {
 
 	h := newHarness(t)
@@ -239,8 +239,10 @@ func TestAccMessage_Texts(t *testing.T) {
 				Check:            h.liveMessage(corepb.MessageShape_MESSAGE_SHAPE_TEXTS, "", texts),
 			},
 			{
+				// Refused at plan from kit's list of the key's parts.
 				Config:      h.textsMessage(`{ heading = "Hi" }`),
-				ExpectError: regexp.MustCompile(`(?s)kit refused the message.*"heading" is not a part`),
+				PlanOnly:    true,
+				ExpectError: regexp.MustCompile(`(?s)no such part.*"heading" is not a part of tenant-invitation; its parts are\s+body,\s+button,\s+details,\s+greeting,\s+instructions,\s+note,\s+subject`),
 			},
 		},
 	})
@@ -320,6 +322,71 @@ resource "authwise_message" "invitation" {
 			{
 				Config:      cfg(`subject = "Hi {{ .Unknown }}"` + "\n" + whole),
 				ExpectError: regexp.MustCompile(`(?s)kit refused the message.*can't evaluate field Unknown`),
+			},
+		},
+	})
+}
+
+// TestAccMessage_TextsChecks: the plan refuses what kit's part list rules
+// out (an unknown case, a part another key has, a subject on two lines, a
+// key kit does not send); when kit cannot be asked at plan, kit refuses at
+// apply instead; and kit alone refuses a locale it ships no wording for
+// that leaves a part unset.
+func TestAccMessage_TextsChecks(t *testing.T) {
+
+	h := newHarness(t)
+	cfg := func(key, locale, texts string) string {
+		return h.providerConfig() + fmt.Sprintf(`
+resource "authwise_message" "invitation" {
+  key    = %q
+  locale = %q
+  texts  = %s
+}
+`, key, locale, texts)
+	}
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: protoFactories(),
+		Steps: []resource.TestStep{
+			{
+				Config:      cfg("tenant-invitation", "en", `{ "body.guest" = "Hi" }`),
+				PlanOnly:    true,
+				ExpectError: regexp.MustCompile(`(?s)no such case.*tenant-invitation's body has no case "guest"; its cases are\s+administration,\s+join`),
+			},
+			{
+				Config:      cfg("mfa-otp", "en", `{ button = "Go" }`),
+				PlanOnly:    true,
+				ExpectError: regexp.MustCompile(`(?s)"button" is not a part of mfa-otp`),
+			},
+			{
+				Config:      cfg("tenant-invitation", "en", `{ "subject.join" = "Join\nus" }`),
+				PlanOnly:    true,
+				ExpectError: regexp.MustCompile(`a subject is one line`),
+			},
+			{
+				Config:      cfg("no-such-message", "en", `{ body = "Hi" }`),
+				PlanOnly:    true,
+				ExpectError: regexp.MustCompile(`(?s)kit sends no such message.*"no-such-message"`),
+			},
+			{
+				// kit cannot be asked at plan: the plan goes ahead and
+				// kit refuses at apply.
+				PreConfig: func() {
+					h.fake.mu.Lock()
+					h.fake.keysUnavailable = true
+					h.fake.mu.Unlock()
+				},
+				Config:      cfg("tenant-invitation", "en", `{ heading = "Hi" }`),
+				ExpectError: regexp.MustCompile(`(?s)kit refused the message.*"heading" is not a part of tenant-invitation`),
+			},
+			{
+				PreConfig: func() {
+					h.fake.mu.Lock()
+					h.fake.keysUnavailable = false
+					h.fake.mu.Unlock()
+				},
+				Config:      cfg("tenant-invitation", "fr", `{ body = "Bonjour" }`),
+				ExpectError: regexp.MustCompile(`(?s)kit refused the message.*kit ships no fr wording for\s+tenant-invitation,\s+so\s+every\s+part\s+must\s+be\s+set`),
 			},
 		},
 	})

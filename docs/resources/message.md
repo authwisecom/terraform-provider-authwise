@@ -6,7 +6,7 @@ description: |-
   A tenant's own wording of one of kit's messages (an invitation, a password reset, a sign-in code), for one key, channel and locale.
   What Terraform applies is published: there is no draft in configuration, and the plan is the review. The console shows a message set here as set by configuration and opens it read-only. A change made in the console or with awctl all the same shows as drift on the next plan, and apply puts back what is configured.
   A message takes exactly one shape:
-  texts: the named parts of the built-in message (its subject, heading, body, button and so on). A part left out keeps the built-in wording, and the built-in layout renders them, so the brand and spacing stay kit's. A part that differs by case is set per case as "<part>.<variant>".subject, html and text: the whole mail.
+  texts: the named parts of the built-in message (its subject, heading, body, button and so on). A part left out keeps the built-in wording, and the built-in layout renders them, so the brand and spacing stay kit's. Each message has its own parts (the invitation has instructions; a sign-in code has no button): kit lists them, with their cases, as the message key's parts, and the plan refuses one it does not list. A part that differs by case is set for every case as body, or for one as "body.administration"; per send kit uses the case's own text, then the part's, then its built-in wording. A part is plain text: markup is shown as typed, never rendered, and a blank line starts a paragraph. A subject is one line. In a locale kit ships no wording for, set every part.subject, html and text: the whole mail.
   A value is written in kit's template syntax, {{ .Recipient.Name }}; kit refuses a value the message does not offer, and any HTML outside what mail clients allow.
   A message laid out in the console's layout editor cannot be written here; managing it replaces the layout.
   Destroying it resets the message to kit's built-in and drops its published history.
@@ -21,7 +21,7 @@ A tenant's own wording of one of kit's messages (an invitation, a password reset
 
 A message takes exactly one shape:
 
-- `texts`: the named parts of the built-in message (its subject, heading, body, button and so on). A part left out keeps the built-in wording, and the built-in layout renders them, so the brand and spacing stay kit's. A part that differs by case is set per case as `"<part>.<variant>"`.
+- `texts`: the named parts of the built-in message (its subject, heading, body, button and so on). A part left out keeps the built-in wording, and the built-in layout renders them, so the brand and spacing stay kit's. Each message has its own parts (the invitation has `instructions`; a sign-in code has no `button`): kit lists them, with their cases, as the message key's parts, and the plan refuses one it does not list. A part that differs by case is set for every case as `body`, or for one as `"body.administration"`; per send kit uses the case's own text, then the part's, then its built-in wording. A part is plain text: markup is shown as typed, never rendered, and a blank line starts a paragraph. A `subject` is one line. In a locale kit ships no wording for, set every part.
 - `subject`, `html` and `text`: the whole mail.
 
 A value is written in kit's template syntax, `{{ .Recipient.Name }}`; kit refuses a value the message does not offer, and any HTML outside what mail clients allow.
@@ -77,7 +77,7 @@ resource "authwise_message" "invitation_fr" {
 - `subject` (String) The whole mail's subject. With `html` and `text`; not with `texts`.
 - `tenant_id` (String) The tenant; overrides the provider default. Changing it replaces the resource.
 - `text` (String) The whole mail's plain-text body, which mail clients show when they show no HTML. With `subject` and `html`; not with `texts`.
-- `texts` (Map of String) The named parts of the built-in message, by part name. A part left out keeps the built-in wording. Not with `subject`, `html` or `text`.
+- `texts` (Map of String) The named parts of the built-in message, by part name (`greeting`) or part and case (`"body.join"`). A part left out keeps the built-in wording. Plain text in kit's template syntax. Not with `subject`, `html` or `text`.
 
 ### Read-Only
 

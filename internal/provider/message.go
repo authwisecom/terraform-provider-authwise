@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -44,6 +45,7 @@ var (
 	_ resource.ResourceWithConfigure      = &messageResource{}
 	_ resource.ResourceWithImportState    = &messageResource{}
 	_ resource.ResourceWithValidateConfig = &messageResource{}
+	_ resource.ResourceWithModifyPlan     = &messageResource{}
 )
 
 // messageResource is authwise_message (tf#75, train 2026.11.3 CX6): a
@@ -104,7 +106,10 @@ func (r *messageResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 			"A message takes exactly one shape:\n\n" +
 			"- `texts`: the named parts of the built-in message (its subject, heading, body, button and so on). " +
 			"A part left out keeps the built-in wording, and the built-in layout renders them, so the brand and spacing stay kit's. " +
-			"A part that differs by case is set per case as `\"<part>.<variant>\"`.\n" +
+			"Each message has its own parts (the invitation has `instructions`; a sign-in code has no `button`): kit lists them, with their cases, as the message key's parts, and the plan refuses one it does not list. " +
+			"A part that differs by case is set for every case as `body`, or for one as `\"body.administration\"`; per send kit uses the case's own text, then the part's, then its built-in wording. " +
+			"A part is plain text: markup is shown as typed, never rendered, and a blank line starts a paragraph. A `subject` is one line. " +
+			"In a locale kit ships no wording for, set every part.\n" +
 			"- `subject`, `html` and `text`: the whole mail.\n\n" +
 			"A value is written in kit's template syntax, `{{ .Recipient.Name }}`; kit refuses a value the message does not offer, and any HTML outside what mail clients allow.\n\n" +
 			"A message laid out in the console's layout editor cannot be written here; managing it replaces the layout.\n\n" +
@@ -143,8 +148,8 @@ func (r *messageResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 			"texts": schema.MapAttribute{
 				Optional:    true,
 				ElementType: types.StringType,
-				MarkdownDescription: "The named parts of the built-in message, by part name. A part left out keeps the built-in wording. " +
-					"Not with `subject`, `html` or `text`.",
+				MarkdownDescription: "The named parts of the built-in message, by part name (`greeting`) or part and case (`\"body.join\"`). A part left out keeps the built-in wording. " +
+					"Plain text in kit's template syntax. Not with `subject`, `html` or `text`.",
 			},
 			"subject": schema.StringAttribute{
 				Optional:            true,
@@ -208,6 +213,87 @@ func (r *messageResource) ValidateConfig(ctx context.Context, req resource.Valid
 		return
 	}
 	m.validateShape(&resp.Diagnostics)
+}
+
+// ModifyPlan checks texts against the parts kit lists for the key, so an
+// unknown part or case, or a subject on two lines, is refused at plan,
+// naming what the message offers. Kit checks again at apply, and alone
+// when it cannot be asked here or lists no parts (a kit before kit#953's
+// part catalog); a part that does not render against the key's values, and
+// a locale kit ships no wording for that leaves a part unset, are kit's to
+// refuse.
+func (r *messageResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+
+	if r.store == nil || req.Plan.Raw.IsNull() {
+		return
+	}
+	var plan messageModel
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	texts, ok := r.plannedTexts(ctx, plan, &resp.Diagnostics)
+	if !ok {
+		return
+	}
+	tenant, key := r.tenant(plan), plan.Key.ValueString()
+
+	parts, found, err := r.store.parts(ctx, tenant, key, plan.Channel.ValueString())
+	switch {
+	case err != nil:
+		return
+	case !found:
+		resp.Diagnostics.AddAttributeError(path.Root("key"), "kit sends no such message",
+			fmt.Sprintf("tenant %s has no message %q; kit lists its messages as message keys", tenant, key))
+		return
+	case len(parts) == 0:
+		return
+	}
+	checkTexts(key, texts, parts, &resp.Diagnostics)
+}
+
+// plannedTexts is the planned texts, when the plan has them and everything
+// that names the message is known.
+func (r *messageResource) plannedTexts(ctx context.Context, plan messageModel, diags *diag.Diagnostics) (map[string]types.String, bool) {
+
+	if plan.Texts.IsNull() || plan.Texts.IsUnknown() || plan.Key.IsUnknown() ||
+		plan.Channel.IsUnknown() || plan.TenantID.IsUnknown() || r.tenant(plan) == "" {
+		return nil, false
+	}
+	texts := map[string]types.String{}
+	diags.Append(plan.Texts.ElementsAs(ctx, &texts, false)...)
+	return texts, !diags.HasError()
+}
+
+// checkTexts refuses a texts key that names no part, or no case of its part,
+// and a subject with a line break.
+func checkTexts(key string, texts map[string]types.String, parts []messagePart, diags *diag.Diagnostics) {
+
+	byName := map[string]messagePart{}
+	names := make([]string, 0, len(parts))
+	for _, p := range parts {
+		byName[p.name] = p
+		names = append(names, p.name)
+	}
+	for name, v := range texts {
+		at := path.Root("texts").AtMapKey(name)
+		part, variant, cased := strings.Cut(name, ".")
+		p, ok := byName[part]
+		switch {
+		case !ok:
+			diags.AddAttributeError(at, "no such part",
+				fmt.Sprintf("%q is not a part of %s; its parts are %s", name, key, strings.Join(names, ", ")))
+		case cased && !slices.Contains(p.variants, variant):
+			cases := "none: set it as \"" + part + "\" alone"
+			if len(p.variants) > 0 {
+				cases = strings.Join(p.variants, ", ")
+			}
+			diags.AddAttributeError(at, "no such case",
+				fmt.Sprintf("%s's %s has no case %q; its cases are %s", key, part, variant, cases))
+		case part == "subject" && !v.IsUnknown() && strings.ContainsAny(v.ValueString(), "\r\n"):
+			diags.AddAttributeError(at, "a subject is one line", fmt.Sprintf("%q has a line break", name))
+		}
+	}
 }
 
 func (m *messageModel) validateShape(diags *diag.Diagnostics) {
@@ -525,6 +611,16 @@ type messageStore interface {
 	// reset deletes the message, so kit sends its built-in. Already gone
 	// is success.
 	reset(ctx context.Context, name string) error
+	// parts are the named parts kit offers for key on channel; found is
+	// false when kit does not know the key.
+	parts(ctx context.Context, tenant, key, channel string) (parts []messagePart, found bool, err error)
+}
+
+// messagePart is one named part of a message and the cases it may be set
+// for, as ListMessageKeys describes it.
+type messagePart struct {
+	name     string
+	variants []string
 }
 
 // messageTemplateStore is messageStore over the MessageTemplate API of
@@ -591,6 +687,35 @@ func (s messageTemplateStore) publish(ctx context.Context, id messageIdentity, c
 		return nil, err
 	}
 	return storedFromTemplate(out.GetMessageTemplate()), nil
+}
+
+func (s messageTemplateStore) parts(ctx context.Context, tenant, key, channel string) ([]messagePart, bool, error) {
+
+	out, err := s.client.ListMessageKeys(ctx, &identitypb.ListMessageKeysRequest{
+		Parent: tenantsCollection + "/" + tenant,
+		View:   "basic",
+	})
+	if err != nil {
+		return nil, false, err
+	}
+	for _, k := range out.GetMessageKeys() {
+		if k.GetKey() != key {
+			continue
+		}
+		var parts []messagePart
+		for _, p := range k.GetParts() {
+			if p.GetChannel() != "" && p.GetChannel() != channel {
+				continue
+			}
+			mp := messagePart{name: p.GetName()}
+			for _, v := range p.GetVariants() {
+				mp.variants = append(mp.variants, v.GetName())
+			}
+			parts = append(parts, mp)
+		}
+		return parts, true, nil
+	}
+	return nil, false, nil
 }
 
 func (s messageTemplateStore) reset(ctx context.Context, name string) error {
