@@ -296,6 +296,7 @@ func (p *AuthwiseProvider) Resources(ctx context.Context) []func() resource.Reso
 		newDomainActivationResource,
 		newIssuerPreferredDomainResource,
 		newIssuerPreferredBindingResource,
+		newMessageResource,
 	))
 }
 

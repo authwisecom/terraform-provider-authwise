@@ -46,6 +46,8 @@ type fakeIdentityServer struct {
 	scopes   map[string]*corepb.Scope
 	profiles map[string]*corepb.AppearanceProfile
 	themes   map[string]*corepb.Theme
+	// messages are the tenants' message templates (tf#75), by name.
+	messages map[string]*corepb.MessageTemplate
 	// scopePerms holds each scope's access-permission set, by name.
 	scopePerms map[string]map[string]bool
 	audiences  map[string]*corepb.Audience
@@ -112,6 +114,7 @@ func newFakeIdentityServer() *fakeIdentityServer {
 		scopes:        map[string]*corepb.Scope{},
 		profiles:      map[string]*corepb.AppearanceProfile{},
 		themes:        map[string]*corepb.Theme{},
+		messages:      map[string]*corepb.MessageTemplate{},
 		scopePerms:    map[string]map[string]bool{},
 		audiences:     map[string]*corepb.Audience{},
 		clients:       map[string]*corepb.Client{},

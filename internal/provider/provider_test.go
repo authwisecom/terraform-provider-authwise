@@ -75,7 +75,8 @@ func TestProviderSurface(t *testing.T) {
 	// issuer_domain_activation and add the generated issuer_domain_binding
 	// and the hand-written issuer_preferred_binding. Home administration
 	// (#70, kit#916) adds the hand-written tenant_home_administration.
-	assert.Len(t, resourceTypes, 45)
+	// Messages (#75, kit#953) add the hand-written message.
+	assert.Len(t, resourceTypes, 46)
 	assert.False(t, resourceTypes["authwise_issuer_domain"], "issuer domains are bindings (#69)")
 	assert.False(t, resourceTypes["authwise_guard_tenant"], "there is no Guard tenant (#65)")
 	assert.False(t, resourceTypes["authwise_guard_invite"], "Guard's Invite is retired (#67)")

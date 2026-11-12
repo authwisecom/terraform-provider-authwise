@@ -1,3 +1,24 @@
+## 0.34.0 (Unreleased)
+
+FEATURES:
+
+* **New resource: `authwise_message`** (tf#75, release train 2026.11.3
+  CX6). A tenant's own wording of one of kit's messages, for one `key`,
+  `channel` and `locale`. Applying it publishes it, and destroying it
+  resets the message to kit's built-in. It takes one shape: `texts` (the
+  named parts of the built-in message) or `subject`, `html` and `text`
+  (the whole mail). A message the console laid out in its layout editor
+  cannot be written here. A change made in the console shows as drift.
+  Import with `[tenant_id/]key/channel/locale`. If the message is
+  already customised, create refuses and names the import.
+
+NOTES:
+
+* **Work in progress.** This build writes the whole mail through the
+  message-template API of apis v0.64.0 (a draft, then publish). `texts`,
+  the configuration mark and the single-call write need kit#953's
+  `:apply` and its apis release.
+
 ## 0.33.0 (November 10, 2026)
 
 BREAKING CHANGES:
