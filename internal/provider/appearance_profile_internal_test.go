@@ -26,6 +26,20 @@ type stubIdentity struct {
 	patches     []*identitypb.PatchAppearanceProfileRequest
 	gets        int
 	madeDefault []string
+	// siblings are the issuer's other profiles. With refuseWhileDefault,
+	// kit refuses deleting this one while it is the default and has them.
+	siblings           []string
+	refuseWhileDefault bool
+	lists              int
+}
+
+func (s *stubIdentity) ListAppearanceProfiles(_ context.Context, _ *identitypb.ListAppearanceProfilesRequest, _ ...grpc.CallOption) (*identitypb.ListAppearanceProfilesResponse, error) {
+	s.lists++
+	out := &identitypb.ListAppearanceProfilesResponse{AppearanceProfiles: []*corepb.AppearanceProfile{{Name: profileName, IsDefault: s.isDefault}}}
+	for _, n := range s.siblings {
+		out.AppearanceProfiles = append(out.AppearanceProfiles, &corepb.AppearanceProfile{Name: n})
+	}
+	return out, nil
 }
 
 func (s *stubIdentity) GetAppearanceProfile(_ context.Context, in *identitypb.GetAppearanceProfileRequest, _ ...grpc.CallOption) (*corepb.AppearanceProfile, error) {
@@ -40,13 +54,13 @@ func (s *stubIdentity) PatchAppearanceProfile(_ context.Context, in *identitypb.
 
 func (s *stubIdentity) MakeDefaultAppearanceProfile(_ context.Context, in *identitypb.MakeDefaultAppearanceProfileRequest, _ ...grpc.CallOption) (*identitypb.MakeDefaultAppearanceProfileResponse, error) {
 	s.madeDefault = append(s.madeDefault, in.GetName())
-	s.isDefault = true
+	s.isDefault = in.GetName() == profileName
 	return &identitypb.MakeDefaultAppearanceProfileResponse{Default: &corepb.AppearanceProfile{Name: in.GetName(), IsDefault: true}}, nil
 }
 
 func (s *stubIdentity) DeleteAppearanceProfile(_ context.Context, _ *identitypb.DeleteAppearanceProfileRequest, _ ...grpc.CallOption) (*emptypb.Empty, error) {
 	s.deletes++
-	if s.deletes < s.deletesTil {
+	if s.deletes < s.deletesTil || (s.refuseWhileDefault && s.isDefault && len(s.siblings) > 0) {
 		return nil, status.Error(codes.FailedPrecondition, "the issuer's default")
 	}
 	return &emptypb.Empty{}, nil
@@ -130,5 +144,35 @@ func TestAppearanceDefault_DeleteWaitsForSiblings(t *testing.T) {
 		_, err := stubbed(s, time.Second).DeleteAppearanceProfile(ctx, req)
 		require.Error(t, err)
 		assert.Equal(t, 1, s.deletes)
+	})
+}
+
+// TestAppearanceDefault_DeleteHandsOffToTheOneLeft (tf#75, kit#953): a new
+// issuer of a branded tenant has kit's own "Default" profile; a
+// configuration that made its profile the default could not be destroyed,
+// since kit refuses deleting the default while that one stays. With one
+// other profile left, the default is handed to it and the delete goes
+// through at once; with several, nothing is handed and the wait ends in the
+// refusal.
+func TestAppearanceDefault_DeleteHandsOffToTheOneLeft(t *testing.T) {
+
+	ctx := context.Background()
+	req := &identitypb.DeleteAppearanceProfileRequest{Name: profileName}
+	kitDefault := "tenants/t-1/issuers/i-1/appearance-profiles/ap-kit"
+
+	t.Run("one other", func(t *testing.T) {
+		s := &stubIdentity{isDefault: true, refuseWhileDefault: true, siblings: []string{kitDefault}}
+		_, err := stubbed(s, time.Minute).DeleteAppearanceProfile(ctx, req)
+		require.NoError(t, err)
+		assert.Equal(t, []string{kitDefault}, s.madeDefault)
+		assert.Equal(t, 2, s.deletes)
+	})
+
+	t.Run("several others", func(t *testing.T) {
+		s := &stubIdentity{isDefault: true, refuseWhileDefault: true, siblings: []string{kitDefault, kitDefault + "2"}}
+		_, err := stubbed(s, 20*time.Millisecond).DeleteAppearanceProfile(ctx, req)
+		require.Error(t, err)
+		assert.Empty(t, s.madeDefault)
+		assert.Contains(t, err.Error(), "is_default = true on the profile that should take over")
 	})
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"strings"
 	"time"
 
 	identitypb "git.authwise.com/authwise/apis/authwise/identity/v1alpha1"
@@ -137,6 +138,35 @@ type appearanceDefaultClient struct {
 	deleteWait, poll time.Duration
 }
 
+// handOff makes the issuer's one other profile the default, and reports
+// whether it did. Several others, none, or a failure to list or make the
+// default, hand nothing.
+func (c appearanceDefaultClient) handOff(ctx context.Context, name string, opts ...grpc.CallOption) bool {
+
+	parent, _, ok := strings.Cut(name, "/"+appearanceProfilesCollection+"/")
+	if !ok {
+		return false
+	}
+	out, err := c.ListAppearanceProfiles(ctx, &identitypb.ListAppearanceProfilesRequest{Parent: parent, PageSize: 3}, opts...)
+	if err != nil || out.GetNextPageToken() != "" {
+		return false
+	}
+	var others []string
+	for _, p := range out.GetAppearanceProfiles() {
+		if p.GetName() != name {
+			others = append(others, p.GetName())
+		}
+	}
+	if len(others) != 1 {
+		return false
+	}
+	_, err = c.MakeDefaultAppearanceProfile(ctx, &identitypb.MakeDefaultAppearanceProfileRequest{Name: others[0]}, opts...)
+	return err == nil
+}
+
+// appearanceProfilesCollection is an issuer's profiles' collection.
+const appearanceProfilesCollection = "appearance-profiles"
+
 func newAppearanceDefaultClient(inner identitypb.AuthwiseIdentityServiceClient) appearanceDefaultClient {
 	return appearanceDefaultClient{AuthwiseIdentityServiceClient: inner, deleteWait: defaultDeleteWait, poll: 500 * time.Millisecond}
 }
@@ -216,9 +246,15 @@ func (c appearanceDefaultClient) UpdateAppearanceProfile(ctx context.Context, in
 	return c.makeDefault(ctx, out, opts...)
 }
 
-// DeleteAppearanceProfile waits out kit's refusal to delete the default
-// while the issuer has other profiles, for as long as deleteWait: in a
-// destroy of them all, the others are going at the same time.
+// DeleteAppearanceProfile deletes the issuer's default the way kit lets it
+// go: once it is the only profile, or once another is the default. While
+// kit refuses, it waits for as long as deleteWait, since in a destroy of
+// them all the others are going at the same time. When one other profile
+// is left, the default is handed to it first: that is kit's own "Default",
+// which a new issuer of a branded tenant is given (kit#953) and no
+// configuration manages, or the one profile the configuration keeps, and
+// either way there is nothing to choose. With several left the choice is
+// the configuration's, and the wait ends in the refusal.
 func (c appearanceDefaultClient) DeleteAppearanceProfile(ctx context.Context, in *identitypb.DeleteAppearanceProfileRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
 	deadline := time.Now().Add(c.deleteWait)
 	for {
@@ -230,6 +266,9 @@ func (c appearanceDefaultClient) DeleteAppearanceProfile(ctx context.Context, in
 			&identitypb.GetAppearanceProfileRequest{Name: in.GetName()}, opts...)
 		if getErr != nil || !p.GetIsDefault() {
 			return out, err
+		}
+		if c.handOff(ctx, in.GetName(), opts...) {
+			continue
 		}
 		if time.Now().After(deadline) {
 			return out, fmt.Errorf("%w; it is the issuer's default, and the issuer still has other profiles after %s. "+
