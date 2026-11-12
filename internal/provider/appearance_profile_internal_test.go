@@ -52,9 +52,6 @@ func (s *stubIdentity) DeleteAppearanceProfile(_ context.Context, _ *identitypb.
 	return &emptypb.Empty{}, nil
 }
 
-// displayName is the profile field the patch cases change beside the flag.
-const displayName = "display_name"
-
 const profileName = "tenants/t-1/issuers/i-1/appearance-profiles/ap-1"
 
 func stubbed(s *stubIdentity, wait time.Duration) appearanceDefaultClient {

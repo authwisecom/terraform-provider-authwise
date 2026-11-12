@@ -84,6 +84,10 @@ func (f *fakeIdentityServer) PatchTheme(ctx context.Context, in *identitypb.Patc
 }
 
 func (f *fakeIdentityServer) DeleteTheme(ctx context.Context, in *identitypb.DeleteThemeRequest) (*emptypb.Empty, error) {
+	// kit refuses deleting the theme a tenant's brand names (kit#953).
+	if err := f.brandRefusal(in.GetName()); err != nil {
+		return nil, err
+	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.recordAuth(ctx)

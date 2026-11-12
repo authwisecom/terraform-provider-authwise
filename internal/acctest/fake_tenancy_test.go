@@ -50,6 +50,7 @@ func newFakeTenancyServer(access *fakeAccessServer, identity *fakeIdentityServer
 		tenants:  map[string]*corepb.Tenant{t.GetName(): t},
 	}
 	identity.brandHolding = f.brandHolding
+	identity.tenancy = f
 	return f
 }
 

@@ -106,6 +106,10 @@ type fakeIdentityServer struct {
 	// brandHolding refuses removing an asset a tenant's brand names; the
 	// fake tenancy server's.
 	brandHolding func(asset string) error
+
+	// tenancy holds the tenants, whose config.branding the branding
+	// singleton reads and writes (kit#953): one stored value.
+	tenancy *fakeTenancyServer
 }
 
 func newFakeIdentityServer() *fakeIdentityServer {

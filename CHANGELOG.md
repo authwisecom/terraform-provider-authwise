@@ -12,6 +12,14 @@ FEATURES:
   Import with `[tenant_id/]key/channel/locale`. If the message is
   already customised, create refuses and names the import.
 
+* **New resource: `authwise_tenant_branding`** (tf#75, kit#953). The
+  tenant's brand (`tenants/{t}/branding`): `display_name` (the brand
+  name in mail and the From name), `theme_id` (the look; mail takes its
+  logo and colour from it), `logo_asset_id` and `logo_dark_asset_id`.
+  The resource is authoritative, and destroy clears the brand. It writes
+  the same stored value as `branding` in `authwise_tenant_config`, so set
+  branding in one place. It needs `identity.themes.update`.
+
 BEHAVIOUR CHANGES:
 
 * **`authwise_tenant_config` leaves `branding` alone unless `config` sets

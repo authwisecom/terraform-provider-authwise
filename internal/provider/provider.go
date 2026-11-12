@@ -35,6 +35,9 @@ import (
 // the per-resource override the hand-written resources compose names from.
 const tenantIDAttribute = "tenant_id"
 
+// displayName is the display_name attribute.
+const displayName = "display_name"
+
 var (
 	_ provider.Provider              = &AuthwiseProvider{}
 	_ provider.ProviderWithFunctions = &AuthwiseProvider{}
@@ -297,6 +300,7 @@ func (p *AuthwiseProvider) Resources(ctx context.Context) []func() resource.Reso
 		newIssuerPreferredDomainResource,
 		newIssuerPreferredBindingResource,
 		newMessageResource,
+		newTenantBrandingResource,
 	))
 }
 

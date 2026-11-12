@@ -81,9 +81,16 @@ func (f *fakeTenancyServer) PatchTenant(_ context.Context, in *tenancypb.PatchTe
 	return proto.Clone(merged).(*corepb.Tenant), nil
 }
 
-// checkBrand is kit's branding.Check: a dark logo needs a light one, and
-// each names an image asset of the tenant.
+// checkBrand is kit's branding.Check: a dark logo needs a light one, each
+// names an image asset of the tenant, the theme is one of the tenant's, and
+// the name is one short line.
 func (f *fakeTenancyServer) checkBrand(tenant string, b *corepb.Branding) error {
+	if id := b.GetThemeId(); id != "" && !f.identity.themeExists(tenant+"/themes/"+id) {
+		return status.Errorf(codes.InvalidArgument, "config.branding.theme_id: no theme %s in tenant", id)
+	}
+	if n := b.GetDisplayName(); len(n) > 64 || strings.ContainsAny(n, "<>\"\n") {
+		return status.Error(codes.InvalidArgument, "config.branding.display_name: at most 64 characters on one line, none of < > \"")
+	}
 	light, dark := b.GetLogoAssetId(), b.GetLogoDarkAssetId()
 	if dark != "" && light == "" {
 		return status.Error(codes.InvalidArgument,
@@ -107,6 +114,15 @@ func (f *fakeTenancyServer) checkBrand(tenant string, b *corepb.Branding) error 
 // brandHolding is kit's brandReferrer: FailedPrecondition when the
 // tenant's brand names the asset. Called without the identity lock held.
 func (f *fakeTenancyServer) brandHolding(asset string) error {
+	if tenant, theme, ok := strings.Cut(asset, "/themes/"); ok {
+		f.mu.Lock()
+		defer f.mu.Unlock()
+		if f.tenants[tenant].GetConfig().GetBranding().GetThemeId() == theme {
+			return status.Errorf(codes.FailedPrecondition,
+				"theme %s is the look of %s (config.branding.theme_id); change the tenant's branding before deleting it", theme, tenant)
+		}
+		return nil
+	}
 	tenant, id, ok := strings.Cut(asset, "/assets/")
 	if !ok {
 		return nil
@@ -143,6 +159,14 @@ func (f *fakeIdentityServer) assetMime(name string) (string, bool) {
 	defer f.mu.Unlock()
 	a, ok := f.assets[name]
 	return a.GetMimeType(), ok
+}
+
+// themeExists is whether the theme exists.
+func (f *fakeIdentityServer) themeExists(name string) bool {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	_, ok := f.themes[name]
+	return ok
 }
 
 // brandRefusal is the fake tenancy server's brandHolding, or nil before
