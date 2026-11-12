@@ -145,3 +145,60 @@ func TestAccTenantBranding_Refusals(t *testing.T) {
 		},
 	})
 }
+
+// TestAccIssuer_BrandedTenantStartingProfile (kit#953, apis v0.67.0): on a
+// tenant whose brand names a theme, kit names the appearance profile it
+// gives a new issuer in the issuer's config, output only. An issuer with a
+// configured config is created without an inconsistent result, plans no
+// change after, and never shows the id; a config change keeps kit's id
+// where it is.
+func TestAccIssuer_BrandedTenantStartingProfile(t *testing.T) {
+
+	h := newHarness(t)
+	h.fake.brandedTenant = true
+
+	config := func(seconds int) string {
+		return h.providerConfig() + fmt.Sprintf(`
+resource "authwise_domain" "login" {
+  hostname = "login.example.com"
+}
+
+resource "authwise_issuer" "login" {
+  domain_id = authwise_domain.login.domain_id
+  config    = jsonencode({ accessTokenExpireSeconds = %d })
+}
+`, seconds)
+	}
+	held := func(*terraform.State) error {
+		h.fake.mu.Lock()
+		defer h.fake.mu.Unlock()
+		for _, i := range h.fake.issuers {
+			if i.GetConfig().GetStartingAppearanceProfileId() == "" {
+				return fmt.Errorf("kit's starting profile id was lost: %v", i.GetConfig())
+			}
+		}
+		return nil
+	}
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: protoFactories(),
+		Steps: []resource.TestStep{
+			{
+				Config: config(600),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("authwise_issuer.login", "config", `{"accessTokenExpireSeconds":600}`),
+					held,
+				),
+			},
+			{Config: config(600), PlanOnly: true},
+			{
+				Config: config(900),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("authwise_issuer.login", "config", `{"accessTokenExpireSeconds":900}`),
+					held,
+				),
+			},
+			{Config: config(900), PlanOnly: true},
+		},
+	})
+}

@@ -4,11 +4,17 @@ import (
 	"context"
 	"regexp"
 
+	corepb "git.authwise.com/authwise/apis/authwise/types/core/v1alpha1"
 	"git.authwise.com/authwise/terraform-provider-authwise/internal/generated"
+	tfruntime "github.com/activatedio/tfinfra/pkg/tf"
+	"github.com/hashicorp/terraform-plugin-framework-jsontypes/jsontypes"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
+	"google.golang.org/protobuf/encoding/protojson"
 )
 
 // issuerTypeName is the Terraform type of the generated issuer resource,
@@ -95,16 +101,19 @@ func (r *issuerResource) Configure(ctx context.Context, req resource.ConfigureRe
 func (r *issuerResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	r.inner.Create(ctx, req, resp)
 	keepStrings(ctx, req.Plan, &resp.State, &resp.Diagnostics, domainIDAttribute, "path")
+	stripIssuerOutputOnly(ctx, &resp.State, &resp.Diagnostics)
 }
 
 func (r *issuerResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	r.inner.Read(ctx, req, resp)
 	keepStrings(ctx, req.State, &resp.State, &resp.Diagnostics, domainIDAttribute, "path")
+	stripIssuerOutputOnly(ctx, &resp.State, &resp.Diagnostics)
 }
 
 func (r *issuerResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	r.inner.Update(ctx, req, resp)
 	keepStrings(ctx, req.Plan, &resp.State, &resp.Diagnostics, domainIDAttribute, "path")
+	stripIssuerOutputOnly(ctx, &resp.State, &resp.Diagnostics)
 }
 
 func (r *issuerResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
@@ -156,4 +165,36 @@ func (r *issuerDomainBindingResource) Schema(ctx context.Context, req resource.S
 	set("hostname", "The domain's hostname.")
 	set("url", "The binding's issuer URL (`iss`): `https://<hostname><path>`.")
 	set("routable", "Whether kit answers here now: always on a native domain; on a custom one once its certificate is live (`PROVISIONING`, `ACTIVE` or `DEGRADED`). A binding may be made before then.")
+}
+
+// issuerStartingProfileField is IssuerConfig's output-only
+// starting_appearance_profile_id (kit#953, apis v0.67.0).
+const issuerStartingProfileField = "starting_appearance_profile_id"
+
+// stripIssuerOutputOnly leaves IssuerConfig's output-only fields out of
+// config. kit names the appearance profile it gave a new issuer of a
+// branded tenant there, and clears it once a configuration's first profile
+// replaces it: read back into config, it made the create inconsistent with
+// its plan and every plan until then show drift. kit ignores the field on
+// a write, so leaving it out loses nothing.
+func stripIssuerOutputOnly(ctx context.Context, state *tfsdk.State, diags *diag.Diagnostics) {
+
+	if state == nil || state.Raw.IsNull() {
+		return
+	}
+	var config jsontypes.Normalized
+	if state.GetAttribute(ctx, path.Root(configAttribute), &config).HasError() || config.IsNull() || config.IsUnknown() {
+		return
+	}
+	held := &corepb.IssuerConfig{}
+	if protojson.Unmarshal([]byte(config.ValueString()), held) != nil || held.GetStartingAppearanceProfileId() == "" {
+		return
+	}
+	held.StartingAppearanceProfileId = ""
+	b, err := tfruntime.ProtoJSON(held)
+	if err != nil {
+		diags.AddError("cannot encode the issuer config", err.Error())
+		return
+	}
+	diags.Append(state.SetAttribute(ctx, path.Root(configAttribute), jsontypes.NewNormalizedValue(string(b)))...)
 }

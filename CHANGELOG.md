@@ -35,14 +35,20 @@ BEHAVIOUR CHANGES:
   sets, apply once with `branding = {}`.
 
 * **`authwise_appearance_profile`: destroying the issuer's default hands
-  the default to the one profile left** (kit#953). A new issuer of a
-  tenant whose brand names a theme now starts with kit's own "Default"
-  appearance profile. A configuration that made its own profile the
-  default could not be destroyed: kit refuses deleting the default while
-  another profile stays, so the delete waited a minute and failed. When
-  exactly one other profile is left, the provider now makes it the
-  default and deletes. With several left, the choice is the
-  configuration's, and the delete still waits and then refuses.
+  the default to the one profile left.** kit does the same from kit#953's
+  fix (apis v0.67.0). On a kit before that fix, a configuration that made
+  its own profile the default could not be destroyed beside kit's own
+  "Default" profile: the delete waited a minute and failed. With several
+  profiles left, the choice is the configuration's, and the delete still
+  waits and then refuses.
+
+* **`authwise_issuer` leaves `startingAppearanceProfileId` out of
+  `config`.** It is output only (apis v0.67.0): kit names there the
+  profile it gave a new issuer of a branded tenant, and clears it once
+  the configuration's first profile replaces that one. Read back into
+  `config`, it made creating an issuer with `config` set fail ("inconsistent
+  result after apply") and later plans show drift.
+  `data.authwise_issuer_config` does not offer it.
 
 DEPRECATIONS:
 
@@ -55,11 +61,13 @@ DEPRECATIONS:
 NOTES:
 
 * **kit#953 changes that reach a configuration.**
-  * A new issuer of a tenant whose brand names a theme (`theme_id`) gets
-    a "Default" appearance profile, and that profile is the default. A
-    configuration's own profile on that issuer is no longer the default
-    by being first: set `is_default = true` on it, or import kit's
-    "Default" and manage it.
+  * A new issuer of a tenant whose brand names a theme (`theme_id`) is
+    given a "Default" appearance profile. The configuration's first
+    profile on that issuer replaces it and becomes the default, as
+    before (kit removes its own while it is untouched and unused). If
+    someone has edited kit's profile, or a client or audience names it,
+    it stays the default: set `is_default = true` on yours, or import
+    kit's and manage it.
   * Deleting an issuer deletes its appearance profiles with it.
   * A tenant created on kit#953 or later starts with a theme "Brand",
     named in its brand's `theme_id`. `authwise_tenant_branding` owns the
@@ -70,8 +78,8 @@ NOTES:
     tenant's display name. An appearance profile's `display_name` is a
     label only.
 
-* **apis v0.66.0** (from v0.63.0), kit#953. It needs a kit that serves it
-  (kit develop 0c27140e or a later release). `authwise_message` writes
+* **apis v0.67.0** (from v0.63.0), kit#953. It needs a kit that serves it
+  (kit develop 474eb347 or a later release). `authwise_message` writes
   through `ApplyMessageTemplate`: one call that writes, publishes, clears
   any draft and sets the configuration mark (`managed_by`, `terraform` by
   default). `texts` are checked at plan against the parts kit lists for

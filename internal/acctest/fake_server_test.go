@@ -111,6 +111,12 @@ type fakeIdentityServer struct {
 	// fake tenancy server's.
 	brandHolding func(asset string) error
 
+	// brandedTenant has CreateIssuer give a new issuer kit's starting
+	// appearance profile, as kit#953 does when the tenant's brand names a
+	// theme: only the config's output-only id, which is what the provider
+	// sees.
+	brandedTenant bool
+
 	// tenancy holds the tenants, whose config.branding the branding
 	// singleton reads and writes (kit#953): one stored value.
 	tenancy *fakeTenancyServer
@@ -407,6 +413,17 @@ func (f *fakeIdentityServer) CreateIssuer(ctx context.Context, in *identitypb.Cr
 	i.DomainId, i.Path, i.DomainName, i.PreferredDomainId, i.PreferredBindingId, i.Bindings = "", "", "", "", "", nil
 	// account_client_id is kit's to set (kit#827); a value sent is ignored.
 	i.AccountClientId = ""
+	// kit#953: a new issuer of a branded tenant is given a profile, named
+	// in its config, output only.
+	if i.GetConfig() != nil {
+		i.Config.StartingAppearanceProfileId = ""
+	}
+	if f.brandedTenant {
+		if i.GetConfig() == nil {
+			i.Config = &corepb.IssuerConfig{}
+		}
+		i.Config.StartingAppearanceProfileId = f.nextID("ap-start")
+	}
 	f.issuers[name] = i
 	if domainID != "" {
 		f.bindLocked(name, domainID, path)
@@ -441,7 +458,16 @@ func (f *fakeIdentityServer) PatchIssuer(ctx context.Context, in *identitypb.Pat
 			if err := f.admitSelectorLocked(tenantOf(in.GetName()), in.GetIssuer().GetConfig().GetMultiRealmProviderSelector()); err != nil {
 				return nil, err
 			}
-			existing.Config = in.GetIssuer().GetConfig()
+			// starting_appearance_profile_id is output only (kit#953):
+			// the stored one stays, whatever is sent.
+			start := existing.GetConfig().GetStartingAppearanceProfileId()
+			existing.Config = proto.Clone(in.GetIssuer().GetConfig()).(*corepb.IssuerConfig)
+			if existing.GetConfig() == nil && start != "" {
+				existing.Config = &corepb.IssuerConfig{}
+			}
+			if existing.GetConfig() != nil {
+				existing.Config.StartingAppearanceProfileId = start
+			}
 		case "preferred_domain_id":
 			// Deprecated (kit#911): resolved to the issuer's binding on
 			// that domain.

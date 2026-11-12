@@ -69,7 +69,7 @@ func (r *tenantBrandingResource) Schema(_ context.Context, _ resource.SchemaRequ
 			"mail's From name and brand name, and the logo and colour from the theme.\n\n" +
 			"The brand is authoritative: it becomes exactly this, a field left out is cleared, and destroying the resource clears the brand. " +
 			"A tenant created on kit with kit#953 starts with a theme \"Brand\" named here: leaving `theme_id` out clears it, so name it (import it as `authwise_theme`) to keep it. " +
-			"A new issuer of a tenant whose brand names a theme is given a \"Default\" appearance profile on that theme.\n\n" +
+			"A new issuer of a tenant whose brand names a theme is given a \"Default\" appearance profile on that theme, which the configuration's first profile on the issuer replaces.\n\n" +
 			"**Set a tenant's branding in one place.** This resource and `branding` in `authwise_tenant_config` write the same stored value. " +
 			"`branding` there is deprecated: leave it out of that `config`, which then leaves the brand to this resource.\n\n" +
 			"Name the theme and the logos through their resources (`authwise_theme.x.theme_id`, `authwise_asset_content.x.asset_id`). " +

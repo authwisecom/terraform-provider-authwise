@@ -250,11 +250,12 @@ func (c appearanceDefaultClient) UpdateAppearanceProfile(ctx context.Context, in
 // go: once it is the only profile, or once another is the default. While
 // kit refuses, it waits for as long as deleteWait, since in a destroy of
 // them all the others are going at the same time. When one other profile
-// is left, the default is handed to it first: that is kit's own "Default",
-// which a new issuer of a branded tenant is given (kit#953) and no
-// configuration manages, or the one profile the configuration keeps, and
-// either way there is nothing to choose. With several left the choice is
-// the configuration's, and the wait ends in the refusal.
+// is left, the default is handed to it first, as kit itself does from
+// kit#953's fix (develop 474eb347): on such a kit the delete is not refused
+// and this never runs, and on a kit before it a destroy would otherwise
+// fail on kit's own "Default" profile, given to a new issuer of a branded
+// tenant. With several left the choice is the configuration's, and the
+// wait ends in the refusal.
 func (c appearanceDefaultClient) DeleteAppearanceProfile(ctx context.Context, in *identitypb.DeleteAppearanceProfileRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
 	deadline := time.Now().Add(c.deleteWait)
 	for {

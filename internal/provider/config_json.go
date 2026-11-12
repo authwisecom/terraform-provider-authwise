@@ -279,6 +279,9 @@ var configJSONSpecs = []configJSONSpec{
 			"cimd.allow_any_host":                                        "Accept a document from any https host, the MCP \"open server\" posture: the deliberate way to open the issuer to every host, and the only one. kit refuses it beside a non-empty `trusted_domains`, and refuses `enabled` with neither, at apply.",
 			"persistent_session":                                         "Whether the session cookie survives a browser restart: at sign-in it is re-issued to last the session's remaining absolute lifetime (the realm's `session.absolute`). Default false: the cookie ends when the browser closes, the right answer on shared computers.",
 		}),
+		// Output only (kit#953): kit ignores a value sent, and
+		// authwise_issuer leaves it out of config.
+		omit: map[string]bool{issuerStartingProfileField: true},
 	},
 	{
 		typeName:    "realm_config",
