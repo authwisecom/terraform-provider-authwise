@@ -178,6 +178,7 @@ func (r *tenantBrandingResource) Update(ctx context.Context, req resource.Update
 // write puts the whole brand: UpdateTenantBranding writes every field.
 func (r *tenantBrandingResource) write(ctx context.Context, plan *tenantBrandingModel, diags *diag.Diagnostics) {
 
+	defer lockTenantRow(plan.Name.ValueString())()
 	_, err := r.client.UpdateTenantBranding(ctx, &identitypb.UpdateTenantBrandingRequest{
 		Name: plan.Name.ValueString(),
 		Branding: &corepb.Branding{
@@ -241,6 +242,7 @@ func (r *tenantBrandingResource) Delete(ctx context.Context, req resource.Delete
 		return
 	}
 
+	defer lockTenantRow(state.Name.ValueString())()
 	_, err := r.client.UpdateTenantBranding(ctx, &identitypb.UpdateTenantBrandingRequest{
 		Name:     state.Name.ValueString(),
 		Branding: &corepb.Branding{},

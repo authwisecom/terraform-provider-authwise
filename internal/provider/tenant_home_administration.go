@@ -179,10 +179,12 @@ func (r *tenantHomeAdministrationResource) Create(ctx context.Context, req resou
 		return
 	}
 
+	unlock := lockTenantRow(tenantID)
 	t, err := r.client.EnableHomeAdministration(ctx, &tenancypb.EnableHomeAdministrationRequest{
 		Name:     tenantsCollection + "/" + tenantID,
 		IssuerId: plan.IssuerID.ValueString(),
 	})
+	unlock()
 	if err != nil {
 		summary, detail := "enabling home administration failed", tenancyErrorDetail(err)
 		if status.Code(err) == codes.PermissionDenied {

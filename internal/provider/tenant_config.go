@@ -206,6 +206,7 @@ func (r *tenantConfigResource) write(ctx context.Context, plan *tenantConfigMode
 		paths = append(paths, labelsAttribute)
 	}
 
+	defer lockTenantRow(plan.Name.ValueString())()
 	out, err := r.client.PatchTenant(ctx, &tenancypb.PatchTenantRequest{
 		Name:       plan.Name.ValueString(),
 		Tenant:     tenant,
@@ -340,6 +341,7 @@ func (r *tenantConfigResource) Delete(ctx context.Context, req resource.DeleteRe
 		paths = append(paths, labelsAttribute)
 	}
 
+	defer lockTenantRow(state.Name.ValueString())()
 	_, err := r.client.PatchTenant(ctx, &tenancypb.PatchTenantRequest{
 		Name:       state.Name.ValueString(),
 		Tenant:     &corepb.Tenant{Config: &corepb.TenantConfig{}},

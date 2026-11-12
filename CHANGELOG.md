@@ -19,6 +19,10 @@ FEATURES:
   The resource is authoritative, and destroy clears the brand. It writes
   the same stored value as `branding` in `authwise_tenant_config`, so set
   branding in one place. It needs `identity.themes.update`.
+  The provider serialises its own writes to one tenant's row
+  (`authwise_tenant_config`, `authwise_tenant_branding`,
+  `authwise_tenant_home_administration`). kit writes the row whole without
+  a lock, so two writes from one apply could lose one of them.
 
 BEHAVIOUR CHANGES:
 
