@@ -1,4 +1,4 @@
-## 0.34.0 (Unreleased)
+## 0.34.0 (November 12, 2026)
 
 FEATURES:
 
@@ -60,6 +60,13 @@ DEPRECATIONS:
 
 NOTES:
 
+* **Release train 2026.11.3.** Pairs with apis v0.67.0. It needs kit
+  1.86.0 or later: message parts and `:apply`, the configuration mark,
+  the branding singleton and its brand fields (kit#953), and the starting
+  appearance profile fixes. On an earlier kit, `authwise_message` and
+  `authwise_tenant_branding` fail with `UNIMPLEMENTED`; the other
+  resources work as in 0.33.0.
+
 * **kit#953 changes that reach a configuration.**
   * A new issuer of a tenant whose brand names a theme (`theme_id`) is
     given a "Default" appearance profile. The configuration's first
@@ -79,7 +86,7 @@ NOTES:
     label only.
 
 * **apis v0.67.0** (from v0.63.0), kit#953. It needs a kit that serves it
-  (kit develop 474eb347 or a later release). `authwise_message` writes
+  (kit 1.86.0 or later). `authwise_message` writes
   through `ApplyMessageTemplate`: one call that writes, publishes, clears
   any draft and sets the configuration mark (`managed_by`, `terraform` by
   default). `texts` are checked at plan against the parts kit lists for
