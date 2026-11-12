@@ -73,6 +73,7 @@ resource "authwise_message" "invitation_fr" {
 
 - `channel` (String) The channel: `email`, the default and the only one kit renders today. Changing it replaces the resource.
 - `html` (String) The whole mail's HTML body. With `subject` and `text`; not with `texts`.
+- `managed_by` (String) The mark kit keeps on the message, which has the console show it as set by configuration, read-only: `terraform` by default. Up to 64 characters of `a-z`, `0-9` and `-`; name the configuration (`terraform-prod`) when several manage one tenant. Publishing from the console removes the mark, and the next plan puts it back.
 - `subject` (String) The whole mail's subject. With `html` and `text`; not with `texts`.
 - `tenant_id` (String) The tenant; overrides the provider default. Changing it replaces the resource.
 - `text` (String) The whole mail's plain-text body, which mail clients show when they show no HTML. With `subject` and `html`; not with `texts`.

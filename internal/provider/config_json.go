@@ -329,7 +329,9 @@ var configJSONSpecs = []configJSONSpec{
 		attribute:   "authwise_tenant_config.config",
 		description: "A tenant's config: its brand, and the token lifetimes and CORS at the tenant, the outermost layer.",
 		descriptions: withTokenLifetimes(map[string]string{
-			"branding":                    "The tenant's own brand: what the admin console shows in place of the Authwise emblem, and what outbound mail falls back to when an appearance profile has no `main_logo`.",
+			"branding":                    "The tenant's own brand: what the admin console shows in place of the Authwise emblem, and what outbound mail falls back to when an appearance profile has no `main_logo`. **Deprecated:** set it with `authwise_tenant_branding` and leave it out here; kit refuses it here from the release train after 2026.11.3.",
+			"branding.display_name":       "The brand's name, which mail shows and sends from (the From name). At most 64 characters on one line, none of `<`, `>` or `\"`.",
+			"branding.theme_id":           "The tenant's look: a theme of the tenant (`th-…`), from which mail takes its logo and colour. kit refuses deleting the theme while this names it.",
 			"branding.logo_asset_id":      "The id (`as-…`) of an image asset in this tenant, e.g. `authwise_asset_content.logo.asset_id`. kit refuses an id that names no image asset of the tenant, and refuses deleting or emptying the asset while this names it.",
 			"branding.logo_dark_asset_id": "The same, for a dark colour scheme. Optional: a reader falls back to `logo_asset_id`. kit refuses it without `logo_asset_id`.",
 		}),

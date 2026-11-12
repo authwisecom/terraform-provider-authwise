@@ -32,10 +32,14 @@ DEPRECATIONS:
 
 NOTES:
 
-* **Work in progress.** This build writes the whole mail through the
-  message-template API of apis v0.64.0 (a draft, then publish). `texts`,
-  the configuration mark and the single-call write need kit#953's
-  `:apply` and its apis release.
+* **apis v0.65.0** (from v0.63.0), kit#953. It needs a kit that serves it
+  (kit develop b74e4ac5 or a later release). `authwise_message` writes
+  through `ApplyMessageTemplate`: one call that writes, publishes, clears
+  any draft and sets the configuration mark (`managed_by`, `terraform` by
+  default). kit refuses `texts` until its part catalog lands; the whole
+  mail works now. `data.authwise_tenant_config`'s `branding` gains
+  `display_name` and `theme_id`. v0.64.0 removed self-service tenancy
+  RPCs, which the provider does not use.
 
 ## 0.33.0 (November 10, 2026)
 

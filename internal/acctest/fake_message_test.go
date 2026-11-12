@@ -15,10 +15,12 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-// The fake's message templates (tf#75), as kit develop holds them before
-// kit#953: a row per key, channel and locale, written as a draft and made
-// live by :publish, which stamps published_at and published_by. Delete is
-// "reset to default".
+// The fake's message templates (tf#75), as kit#953 holds them (apis
+// v0.65.0): a copy per key, channel and locale. :apply writes it live in
+// one call, with its managed_by mark; Create and Patch write drafts only;
+// :publish takes a draft live and clears the mark; Delete is the reset to
+// the built-in. Unlike kit before its part catalog lands, the fake takes
+// texts, checked against the parts kit described.
 
 // fakeMessagePublisher is who the fake records as publishing.
 const fakeMessagePublisher = "c-acc"
@@ -26,6 +28,13 @@ const fakeMessagePublisher = "c-acc"
 // fakeMessageKeys are the keys the fake's catalog offers; anything else is
 // refused at save, as kit refuses it.
 var fakeMessageKeys = []string{"tenant-invitation", "password-recovery"}
+
+// fakeMessageParts are the email parts every key has (kit#953), and the
+// invitation body's cases.
+var (
+	fakeMessageParts    = []string{"subject", "greeting", "body", "button", "details", "note"}
+	fakeMessageVariants = map[string][]string{"body": {"administration", "join"}}
+)
 
 func (f *fakeIdentityServer) ListMessageTemplates(ctx context.Context, req *identitypb.ListMessageTemplatesRequest) (*identitypb.ListMessageTemplatesResponse, error) {
 	f.mu.Lock()
@@ -46,29 +55,76 @@ func (f *fakeIdentityServer) GetMessageTemplate(ctx context.Context, req *identi
 	return proto.Clone(t).(*corepb.MessageTemplate), nil
 }
 
+// ApplyMessageTemplate is kit#953's one call for configuration: upsert by
+// the triple, live, draft cleared, published and marked.
+func (f *fakeIdentityServer) ApplyMessageTemplate(ctx context.Context, req *identitypb.ApplyMessageTemplateRequest) (*identitypb.ApplyMessageTemplateResponse, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.recordAuth(ctx)
+	f.applies++
+
+	channel := req.GetChannel()
+	if channel == "" {
+		channel = "email"
+	}
+	if err := admitMessageIdentity(req.GetKey(), channel); err != nil {
+		return nil, err
+	}
+	whole := req.GetSubject() != "" || req.GetHtmlBody() != "" || req.GetTextBody() != ""
+	if len(req.GetTexts()) > 0 && whole {
+		return nil, status.Error(codes.InvalidArgument, "texts: set texts, or subject, text_body and html_body; not both")
+	}
+	if err := admitMessageTexts(req.GetTexts()); err != nil {
+		return nil, err
+	}
+	if err := admitMessageValues(req.GetSubject(), req.GetHtmlBody(), req.GetTextBody()); err != nil {
+		return nil, err
+	}
+
+	t := f.findMessage(req.GetParent(), req.GetKey(), channel, req.GetLocale())
+	created := t == nil
+	if created {
+		t = &corepb.MessageTemplate{
+			Name: req.GetParent() + "/message-templates/" + f.nextID("mt"),
+			Key:  req.GetKey(), Channel: channel, Locale: req.GetLocale(),
+		}
+		f.messages[t.GetName()] = t
+	}
+	t.Texts, t.Subject, t.HtmlBody, t.TextBody = nil, "", "", ""
+	t.Blocks, t.Mjml, t.Draft = nil, "", nil
+	if len(req.GetTexts()) > 0 {
+		t.Texts = req.GetTexts()
+		t.Shape = corepb.MessageShape_MESSAGE_SHAPE_TEXTS
+	} else {
+		t.Subject, t.HtmlBody, t.TextBody = req.GetSubject(), req.GetHtmlBody(), req.GetTextBody()
+		t.Shape = corepb.MessageShape_MESSAGE_SHAPE_HTML
+	}
+	t.ManagedBy = req.GetManagedBy()
+	f.stampPublished(t)
+	return &identitypb.ApplyMessageTemplateResponse{MessageTemplate: proto.Clone(t).(*corepb.MessageTemplate), Created: created}, nil
+}
+
+// CreateMessageTemplate writes a copy holding a draft; a live part is
+// refused, as kit#953 refuses it.
 func (f *fakeIdentityServer) CreateMessageTemplate(ctx context.Context, req *identitypb.CreateMessageTemplateRequest) (*corepb.MessageTemplate, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.recordAuth(ctx)
 
 	t := proto.Clone(req.GetMessageTemplate()).(*corepb.MessageTemplate)
-	if !slices.Contains(fakeMessageKeys, t.GetKey()) {
-		return nil, status.Errorf(codes.InvalidArgument, "key %q is not a message kit sends", t.GetKey())
-	}
-	if t.GetChannel() != "email" {
-		return nil, status.Errorf(codes.InvalidArgument, "channel %q: only email renders", t.GetChannel())
-	}
-	if err := admitMessageDraft(t.GetDraft()); err != nil {
+	if err := admitMessageIdentity(t.GetKey(), t.GetChannel()); err != nil {
 		return nil, err
 	}
+	if t.GetSubject() != "" || t.GetHtmlBody() != "" || t.GetTextBody() != "" || len(t.GetTexts()) > 0 {
+		return nil, status.Error(codes.InvalidArgument, "a live part is written by :publish or :apply; save a draft")
+	}
 	t.Name = req.GetParent() + "/message-templates/" + f.nextID("mt")
-	t.PublishedAt, t.PublishedBy = nil, ""
+	t.PublishedAt, t.PublishedBy, t.Shape = nil, "", corepb.MessageShape_MESSAGE_SHAPE_UNSPECIFIED
 	f.messages[t.GetName()] = t
 	return proto.Clone(t).(*corepb.MessageTemplate), nil
 }
 
-// PatchMessageTemplate takes the masks the provider sends: draft, and the
-// live parts a console edit writes.
+// PatchMessageTemplate writes the draft only.
 func (f *fakeIdentityServer) PatchMessageTemplate(ctx context.Context, req *identitypb.PatchMessageTemplateRequest) (*corepb.MessageTemplate, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -78,27 +134,17 @@ func (f *fakeIdentityServer) PatchMessageTemplate(ctx context.Context, req *iden
 	if !ok {
 		return nil, status.Errorf(codes.NotFound, "%s not found", req.GetName())
 	}
-	in := req.GetMessageTemplate()
 	for _, p := range req.GetUpdateMask().GetPaths() {
-		switch p {
-		case "draft":
-			if err := admitMessageDraft(in.GetDraft()); err != nil {
-				return nil, err
-			}
-			t.Draft = proto.Clone(in.GetDraft()).(*corepb.MessageTemplateDraft)
-		case "subject":
-			t.Subject = in.GetSubject()
-		case "html_body":
-			t.HtmlBody = in.GetHtmlBody()
-		case "text_body":
-			t.TextBody = in.GetTextBody()
-		default:
-			return nil, status.Errorf(codes.InvalidArgument, "update_mask: the fake takes no %q", p)
+		if p != "draft" {
+			return nil, status.Errorf(codes.InvalidArgument, "update_mask: %q is written by :publish or :apply", p)
 		}
+		t.Draft = proto.Clone(req.GetMessageTemplate().GetDraft()).(*corepb.MessageTemplateDraft)
 	}
 	return proto.Clone(t).(*corepb.MessageTemplate), nil
 }
 
+// PublishMessageTemplate is the console's publish: the draft goes live and
+// the configuration mark is cleared.
 func (f *fakeIdentityServer) PublishMessageTemplate(ctx context.Context, req *identitypb.PublishMessageTemplateRequest) (*identitypb.PublishMessageTemplateResponse, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -112,12 +158,18 @@ func (f *fakeIdentityServer) PublishMessageTemplate(ctx context.Context, req *id
 	if d == nil {
 		return nil, status.Errorf(codes.FailedPrecondition, "%s has no draft to publish", req.GetName())
 	}
-	t.Subject, t.TextBody, t.HtmlBody = d.GetSubject(), d.GetTextBody(), d.GetHtmlBody()
+	t.Subject, t.TextBody, t.HtmlBody, t.Texts = d.GetSubject(), d.GetTextBody(), d.GetHtmlBody(), d.GetTexts()
 	t.Blocks, t.Mjml = d.GetBlocks(), d.GetMjml()
-	t.Draft = nil
-	f.seq++
-	t.PublishedAt = timestamppb.New(certNotBefore.Add(time.Duration(f.seq) * time.Second))
-	t.PublishedBy = fakeMessagePublisher
+	switch {
+	case d.GetBlocks() != nil:
+		t.Shape = corepb.MessageShape_MESSAGE_SHAPE_LAYOUT
+	case len(d.GetTexts()) > 0:
+		t.Shape = corepb.MessageShape_MESSAGE_SHAPE_TEXTS
+	default:
+		t.Shape = corepb.MessageShape_MESSAGE_SHAPE_HTML
+	}
+	t.Draft, t.ManagedBy = nil, ""
+	f.stampPublished(t)
 	return &identitypb.PublishMessageTemplateResponse{MessageTemplate: proto.Clone(t).(*corepb.MessageTemplate)}, nil
 }
 
@@ -133,10 +185,54 @@ func (f *fakeIdentityServer) DeleteMessageTemplate(ctx context.Context, req *ide
 	return &emptypb.Empty{}, nil
 }
 
-// admitMessageDraft refuses a value the message does not offer, as kit's
+func (f *fakeIdentityServer) stampPublished(t *corepb.MessageTemplate) {
+	f.seq++
+	t.PublishedAt = timestamppb.New(certNotBefore.Add(time.Duration(f.seq) * time.Second))
+	t.PublishedBy = fakeMessagePublisher
+}
+
+// findMessage is the stored copy with this identity, or nil. The caller
+// holds the lock.
+func (f *fakeIdentityServer) findMessage(parent, key, channel, locale string) *corepb.MessageTemplate {
+	for _, t := range f.messages {
+		if strings.HasPrefix(t.GetName(), parent+"/") && t.GetKey() == key && t.GetChannel() == channel && t.GetLocale() == locale {
+			return t
+		}
+	}
+	return nil
+}
+
+func admitMessageIdentity(key, channel string) error {
+	if !slices.Contains(fakeMessageKeys, key) {
+		return status.Errorf(codes.InvalidArgument, "key %q is not a message kit sends", key)
+	}
+	if channel != "email" {
+		return status.Errorf(codes.InvalidArgument, "channel %q: only email renders", channel)
+	}
+	return nil
+}
+
+// admitMessageTexts refuses an unknown part or variant by name.
+func admitMessageTexts(texts map[string]string) error {
+	for name, v := range texts {
+		part, variant, cased := strings.Cut(name, ".")
+		if !slices.Contains(fakeMessageParts, part) {
+			return status.Errorf(codes.InvalidArgument, "texts: %q is not a part of this message", name)
+		}
+		if cased && !slices.Contains(fakeMessageVariants[part], variant) {
+			return status.Errorf(codes.InvalidArgument, "texts: %q: part %s has no case %q", name, part, variant)
+		}
+		if err := admitMessageValues(v); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// admitMessageValues refuses a value the message does not offer, as kit's
 // save-time render does: the fake refuses .Unknown.
-func admitMessageDraft(d *corepb.MessageTemplateDraft) error {
-	for _, s := range []string{d.GetSubject(), d.GetHtmlBody(), d.GetTextBody()} {
+func admitMessageValues(sources ...string) error {
+	for _, s := range sources {
 		if strings.Contains(s, "{{ .Unknown") {
 			return status.Error(codes.InvalidArgument, `template: can't evaluate field Unknown`)
 		}
@@ -148,16 +244,13 @@ func admitMessageDraft(d *corepb.MessageTemplateDraft) error {
 func (f *fakeIdentityServer) message(tenant, key, channel, locale string) *corepb.MessageTemplate {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	for _, t := range f.messages {
-		if strings.HasPrefix(t.GetName(), "tenants/"+tenant+"/") && t.GetKey() == key && t.GetChannel() == channel && t.GetLocale() == locale {
-			return proto.Clone(t).(*corepb.MessageTemplate)
-		}
+	if t := f.findMessage("tenants/"+tenant, key, channel, locale); t != nil {
+		return proto.Clone(t).(*corepb.MessageTemplate)
 	}
 	return nil
 }
 
-// editMessage writes live parts behind Terraform's back, as a console
-// edit published there does.
+// editMessage changes a stored copy behind Terraform's back.
 func (f *fakeIdentityServer) editMessage(name string, edit func(*corepb.MessageTemplate)) {
 	f.mu.Lock()
 	defer f.mu.Unlock()

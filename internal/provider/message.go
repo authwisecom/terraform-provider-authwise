@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 
@@ -10,6 +11,7 @@ import (
 	corepb "git.authwise.com/authwise/apis/authwise/types/core/v1alpha1"
 	"github.com/activatedio/tfinfra/pkg/aip"
 	tfruntime "github.com/activatedio/tfinfra/pkg/tf"
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
@@ -21,7 +23,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/types/known/fieldmaskpb"
 )
 
 const (
@@ -29,7 +30,14 @@ const (
 
 	// messageChannelEmail is the one channel kit renders today.
 	messageChannelEmail = "email"
+
+	// messageManagedBy is the mark a message written here carries unless
+	// configured otherwise.
+	messageManagedBy = "terraform"
 )
+
+// messageManagedByPattern is kit's rule for managed_by.
+var messageManagedByPattern = regexp.MustCompile(`^[a-z0-9-]{1,64}$`)
 
 var (
 	_ resource.Resource                   = &messageResource{}
@@ -50,9 +58,10 @@ var (
 // differs from the configuration, and apply replaces it.
 //
 // Its identity is the triple; kit's row id is only how it is addressed.
-// Every call to kit goes through messageStore, the one place that changes
-// when kit#953's API lands (K1 identity, K2 publish in one call, K3 the
-// configuration mark, K4 the shape on the wire).
+// Every call to kit goes through messageStore. A write carries managed_by,
+// the mark that has the console show the message read-only; the console's
+// own publish clears it, which reads as drift here, as a changed wording
+// or shape does, and apply puts it back.
 type messageResource struct {
 	store    messageStore
 	defaults map[string]string
@@ -68,6 +77,7 @@ type messageModel struct {
 	Subject     types.String `tfsdk:"subject"`
 	HTML        types.String `tfsdk:"html"`
 	Text        types.String `tfsdk:"text"`
+	ManagedBy   types.String `tfsdk:"managed_by"`
 	PublishedAt types.String `tfsdk:"published_at"`
 	PublishedBy types.String `tfsdk:"published_by"`
 }
@@ -147,6 +157,16 @@ func (r *messageResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 			"text": schema.StringAttribute{
 				Optional:            true,
 				MarkdownDescription: "The whole mail's plain-text body, which mail clients show when they show no HTML. With `subject` and `html`; not with `texts`.",
+			},
+			"managed_by": schema.StringAttribute{
+				Optional: true,
+				Computed: true,
+				Default:  stringdefault.StaticString(messageManagedBy),
+				MarkdownDescription: "The mark kit keeps on the message, which has the console show it as set by configuration, read-only: `terraform` by default. " +
+					"Up to 64 characters of `a-z`, `0-9` and `-`; name the configuration (`terraform-prod`) when several manage one tenant. " +
+					"Publishing from the console removes the mark, and the next plan puts it back.",
+				Validators: []validator.String{stringvalidator.RegexMatches(messageManagedByPattern,
+					"must be 1 to 64 characters of a-z, 0-9 and -")},
 			},
 			"published_at": schema.StringAttribute{
 				Computed:            true,
@@ -260,7 +280,7 @@ func (r *messageResource) Create(ctx context.Context, req resource.CreateRequest
 		return
 	}
 
-	out, err := r.store.publish(ctx, id, "", content)
+	out, err := r.store.publish(ctx, id, content)
 	if err != nil {
 		addMessageWriteError(&resp.Diagnostics, err)
 		return
@@ -288,7 +308,7 @@ func (r *messageResource) Update(ctx context.Context, req resource.UpdateRequest
 		return
 	}
 
-	out, err := r.store.publish(ctx, plan.identity(r.tenant(state)), state.Name.ValueString(), content)
+	out, err := r.store.publish(ctx, plan.identity(r.tenant(state)), content)
 	if err != nil {
 		addMessageWriteError(&resp.Diagnostics, err)
 		return
@@ -404,12 +424,13 @@ func (m *messageModel) content(ctx context.Context) (messageContent, diag.Diagno
 	if !m.Texts.IsNull() {
 		texts := map[string]string{}
 		diags.Append(m.Texts.ElementsAs(ctx, &texts, false)...)
-		return messageContent{texts: texts}, diags
+		return messageContent{texts: texts, managedBy: m.ManagedBy.ValueString()}, diags
 	}
 	return messageContent{
-		subject: m.Subject.ValueString(),
-		html:    m.HTML.ValueString(),
-		text:    m.Text.ValueString(),
+		subject:   m.Subject.ValueString(),
+		html:      m.HTML.ValueString(),
+		text:      m.Text.ValueString(),
+		managedBy: m.ManagedBy.ValueString(),
 	}, diags
 }
 
@@ -425,6 +446,7 @@ func (m *messageModel) fromStored(ctx context.Context, s *storedMessage) diag.Di
 	m.Key = types.StringValue(s.key)
 	m.Channel = types.StringValue(s.channel)
 	m.Locale = types.StringValue(s.locale)
+	m.ManagedBy = types.StringValue(s.managedBy)
 	m.PublishedAt = types.StringValue(s.publishedAt)
 	m.PublishedBy = types.StringValue(s.publishedBy)
 
@@ -477,6 +499,7 @@ func (id messageIdentity) importID() string {
 type messageContent struct {
 	texts               map[string]string
 	subject, html, text string
+	managedBy           string
 }
 
 // storedMessage is what kit holds for a message, as the resource reads it.
@@ -485,6 +508,7 @@ type storedMessage struct {
 	name, key, channel, locale string
 	texts                      map[string]string
 	subject, html, text        string
+	managedBy                  string
 	published                  bool
 	publishedAt, publishedBy   string
 }
@@ -495,18 +519,18 @@ type messageStore interface {
 	find(ctx context.Context, id messageIdentity) (*storedMessage, error)
 	// get reads a message by name; nil when it is gone.
 	get(ctx context.Context, name string) (*storedMessage, error)
-	// publish writes content to the message (name, or a new one when
-	// empty) and publishes it.
-	publish(ctx context.Context, id messageIdentity, name string, content messageContent) (*storedMessage, error)
+	// publish writes content live to the message with this identity,
+	// creating it when there is none.
+	publish(ctx context.Context, id messageIdentity, content messageContent) (*storedMessage, error)
 	// reset deletes the message, so kit sends its built-in. Already gone
 	// is success.
 	reset(ctx context.Context, name string) error
 }
 
 // messageTemplateStore is messageStore over the MessageTemplate API of
-// apis v0.64.0. It has no named parts, no configuration mark and no
-// one-call publish, so it writes the draft then publishes it (two calls),
-// finds a message by listing, and refuses texts.
+// apis v0.65.0 (kit#953): :apply writes and publishes in one call, a message
+// is found by listing the tenant's and matching the triple (List's filter is
+// a label selector), and Delete is the reset.
 type messageTemplateStore struct {
 	client identitypb.AuthwiseIdentityServiceClient
 }
@@ -547,49 +571,24 @@ func (s messageTemplateStore) get(ctx context.Context, name string) (*storedMess
 	return storedFromTemplate(out), nil
 }
 
-func (s messageTemplateStore) publish(ctx context.Context, id messageIdentity, name string, content messageContent) (*storedMessage, error) {
+func (s messageTemplateStore) publish(ctx context.Context, id messageIdentity, content messageContent) (*storedMessage, error) {
 
+	req := &identitypb.ApplyMessageTemplateRequest{
+		Parent:    id.parent(),
+		Key:       id.key,
+		Channel:   id.channel,
+		Locale:    id.locale,
+		ManagedBy: content.managedBy,
+	}
 	if content.texts != nil {
-		return nil, status.Error(codes.Unimplemented,
-			"texts needs kit's named message parts (kit#953) and the apis release with them; this build writes only subject, html and text")
-	}
-
-	tpl := &corepb.MessageTemplate{
-		Key:     id.key,
-		Channel: id.channel,
-		Locale:  id.locale,
-		Draft: &corepb.MessageTemplateDraft{
-			Subject:  content.subject,
-			HtmlBody: content.html,
-			TextBody: content.text,
-		},
-	}
-
-	var (
-		saved *corepb.MessageTemplate
-		err   error
-	)
-	if name == "" {
-		saved, err = s.client.CreateMessageTemplate(ctx, &identitypb.CreateMessageTemplateRequest{
-			Parent:          id.parent(),
-			MessageTemplate: tpl,
-		})
+		req.Texts = content.texts
 	} else {
-		// The draft alone: a whole-record write would clear what is live
-		// until the publish that follows.
-		saved, err = s.client.PatchMessageTemplate(ctx, &identitypb.PatchMessageTemplateRequest{
-			Name:            name,
-			MessageTemplate: &corepb.MessageTemplate{Draft: tpl.GetDraft()},
-			UpdateMask:      &fieldmaskpb.FieldMask{Paths: []string{"draft"}},
-		})
+		req.Subject, req.HtmlBody, req.TextBody = content.subject, content.html, content.text
 	}
+
+	out, err := s.client.ApplyMessageTemplate(ctx, req)
 	if err != nil {
 		return nil, err
-	}
-
-	out, err := s.client.PublishMessageTemplate(ctx, &identitypb.PublishMessageTemplateRequest{Name: saved.GetName()})
-	if err != nil {
-		return nil, fmt.Errorf("%s was saved as a draft but not published: %w", saved.GetName(), err)
 	}
 	return storedFromTemplate(out.GetMessageTemplate()), nil
 }
@@ -604,26 +603,33 @@ func (s messageTemplateStore) reset(ctx context.Context, name string) error {
 }
 
 // storedFromTemplate reads a MessageTemplate as the resource does: what is
-// published, never the draft.
+// live, never the draft. Named parts read as texts; the whole mail, and a
+// layout the console wrote, read as subject, html and text, so a layout is
+// drift against either configured shape.
 func storedFromTemplate(t *corepb.MessageTemplate) *storedMessage {
 
 	s := &storedMessage{
-		name:    t.GetName(),
-		key:     t.GetKey(),
-		channel: t.GetChannel(),
-		locale:  t.GetLocale(),
-		subject: t.GetSubject(),
-		html:    t.GetHtmlBody(),
-		text:    t.GetTextBody(),
-		// A copy kit published, or one written as text before kit#953,
-		// whose parts were live on save; a copy holding only a draft
-		// has never been sent.
-		published: t.GetPublishedAt() != nil ||
+		name:      t.GetName(),
+		key:       t.GetKey(),
+		channel:   t.GetChannel(),
+		locale:    t.GetLocale(),
+		managedBy: t.GetManagedBy(),
+		// Published, or (unspecified shape) a copy an older kit took
+		// live on save; a copy holding only a draft has never been sent.
+		published: t.GetPublishedAt() != nil || t.GetShape() != corepb.MessageShape_MESSAGE_SHAPE_UNSPECIFIED ||
 			t.GetSubject() != "" || t.GetHtmlBody() != "" || t.GetTextBody() != "" || t.GetMjml() != "",
 		publishedBy: t.GetPublishedBy(),
 	}
 	if t.GetPublishedAt() != nil {
 		s.publishedAt = t.GetPublishedAt().AsTime().UTC().Format(time.RFC3339Nano)
 	}
+	if t.GetShape() == corepb.MessageShape_MESSAGE_SHAPE_TEXTS {
+		s.texts = t.GetTexts()
+		if s.texts == nil {
+			s.texts = map[string]string{}
+		}
+		return s
+	}
+	s.subject, s.html, s.text = t.GetSubject(), t.GetHtmlBody(), t.GetTextBody()
 	return s
 }
