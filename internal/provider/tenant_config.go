@@ -71,7 +71,11 @@ func (r *tenantConfigResource) Schema(_ context.Context, _ resource.SchemaReques
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "The config of an existing tenant: its brand, and its token lifetimes and CORS. " +
 			"The tenant itself is not created or deleted here: tenants are provisioned with awtenant.\n\n" +
-			"`config` is authoritative: the tenant's config becomes exactly this, and a field left out is cleared. " +
+			"`config` is authoritative: the tenant's config becomes exactly this, and a field left out is cleared, except `branding`. " +
+			"**Set a tenant's branding in one place.** `branding` here is deprecated in favour of `authwise_tenant_branding`, which writes the same stored value. " +
+			"A `config` without `branding` leaves the tenant's branding alone, on write, on read and on destroy. " +
+			"A `config` that sets `branding`, even to `{}`, owns it as before, and the two resources would then overwrite each other. " +
+			"kit refuses `branding` here from the release train after 2026.11.3 (0.34.0 is the last provider that writes it here): move it to `authwise_tenant_branding`.\n\n" +
 			"Creating the resource replaces whatever config the tenant had. " +
 			"Destroying it clears the config (and `labels`, when set) rather than only dropping it from state, " +
 			"so the assets the brand names can be deleted after it. " +
@@ -97,6 +101,7 @@ func (r *tenantConfigResource) Schema(_ context.Context, _ resource.SchemaReques
 				Required:   true,
 				CustomType: jsontypes.NormalizedType{},
 				MarkdownDescription: "The TenantConfig as protojson: `data.authwise_tenant_config.x.json`, or `jsonencode`. " +
+					"`branding` is deprecated: set it with `authwise_tenant_branding`, and leave it out here. " +
 					"kit refuses a `branding` that names no image asset of the tenant, or a dark logo without a light one.",
 			},
 			labelsAttribute: schema.MapAttribute{
@@ -190,7 +195,7 @@ func (r *tenantConfigResource) write(ctx context.Context, plan *tenantConfigMode
 	}
 
 	tenant := &corepb.Tenant{Config: config}
-	paths := []string{configAttribute}
+	paths := configMaskPaths(config)
 	if !plan.Labels.IsNull() {
 		labels := map[string]string{}
 		diags.Append(plan.Labels.ElementsAs(ctx, &labels, false)...)
@@ -248,28 +253,19 @@ func (r *tenantConfigResource) Read(ctx context.Context, req resource.ReadReques
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
-// fromProto reads the tenant into the model. The config is kept as written
-// while it means what the tenant holds, so a hand-written jsonencode, with
-// snake_case keys or zero values kit leaves out, is no drift; otherwise it
-// is the tenant's, re-encoded as the data source encodes it. Labels are read
-// when managed, and on import.
+// fromProto reads the tenant into the model: the config as configRead
+// keeps it, and labels when managed, and on import.
 func (m *tenantConfigModel) fromProto(ctx context.Context, t *corepb.Tenant) diag.Diagnostics {
 
 	var diags diag.Diagnostics
 
 	imported := m.Config.IsNull()
-
-	held := t.GetConfig()
-	if held == nil {
-		held = &corepb.TenantConfig{}
+	doc, changed, err := m.configRead(t.GetConfig())
+	if err != nil {
+		diags.AddError("cannot encode the tenant config", err.Error())
+		return diags
 	}
-	written := &corepb.TenantConfig{}
-	if imported || protojson.Unmarshal([]byte(m.Config.ValueString()), written) != nil || !proto.Equal(written, held) {
-		doc, err := configJSON(held)
-		if err != nil {
-			diags.AddError("cannot encode the tenant config", err.Error())
-			return diags
-		}
+	if changed {
 		m.Config = jsontypes.NewNormalizedValue(doc)
 	}
 
@@ -288,9 +284,40 @@ func (m *tenantConfigModel) fromProto(ctx context.Context, t *corepb.Tenant) dia
 	return diags
 }
 
+// configRead is the config to keep in state, and whether it differs from
+// what the model holds. The config is kept as written while it means what
+// the tenant holds, so a hand-written jsonencode, with snake_case keys or
+// zero values kit leaves out, is no drift; otherwise it is the tenant's,
+// re-encoded as the data source encodes it. Branding the written config
+// does not set is not this config's (authwise_tenant_branding's, or
+// nobody's), so what the tenant holds there is no drift here.
+func (m *tenantConfigModel) configRead(held *corepb.TenantConfig) (string, bool, error) {
+
+	if held == nil {
+		held = &corepb.TenantConfig{}
+	}
+	if m.Config.IsNull() {
+		doc, err := configJSON(held)
+		return doc, true, err
+	}
+
+	written := &corepb.TenantConfig{}
+	if protojson.Unmarshal([]byte(m.Config.ValueString()), written) == nil {
+		if written.GetBranding() == nil {
+			held = proto.Clone(held).(*corepb.TenantConfig)
+			held.Branding = nil
+		}
+		if proto.Equal(written, held) {
+			return "", false, nil
+		}
+	}
+	doc, err := configJSON(held)
+	return doc, true, err
+}
+
 // Delete clears the config, and the labels when managed, under the same
-// mask. kit refuses deleting an asset the brand names, so this is what lets
-// the assets go after it.
+// mask: the branding too when the config set it. kit refuses deleting an
+// asset the brand names, so this is what lets the assets go after it.
 func (r *tenantConfigResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 
 	if !r.configured(&resp.Diagnostics) {
@@ -303,7 +330,12 @@ func (r *tenantConfigResource) Delete(ctx context.Context, req resource.DeleteRe
 		return
 	}
 
-	paths := []string{configAttribute}
+	// Branding is cleared only when this config held it.
+	held := &corepb.TenantConfig{}
+	if protojson.Unmarshal([]byte(state.Config.ValueString()), held) != nil {
+		held.Branding = &corepb.Branding{}
+	}
+	paths := configMaskPaths(held)
 	if !state.Labels.IsNull() {
 		paths = append(paths, labelsAttribute)
 	}
@@ -331,3 +363,27 @@ func (r *tenantConfigResource) ImportState(ctx context.Context, req resource.Imp
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root(tfruntime.NameAttribute), tenantsCollection+"/"+id)...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root(tenantIDAttribute), id)...)
 }
+
+// configMaskPaths is what a write of config replaces. A config that sets
+// branding, even to {}, owns it and is written whole, as before 0.34.0. One
+// that does not leaves the tenant's branding alone, so that
+// authwise_tenant_branding, which writes the same stored value
+// (tenants/{t}/branding, kit#953), and this resource never fight over it:
+// every other field of the config is named, so each is still authoritative.
+func configMaskPaths(config *corepb.TenantConfig) []string {
+
+	if config.GetBranding() != nil {
+		return []string{configAttribute}
+	}
+	fields := config.ProtoReflect().Descriptor().Fields()
+	paths := make([]string, 0, fields.Len())
+	for i := range fields.Len() {
+		if name := string(fields.Get(i).Name()); name != brandingField {
+			paths = append(paths, configAttribute+"."+name)
+		}
+	}
+	return paths
+}
+
+// brandingField is TenantConfig's branding, in proto field names.
+const brandingField = "branding"

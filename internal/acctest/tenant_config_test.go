@@ -240,3 +240,73 @@ resource "authwise_tenant_config" "this" {
 		},
 	})
 }
+
+// TestAccTenantConfig_BrandingSetElsewhere (tf#75): a config that does not
+// set branding leaves the tenant's alone, as authwise_tenant_branding sets
+// it (one stored value, kit#953): no drift, kept through a change to the
+// config, and kept by a destroy. A config that sets branding, even to {},
+// owns it again and clears it.
+func TestAccTenantConfig_BrandingSetElsewhere(t *testing.T) {
+
+	h := newHarness(t)
+
+	config := func(seconds int, brand string) string {
+		return h.providerConfig() + brandAssets + fmt.Sprintf(`
+data "authwise_tenant_config" "this" {
+  access_token_expire_seconds = %d
+  %s
+}
+
+resource "authwise_tenant_config" "this" {
+  config = data.authwise_tenant_config.this.json
+}
+`, seconds, brand)
+	}
+
+	var logo string
+	brandedElsewhere := func() {
+		h.tenancy.mu.Lock()
+		defer h.tenancy.mu.Unlock()
+		tn := h.tenancy.tenants["tenants/t-1"]
+		if tn.GetConfig() == nil {
+			tn.Config = &corepb.TenantConfig{}
+		}
+		tn.Config.Branding = &corepb.Branding{LogoAssetId: logo}
+	}
+	brand := func(want string) resource.TestCheckFunc {
+		return func(*terraform.State) error {
+			tn := h.tenancy.tenant("tenants/t-1")
+			if got := tn.GetConfig().GetBranding().GetLogoAssetId(); got != want {
+				return fmt.Errorf("branding logo = %q, want %q", got, want)
+			}
+			if tn.GetConfig().GetAccessTokenExpireSeconds() == 0 {
+				return fmt.Errorf("the config was not written: %v", tn.GetConfig())
+			}
+			return nil
+		}
+	}
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: protoFactories(),
+		Steps: []resource.TestStep{
+			{
+				Config: config(600, ""),
+				Check: func(s *terraform.State) error {
+					logo = s.RootModule().Resources["authwise_asset_content.logo"].Primary.Attributes["asset_id"]
+					return nil
+				},
+			},
+			{PreConfig: brandedElsewhere, Config: config(600, ""), PlanOnly: true},
+			{
+				Config: config(900, ""),
+				Check: func(s *terraform.State) error {
+					return brand(logo)(s)
+				},
+			},
+			{
+				Config: config(900, "branding = {}"),
+				Check:  brand(""),
+			},
+		},
+	})
+}

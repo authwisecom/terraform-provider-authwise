@@ -12,6 +12,24 @@ FEATURES:
   Import with `[tenant_id/]key/channel/locale`. If the message is
   already customised, create refuses and names the import.
 
+BEHAVIOUR CHANGES:
+
+* **`authwise_tenant_config` leaves `branding` alone unless `config` sets
+  it** (tf#75). Before, a `config` without `branding` cleared the
+  tenant's branding. Now such a config leaves branding as the tenant
+  holds it, on write, on read and on destroy. It writes every other field
+  by its own `config.<field>` path. A config that sets `branding`, even to
+  `{}`, owns it as before. To clear branding that a config no longer
+  sets, apply once with `branding = {}`.
+
+DEPRECATIONS:
+
+* **`branding` in `authwise_tenant_config` is deprecated** in favour of
+  `authwise_tenant_branding` (kit#953), which writes the same stored
+  value. Set branding in one place. kit refuses `config.branding` from
+  the release train after 2026.11.3, so a configuration that still sets
+  it there will fail on that kit.
+
 NOTES:
 
 * **Work in progress.** This build writes the whole mail through the

@@ -4,7 +4,8 @@ page_title: "authwise_tenant_config Resource - Authwise"
 subcategory: "Identity"
 description: |-
   The config of an existing tenant: its brand, and its token lifetimes and CORS. The tenant itself is not created or deleted here: tenants are provisioned with awtenant.
-  config is authoritative: the tenant's config becomes exactly this, and a field left out is cleared. Creating the resource replaces whatever config the tenant had. Destroying it clears the config (and labels, when set) rather than only dropping it from state, so the assets the brand names can be deleted after it. Reference the logo as authwise_asset_content.x.asset_id, not authwise_asset.x.asset_id: kit refuses deleting an asset, or removing its content, while the brand names it, and the reference makes Terraform destroy this resource before both.
+  config is authoritative: the tenant's config becomes exactly this, and a field left out is cleared, except branding. Set a tenant's branding in one place. branding here is deprecated in favour of authwise_tenant_branding, which writes the same stored value. A config without branding leaves the tenant's branding alone, on write, on read and on destroy. A config that sets branding, even to {}, owns it as before, and the two resources would then overwrite each other. kit refuses branding here from the release train after 2026.11.3 (0.34.0 is the last provider that writes it here): move it to authwise_tenant_branding.
+  Creating the resource replaces whatever config the tenant had. Destroying it clears the config (and labels, when set) rather than only dropping it from state, so the assets the brand names can be deleted after it. Reference the logo as authwise_asset_content.x.asset_id, not authwise_asset.x.asset_id: kit refuses deleting an asset, or removing its content, while the brand names it, and the reference makes Terraform destroy this resource before both.
   Writing a tenant needs tenancy.tenants.update at the tenant, which a service account holds through tenant.admin.
 ---
 
@@ -12,7 +13,9 @@ description: |-
 
 The config of an existing tenant: its brand, and its token lifetimes and CORS. The tenant itself is not created or deleted here: tenants are provisioned with awtenant.
 
-`config` is authoritative: the tenant's config becomes exactly this, and a field left out is cleared. Creating the resource replaces whatever config the tenant had. Destroying it clears the config (and `labels`, when set) rather than only dropping it from state, so the assets the brand names can be deleted after it. Reference the logo as `authwise_asset_content.x.asset_id`, not `authwise_asset.x.asset_id`: kit refuses deleting an asset, or removing its content, while the brand names it, and the reference makes Terraform destroy this resource before both.
+`config` is authoritative: the tenant's config becomes exactly this, and a field left out is cleared, except `branding`. **Set a tenant's branding in one place.** `branding` here is deprecated in favour of `authwise_tenant_branding`, which writes the same stored value. A `config` without `branding` leaves the tenant's branding alone, on write, on read and on destroy. A `config` that sets `branding`, even to `{}`, owns it as before, and the two resources would then overwrite each other. kit refuses `branding` here from the release train after 2026.11.3 (0.34.0 is the last provider that writes it here): move it to `authwise_tenant_branding`.
+
+Creating the resource replaces whatever config the tenant had. Destroying it clears the config (and `labels`, when set) rather than only dropping it from state, so the assets the brand names can be deleted after it. Reference the logo as `authwise_asset_content.x.asset_id`, not `authwise_asset.x.asset_id`: kit refuses deleting an asset, or removing its content, while the brand names it, and the reference makes Terraform destroy this resource before both.
 
 Writing a tenant needs `tenancy.tenants.update` at the tenant, which a service account holds through `tenant.admin`.
 
@@ -48,7 +51,7 @@ resource "authwise_tenant_config" "this" {
 
 ### Required
 
-- `config` (String) The TenantConfig as protojson: `data.authwise_tenant_config.x.json`, or `jsonencode`. kit refuses a `branding` that names no image asset of the tenant, or a dark logo without a light one.
+- `config` (String) The TenantConfig as protojson: `data.authwise_tenant_config.x.json`, or `jsonencode`. `branding` is deprecated: set it with `authwise_tenant_branding`, and leave it out here. kit refuses a `branding` that names no image asset of the tenant, or a dark logo without a light one.
 
 ### Optional
 

@@ -9,6 +9,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
 // The tenant as the public tenancy service writes it (kit#166, kit#638):
@@ -54,6 +55,12 @@ func (f *fakeTenancyServer) PatchTenant(_ context.Context, in *tenancypb.PatchTe
 	}
 	merged := proto.Clone(t).(*corepb.Tenant)
 	for _, p := range in.GetUpdateMask().GetPaths() {
+		if sub, ok := strings.CutPrefix(p, "config."); ok {
+			if err := patchConfigField(merged, in.GetTenant().GetConfig(), sub); err != nil {
+				return nil, err
+			}
+			continue
+		}
 		if !tenantMutablePaths[p] {
 			return nil, status.Errorf(codes.InvalidArgument,
 				"update_mask path %q: PatchTenant writes only display_name, labels, config", p)
@@ -145,4 +152,25 @@ func (f *fakeIdentityServer) brandRefusal(asset string) error {
 		return nil
 	}
 	return f.brandHolding(asset)
+}
+
+// patchConfigField writes one field of the config from in, cleared when in
+// does not set it, as kit's masked merge does for config.<field>. The fake
+// takes one level; kit takes deeper paths too.
+func patchConfigField(merged *corepb.Tenant, in *corepb.TenantConfig, field string) error {
+	if merged.GetConfig() == nil {
+		merged.Config = &corepb.TenantConfig{}
+	}
+	dst := merged.GetConfig().ProtoReflect()
+	fd := dst.Descriptor().Fields().ByName(protoreflect.Name(field))
+	if fd == nil {
+		return status.Errorf(codes.InvalidArgument, "update_mask path %q names no field of the tenant config", "config."+field)
+	}
+	src := in.ProtoReflect()
+	if in != nil && src.Has(fd) {
+		dst.Set(fd, src.Get(fd))
+	} else {
+		dst.Clear(fd)
+	}
+	return nil
 }
