@@ -38,6 +38,12 @@ func (f *fakeGuardServer) allocateLocked(network string) (string, error) {
 			taken[n.GetAddress()] = true
 		}
 	}
+	// Translated applications' virtual addresses come from the same pool.
+	for name, r := range f.resources {
+		if networkOf(name) == network && r.GetVirtualAddress() != "" {
+			taken[r.GetVirtualAddress()] = true
+		}
+	}
 	for a := p.Addr().Next(); p.Contains(a); a = a.Next() {
 		if !taken[a.String()] {
 			return a.String(), nil
@@ -82,6 +88,7 @@ func (f *fakeGuardServer) readNodeLocked(name string) (*guardpb.Node, error) {
 	}
 	out := proto.Clone(n).(*guardpb.Node)
 	f.deriveLocked(out)
+	out.NodeGroups = f.groupsOfLocked(name)
 	out.AuthCode = ""
 	return out, nil
 }
@@ -145,10 +152,21 @@ func (f *fakeGuardServer) ListNodes(ctx context.Context, in *guardpb.ListNodesRe
 	defer f.mu.Unlock()
 	f.record(ctx)
 	out := &guardpb.ListNodesResponse{}
+	// The one filter the provider sends: node_group="<group name>".
+	group := ""
+	if fl := in.GetFilter(); fl != "" {
+		if !strings.HasPrefix(fl, `node_group="`) || !strings.HasSuffix(fl, `"`) {
+			return nil, status.Errorf(codes.InvalidArgument, "filter %q is not supported by the fake", fl)
+		}
+		group = strings.TrimSuffix(strings.TrimPrefix(fl, `node_group="`), `"`)
+	}
 	for _, n := range children(f.nodes, in.GetParent()+"/nodes/") {
 		read, err := f.readNodeLocked(n.GetName())
 		if err != nil {
 			return nil, err
+		}
+		if group != "" && !slices.Contains(read.GetNodeGroups(), group) {
+			continue
 		}
 		out.Nodes = append(out.Nodes, read)
 	}
@@ -234,13 +252,8 @@ func (f *fakeGuardServer) ListNodeGrants(ctx context.Context, in *guardpb.ListNo
 	}
 	out := &guardpb.ListNodeGrantsResponse{}
 	for _, target := range f.grants[in.GetName()] {
-		g := &guardpb.NodeGrant{Target: target, Kind: "node"}
-		if r, ok := f.resources[target]; ok {
-			g.Kind, g.DisplayName = "resource", r.GetDisplayName()
-		} else {
-			g.DisplayName = f.nodes[target].GetDisplayName()
-		}
-		out.Grants = append(out.Grants, g)
+		kind, dn := f.grantKindLocked(target)
+		out.Grants = append(out.Grants, &guardpb.NodeGrant{Target: target, Kind: kind, DisplayName: dn})
 	}
 	return out, nil
 }
@@ -255,11 +268,10 @@ func (f *fakeGuardServer) AssociateGrantsToNode(ctx context.Context, in *guardpb
 	network := networkOf(in.GetName())
 	targets := slices.Clone(f.grants[in.GetName()])
 	for _, t := range in.GetAssociation().GetSet() {
-		_, isResource := f.resources[t]
-		_, isNode := f.nodes[t]
+		kind, _ := f.grantKindLocked(t)
 		switch {
-		case !strings.HasPrefix(t, network+"/"), !isResource && !isNode:
-			return nil, status.Errorf(codes.InvalidArgument, "%s is not a resource or node of %s", t, network)
+		case !strings.HasPrefix(t, network+"/"), kind == "":
+			return nil, status.Errorf(codes.InvalidArgument, "%s is not a resource, node or node group of %s", t, network)
 		case t == in.GetName():
 			return nil, status.Error(codes.InvalidArgument, "a node cannot be granted itself")
 		}

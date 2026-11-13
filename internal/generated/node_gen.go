@@ -16,6 +16,7 @@ import (
 	path "github.com/hashicorp/terraform-plugin-framework/path"
 	resource "github.com/hashicorp/terraform-plugin-framework/resource"
 	schema "github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	boolplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	listplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	mapplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
 	planmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
@@ -53,6 +54,14 @@ func NodeResourceSchema() schema.Schema {
 				MarkdownDescription: "`auth_code_expires_at` as an RFC 3339 timestamp.",
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
+			"capabilities": schema.ListAttribute{
+				Computed:    true,
+				ElementType: types.StringType,
+			},
+			"cluster_trust_rule": schema.StringAttribute{
+				Computed:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
 			"config": schema.StringAttribute{
 				Computed:            true,
 				CustomType:          jsontypes.NormalizedType{},
@@ -69,6 +78,14 @@ func NodeResourceSchema() schema.Schema {
 				Computed:      true,
 				Optional:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
+			"enrollment_key": schema.StringAttribute{
+				Computed:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
+			"ephemeral": schema.BoolAttribute{
+				Computed:      true,
+				PlanModifiers: []planmodifier.Bool{boolplanmodifier.UseStateForUnknown()},
 			},
 			"guard_node_id": schema.StringAttribute{
 				Computed:            true,
@@ -98,6 +115,10 @@ func NodeResourceSchema() schema.Schema {
 				PlanModifiers:       []planmodifier.String{tf.RequiresReplaceIfConfigured(), stringplanmodifier.UseStateForUnknown()},
 				Validators:          []validator.String{tf.ReferenceID("n", "guard_network", "authwise_guard_network.<name>.guard_network_id")},
 			},
+			"node_groups": schema.ListAttribute{
+				Computed:    true,
+				ElementType: types.StringType,
+			},
 			"owner_id": schema.StringAttribute{
 				Computed:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
@@ -105,7 +126,7 @@ func NodeResourceSchema() schema.Schema {
 			"platform": schema.StringAttribute{
 				Computed:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
-				Validators:    []validator.String{stringvalidator.OneOf("PLATFORM_UNSPECIFIED", "PLATFORM_LINUX", "PLATFORM_MACOS", "PLATFORM_WINDOWS", "PLATFORM_IOS", "PLATFORM_MACOS_APP")},
+				Validators:    []validator.String{stringvalidator.OneOf("PLATFORM_UNSPECIFIED", "PLATFORM_LINUX", "PLATFORM_MACOS", "PLATFORM_WINDOWS", "PLATFORM_IOS", "PLATFORM_MACOS_APP", "PLATFORM_KUBERNETES")},
 			},
 			"public_key": schema.StringAttribute{
 				Computed:      true,
@@ -165,6 +186,11 @@ type NodeModel struct {
 	Slug              types.String         `tfsdk:"slug"`
 	Platform          types.String         `tfsdk:"platform"`
 	Region            types.String         `tfsdk:"region"`
+	EnrollmentKey     types.String         `tfsdk:"enrollment_key"`
+	NodeGroups        types.List           `tfsdk:"node_groups"`
+	ClusterTrustRule  types.String         `tfsdk:"cluster_trust_rule"`
+	Ephemeral         types.Bool           `tfsdk:"ephemeral"`
+	Capabilities      types.List           `tfsdk:"capabilities"`
 }
 
 // NewNodeModel returns a model with every attribute set to its typed null; collection types cannot be zero-valued.
@@ -174,14 +200,19 @@ func NewNodeModel() *NodeModel {
 		AllowedIps:        types.ListNull(types.StringType),
 		AuthCode:          types.StringNull(),
 		AuthCodeExpiresAt: types.StringNull(),
+		Capabilities:      types.ListNull(types.StringType),
+		ClusterTrustRule:  types.StringNull(),
 		Config:            jsontypes.NewNormalizedNull(),
 		DisplayName:       types.StringNull(),
 		Endpoint:          types.StringNull(),
+		EnrollmentKey:     types.StringNull(),
+		Ephemeral:         types.BoolNull(),
 		GuardNodeId:       types.StringNull(),
 		Labels:            types.MapNull(types.StringType),
 		LastSeenAt:        types.StringNull(),
 		Name:              types.StringNull(),
 		NetworkId:         types.StringNull(),
+		NodeGroups:        types.ListNull(types.StringType),
 		OwnerId:           types.StringNull(),
 		Platform:          types.StringNull(),
 		PublicKey:         types.StringNull(),
@@ -243,6 +274,15 @@ func (m *NodeModel) ToProto(ctx context.Context) (*v1alpha1.Node, diag.Diagnosti
 		out.Platform = v1alpha1.Platform(v1alpha1.Platform_value[m.Platform.ValueString()])
 	}
 	out.Region = m.Region.ValueString()
+	out.EnrollmentKey = m.EnrollmentKey.ValueString()
+	if !m.NodeGroups.IsNull() && !m.NodeGroups.IsUnknown() {
+		diags.Append(m.NodeGroups.ElementsAs(ctx, &out.NodeGroups, false)...)
+	}
+	out.ClusterTrustRule = m.ClusterTrustRule.ValueString()
+	out.Ephemeral = m.Ephemeral.ValueBool()
+	if !m.Capabilities.IsNull() && !m.Capabilities.IsUnknown() {
+		diags.Append(m.Capabilities.ElementsAs(ctx, &out.Capabilities, false)...)
+	}
 	return out, diags
 }
 
@@ -342,6 +382,35 @@ func (m *NodeModel) FromProto(ctx context.Context, e *v1alpha1.Node) diag.Diagno
 		m.Region = types.StringNull()
 	} else {
 		m.Region = types.StringValue(e.Region)
+	}
+	if e.EnrollmentKey == "" {
+		m.EnrollmentKey = types.StringNull()
+	} else {
+		m.EnrollmentKey = types.StringValue(e.EnrollmentKey)
+	}
+	if len(e.NodeGroups) == 0 {
+		if !tf.KeepEmpty(m.NodeGroups) {
+			m.NodeGroups = types.ListNull(types.StringType)
+		}
+	} else {
+		v, d := types.ListValueFrom(ctx, types.StringType, e.NodeGroups)
+		diags.Append(d...)
+		m.NodeGroups = v
+	}
+	if e.ClusterTrustRule == "" {
+		m.ClusterTrustRule = types.StringNull()
+	} else {
+		m.ClusterTrustRule = types.StringValue(e.ClusterTrustRule)
+	}
+	m.Ephemeral = types.BoolValue(e.Ephemeral)
+	if len(e.Capabilities) == 0 {
+		if !tf.KeepEmpty(m.Capabilities) {
+			m.Capabilities = types.ListNull(types.StringType)
+		}
+	} else {
+		v, d := types.ListValueFrom(ctx, types.StringType, e.Capabilities)
+		diags.Append(d...)
+		m.Capabilities = v
 	}
 	return diags
 }
@@ -526,12 +595,19 @@ func NodeDataSourceSchema() schema1.Schema {
 				Sensitive: true,
 			},
 			"auth_code_expires_at": schema1.StringAttribute{Computed: true},
+			"capabilities": schema1.ListAttribute{
+				Computed:    true,
+				ElementType: types.StringType,
+			},
+			"cluster_trust_rule": schema1.StringAttribute{Computed: true},
 			"config": schema1.StringAttribute{
 				Computed:   true,
 				CustomType: jsontypes.NormalizedType{},
 			},
-			"display_name": schema1.StringAttribute{Computed: true},
-			"endpoint":     schema1.StringAttribute{Computed: true},
+			"display_name":   schema1.StringAttribute{Computed: true},
+			"endpoint":       schema1.StringAttribute{Computed: true},
+			"enrollment_key": schema1.StringAttribute{Computed: true},
+			"ephemeral":      schema1.BoolAttribute{Computed: true},
 			"guard_node_id": schema1.StringAttribute{
 				Computed:            true,
 				MarkdownDescription: "Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.",
@@ -546,6 +622,10 @@ func NodeDataSourceSchema() schema1.Schema {
 				Required:            true,
 			},
 			"network_id": schema1.StringAttribute{Computed: true},
+			"node_groups": schema1.ListAttribute{
+				Computed:    true,
+				ElementType: types.StringType,
+			},
 			"owner_id":   schema1.StringAttribute{Computed: true},
 			"platform":   schema1.StringAttribute{Computed: true},
 			"public_key": schema1.StringAttribute{Computed: true},
@@ -610,6 +690,11 @@ type NodeItemModel struct {
 	Slug              types.String         `tfsdk:"slug"`
 	Platform          types.String         `tfsdk:"platform"`
 	Region            types.String         `tfsdk:"region"`
+	EnrollmentKey     types.String         `tfsdk:"enrollment_key"`
+	NodeGroups        types.List           `tfsdk:"node_groups"`
+	ClusterTrustRule  types.String         `tfsdk:"cluster_trust_rule"`
+	Ephemeral         types.Bool           `tfsdk:"ephemeral"`
+	Capabilities      types.List           `tfsdk:"capabilities"`
 }
 
 // NodeItemAttrTypes returns the attribute types of one guard_nodes list element.
@@ -619,13 +704,18 @@ func NodeItemAttrTypes() map[string]attr.Type {
 		"allowed_ips":          types.ListType{ElemType: types.StringType},
 		"auth_code":            types.StringType,
 		"auth_code_expires_at": types.StringType,
+		"capabilities":         types.ListType{ElemType: types.StringType},
+		"cluster_trust_rule":   types.StringType,
 		"config":               jsontypes.NormalizedType{},
 		"display_name":         types.StringType,
 		"endpoint":             types.StringType,
+		"enrollment_key":       types.StringType,
+		"ephemeral":            types.BoolType,
 		"guard_node_id":        types.StringType,
 		"labels":               types.MapType{ElemType: types.StringType},
 		"last_seen_at":         types.StringType,
 		"name":                 types.StringType,
+		"node_groups":          types.ListType{ElemType: types.StringType},
 		"owner_id":             types.StringType,
 		"platform":             types.StringType,
 		"public_key":           types.StringType,
@@ -661,12 +751,19 @@ func NodeListDataSourceSchema() schema1.Schema {
 						Sensitive: true,
 					},
 					"auth_code_expires_at": schema1.StringAttribute{Computed: true},
+					"capabilities": schema1.ListAttribute{
+						Computed:    true,
+						ElementType: types.StringType,
+					},
+					"cluster_trust_rule": schema1.StringAttribute{Computed: true},
 					"config": schema1.StringAttribute{
 						Computed:   true,
 						CustomType: jsontypes.NormalizedType{},
 					},
-					"display_name": schema1.StringAttribute{Computed: true},
-					"endpoint":     schema1.StringAttribute{Computed: true},
+					"display_name":   schema1.StringAttribute{Computed: true},
+					"endpoint":       schema1.StringAttribute{Computed: true},
+					"enrollment_key": schema1.StringAttribute{Computed: true},
+					"ephemeral":      schema1.BoolAttribute{Computed: true},
 					"guard_node_id": schema1.StringAttribute{
 						Computed:            true,
 						MarkdownDescription: "Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.",
@@ -679,6 +776,10 @@ func NodeListDataSourceSchema() schema1.Schema {
 					"name": schema1.StringAttribute{
 						Computed:            true,
 						MarkdownDescription: "Full resource name.",
+					},
+					"node_groups": schema1.ListAttribute{
+						Computed:    true,
+						ElementType: types.StringType,
 					},
 					"owner_id":   schema1.StringAttribute{Computed: true},
 					"platform":   schema1.StringAttribute{Computed: true},
@@ -804,6 +905,35 @@ func nodeItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Node, *NodeM
 		item.Region = types.StringNull()
 	} else {
 		item.Region = types.StringValue(e.Region)
+	}
+	if e.EnrollmentKey == "" {
+		item.EnrollmentKey = types.StringNull()
+	} else {
+		item.EnrollmentKey = types.StringValue(e.EnrollmentKey)
+	}
+	if len(e.NodeGroups) == 0 {
+		if !tf.KeepEmpty(item.NodeGroups) {
+			item.NodeGroups = types.ListNull(types.StringType)
+		}
+	} else {
+		v, d := types.ListValueFrom(ctx, types.StringType, e.NodeGroups)
+		diags.Append(d...)
+		item.NodeGroups = v
+	}
+	if e.ClusterTrustRule == "" {
+		item.ClusterTrustRule = types.StringNull()
+	} else {
+		item.ClusterTrustRule = types.StringValue(e.ClusterTrustRule)
+	}
+	item.Ephemeral = types.BoolValue(e.Ephemeral)
+	if len(e.Capabilities) == 0 {
+		if !tf.KeepEmpty(item.Capabilities) {
+			item.Capabilities = types.ListNull(types.StringType)
+		}
+	} else {
+		v, d := types.ListValueFrom(ctx, types.StringType, e.Capabilities)
+		diags.Append(d...)
+		item.Capabilities = v
 	}
 	id, err := crud.IDFromName(e.Name)
 	if err != nil {

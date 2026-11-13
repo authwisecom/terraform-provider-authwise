@@ -44,6 +44,7 @@ resource "authwise_provider" "google" {
 - `link_by_verified_email` (Boolean)
 - `provider_type` (String)
 - `realm_id` (String) Parent identifier `realm_id`; overrides the provider default, and reads back from the name. Changing a configured one replaces the resource.
+- `status` (String)
 - `tenant_id` (String) Parent identifier `tenant_id`; overrides the provider default, and reads back from the name. Changing a configured one replaces the resource.
 - `trust_upstream_amr` (Boolean)
 - `trust_upstream_email_verified` (Boolean)

@@ -3,12 +3,15 @@
 page_title: "authwise_guard_resource Resource - Authwise"
 subcategory: "Guard"
 description: |-
-  A routed target in a Guard network that is not a node: a subnet, a host or an application. The nodes that serve it are managed by authwise_guard_resource_nodes.
+  A routed target in a Guard network that is not a node: a subnet, a host or an application. The nodes that serve it are managed by authwise_guard_resource_nodes, the node groups by authwise_guard_resource_node_groups.
+  An application may be translated: clients are served published_name at virtual_address, an address of the network's own, and the serving node resolves address itself and forwards to what it found. Two Kubernetes clusters can then serve the same cluster name (prometheus.monitoring.svc.cluster.local) without a clash. translated is set on create and never changed; left unset, guard-control makes it true when a node or group serving the resource at create runs on Kubernetes, so name the group's members (or the group) before or at create. Every serving node must have reported the app-translate capability (authwise_guard_node.capabilities). published_name defaults to the address's first two labels under the network's mesh domain.
 ---
 
 # authwise_guard_resource (Resource)
 
-A routed target in a Guard network that is not a node: a subnet, a host or an application. The nodes that serve it are managed by `authwise_guard_resource_nodes`.
+A routed target in a Guard network that is not a node: a subnet, a host or an application. The nodes that serve it are managed by `authwise_guard_resource_nodes`, the node groups by `authwise_guard_resource_node_groups`.
+
+An application may be **translated**: clients are served `published_name` at `virtual_address`, an address of the network's own, and the serving node resolves `address` itself and forwards to what it found. Two Kubernetes clusters can then serve the same cluster name (`prometheus.monitoring.svc.cluster.local`) without a clash. `translated` is set on create and never changed; left unset, guard-control makes it true when a node or group serving the resource at create runs on Kubernetes, so name the group's members (or the group) before or at create. Every serving node must have reported the `app-translate` capability (`authwise_guard_node.capabilities`). `published_name` defaults to the address's first two labels under the network's mesh domain.
 
 ## Example Usage
 
@@ -39,13 +42,17 @@ resource "authwise_guard_resource" "office_lan" {
 - `config` (String) `config` as a JSON object.
 - `display_name` (String)
 - `labels` (Map of String)
+- `published_name` (String)
+- `translated` (Boolean)
 
 ### Read-Only
 
 - `addresses` (Attributes List) (see [below for nested schema](#nestedatt--addresses))
 - `guard_resource_id` (String) Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.
 - `name` (String) Full resource name; serves as the Terraform ID.
+- `serving_node_groups` (List of String)
 - `serving_node_ids` (List of String)
+- `virtual_address` (String)
 
 <a id="nestedatt--addresses"></a>
 ### Nested Schema for `addresses`

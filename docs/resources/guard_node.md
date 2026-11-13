@@ -52,9 +52,14 @@ output "gateway_auth_code" {
 - `allowed_ips` (List of String)
 - `auth_code` (String, Sensitive)
 - `auth_code_expires_at` (String) `auth_code_expires_at` as an RFC 3339 timestamp.
+- `capabilities` (List of String)
+- `cluster_trust_rule` (String)
+- `enrollment_key` (String)
+- `ephemeral` (Boolean)
 - `guard_node_id` (String) Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.
 - `last_seen_at` (String) `last_seen_at` as an RFC 3339 timestamp.
 - `name` (String) Full resource name; serves as the Terraform ID.
+- `node_groups` (List of String)
 - `owner_id` (String)
 - `platform` (String)
 - `roles` (List of String)

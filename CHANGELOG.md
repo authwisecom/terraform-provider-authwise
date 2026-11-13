@@ -1,3 +1,74 @@
+## 0.35.0 (Unreleased)
+
+NOTES:
+
+* Release train 2026.11.GFK.1 (Guard for Kubernetes), stage GK5, built
+  against apis v0.73.0. guard-control's servers for node groups, cluster
+  trusts and enrollment keys were still being built on its `feat/gfk1`
+  branch: these resources are tested against the acceptance fake's reading
+  of the contract, not a running guard-control. The guard-control minimum
+  is set when that release is tagged.
+* Built on tfinfra with two generator changes, released separately:
+  proto3 `optional bool` fields (`authwise_guard_resource.translated`),
+  and snake-case parent attributes for camelCase collections
+  (`cluster_trust_id`, not `clusterTrust_id`). No existing resource's
+  schema changes.
+
+FEATURES:
+
+* **New resource: `authwise_guard_node_group`**. A named set of a Guard
+  network's nodes that grants and serving refer to as one. Its members
+  are `authwise_guard_node_group_members` (for nodes registered by hand),
+  or the nodes that an enrollment key or cluster trust rule naming the
+  group enrolls. What the group's members may reach is
+  `authwise_guard_node_group_grants`. A group serves a resource through
+  `authwise_guard_resource_node_groups`. Data sources:
+  `authwise_guard_node_group` and `authwise_guard_node_groups`.
+
+* **New resource: `authwise_guard_cluster_trust`**. A Kubernetes cluster
+  registered on a network. Its pods join with their projected service
+  account tokens, so no secret is stored. Its keys come from the issuer's
+  discovery document (`discover = true`: GKE, EKS, AKS) or an uploaded
+  `jwks` (a private cluster); uploading again renews rotated keys.
+  `issuer` never changes. Destroy revokes the trust, and a trust revoked
+  out of band drops out of state. This is how a customer declares the
+  trust: the Guard operator in their cluster holds no administrative
+  credential.
+
+* **New resource: `authwise_guard_cluster_trust_rule`**. Lets one
+  namespace's service account (or `*`) join through a trust, with
+  `node_name_prefix`, `ephemeral`, `node_group` and `max_nodes`
+  (unset is 100). `namespace` and `service_account` replace the rule.
+  Data sources: `authwise_guard_cluster_trust_rule` and
+  `authwise_guard_cluster_trust_rules`.
+
+* **New resource: `authwise_guard_enrollment_key`** (tf#74,
+  guard-control#98). A secret that lets machines join a network as server
+  nodes: `expiry_days` (1 to 90, unset is 30), `max_uses` (1 to 1000,
+  unset is 1), `ephemeral` (refused at plan on a one-use key),
+  `node_name_prefix` and `node_group`. The secret is shown once and kept
+  in state. Every argument replaces the key. Refresh drops a revoked key,
+  and an expired or used-up one unless `recreate_if_invalid = false`.
+  Destroy revokes the key. There is no import.
+
+* **`authwise_guard_resource`: translated applications.** `translated`
+  (set on create, never changed; guard-control makes it true when a
+  Kubernetes node or group serves the resource at create),
+  `published_name` (the name clients use; derived when unset) and
+  `virtual_address` (computed). `serving_node_groups` is read-only.
+
+* **`authwise_guard_node`: how a node joined.** Read-only
+  `enrollment_key`, `cluster_trust_rule`, `ephemeral`, `node_groups` and
+  `capabilities`. `platform` gains `PLATFORM_KUBERNETES`.
+
+* **`authwise_guard_node_grants` and `authwise_guard_node_group_grants`
+  take node group names**: a granted group means every member of it.
+
+* **`authwise_provider`: `status`** (apis v0.68.0, kit#955): `active` or
+  `disabled`. A disabled provider keeps its users and links, and sign-in
+  skips it. kit refuses to disable a realm's last active provider; the
+  provider does not send `force_disable`.
+
 ## 0.34.0 (November 12, 2026)
 
 FEATURES:

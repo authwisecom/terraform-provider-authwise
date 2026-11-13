@@ -30,6 +30,7 @@ import (
 	guardpb "git.authwise.com/authwise/apis/authwise/guardcontrol/v1alpha1"
 	identitypb "git.authwise.com/authwise/apis/authwise/identity/v1alpha1"
 	corepb "git.authwise.com/authwise/apis/authwise/types/core/v1alpha1"
+	"git.authwise.com/authwise/terraform-provider-authwise/internal/guardadapt"
 	gentf "github.com/activatedio/tfinfra/genlib/tf"
 	tf "github.com/activatedio/tfinfra/pkg/tf"
 )
@@ -44,6 +45,9 @@ var (
 
 	// Guard's (guard-control): a network in a kit tenant (tf#65).
 	scopeGuardNetwork = tf.NewScope("tenants", "networks")
+	// A network's cluster trust (train 2026.11.GFK.1): its rules live under
+	// it.
+	scopeGuardClusterTrust = tf.NewScope("tenants", "networks", "clusterTrusts")
 )
 
 // References: the bare-AWID fields and what they hold, from kit's
@@ -74,6 +78,9 @@ var (
 		"audience_id": refAudience,
 		"client_id":   {Target: "client", Prefix: "c"},
 		"network_id":  {Target: "guard_network", Prefix: "n"},
+		// The hand-written authwise_guard_cluster_trust (its keys are a
+		// oneof).
+		"cluster_trust_id": {Target: "guard_cluster_trust", Prefix: "ct"},
 	}
 )
 
@@ -81,6 +88,12 @@ var (
 	identityClient = reflect.TypeFor[identitypb.AuthwiseIdentityServiceClient]()
 	accessClient   = reflect.TypeFor[accesspb.AuthwiseAccessServiceClient]()
 	guardClient    = reflect.TypeFor[guardpb.GuardControlServiceClient]()
+
+	// guard-control's hand-authored services, adapted to the generator's
+	// Patch shape (internal/guardadapt). The keys are the provider's
+	// ProviderData.Clients keys.
+	guardNodeGroupClient        = reflect.TypeFor[guardadapt.NodeGroupClient]()
+	guardClusterTrustRuleClient = reflect.TypeFor[guardadapt.ClusterTrustRuleClient]()
 )
 
 // resource builds the standard identity resource marker.
@@ -135,6 +148,17 @@ func guard(typeName string) func(r *gentf.Resource) {
 		r.ClientType = guardClient
 		r.Client = "guard"
 		r.TypeName = "guard_" + typeName
+	}
+}
+
+// guardVia is guard() on one of guard-control's hand-authored services,
+// through its adapter and under its own client key.
+func guardVia(typeName string, clientType reflect.Type, clientKey string) func(r *gentf.Resource) {
+	return func(r *gentf.Resource) {
+		guard(typeName)(r)
+		r.ClientType = clientType
+		r.Client = clientKey
+		r.Ops = gentf.OpGet | gentf.OpList | gentf.OpCreate | gentf.OpPatch | gentf.OpDelete
 	}
 }
 
@@ -476,11 +500,24 @@ func main() {
 			// is read-only. addresses (apis v0.48.0) is what the serving
 			// nodes last resolved an application to: output-only, and moved
 			// by the nodes rather than by a write.
+			//
+			// Translated applications (train 2026.11.GFK.1): translated is
+			// set on create and never changed, and defaults on the server
+			// (true when a serving node or group at create is a Kubernetes
+			// node), so it is optional and computed. published_name is the
+			// clients' name, derived when left empty and patchable;
+			// virtual_address is allocated. serving_node_groups is, like
+			// serving_node_ids, owned by an association resource
+			// (authwise_guard_resource_node_groups) and read-only here.
 			crud[guardpb.Resource](scopeGuardNetwork,
-				withDescription("A routed target in a Guard network that is not a node: a subnet, a host or an application. The nodes that serve it are managed by `authwise_guard_resource_nodes`."),
+				withDescription("A routed target in a Guard network that is not a node: a subnet, a host or an application. The nodes that serve it are managed by `authwise_guard_resource_nodes`, the node groups by `authwise_guard_resource_node_groups`.\n\n"+
+					"An application may be **translated**: clients are served `published_name` at `virtual_address`, an address of the network's own, and the serving node resolves `address` itself and forwards to what it found. "+
+					"Two Kubernetes clusters can then serve the same cluster name (`prometheus.monitoring.svc.cluster.local`) without a clash. "+
+					"`translated` is set on create and never changed; left unset, guard-control makes it true when a node or group serving the resource at create runs on Kubernetes, so name the group's members (or the group) before or at create. "+
+					"Every serving node must have reported the `app-translate` capability (`authwise_guard_node.capabilities`). `published_name` defaults to the address's first two labels under the network's mesh domain."),
 				guard("resource"), guardList("resources"),
-				withRequired("kind", "address"), withImmutable("kind"),
-				withComputed("serving_node_ids", "addresses"), withVolatile("addresses"), withJSON("config"),
+				withRequired("kind", "address"), withImmutable("kind", "translated"),
+				withComputed("serving_node_ids", "addresses", "serving_node_groups", "virtual_address"), withVolatile("addresses"), withJSON("config"),
 				gentf.Associate{Target: reflect.TypeFor[guardpb.Node](), Attribute: "nodes", TypeName: "guard_resource_nodes"}),
 			// A node terraform declares is a pre-registered server (#32 stage
 			// 2). Created without a public_key it is PENDING, and the create
@@ -495,9 +532,42 @@ func main() {
 				withDescription("A server's node in a Guard network, registered ahead of time. Created without a `public_key`, it is `PENDING` and its one-time `auth_code` enrolls the server; created with one, it is `ACTIVE` at once. The auth code is shown once, so it is kept in state: treat the state as sensitive. People's nodes join when they sign in and are not managed here."),
 				guard("node"), guardList("nodes"),
 				withImmutable("address"),
-				withComputed("allowed_ips", "owner_id", "state", "roles", "auth_code", "auth_code_expires_at", "last_seen_at", "platform"),
+				// How a node joined and what it reports (train 2026.11.GFK.1):
+				// read only. node_groups and capabilities move with group
+				// membership and the agent's reports, not with a write here.
+				withComputed("allowed_ips", "owner_id", "state", "roles", "auth_code", "auth_code_expires_at", "last_seen_at", "platform",
+					"enrollment_key", "cluster_trust_rule", "ephemeral"),
+				withVolatile("node_groups", "capabilities"),
 				withSensitive("auth_code"),
 				withJSON("config")),
+			// Node groups (train 2026.11.GFK.1, GUARD_KUBERNETES.md §7): a
+			// named set of a network's nodes that grants and serving name as
+			// one. Members are authwise_guard_node_group_members, the group's
+			// own grants authwise_guard_node_group_grants (hand-written).
+			// Enrollment keys and cluster trust rules that name a group add
+			// what they enroll.
+			crud[guardpb.NodeGroup](scopeGuardNetwork,
+				withDescription("A Guard node group: a named set of a network's nodes that grants and serving name as one. "+
+					"A group may be granted what its members reach (`authwise_guard_node_group_grants`), be granted to a node or another group (members are reached as one), and serve a resource (`authwise_guard_resource_node_groups`: every member serves it). "+
+					"Members are added by hand (`authwise_guard_node_group_members`) or by the credential a node joins with: an `authwise_guard_enrollment_key` or `authwise_guard_cluster_trust_rule` that names the group adds each node it enrolls, so a pod that joins is reachable and served at once. "+
+					"A group named by an unrevoked enrollment key or a cluster trust rule is not deleted (`NODE_GROUP_IN_USE`): Terraform's dependency order removes those first when they reference this resource. Deleting a group removes its memberships, grants and serving; the nodes stay."),
+				guardVia("node_group", guardNodeGroupClient, "guard_node_group"), guardList("node_groups"),
+				withRequired("display_name"),
+				withComputed("created_by", "created_at"),
+				withVolatile("member_count", "updated_at")),
+			// A cluster trust's rules (GK2): one namespace's service account
+			// joins through the trust. namespace and service_account are the
+			// rule's identity; the rest applies to joins from now on.
+			crud[guardpb.ClusterTrustRule](scopeGuardClusterTrust,
+				withDescription("A rule of a Guard cluster trust: pods of one namespace running as one service account (or `*`, any of the namespace's) may join the network with their projected service account token. "+
+					"The node is named `<node_name_prefix>-<pod name>`, runs on platform `KUBERNETES`, is added to `node_group`, and counts against `max_nodes` (1 to 1000; unset is 100). "+
+					"`ephemeral` removes a node once it has been offline an hour, or as soon as its pod leaves: for Deployment and Job pods, not StatefulSet pods, which keep their node across restarts. "+
+					"Changes apply to joins from now on; joined nodes keep what they joined with. Deleting a rule stops further joins; joined nodes stay."),
+				guardVia("cluster_trust_rule", guardClusterTrustRuleClient, "guard_cluster_trust_rule"), guardList("cluster_trust_rules"),
+				withCollection("rules"),
+				withRequired("namespace", "service_account"), withImmutable("namespace", "service_account"),
+				withComputed("created_by", "created_at"),
+				withVolatile("node_count")),
 			// No Invite: Guard's Invite entity is retired (kit#902 D5, tf#67).
 			// A person is invited by kit's InviteUser and granted with
 			// GrantEnrolment.

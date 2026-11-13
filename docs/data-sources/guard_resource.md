@@ -3,12 +3,15 @@
 page_title: "authwise_guard_resource Data Source - Authwise"
 subcategory: "Guard"
 description: |-
-  A routed target in a Guard network that is not a node: a subnet, a host or an application. The nodes that serve it are managed by authwise_guard_resource_nodes. This data source reads one by its full resource name.
+  A routed target in a Guard network that is not a node: a subnet, a host or an application. The nodes that serve it are managed by authwise_guard_resource_nodes, the node groups by authwise_guard_resource_node_groups.
+  An application may be translated: clients are served published_name at virtual_address, an address of the network's own, and the serving node resolves address itself and forwards to what it found. Two Kubernetes clusters can then serve the same cluster name (prometheus.monitoring.svc.cluster.local) without a clash. translated is set on create and never changed; left unset, guard-control makes it true when a node or group serving the resource at create runs on Kubernetes, so name the group's members (or the group) before or at create. Every serving node must have reported the app-translate capability (authwise_guard_node.capabilities). published_name defaults to the address's first two labels under the network's mesh domain. This data source reads one by its full resource name.
 ---
 
 # authwise_guard_resource (Data Source)
 
-A routed target in a Guard network that is not a node: a subnet, a host or an application. The nodes that serve it are managed by `authwise_guard_resource_nodes`. This data source reads one by its full resource name.
+A routed target in a Guard network that is not a node: a subnet, a host or an application. The nodes that serve it are managed by `authwise_guard_resource_nodes`, the node groups by `authwise_guard_resource_node_groups`.
+
+An application may be **translated**: clients are served `published_name` at `virtual_address`, an address of the network's own, and the serving node resolves `address` itself and forwards to what it found. Two Kubernetes clusters can then serve the same cluster name (`prometheus.monitoring.svc.cluster.local`) without a clash. `translated` is set on create and never changed; left unset, guard-control makes it true when a node or group serving the resource at create runs on Kubernetes, so name the group's members (or the group) before or at create. Every serving node must have reported the `app-translate` capability (`authwise_guard_node.capabilities`). `published_name` defaults to the address's first two labels under the network's mesh domain. This data source reads one by its full resource name.
 
 
 
@@ -29,8 +32,12 @@ A routed target in a Guard network that is not a node: a subnet, a host or an ap
 - `kind` (String)
 - `labels` (Map of String)
 - `network_id` (String)
+- `published_name` (String)
+- `serving_node_groups` (List of String)
 - `serving_node_ids` (List of String)
 - `tenant_id` (String)
+- `translated` (Boolean)
+- `virtual_address` (String)
 
 <a id="nestedatt--addresses"></a>
 ### Nested Schema for `addresses`

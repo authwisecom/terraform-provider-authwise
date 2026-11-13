@@ -76,8 +76,12 @@ func TestProviderSurface(t *testing.T) {
 	// and the hand-written issuer_preferred_binding. Home administration
 	// (#70, kit#916) adds the hand-written tenant_home_administration.
 	// Messages (#75, kit#953) add the hand-written message and
-	// tenant_branding.
-	assert.Len(t, resourceTypes, 47)
+	// tenant_branding. Guard for Kubernetes (2026.11.GFK.1) adds the
+	// generated guard_node_group and guard_cluster_trust_rule, the
+	// hand-written guard_cluster_trust and guard_enrollment_key, and the
+	// associations guard_node_group_members, guard_node_group_grants and
+	// guard_resource_node_groups.
+	assert.Len(t, resourceTypes, 54)
 	assert.False(t, resourceTypes["authwise_issuer_domain"], "issuer domains are bindings (#69)")
 	assert.False(t, resourceTypes["authwise_guard_tenant"], "there is no Guard tenant (#65)")
 	assert.False(t, resourceTypes["authwise_guard_invite"], "Guard's Invite is retired (#67)")
@@ -105,6 +109,13 @@ func TestProviderSurface(t *testing.T) {
 		"authwise_asset_content",
 		"authwise_service_account",
 		"authwise_service_account_secret",
+		"authwise_guard_node_group",
+		"authwise_guard_node_group_members",
+		"authwise_guard_node_group_grants",
+		"authwise_guard_resource_node_groups",
+		"authwise_guard_cluster_trust",
+		"authwise_guard_cluster_trust_rule",
+		"authwise_guard_enrollment_key",
 	} {
 		assert.True(t, resourceTypes[want], "missing resource %s", want)
 	}
@@ -141,8 +152,9 @@ func TestProviderSurface(t *testing.T) {
 	// Relay pools (#66) add a pair each for relay_pool and pool_relay, and
 	// the hand-written guard_allowed_relay_pools. The Invite's retirement
 	// (#67) removes guard_invite and guard_invites. Bindings (#69) add a
-	// pair for issuer_domain_binding.
-	assert.Len(t, dataSourceTypes, 81)
+	// pair for issuer_domain_binding. Guard for Kubernetes (2026.11.GFK.1)
+	// adds a pair each for node_group and cluster_trust_rule.
+	assert.Len(t, dataSourceTypes, 85)
 	for _, gone := range []string{"authwise_guard_tenant", "authwise_guard_tenants", "authwise_guard_deprovisioning"} {
 		assert.False(t, dataSourceTypes[gone], "%s went with the tenant collapse (#65)", gone)
 	}

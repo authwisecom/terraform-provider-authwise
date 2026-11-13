@@ -15,6 +15,7 @@ import (
 	path "github.com/hashicorp/terraform-plugin-framework/path"
 	resource "github.com/hashicorp/terraform-plugin-framework/resource"
 	schema "github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	boolplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	listplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	mapplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
 	planmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
@@ -22,6 +23,7 @@ import (
 	validator "github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
 	protojson "google.golang.org/protobuf/encoding/protojson"
+	proto "google.golang.org/protobuf/proto"
 	fieldmaskpb "google.golang.org/protobuf/types/known/fieldmaskpb"
 	structpb "google.golang.org/protobuf/types/known/structpb"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
@@ -103,6 +105,16 @@ func ResourceResourceSchema() schema.Schema {
 				PlanModifiers:       []planmodifier.String{tf.RequiresReplaceIfConfigured(), stringplanmodifier.UseStateForUnknown()},
 				Validators:          []validator.String{tf.ReferenceID("n", "guard_network", "authwise_guard_network.<name>.guard_network_id")},
 			},
+			"published_name": schema.StringAttribute{
+				Computed:      true,
+				Optional:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
+			"serving_node_groups": schema.ListAttribute{
+				Computed:      true,
+				ElementType:   types.StringType,
+				PlanModifiers: []planmodifier.List{listplanmodifier.UseStateForUnknown()},
+			},
 			"serving_node_ids": schema.ListAttribute{
 				Computed:      true,
 				ElementType:   types.StringType,
@@ -115,8 +127,17 @@ func ResourceResourceSchema() schema.Schema {
 				PlanModifiers:       []planmodifier.String{tf.RequiresReplaceIfConfigured(), stringplanmodifier.UseStateForUnknown()},
 				Validators:          []validator.String{tf.ReferenceID("t", "tenant", "")},
 			},
+			"translated": schema.BoolAttribute{
+				Computed:      true,
+				Optional:      true,
+				PlanModifiers: []planmodifier.Bool{boolplanmodifier.RequiresReplace(), boolplanmodifier.UseStateForUnknown()},
+			},
+			"virtual_address": schema.StringAttribute{
+				Computed:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
 		},
-		MarkdownDescription: "A routed target in a Guard network that is not a node: a subnet, a host or an application. The nodes that serve it are managed by `authwise_guard_resource_nodes`.",
+		MarkdownDescription: "A routed target in a Guard network that is not a node: a subnet, a host or an application. The nodes that serve it are managed by `authwise_guard_resource_nodes`, the node groups by `authwise_guard_resource_node_groups`.\n\nAn application may be **translated**: clients are served `published_name` at `virtual_address`, an address of the network's own, and the serving node resolves `address` itself and forwards to what it found. Two Kubernetes clusters can then serve the same cluster name (`prometheus.monitoring.svc.cluster.local`) without a clash. `translated` is set on create and never changed; left unset, guard-control makes it true when a node or group serving the resource at create runs on Kubernetes, so name the group's members (or the group) before or at create. Every serving node must have reported the `app-translate` capability (`authwise_guard_node.capabilities`). `published_name` defaults to the address's first two labels under the network's mesh domain.",
 	}
 }
 
@@ -144,33 +165,41 @@ func ResourceAddressesAttrTypes() map[string]attr.Type {
 
 // ResourceModel is the Terraform plan/state model for Resource.
 type ResourceModel struct {
-	Name            types.String         `tfsdk:"name"`
-	GuardResourceId types.String         `tfsdk:"guard_resource_id"`
-	TenantId        types.String         `tfsdk:"tenant_id"`
-	NetworkId       types.String         `tfsdk:"network_id"`
-	Labels          types.Map            `tfsdk:"labels"`
-	Kind            types.String         `tfsdk:"kind"`
-	Address         types.String         `tfsdk:"address"`
-	DisplayName     types.String         `tfsdk:"display_name"`
-	Config          jsontypes.Normalized `tfsdk:"config"`
-	ServingNodeIds  types.List           `tfsdk:"serving_node_ids"`
-	Addresses       types.List           `tfsdk:"addresses"`
+	Name              types.String         `tfsdk:"name"`
+	GuardResourceId   types.String         `tfsdk:"guard_resource_id"`
+	TenantId          types.String         `tfsdk:"tenant_id"`
+	NetworkId         types.String         `tfsdk:"network_id"`
+	Labels            types.Map            `tfsdk:"labels"`
+	Kind              types.String         `tfsdk:"kind"`
+	Address           types.String         `tfsdk:"address"`
+	DisplayName       types.String         `tfsdk:"display_name"`
+	Config            jsontypes.Normalized `tfsdk:"config"`
+	ServingNodeIds    types.List           `tfsdk:"serving_node_ids"`
+	Addresses         types.List           `tfsdk:"addresses"`
+	ServingNodeGroups types.List           `tfsdk:"serving_node_groups"`
+	Translated        types.Bool           `tfsdk:"translated"`
+	PublishedName     types.String         `tfsdk:"published_name"`
+	VirtualAddress    types.String         `tfsdk:"virtual_address"`
 }
 
 // NewResourceModel returns a model with every attribute set to its typed null; collection types cannot be zero-valued.
 func NewResourceModel() *ResourceModel {
 	return &ResourceModel{
-		Address:         types.StringNull(),
-		Addresses:       types.ListNull(types.ObjectType{AttrTypes: ResourceAddressesAttrTypes()}),
-		Config:          jsontypes.NewNormalizedNull(),
-		DisplayName:     types.StringNull(),
-		GuardResourceId: types.StringNull(),
-		Kind:            types.StringNull(),
-		Labels:          types.MapNull(types.StringType),
-		Name:            types.StringNull(),
-		NetworkId:       types.StringNull(),
-		ServingNodeIds:  types.ListNull(types.StringType),
-		TenantId:        types.StringNull(),
+		Address:           types.StringNull(),
+		Addresses:         types.ListNull(types.ObjectType{AttrTypes: ResourceAddressesAttrTypes()}),
+		Config:            jsontypes.NewNormalizedNull(),
+		DisplayName:       types.StringNull(),
+		GuardResourceId:   types.StringNull(),
+		Kind:              types.StringNull(),
+		Labels:            types.MapNull(types.StringType),
+		Name:              types.StringNull(),
+		NetworkId:         types.StringNull(),
+		PublishedName:     types.StringNull(),
+		ServingNodeGroups: types.ListNull(types.StringType),
+		ServingNodeIds:    types.ListNull(types.StringType),
+		TenantId:          types.StringNull(),
+		Translated:        types.BoolNull(),
+		VirtualAddress:    types.StringNull(),
 	}
 }
 
@@ -228,6 +257,14 @@ func (m *ResourceModel) ToProto(ctx context.Context) (*v1alpha1.Resource, diag.D
 			out.Addresses = append(out.Addresses, v)
 		}
 	}
+	if !m.ServingNodeGroups.IsNull() && !m.ServingNodeGroups.IsUnknown() {
+		diags.Append(m.ServingNodeGroups.ElementsAs(ctx, &out.ServingNodeGroups, false)...)
+	}
+	if !m.Translated.IsNull() && !m.Translated.IsUnknown() {
+		out.Translated = proto.Bool(m.Translated.ValueBool())
+	}
+	out.PublishedName = m.PublishedName.ValueString()
+	out.VirtualAddress = m.VirtualAddress.ValueString()
 	return out, diags
 }
 
@@ -329,6 +366,30 @@ func (m *ResourceModel) FromProto(ctx context.Context, e *v1alpha1.Resource) dia
 		diags.Append(d...)
 		m.Addresses = list
 	}
+	if len(e.ServingNodeGroups) == 0 {
+		if !tf.KeepEmpty(m.ServingNodeGroups) {
+			m.ServingNodeGroups = types.ListNull(types.StringType)
+		}
+	} else {
+		v, d := types.ListValueFrom(ctx, types.StringType, e.ServingNodeGroups)
+		diags.Append(d...)
+		m.ServingNodeGroups = v
+	}
+	if e.Translated == nil {
+		m.Translated = types.BoolNull()
+	} else {
+		m.Translated = types.BoolValue(*e.Translated)
+	}
+	if e.PublishedName == "" {
+		m.PublishedName = types.StringNull()
+	} else {
+		m.PublishedName = types.StringValue(e.PublishedName)
+	}
+	if e.VirtualAddress == "" {
+		m.VirtualAddress = types.StringNull()
+	} else {
+		m.VirtualAddress = types.StringValue(e.VirtualAddress)
+	}
 	return diags
 }
 
@@ -364,6 +425,12 @@ func (m *ResourceModel) UpdateMask(ctx context.Context, prior *ResourceModel) []
 		if eq, _ := m.Config.StringSemanticEquals(ctx, prior.Config); !eq {
 			paths = append(paths, "config")
 		}
+	}
+	if !m.Translated.Equal(prior.Translated) {
+		paths = append(paths, "translated")
+	}
+	if !m.PublishedName.Equal(prior.PublishedName) {
+		paths = append(paths, "published_name")
 	}
 	return paths
 }
@@ -529,14 +596,21 @@ func ResourceDataSourceSchema() schema1.Schema {
 				MarkdownDescription: "Full resource name of the object to read.",
 				Required:            true,
 			},
-			"network_id": schema1.StringAttribute{Computed: true},
+			"network_id":     schema1.StringAttribute{Computed: true},
+			"published_name": schema1.StringAttribute{Computed: true},
+			"serving_node_groups": schema1.ListAttribute{
+				Computed:    true,
+				ElementType: types.StringType,
+			},
 			"serving_node_ids": schema1.ListAttribute{
 				Computed:    true,
 				ElementType: types.StringType,
 			},
-			"tenant_id": schema1.StringAttribute{Computed: true},
+			"tenant_id":       schema1.StringAttribute{Computed: true},
+			"translated":      schema1.BoolAttribute{Computed: true},
+			"virtual_address": schema1.StringAttribute{Computed: true},
 		},
-		MarkdownDescription: "A routed target in a Guard network that is not a node: a subnet, a host or an application. The nodes that serve it are managed by `authwise_guard_resource_nodes`. This data source reads one by its full resource name.",
+		MarkdownDescription: "A routed target in a Guard network that is not a node: a subnet, a host or an application. The nodes that serve it are managed by `authwise_guard_resource_nodes`, the node groups by `authwise_guard_resource_node_groups`.\n\nAn application may be **translated**: clients are served `published_name` at `virtual_address`, an address of the network's own, and the serving node resolves `address` itself and forwards to what it found. Two Kubernetes clusters can then serve the same cluster name (`prometheus.monitoring.svc.cluster.local`) without a clash. `translated` is set on create and never changed; left unset, guard-control makes it true when a node or group serving the resource at create runs on Kubernetes, so name the group's members (or the group) before or at create. Every serving node must have reported the `app-translate` capability (`authwise_guard_node.capabilities`). `published_name` defaults to the address's first two labels under the network's mesh domain. This data source reads one by its full resource name.",
 	}
 }
 
@@ -570,29 +644,37 @@ func (d *resourceDataSource) Read(ctx context.Context, req datasource.ReadReques
 
 // ResourceItemModel is one element of the guard_resources data source's "guard_resources" list.
 type ResourceItemModel struct {
-	GuardResourceId types.String         `tfsdk:"guard_resource_id"`
-	Name            types.String         `tfsdk:"name"`
-	Labels          types.Map            `tfsdk:"labels"`
-	Kind            types.String         `tfsdk:"kind"`
-	Address         types.String         `tfsdk:"address"`
-	DisplayName     types.String         `tfsdk:"display_name"`
-	Config          jsontypes.Normalized `tfsdk:"config"`
-	ServingNodeIds  types.List           `tfsdk:"serving_node_ids"`
-	Addresses       types.List           `tfsdk:"addresses"`
+	GuardResourceId   types.String         `tfsdk:"guard_resource_id"`
+	Name              types.String         `tfsdk:"name"`
+	Labels            types.Map            `tfsdk:"labels"`
+	Kind              types.String         `tfsdk:"kind"`
+	Address           types.String         `tfsdk:"address"`
+	DisplayName       types.String         `tfsdk:"display_name"`
+	Config            jsontypes.Normalized `tfsdk:"config"`
+	ServingNodeIds    types.List           `tfsdk:"serving_node_ids"`
+	Addresses         types.List           `tfsdk:"addresses"`
+	ServingNodeGroups types.List           `tfsdk:"serving_node_groups"`
+	Translated        types.Bool           `tfsdk:"translated"`
+	PublishedName     types.String         `tfsdk:"published_name"`
+	VirtualAddress    types.String         `tfsdk:"virtual_address"`
 }
 
 // ResourceItemAttrTypes returns the attribute types of one guard_resources list element.
 func ResourceItemAttrTypes() map[string]attr.Type {
 	return map[string]attr.Type{
-		"address":           types.StringType,
-		"addresses":         types.ListType{ElemType: types.ObjectType{AttrTypes: ResourceAddressesAttrTypes()}},
-		"config":            jsontypes.NormalizedType{},
-		"display_name":      types.StringType,
-		"guard_resource_id": types.StringType,
-		"kind":              types.StringType,
-		"labels":            types.MapType{ElemType: types.StringType},
-		"name":              types.StringType,
-		"serving_node_ids":  types.ListType{ElemType: types.StringType},
+		"address":             types.StringType,
+		"addresses":           types.ListType{ElemType: types.ObjectType{AttrTypes: ResourceAddressesAttrTypes()}},
+		"config":              jsontypes.NormalizedType{},
+		"display_name":        types.StringType,
+		"guard_resource_id":   types.StringType,
+		"kind":                types.StringType,
+		"labels":              types.MapType{ElemType: types.StringType},
+		"name":                types.StringType,
+		"published_name":      types.StringType,
+		"serving_node_groups": types.ListType{ElemType: types.StringType},
+		"serving_node_ids":    types.ListType{ElemType: types.StringType},
+		"translated":          types.BoolType,
+		"virtual_address":     types.StringType,
 	}
 }
 
@@ -647,10 +729,17 @@ func ResourceListDataSourceSchema() schema1.Schema {
 						Computed:            true,
 						MarkdownDescription: "Full resource name.",
 					},
+					"published_name": schema1.StringAttribute{Computed: true},
+					"serving_node_groups": schema1.ListAttribute{
+						Computed:    true,
+						ElementType: types.StringType,
+					},
 					"serving_node_ids": schema1.ListAttribute{
 						Computed:    true,
 						ElementType: types.StringType,
 					},
+					"translated":      schema1.BoolAttribute{Computed: true},
+					"virtual_address": schema1.StringAttribute{Computed: true},
 				}},
 			},
 			"network_id": schema1.StringAttribute{
@@ -664,7 +753,7 @@ func ResourceListDataSourceSchema() schema1.Schema {
 				Validators:          []validator.String{tf.ReferenceID("t", "tenant", "")},
 			},
 		},
-		MarkdownDescription: "A routed target in a Guard network that is not a node: a subnet, a host or an application. The nodes that serve it are managed by `authwise_guard_resource_nodes`. This data source lists every one under a parent.",
+		MarkdownDescription: "A routed target in a Guard network that is not a node: a subnet, a host or an application. The nodes that serve it are managed by `authwise_guard_resource_nodes`, the node groups by `authwise_guard_resource_node_groups`.\n\nAn application may be **translated**: clients are served `published_name` at `virtual_address`, an address of the network's own, and the serving node resolves `address` itself and forwards to what it found. Two Kubernetes clusters can then serve the same cluster name (`prometheus.monitoring.svc.cluster.local`) without a clash. `translated` is set on create and never changed; left unset, guard-control makes it true when a node or group serving the resource at create runs on Kubernetes, so name the group's members (or the group) before or at create. Every serving node must have reported the `app-translate` capability (`authwise_guard_node.capabilities`). `published_name` defaults to the address's first two labels under the network's mesh domain. This data source lists every one under a parent.",
 	}
 }
 
@@ -766,6 +855,30 @@ func resourceItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Resource
 		list, d := types.ListValueFrom(ctx, types.ObjectType{AttrTypes: ResourceAddressesAttrTypes()}, items)
 		diags.Append(d...)
 		item.Addresses = list
+	}
+	if len(e.ServingNodeGroups) == 0 {
+		if !tf.KeepEmpty(item.ServingNodeGroups) {
+			item.ServingNodeGroups = types.ListNull(types.StringType)
+		}
+	} else {
+		v, d := types.ListValueFrom(ctx, types.StringType, e.ServingNodeGroups)
+		diags.Append(d...)
+		item.ServingNodeGroups = v
+	}
+	if e.Translated == nil {
+		item.Translated = types.BoolNull()
+	} else {
+		item.Translated = types.BoolValue(*e.Translated)
+	}
+	if e.PublishedName == "" {
+		item.PublishedName = types.StringNull()
+	} else {
+		item.PublishedName = types.StringValue(e.PublishedName)
+	}
+	if e.VirtualAddress == "" {
+		item.VirtualAddress = types.StringNull()
+	} else {
+		item.VirtualAddress = types.StringValue(e.VirtualAddress)
 	}
 	id, err := crud.IDFromName(e.Name)
 	if err != nil {

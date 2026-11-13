@@ -36,13 +36,18 @@ Read-Only:
 - `allowed_ips` (List of String)
 - `auth_code` (String, Sensitive)
 - `auth_code_expires_at` (String)
+- `capabilities` (List of String)
+- `cluster_trust_rule` (String)
 - `config` (String)
 - `display_name` (String)
 - `endpoint` (String)
+- `enrollment_key` (String)
+- `ephemeral` (Boolean)
 - `guard_node_id` (String) Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.
 - `labels` (Map of String)
 - `last_seen_at` (String)
 - `name` (String) Full resource name.
+- `node_groups` (List of String)
 - `owner_id` (String)
 - `platform` (String)
 - `public_key` (String)

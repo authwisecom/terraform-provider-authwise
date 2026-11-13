@@ -28,6 +28,7 @@ A way people sign in to a realm: username and password, a magic link, passkeys, 
 - `provider_id` (String) Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.
 - `provider_type` (String)
 - `realm_id` (String)
+- `status` (String)
 - `tenant_id` (String)
 - `trust_upstream_amr` (Boolean)
 - `trust_upstream_email_verified` (Boolean)

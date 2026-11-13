@@ -17,6 +17,7 @@ import (
 	identitypb "git.authwise.com/authwise/apis/authwise/identity/v1alpha1"
 	tenancypb "git.authwise.com/authwise/apis/authwise/tenancy/v1alpha1"
 	"git.authwise.com/authwise/terraform-provider-authwise/internal/generated"
+	"git.authwise.com/authwise/terraform-provider-authwise/internal/guardadapt"
 	tfruntime "github.com/activatedio/tfinfra/pkg/tf"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/function"
@@ -258,7 +259,16 @@ func (p *AuthwiseProvider) Configure(ctx context.Context, req provider.Configure
 			guardTenantAdminClientKey: guardpb.NewGuardTenantAdminServiceClient(guardConn),
 			// Relay pools beyond their CRUD: credentials, access (#66).
 			guardRelayPoolClientKey: guardpb.NewGuardRelayPoolServiceClient(guardConn),
-			guardConfiguredKey:      guardConfigured,
+			// Guard for Kubernetes (train 2026.11.GFK.1): node groups,
+			// cluster trusts and their rules (the generated resources'
+			// clients adapted to the generator's Patch shape), enrollment
+			// keys.
+			"guard_node_group":          guardadapt.NewNodeGroupClient(guardpb.NewGuardNodeGroupServiceClient(guardConn)),
+			guardNodeGroupServiceKey:    guardpb.NewGuardNodeGroupServiceClient(guardConn),
+			"guard_cluster_trust_rule":  guardadapt.NewClusterTrustRuleClient(guardpb.NewGuardClusterTrustServiceClient(guardConn)),
+			guardClusterTrustClientKey:  guardpb.NewGuardClusterTrustServiceClient(guardConn),
+			guardEnrollmentKeyClientKey: guardpb.NewGuardEnrollmentKeyServiceClient(guardConn),
+			guardConfiguredKey:          guardConfigured,
 			// A custom host waits on the controller (#44, #47).
 			domainsClientKey: domainClient{identitypb.NewAuthwiseIdentityServiceClient(conn)},
 		},
@@ -301,6 +311,11 @@ func (p *AuthwiseProvider) Resources(ctx context.Context) []func() resource.Reso
 		newIssuerPreferredBindingResource,
 		newMessageResource,
 		newTenantBrandingResource,
+		newGuardNodeGroupMembersResource,
+		newGuardNodeGroupGrantsResource,
+		newGuardResourceNodeGroupsResource,
+		newGuardClusterTrustResource,
+		newGuardEnrollmentKeyResource,
 	))
 }
 

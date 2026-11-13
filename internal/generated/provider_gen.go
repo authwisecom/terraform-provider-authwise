@@ -76,6 +76,11 @@ func ProviderResourceSchema() schema.Schema {
 				PlanModifiers:       []planmodifier.String{tf.RequiresReplaceIfConfigured(), stringplanmodifier.UseStateForUnknown()},
 				Validators:          []validator.String{tf.ReferenceID("r", "realm", "authwise_realm.<name>.realm_id")},
 			},
+			"status": schema.StringAttribute{
+				Computed:      true,
+				Optional:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
 			"tenant_id": schema.StringAttribute{
 				Computed:            true,
 				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default, and reads back from the name. Changing a configured one replaces the resource.",
@@ -118,6 +123,7 @@ type ProviderModel struct {
 	UpstreamAcrMap             types.Map            `tfsdk:"upstream_acr_map"`
 	LinkByVerifiedEmail        types.Bool           `tfsdk:"link_by_verified_email"`
 	TrustUpstreamEmailVerified types.Bool           `tfsdk:"trust_upstream_email_verified"`
+	Status                     types.String         `tfsdk:"status"`
 }
 
 // NewProviderModel returns a model with every attribute set to its typed null; collection types cannot be zero-valued.
@@ -131,6 +137,7 @@ func NewProviderModel() *ProviderModel {
 		ProviderId:                 types.StringNull(),
 		ProviderType:               types.StringNull(),
 		RealmId:                    types.StringNull(),
+		Status:                     types.StringNull(),
 		TenantId:                   types.StringNull(),
 		TrustUpstreamAmr:           types.BoolNull(),
 		TrustUpstreamEmailVerified: types.BoolNull(),
@@ -162,6 +169,7 @@ func (m *ProviderModel) ToProto(ctx context.Context) (*v1alpha1.Provider, diag.D
 	}
 	out.LinkByVerifiedEmail = m.LinkByVerifiedEmail.ValueBool()
 	out.TrustUpstreamEmailVerified = m.TrustUpstreamEmailVerified.ValueBool()
+	out.Status = m.Status.ValueString()
 	return out, diags
 }
 
@@ -210,6 +218,11 @@ func (m *ProviderModel) FromProto(ctx context.Context, e *v1alpha1.Provider) dia
 	}
 	m.LinkByVerifiedEmail = types.BoolValue(e.LinkByVerifiedEmail)
 	m.TrustUpstreamEmailVerified = types.BoolValue(e.TrustUpstreamEmailVerified)
+	if e.Status == "" {
+		m.Status = types.StringNull()
+	} else {
+		m.Status = types.StringValue(e.Status)
+	}
 	return diags
 }
 
@@ -254,6 +267,9 @@ func (m *ProviderModel) UpdateMask(ctx context.Context, prior *ProviderModel) []
 	}
 	if !m.TrustUpstreamEmailVerified.Equal(prior.TrustUpstreamEmailVerified) {
 		paths = append(paths, "trust_upstream_email_verified")
+	}
+	if !m.Status.Equal(prior.Status) {
+		paths = append(paths, "status")
 	}
 	return paths
 }
@@ -403,6 +419,7 @@ func ProviderDataSourceSchema() schema1.Schema {
 			},
 			"provider_type":                 schema1.StringAttribute{Computed: true},
 			"realm_id":                      schema1.StringAttribute{Computed: true},
+			"status":                        schema1.StringAttribute{Computed: true},
 			"tenant_id":                     schema1.StringAttribute{Computed: true},
 			"trust_upstream_amr":            schema1.BoolAttribute{Computed: true},
 			"trust_upstream_email_verified": schema1.BoolAttribute{Computed: true},
@@ -455,6 +472,7 @@ type ProviderItemModel struct {
 	UpstreamAcrMap             types.Map            `tfsdk:"upstream_acr_map"`
 	LinkByVerifiedEmail        types.Bool           `tfsdk:"link_by_verified_email"`
 	TrustUpstreamEmailVerified types.Bool           `tfsdk:"trust_upstream_email_verified"`
+	Status                     types.String         `tfsdk:"status"`
 }
 
 // ProviderItemAttrTypes returns the attribute types of one providers list element.
@@ -467,6 +485,7 @@ func ProviderItemAttrTypes() map[string]attr.Type {
 		"name":                          types.StringType,
 		"provider_id":                   types.StringType,
 		"provider_type":                 types.StringType,
+		"status":                        types.StringType,
 		"trust_upstream_amr":            types.BoolType,
 		"trust_upstream_email_verified": types.BoolType,
 		"upstream_acr_map":              types.MapType{ElemType: types.StringType},
@@ -507,6 +526,7 @@ func ProviderListDataSourceSchema() schema1.Schema {
 						MarkdownDescription: "Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.",
 					},
 					"provider_type":                 schema1.StringAttribute{Computed: true},
+					"status":                        schema1.StringAttribute{Computed: true},
 					"trust_upstream_amr":            schema1.BoolAttribute{Computed: true},
 					"trust_upstream_email_verified": schema1.BoolAttribute{Computed: true},
 					"upstream_acr_map": schema1.MapAttribute{
@@ -576,6 +596,11 @@ func providerItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Provider
 	}
 	item.LinkByVerifiedEmail = types.BoolValue(e.LinkByVerifiedEmail)
 	item.TrustUpstreamEmailVerified = types.BoolValue(e.TrustUpstreamEmailVerified)
+	if e.Status == "" {
+		item.Status = types.StringNull()
+	} else {
+		item.Status = types.StringValue(e.Status)
+	}
 	id, err := crud.IDFromName(e.Name)
 	if err != nil {
 		diags.AddError("unexpected provider name", err.Error())

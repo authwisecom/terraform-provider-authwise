@@ -30,6 +30,9 @@ type fakeGuardServer struct {
 	guardpb.UnimplementedGuardControlServiceServer
 	guardpb.UnimplementedGuardNodeServiceServer
 	guardpb.UnimplementedGuardRelayPoolServiceServer
+	guardpb.UnimplementedGuardNodeGroupServiceServer
+	guardpb.UnimplementedGuardClusterTrustServiceServer
+	guardpb.UnimplementedGuardEnrollmentKeyServiceServer
 
 	mu        sync.Mutex
 	tenants   map[string]*guardpb.Tenant
@@ -44,9 +47,12 @@ type fakeGuardServer struct {
 	poolRelays map[string]*guardpb.PoolRelay
 	access     map[string]*guardpb.RelayPoolAccess
 	creds      map[string]string
-	// grants are each node's, by node name: resource and node names.
+	// grants are each node's and node group's, by its name: resource, node
+	// and node group names.
 	grants map[string][]string
-	seq    int
+	// Guard for Kubernetes (fake_guard_k8s_test.go).
+	k8s *fakeGuardK8s
+	seq int
 	// auths records the authorization header of every call, to show the
 	// provider's bearer reaches guard-control too.
 	auths []string
@@ -64,6 +70,7 @@ func newFakeGuardServer() *fakeGuardServer {
 		access:     map[string]*guardpb.RelayPoolAccess{},
 		creds:      map[string]string{},
 		grants:     map[string][]string{},
+		k8s:        newFakeGuardK8s(),
 	}
 	f.seedTenant("t-1")
 	return f
@@ -450,6 +457,14 @@ func (f *fakeGuardServer) CreateResource(ctx context.Context, in *guardpb.Create
 			return nil, status.Errorf(codes.InvalidArgument, "serving_node_ids: no node %s in the network", id)
 		}
 	}
+	for _, g := range r.GetServingNodeGroups() {
+		if _, ok := f.k8s.groups[g]; !ok || networkOf(g) != in.GetParent() {
+			return nil, status.Errorf(codes.InvalidArgument, "serving_node_groups: no node group %s in the network", g)
+		}
+	}
+	if err := f.translateOnCreateLocked(in.GetParent(), r); err != nil {
+		return nil, err
+	}
 	r.Name = in.GetParent() + "/resources/" + f.nextID("res")
 	f.resources[r.GetName()] = r
 	return proto.Clone(r).(*guardpb.Resource), nil
@@ -491,6 +506,15 @@ func (f *fakeGuardServer) PatchResource(ctx context.Context, in *guardpb.PatchRe
 	}
 	if !slices.Equal(next.GetServingNodeIds(), r.GetServingNodeIds()) {
 		return nil, status.Error(codes.InvalidArgument, "serving_node_ids may only echo the current set; :associateNodes changes it")
+	}
+	if !slices.Equal(next.GetServingNodeGroups(), r.GetServingNodeGroups()) {
+		return nil, status.Error(codes.InvalidArgument, "serving_node_groups may only echo the current set; :associateNodes changes it")
+	}
+	if next.GetTranslated() != r.GetTranslated() || next.GetVirtualAddress() != r.GetVirtualAddress() {
+		return nil, status.Error(codes.InvalidArgument, "translated and virtual_address never change")
+	}
+	if !next.GetTranslated() && next.GetPublishedName() != "" {
+		return nil, status.Error(codes.InvalidArgument, "published_name: only on a translated application")
 	}
 	if err := checkResource(next); err != nil {
 		return nil, err
@@ -535,8 +559,17 @@ func (f *fakeGuardServer) AssociateNodesToResource(ctx context.Context, in *guar
 		return nil, status.Errorf(codes.NotFound, "resource %q not found", in.GetName())
 	}
 	network := in.GetName()[:strings.LastIndex(in.GetName(), "/resources/")]
+	// Node group names serve as one (train 2026.11.GFK.1).
+	set, groupSet := splitGroups(in.GetAssociation().GetSet())
+	remove, groupRemove := splitGroups(in.GetAssociation().GetRemove())
+	if err := f.associateGroupsToResourceLocked(r, groupSet, groupRemove); err != nil {
+		return nil, err
+	}
+	if err := f.checkTranslatorsLocked(r, set); err != nil {
+		return nil, err
+	}
 	ids := slices.Clone(r.GetServingNodeIds())
-	for _, name := range in.GetAssociation().GetSet() {
+	for _, name := range set {
 		if !strings.HasPrefix(name, network+"/nodes/") {
 			return nil, status.Errorf(codes.InvalidArgument, "%s is not a node of %s", name, network)
 		}
@@ -547,7 +580,7 @@ func (f *fakeGuardServer) AssociateNodesToResource(ctx context.Context, in *guar
 			ids = append(ids, id)
 		}
 	}
-	for _, name := range in.GetAssociation().GetRemove() {
+	for _, name := range remove {
 		id := name[strings.LastIndex(name, "/")+1:]
 		ids = slices.DeleteFunc(ids, func(s string) bool { return s == id })
 	}
@@ -557,6 +590,18 @@ func (f *fakeGuardServer) AssociateNodesToResource(ctx context.Context, in *guar
 }
 
 // --- helpers ---
+
+// splitGroups separates node group names from node names.
+func splitGroups(names []string) (nodes, groups []string) {
+	for _, n := range names {
+		if isNodeGroupName(n) {
+			groups = append(groups, n)
+		} else {
+			nodes = append(nodes, n)
+		}
+	}
+	return nodes, groups
+}
 
 func keys[V any](m map[string]V) []string {
 	out := make([]string, 0, len(m))
