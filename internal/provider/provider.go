@@ -206,8 +206,8 @@ func (p *AuthwiseProvider) Configure(ctx context.Context, req provider.Configure
 		transport = insecure.NewCredentials()
 	}
 
-	dial := func(target string) (*grpc.ClientConn, error) {
-		return grpc.NewClient(target,
+	dial := func(target string, opts ...grpc.DialOption) (*grpc.ClientConn, error) {
+		return grpc.NewClient(target, append(opts,
 			grpc.WithTransportCredentials(transport),
 			grpc.WithChainUnaryInterceptor(
 				authwise.NewBearerCredentialsInterceptor(bearerService),
@@ -218,10 +218,15 @@ func (p *AuthwiseProvider) Configure(ctx context.Context, req provider.Configure
 			grpc.WithChainStreamInterceptor(
 				authwise.NewBearerCredentialsStreamInterceptor(bearerService),
 			),
-		)
+		)...)
 	}
 
-	conn, err := dial(endpoint)
+	// kit only: refuse a kit without kit#968's names before the first call,
+	// rather than let each renamed call answer Unimplemented.
+	compat := newKitCompat(p.version, defaultTenant(config))
+	conn, err := dial(endpoint,
+		grpc.WithChainUnaryInterceptor(compat.unary()),
+		grpc.WithChainStreamInterceptor(compat.stream()))
 	if err != nil {
 		resp.Diagnostics.AddError("cannot create gRPC client", err.Error())
 		return
@@ -361,4 +366,12 @@ func (p *AuthwiseProvider) DataSources(ctx context.Context) []func() datasource.
 // sources as functions, evaluated at plan (#55).
 func (p *AuthwiseProvider) Functions(_ context.Context) []func() function.Function {
 	return configJSONFunctions()
+}
+
+// defaultTenant is the provider's tenant_id, when it is known at configure.
+func defaultTenant(config authwiseProviderModel) string {
+	if config.TenantID.IsNull() || config.TenantID.IsUnknown() {
+		return ""
+	}
+	return config.TenantID.ValueString()
 }

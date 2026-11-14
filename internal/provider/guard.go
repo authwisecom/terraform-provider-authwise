@@ -119,7 +119,7 @@ func (unconfiguredGuardConn) NewStream(context.Context, *grpc.StreamDesc, string
 // guardConnFor is Guard's connection: the same bearer, sent to
 // guard-control. Without guard_endpoint it is unconfiguredGuardConn, and
 // configured is false.
-func guardConnFor(config authwiseProviderModel, dial func(string) (*grpc.ClientConn, error)) (conn grpc.ClientConnInterface, configured bool, err error) {
+func guardConnFor(config authwiseProviderModel, dial func(string, ...grpc.DialOption) (*grpc.ClientConn, error)) (conn grpc.ClientConnInterface, configured bool, err error) {
 	endpoint := stringOr(config.GuardEndpoint, "AUTHWISE_GUARD_ENDPOINT")
 	if endpoint == "" {
 		return unconfiguredGuardConn{}, false, nil
