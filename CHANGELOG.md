@@ -13,7 +13,7 @@ BREAKING CHANGES:
   | `authwise_client` (resource and data source), `authwise_clients` | `authwise_application`, `authwise_applications` |
   | `authwise_client.client_id` | `authwise_application.application_id` (it is the OAuth `client_id`) |
   | `authwise_client_secret`, `authwise_client_secrets` (`client_secrets`) | `authwise_application_secret`, `authwise_application_secrets` (`application_secrets`) |
-  | `client_id` on a secret | `application_id` |
+  | `client_id`, `client_secret_id` on a secret | `application_id`, `application_secret_id` |
   | `authwise_appearance_profile` (resource and data source), `authwise_appearance_profiles` | `authwise_theme_variant`, `authwise_theme_variants` |
   | `appearance_profile_id` (on the profile, an application, an audience) | `theme_variant_id` |
   | import IDs `…/clients/c-…`, `…/client-secrets/cs-…`, `…/appearance-profiles/ap-…` | `…/applications/c-…`, `…/application-secrets/cs-…`, `…/theme-variants/ap-…` |

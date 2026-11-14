@@ -37,7 +37,7 @@ var (
 	}
 	applicationSecretRenamedFrom = renamedFrom{
 		typeName:   "authwise_client_secret",
-		attributes: map[string]string{"client_id": "application_id"},
+		attributes: map[string]string{"client_id": "application_id", "client_secret_id": "application_secret_id"},
 		segments:   map[string]string{"clients": "applications", "client-secrets": "application-secrets"},
 	}
 	themeVariantRenamedFrom = renamedFrom{

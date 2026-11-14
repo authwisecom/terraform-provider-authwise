@@ -91,6 +91,7 @@ func TestMoved_ClientSecret(t *testing.T) {
 	resp := move(t, applicationSecretTypeName, "authwise_client_secret", registryAddress, `{
 		"name": "tenants/t-01/issuers/i-01/clients/c-01/client-secrets/cs-01",
 		"client_id": "c-01",
+		"client_secret_id": "cs-01",
 		"tenant_id": "t-01",
 		"issuer_id": "i-01",
 		"secret": "s3cret",
@@ -99,6 +100,7 @@ func TestMoved_ClientSecret(t *testing.T) {
 	require.False(t, resp.Diagnostics.HasError(), "%v", resp.Diagnostics)
 	assert.Equal(t, "tenants/t-01/issuers/i-01/applications/c-01/application-secrets/cs-01", stringAt(t, resp.TargetState, "name"))
 	assert.Equal(t, "c-01", stringAt(t, resp.TargetState, "application_id"))
+	assert.Equal(t, "cs-01", stringAt(t, resp.TargetState, "application_secret_id"))
 	assert.Equal(t, "s3cret", stringAt(t, resp.TargetState, "secret"))
 }
 
