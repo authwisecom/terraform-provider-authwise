@@ -1,6 +1,6 @@
 // Service accounts (kit#756, #37): a client of the admin issuer its tenant
-// owns, made through the public tenancy service, and its secrets, minted
-// once and kept in state. The steps walk a mint, a refresh, a
+// owns, made through the public tenancy service, and its secrets, created
+// once and kept in state. The steps walk a create, a refresh, a
 // keepers-driven rotation with its grace, a secret that lapsed, import,
 // and kit's refusal to delete an account that still holds a role.
 package acctest_test
@@ -54,7 +54,7 @@ func TestAccServiceAccount_MintRotate(t *testing.T) {
 					resource.TestMatchResourceAttr(serviceAccountAddr, "name", regexp.MustCompile(`^tenants/t-1/service-accounts/c-[0-9]+$`)),
 					resource.TestCheckResourceAttr(serviceAccountAddr, "tenant_id", "t-1"),
 					resource.TestMatchResourceAttr(serviceAccountAddr, "client_id", regexp.MustCompile(`^c-[0-9]+$`)),
-					resource.TestCheckResourceAttr(serviceAccountAddr, "status", "CLIENT_STATUS_ACTIVE"),
+					resource.TestCheckResourceAttr(serviceAccountAddr, "status", "APPLICATION_STATUS_ACTIVE"),
 					resource.TestCheckNoResourceAttr(serviceAccountAddr, "expires_at"),
 					resource.TestCheckResourceAttr(serviceAccountSecretAddr, "token_url", fakeAdminTokenURL),
 					resource.TestCheckResourceAttr(serviceAccountSecretAddr, "audience", "a-01"),
@@ -81,7 +81,7 @@ func TestAccServiceAccount_MintRotate(t *testing.T) {
 				),
 			},
 			{
-				// A keepers change mints a successor; the rotation gives the
+				// A keepers change creates a successor; the rotation gives the
 				// old secret the 72h grace rather than revoking it.
 				Config: h.serviceAccountConfig("2", ""),
 				ConfigPlanChecks: resource.ConfigPlanChecks{
@@ -107,7 +107,7 @@ func TestAccServiceAccount_MintRotate(t *testing.T) {
 			},
 			{
 				// A secret that lapsed is gone from state: the next apply
-				// mints another.
+				// creates another.
 				PreConfig: func() {
 					h.tenancy.mu.Lock()
 					var id string
@@ -126,8 +126,8 @@ func TestAccServiceAccount_MintRotate(t *testing.T) {
 				Check: checkServer(func() error {
 					h.tenancy.mu.Lock()
 					defer h.tenancy.mu.Unlock()
-					if h.tenancy.mints != 3 {
-						return fmt.Errorf("%d mints, want 3", h.tenancy.mints)
+					if h.tenancy.creates != 3 {
+						return fmt.Errorf("%d creates, want 3", h.tenancy.creates)
 					}
 					return nil
 				}),

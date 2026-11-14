@@ -1,4 +1,4 @@
-// authwise_client_secret (kit#617, #18): minted through MintClientSecret,
+// authwise_application_secret (kit#617, #18): created through CreateApplicationSecret,
 // its secret returned once and kept in state from there on. The steps walk
 // what that has to survive — a refresh, an in-place expires_at change, a
 // keepers-driven rotation — and what it cannot: an import has no secret.
@@ -14,21 +14,21 @@ import (
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
 )
 
-const clientSecretAddr = "authwise_client_secret.ci"
+const clientSecretAddr = "authwise_application_secret.ci"
 
-func TestAccClientSecret_MintKeepRotate(t *testing.T) {
+func TestAccApplicationSecret_CreateKeepRotate(t *testing.T) {
 
 	h := newHarness(t)
 
 	config := func(expires, rotation string) string {
 		return h.providerConfig() + fmt.Sprintf(`
-resource "authwise_client" "ci" {
+resource "authwise_application" "ci" {
   display_name = "CI"
   grant_types  = ["client_credentials"]
 }
 
-resource "authwise_client_secret" "ci" {
-  client_id  = authwise_client.ci.client_id
+resource "authwise_application_secret" "ci" {
+  application_id  = authwise_application.ci.application_id
   expires_at = %q
   keepers    = { rotation = %q }
 
@@ -37,9 +37,9 @@ resource "authwise_client_secret" "ci" {
   }
 }
 
-data "authwise_client_secrets" "ci" {
-  client_id  = authwise_client.ci.client_id
-  depends_on = [authwise_client_secret.ci]
+data "authwise_application_secrets" "ci" {
+  application_id  = authwise_application.ci.application_id
+  depends_on = [authwise_application_secret.ci]
 }
 `, expires, rotation)
 	}
@@ -55,7 +55,7 @@ data "authwise_client_secrets" "ci" {
 				Config: config("2030-01-01T00:00:00Z", "1"),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestMatchResourceAttr(clientSecretAddr, "name",
-						regexp.MustCompile(`^tenants/t-1/issuers/i-1/clients/[^/]+/client-secrets/[^/]+$`)),
+						regexp.MustCompile(`^tenants/t-1/issuers/i-1/applications/[^/]+/application-secrets/[^/]+$`)),
 					resource.TestCheckResourceAttr(clientSecretAddr, "hash_enabled", "true"),
 					resource.TestCheckResourceAttr(clientSecretAddr, "expires_at", "2030-01-01T00:00:00Z"),
 					func(s *terraform.State) error {
@@ -70,17 +70,17 @@ data "authwise_client_secrets" "ci" {
 					checkServer(func() error {
 						h.fake.mu.Lock()
 						defer h.fake.mu.Unlock()
-						if h.fake.mints != 1 {
-							return fmt.Errorf("%d mints, want 1", h.fake.mints)
+						if h.fake.creates != 1 {
+							return fmt.Errorf("%d creates, want 1", h.fake.creates)
 						}
 						return nil
 					}),
-					resource.TestCheckResourceAttr("data.authwise_client_secrets.ci", "client_secrets.#", "1"),
-					resource.TestCheckNoResourceAttr("data.authwise_client_secrets.ci", "client_secrets.0.secret"),
+					resource.TestCheckResourceAttr("data.authwise_application_secrets.ci", "application_secrets.#", "1"),
+					resource.TestCheckNoResourceAttr("data.authwise_application_secrets.ci", "application_secrets.0.secret"),
 				),
 			},
 			{
-				// expires_at patches in place: same row, same secret, no mint.
+				// expires_at patches in place: same row, same secret, no create.
 				Config: config("2031-06-30T00:00:00Z", "1"),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(clientSecretAddr, "expires_at", "2031-06-30T00:00:00Z"),
@@ -89,8 +89,8 @@ data "authwise_client_secrets" "ci" {
 					checkServer(func() error {
 						h.fake.mu.Lock()
 						defer h.fake.mu.Unlock()
-						if h.fake.mints != 1 {
-							return fmt.Errorf("%d mints after an expires_at change, want 1", h.fake.mints)
+						if h.fake.creates != 1 {
+							return fmt.Errorf("%d creates after an expires_at change, want 1", h.fake.creates)
 						}
 						if got := h.fake.clientSecrets[firstName].GetExpiresAt().AsTime().Format("2006-01-02"); got != "2031-06-30" {
 							return fmt.Errorf("server expires_at = %s", got)
@@ -100,7 +100,7 @@ data "authwise_client_secrets" "ci" {
 				),
 			},
 			{
-				// A keepers change rotates: the successor is minted, then the
+				// A keepers change rotates: the successor is created, then the
 				// old row deleted.
 				Config: config("2031-06-30T00:00:00Z", "2"),
 				Check: resource.ComposeAggregateTestCheckFunc(
@@ -109,8 +109,8 @@ data "authwise_client_secrets" "ci" {
 					checkServer(func() error {
 						h.fake.mu.Lock()
 						defer h.fake.mu.Unlock()
-						if h.fake.mints != 2 {
-							return fmt.Errorf("%d mints after rotation, want 2", h.fake.mints)
+						if h.fake.creates != 2 {
+							return fmt.Errorf("%d creates after rotation, want 2", h.fake.creates)
 						}
 						if _, ok := h.fake.clientSecrets[firstName]; ok {
 							return fmt.Errorf("the rotated-out secret %s is still there", firstName)
@@ -146,7 +146,7 @@ data "authwise_client_secrets" "ci" {
 }
 
 // kit refuses an expiry that has already passed; the apply surfaces it.
-func TestAccClientSecret_PastExpiryRefused(t *testing.T) {
+func TestAccApplicationSecret_PastExpiryRefused(t *testing.T) {
 
 	h := newHarness(t)
 
@@ -155,13 +155,13 @@ func TestAccClientSecret_PastExpiryRefused(t *testing.T) {
 		Steps: []resource.TestStep{
 			{
 				Config: h.providerConfig() + `
-resource "authwise_client" "ci" {
+resource "authwise_application" "ci" {
   display_name = "CI"
   grant_types  = ["client_credentials"]
 }
 
-resource "authwise_client_secret" "ci" {
-  client_id  = authwise_client.ci.client_id
+resource "authwise_application_secret" "ci" {
+  application_id  = authwise_application.ci.application_id
   expires_at = "2020-01-01T00:00:00Z"
 }
 `,

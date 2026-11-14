@@ -17,12 +17,12 @@ An API an issuer issues access tokens for, and the audience its Access catalog h
 
 ### Optional
 
-- `appearance_profile_id` (String)
 - `config` (String) `config` as the protojson encoding of AudienceConfig.
 - `display_name` (String)
 - `issuer_id` (String) Parent identifier `issuer_id`; overrides the provider default, and reads back from the name. Changing a configured one replaces the resource.
 - `labels` (Map of String)
 - `tenant_id` (String) Parent identifier `tenant_id`; overrides the provider default, and reads back from the name. Changing a configured one replaces the resource.
+- `theme_variant_id` (String)
 
 ### Read-Only
 

@@ -15,12 +15,12 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-// ClientSecret, the kit#617 shape: minted rather than created, the secret
+// ApplicationSecret, the kit#617 shape: created with its value, the secret
 // returned once as <id>_<plaintext> beside a row that never carries it.
 // expires_at is the only input, it must be in the future, and it patches
 // in place without touching the credential.
 
-var clientParent = regexp.MustCompile(`^tenants/[^/]+/issuers/[^/]+/clients/[^/]+$`)
+var clientParent = regexp.MustCompile(`^tenants/[^/]+/issuers/[^/]+/applications/[^/]+$`)
 
 func checkExpiry(ts *timestamppb.Timestamp) error {
 	if ts != nil && !ts.AsTime().After(time.Now()) {
@@ -29,7 +29,7 @@ func checkExpiry(ts *timestamppb.Timestamp) error {
 	return nil
 }
 
-func (f *fakeIdentityServer) MintClientSecret(ctx context.Context, in *identitypb.MintClientSecretRequest) (*identitypb.MintClientSecretResponse, error) {
+func (f *fakeIdentityServer) CreateApplicationSecret(ctx context.Context, in *identitypb.CreateApplicationSecretRequest) (*identitypb.CreateApplicationSecretResponse, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.recordAuth(ctx)
@@ -48,21 +48,21 @@ func (f *fakeIdentityServer) MintClientSecret(ctx context.Context, in *identityp
 	if err := checkExpiry(in.GetExpiresAt()); err != nil {
 		return nil, err
 	}
-	f.mints++
+	f.creates++
 	id := f.nextID("cs")
-	cs := &corepb.ClientSecret{
-		Name:        in.GetParent() + "/client-secrets/" + id,
+	cs := &corepb.ApplicationSecret{
+		Name:        in.GetParent() + "/application-secrets/" + id,
 		HashEnabled: true,
 		ExpiresAt:   in.GetExpiresAt(),
 	}
 	f.clientSecrets[cs.GetName()] = cs
-	return &identitypb.MintClientSecretResponse{
-		ClientSecret: proto.Clone(cs).(*corepb.ClientSecret),
-		Secret:       fmt.Sprintf("%s_plaintext%d", id, f.mints),
+	return &identitypb.CreateApplicationSecretResponse{
+		ApplicationSecret: proto.Clone(cs).(*corepb.ApplicationSecret),
+		Secret:            fmt.Sprintf("%s_plaintext%d", id, f.creates),
 	}, nil
 }
 
-func (f *fakeIdentityServer) GetClientSecret(ctx context.Context, in *identitypb.GetClientSecretRequest) (*corepb.ClientSecret, error) {
+func (f *fakeIdentityServer) GetApplicationSecret(ctx context.Context, in *identitypb.GetApplicationSecretRequest) (*corepb.ApplicationSecret, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.recordAuth(ctx)
@@ -70,18 +70,18 @@ func (f *fakeIdentityServer) GetClientSecret(ctx context.Context, in *identitypb
 	if !ok {
 		return nil, status.Errorf(codes.NotFound, "client secret %q not found", in.GetName())
 	}
-	return proto.Clone(cs).(*corepb.ClientSecret), nil
+	return proto.Clone(cs).(*corepb.ApplicationSecret), nil
 }
 
-func (f *fakeIdentityServer) ListClientSecrets(ctx context.Context, in *identitypb.ListClientSecretsRequest) (*identitypb.ListClientSecretsResponse, error) {
+func (f *fakeIdentityServer) ListApplicationSecrets(ctx context.Context, in *identitypb.ListApplicationSecretsRequest) (*identitypb.ListApplicationSecretsResponse, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.recordAuth(ctx)
-	page, next := pageUnder(f.clientSecrets, in.GetParent()+"/client-secrets/", in.GetPageToken())
-	return &identitypb.ListClientSecretsResponse{ClientSecrets: page, NextPageToken: next}, nil
+	page, next := pageUnder(f.clientSecrets, in.GetParent()+"/application-secrets/", in.GetPageToken())
+	return &identitypb.ListApplicationSecretsResponse{ApplicationSecrets: page, NextPageToken: next}, nil
 }
 
-func (f *fakeIdentityServer) PatchClientSecret(ctx context.Context, in *identitypb.PatchClientSecretRequest) (*corepb.ClientSecret, error) {
+func (f *fakeIdentityServer) PatchApplicationSecret(ctx context.Context, in *identitypb.PatchApplicationSecretRequest) (*corepb.ApplicationSecret, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.recordAuth(ctx)
@@ -92,18 +92,18 @@ func (f *fakeIdentityServer) PatchClientSecret(ctx context.Context, in *identity
 	for _, path := range in.GetUpdateMask().GetPaths() {
 		switch path {
 		case "expires_at":
-			if err := checkExpiry(in.GetClientSecret().GetExpiresAt()); err != nil {
+			if err := checkExpiry(in.GetApplicationSecret().GetExpiresAt()); err != nil {
 				return nil, err
 			}
-			existing.ExpiresAt = in.GetClientSecret().GetExpiresAt()
+			existing.ExpiresAt = in.GetApplicationSecret().GetExpiresAt()
 		default:
 			return nil, status.Errorf(codes.InvalidArgument, "unsupported update_mask path %q", path)
 		}
 	}
-	return proto.Clone(existing).(*corepb.ClientSecret), nil
+	return proto.Clone(existing).(*corepb.ApplicationSecret), nil
 }
 
-func (f *fakeIdentityServer) DeleteClientSecret(ctx context.Context, in *identitypb.DeleteClientSecretRequest) (*emptypb.Empty, error) {
+func (f *fakeIdentityServer) DeleteApplicationSecret(ctx context.Context, in *identitypb.DeleteApplicationSecretRequest) (*emptypb.Empty, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.recordAuth(ctx)

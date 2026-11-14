@@ -21,8 +21,8 @@ import (
 // fakeTenancyServer is the public tenancy service's service accounts as
 // kit#756 and kit#763 built them (apis v0.31.0): a client of the admin
 // issuer the tenant owns, made with no secret and no roles; roles from a
-// fixed list, set as a whole; secrets minted once, shown once, and
-// listed live (unexpired) on the account; a rotating mint giving the
+// fixed list, set as a whole; secrets created once, shown once, and
+// listed live (unexpired) on the account; a rotating create giving the
 // others a bounded grace; and delete refused while any binding names the
 // account. Bindings are the fake Access server's.
 type fakeTenancyServer struct {
@@ -34,7 +34,7 @@ type fakeTenancyServer struct {
 	mu       sync.Mutex
 	accounts map[string]*tenancypb.ServiceAccount
 	tenants  map[string]*corepb.Tenant
-	mints    int
+	creates  int
 	roleSets int
 	seq      int
 	// denyAdministration refuses EnableHomeAdministration as kit refuses a
@@ -101,7 +101,7 @@ func (f *fakeTenancyServer) CreateServiceAccount(_ context.Context, in *tenancyp
 		Name:        in.GetParent() + "/service-accounts/" + id,
 		ClientId:    id,
 		DisplayName: name,
-		Status:      corepb.ClientStatus_CLIENT_STATUS_ACTIVE,
+		Status:      corepb.ApplicationStatus_APPLICATION_STATUS_ACTIVE,
 		ExpiresAt:   in.GetServiceAccount().GetExpiresAt(),
 		CreatedAt:   now,
 		UpdatedAt:   now,
@@ -159,7 +159,7 @@ func (f *fakeTenancyServer) DeleteServiceAccount(_ context.Context, in *tenancyp
 	return &emptypb.Empty{}, nil
 }
 
-func (f *fakeTenancyServer) MintServiceAccountSecret(_ context.Context, in *tenancypb.MintServiceAccountSecretRequest) (*tenancypb.MintServiceAccountSecretResponse, error) {
+func (f *fakeTenancyServer) CreateServiceAccountSecret(_ context.Context, in *tenancypb.CreateServiceAccountSecretRequest) (*tenancypb.CreateServiceAccountSecretResponse, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	sa, ok := f.accounts[in.GetName()]
@@ -188,11 +188,11 @@ func (f *fakeTenancyServer) MintServiceAccountSecret(_ context.Context, in *tena
 			}
 		}
 	}
-	f.mints++
+	f.creates++
 	id := f.nextID("sas")
 	sa.Secrets = append(sa.Secrets, &tenancypb.ServiceAccountSecret{Id: id, CreatedAt: timestamppb.Now(), ExpiresAt: in.GetExpiresAt()})
-	return &tenancypb.MintServiceAccountSecretResponse{
-		Secret:         fmt.Sprintf("%s_plaintext%d", id, f.mints),
+	return &tenancypb.CreateServiceAccountSecretResponse{
+		Secret:         fmt.Sprintf("%s_plaintext%d", id, f.creates),
 		ServiceAccount: f.liveLocked(sa),
 		TokenUrl:       fakeAdminTokenURL,
 		Audience:       fakeEstateAud,

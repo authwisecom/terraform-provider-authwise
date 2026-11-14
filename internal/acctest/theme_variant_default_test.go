@@ -10,9 +10,9 @@ import (
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
 )
 
-// An issuer's appearance is its default profile (kit#680, apis v0.18.0).
+// An issuer's pages use its default theme variant (kit#680, apis v0.18.0).
 
-// profileBlock is one authwise_appearance_profile, with is_default = true
+// profileBlock is one authwise_theme_variant, with is_default = true
 // when def.
 func profileBlock(key, displayName string, def bool) string {
 	isDefault := ""
@@ -20,7 +20,7 @@ func profileBlock(key, displayName string, def bool) string {
 		isDefault = "\n  is_default   = true"
 	}
 	return fmt.Sprintf(`
-resource "authwise_appearance_profile" %q {
+resource "authwise_theme_variant" %q {
   display_name = %q%s
 }
 `, key, displayName, isDefault)
@@ -50,18 +50,18 @@ func profilesGone(h *harness) resource.TestCheckFunc {
 		h.fake.mu.Lock()
 		defer h.fake.mu.Unlock()
 		if n := len(h.fake.profiles); n != 0 {
-			return fmt.Errorf("%d appearance profiles left", n)
+			return fmt.Errorf("%d theme variants left", n)
 		}
 		return nil
 	}
 }
 
-// TestAccAppearanceProfile_Default: the first profile is the default
+// TestAccThemeVariant_Default: the first profile is the default
 // without asking; the default moves by setting is_default on the new one and
 // removing it from the old one, even while the old one changes in the same
 // apply; and destroying them all succeeds whichever order Terraform picks,
 // though kit refuses the default until it is the last.
-func TestAccAppearanceProfile_Default(t *testing.T) {
+func TestAccThemeVariant_Default(t *testing.T) {
 
 	h := newHarness(t)
 	cfg := func(blocks ...string) string { return h.providerConfig() + strings.Join(blocks, "") }
@@ -72,15 +72,15 @@ func TestAccAppearanceProfile_Default(t *testing.T) {
 			{
 				Config: cfg(profileBlock("a", "A", false)),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("authwise_appearance_profile.a", "is_default", "true"),
+					resource.TestCheckResourceAttr("authwise_theme_variant.a", "is_default", "true"),
 					defaultIs(h, "A"),
 				),
 			},
 			{
 				Config: cfg(profileBlock("a", "A", false), profileBlock("b", "B", false), profileBlock("c", "C", false)),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("authwise_appearance_profile.b", "is_default", "false"),
-					resource.TestCheckResourceAttr("authwise_appearance_profile.c", "is_default", "false"),
+					resource.TestCheckResourceAttr("authwise_theme_variant.b", "is_default", "false"),
+					resource.TestCheckResourceAttr("authwise_theme_variant.c", "is_default", "false"),
 					defaultIs(h, "A"),
 				),
 			},
@@ -89,13 +89,13 @@ func TestAccAppearanceProfile_Default(t *testing.T) {
 				// and after it: the label's reference orders A's update behind
 				// B's. Its plan must not promise a stale true.
 				Config: cfg(`
-resource "authwise_appearance_profile" "a" {
+resource "authwise_theme_variant" "a" {
   display_name = "A renamed"
-  labels       = { after = authwise_appearance_profile.b.name }
+  labels       = { after = authwise_theme_variant.b.name }
 }
 `, profileBlock("b", "B", true), profileBlock("c", "C", false)),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("authwise_appearance_profile.b", "is_default", "true"),
+					resource.TestCheckResourceAttr("authwise_theme_variant.b", "is_default", "true"),
 					defaultIs(h, "B"),
 				),
 			},
@@ -108,10 +108,10 @@ resource "authwise_appearance_profile" "a" {
 	})
 }
 
-// TestAccAppearanceProfile_CreateAsDefault: a profile created with
+// TestAccThemeVariant_CreateAsDefault: a profile created with
 // is_default = true beside an existing default takes over, through
 // :makeDefault rather than the create kit would refuse.
-func TestAccAppearanceProfile_CreateAsDefault(t *testing.T) {
+func TestAccThemeVariant_CreateAsDefault(t *testing.T) {
 
 	h := newHarness(t)
 
@@ -125,7 +125,7 @@ func TestAccAppearanceProfile_CreateAsDefault(t *testing.T) {
 			{
 				Config: h.providerConfig() + profileBlock("a", "A", false) + profileBlock("b", "B", true),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("authwise_appearance_profile.b", "is_default", "true"),
+					resource.TestCheckResourceAttr("authwise_theme_variant.b", "is_default", "true"),
 					defaultIs(h, "B"),
 				),
 			},
@@ -134,9 +134,9 @@ func TestAccAppearanceProfile_CreateAsDefault(t *testing.T) {
 	})
 }
 
-// TestAccAppearanceProfile_DefaultFalseRefused: is_default = false is
+// TestAccThemeVariant_DefaultFalseRefused: is_default = false is
 // refused at plan; kit could not honour it on an issuer's first profile.
-func TestAccAppearanceProfile_DefaultFalseRefused(t *testing.T) {
+func TestAccThemeVariant_DefaultFalseRefused(t *testing.T) {
 
 	h := newHarness(t)
 
@@ -144,7 +144,7 @@ func TestAccAppearanceProfile_DefaultFalseRefused(t *testing.T) {
 		ProtoV6ProviderFactories: protoFactories(),
 		Steps: []resource.TestStep{{
 			Config: h.providerConfig() + `
-resource "authwise_appearance_profile" "a" {
+resource "authwise_theme_variant" "a" {
   display_name = "A"
   is_default   = false
 }

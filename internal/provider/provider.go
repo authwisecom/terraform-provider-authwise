@@ -247,7 +247,7 @@ func (p *AuthwiseProvider) Configure(ctx context.Context, req provider.Configure
 
 	providerData := &tfruntime.ProviderData{
 		Clients: map[string]any{
-			"identity": userContactClient{issuerDeleteClient{bindingRefusalClient{newAppearanceDefaultClient(identitypb.NewAuthwiseIdentityServiceClient(conn))}}},
+			"identity": userContactClient{issuerDeleteClient{bindingRefusalClient{newThemeVariantDefaultClient(identitypb.NewAuthwiseIdentityServiceClient(conn))}}},
 			"access":   accesspb.NewAuthwiseAccessServiceClient(conn),
 			// The public tenancy service, on kit's endpoint: service
 			// accounts (#37).
@@ -287,7 +287,9 @@ func (p *AuthwiseProvider) Resources(ctx context.Context) []func() resource.Reso
 		accessBindingTypeName:       newAccessBindingResource,
 		realmTypeName:               newRealmResource,
 		factorTypeName:              newFactorResource,
-		appearanceProfileTypeName:   newAppearanceProfileResource,
+		themeVariantTypeName:        moved(newThemeVariantResource, themeVariantRenamedFrom),
+		applicationTypeName:         moved(generated.NewApplicationResource, applicationRenamedFrom),
+		applicationSecretTypeName:   moved(generated.NewApplicationSecretResource, applicationSecretRenamedFrom),
 		guardNodeTypeName:           newGuardNodeResource,
 		guardNetworkTypeName:        newGuardNetworkResource,
 		domainTypeName:              newDomainResource,

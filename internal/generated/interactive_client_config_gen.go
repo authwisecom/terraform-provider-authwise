@@ -26,7 +26,7 @@ func InteractiveClientConfigDataSourceSchema() schema.Schema {
 			},
 			"allowed_redirect_uris": schema.ListAttribute{
 				ElementType:         types.StringType,
-				MarkdownDescription: "The redirect URIs /authorize accepts for this client.",
+				MarkdownDescription: "The redirect URIs /authorize accepts for this application.",
 				Optional:            true,
 			},
 			"any": schema.StringAttribute{
@@ -36,12 +36,12 @@ func InteractiveClientConfigDataSourceSchema() schema.Schema {
 			},
 			"cors": schema.StringAttribute{
 				CustomType:          jsontypes.NormalizedType{},
-				MarkdownDescription: "The browser origins allowed to call kit for this client. `cors` as the protojson encoding of CorsConfig.",
+				MarkdownDescription: "The browser origins allowed to call kit for this application. `cors` as the protojson encoding of CorsConfig.",
 				Optional:            true,
 			},
 			"flow_integration_config": schema.StringAttribute{
 				CustomType:          jsontypes.NormalizedType{},
-				MarkdownDescription: "The endpoint kit calls during this client's login flow. `flow_integration_config` as the protojson encoding of IntegrationConfig.",
+				MarkdownDescription: "The endpoint kit calls during this application's login flow. `flow_integration_config` as the protojson encoding of IntegrationConfig.",
 				Optional:            true,
 			},
 			"interaction_forward_uri": schema.StringAttribute{Optional: true},
@@ -54,7 +54,7 @@ func InteractiveClientConfigDataSourceSchema() schema.Schema {
 				Optional:            true,
 			},
 			"require_consent": schema.BoolAttribute{
-				MarkdownDescription: "Make /authorize ask the person to approve this client for the scopes it requests. Default false. `prompt=consent` asks regardless, so this is the floor, not the switch.",
+				MarkdownDescription: "Make /authorize ask the person to approve this application for the scopes it requests. Default false. `prompt=consent` asks regardless, so this is the floor, not the switch.",
 				Optional:            true,
 			},
 		},

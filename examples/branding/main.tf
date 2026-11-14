@@ -1,6 +1,6 @@
 # Brand the hosted login pages: a logo, a theme built from the center
-# layout's starter, the issuer's default appearance, and a second
-# appearance one client signs in with.
+# layout's starter, the issuer's default theme variant, and a second
+# variant one application signs in with.
 
 # ---------------------------------------------------------------------------
 # The logo
@@ -62,12 +62,12 @@ resource "authwise_theme" "brand" {
 }
 
 # ---------------------------------------------------------------------------
-# Appearance profiles
+# Theme variants
 # ---------------------------------------------------------------------------
 
-# The issuer's appearance. A profile's stylesheet_attributes and content
-# override the theme's, key by key.
-resource "authwise_appearance_profile" "default" {
+# The issuer's default variant. A variant's stylesheet_attributes and
+# content override the theme's, key by key.
+resource "authwise_theme_variant" "default" {
   display_name = "Example"
   theme_id     = authwise_theme.brand.theme_id
   is_default   = true
@@ -78,7 +78,7 @@ resource "authwise_appearance_profile" "default" {
 }
 
 # Same theme, another face: the partner portal signs in with this one.
-resource "authwise_appearance_profile" "partners" {
+resource "authwise_theme_variant" "partners" {
   display_name = "Example for partners"
   theme_id     = authwise_theme.brand.theme_id
 
@@ -101,10 +101,10 @@ data "authwise_interactive_client_config" "portal" {
   allowed_redirect_uris = ["https://partners.example.com/callback"]
 }
 
-resource "authwise_client" "portal" {
-  display_name          = "Partner portal"
-  audience_id           = authwise_audience.portal.audience_id
-  grant_types           = ["authorization_code", "refresh_token"]
-  config                = data.authwise_interactive_client_config.portal.any
-  appearance_profile_id = authwise_appearance_profile.partners.appearance_profile_id
+resource "authwise_application" "portal" {
+  display_name     = "Partner portal"
+  audience_id      = authwise_audience.portal.audience_id
+  grant_types      = ["authorization_code", "refresh_token"]
+  config           = data.authwise_interactive_client_config.portal.any
+  theme_variant_id = authwise_theme_variant.partners.theme_variant_id
 }

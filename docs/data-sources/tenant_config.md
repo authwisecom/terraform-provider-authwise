@@ -43,7 +43,7 @@ resource "authwise_tenant_config" "this" {
 ### Optional
 
 - `access_token_expire_seconds` (Number) Access token lifetime in seconds. Unset takes the value from the layer above (tenant, issuer, audience, client).
-- `branding` (Attributes) The tenant's own brand: what the admin console shows in place of the Authwise emblem, and what outbound mail falls back to when an appearance profile has no `main_logo`. **Deprecated:** set it with `authwise_tenant_branding` and leave it out here; kit refuses it here from the release train after 2026.11.3. (see [below for nested schema](#nestedatt--branding))
+- `branding` (Attributes) The tenant's own brand: what the admin console shows in place of the Authwise emblem, and what outbound mail falls back to when an theme variant has no `main_logo`. **Deprecated:** set it with `authwise_tenant_branding` and leave it out here; kit refuses it here from the release train after 2026.11.3. (see [below for nested schema](#nestedatt--branding))
 - `cors` (Attributes) The browser origins allowed to call kit. (see [below for nested schema](#nestedatt--cors))
 - `interaction_forward_uri` (String)
 - `refresh_token_absolute_expire_seconds` (Number) Hard cap on a refresh token family in seconds, set once when the family is created. Unset takes the value from the layer above.

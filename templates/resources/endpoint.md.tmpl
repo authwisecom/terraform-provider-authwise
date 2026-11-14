@@ -174,7 +174,7 @@ the protojson form, `"1.5s"`, or `"60s"` rather than `"1m"`.
 
 kit refuses to delete an endpoint while anything names it. The error
 (`FailedPrecondition`) names the holder and the field. Holders include an
-issuer, client, audience, realm, provider or factor config, and an Access
+issuer, application, audience, realm, provider or factor config, and an Access
 type. For the same reason, kit refuses to delete a certificate while an
 endpoint presents it as `tls.client_certificate`, and an issuer while an
 endpoint's `kitToken` signs from it.

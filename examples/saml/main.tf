@@ -6,7 +6,7 @@
 #   SP role  — Authwise consumes a partner IdP, so users log in to Authwise
 #              with the partner's credentials. Configured on a *provider*.
 #   IdP role — Authwise issues assertions to a partner SP, so their app logs
-#              its users in with Authwise. Configured on a *client*.
+#              its users in with Authwise. Configured on an *application*.
 #
 # Every certificate reference below is a Certificate resource name. Inbound
 # signatures are checked against that certificate and nothing else: the
@@ -184,7 +184,7 @@ data "authwise_saml_relying_party_config" "app" {
   }
 }
 
-resource "authwise_client" "partner_app" {
+resource "authwise_application" "partner_app" {
   display_name = "Partner Co app (SAML)"
   audience_id  = "a-01"
   grant_types  = ["saml_idp"]
@@ -201,7 +201,7 @@ output "provider_name" {
   value       = authwise_provider.partner.name
 }
 
-output "client_name" {
+output "application_name" {
   description = "Feed this to awctl export-saml-metadata to render our IdP document."
-  value       = authwise_client.partner_app.name
+  value       = authwise_application.partner_app.name
 }

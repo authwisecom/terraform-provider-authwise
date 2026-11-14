@@ -31,7 +31,7 @@ func onlyProvider(t *testing.T, m map[string]*corepb.Provider) *corepb.Provider 
 }
 
 // onlyClient returns the single client on the fake server.
-func onlyClient(t *testing.T, m map[string]*corepb.Client) *corepb.Client {
+func onlyClient(t *testing.T, m map[string]*corepb.Application) *corepb.Application {
 	t.Helper()
 	if len(m) != 1 {
 		t.Fatalf("expected exactly one client on the server, got %d", len(m))
@@ -42,11 +42,11 @@ func onlyClient(t *testing.T, m map[string]*corepb.Client) *corepb.Client {
 	return nil
 }
 
-// TestAccCertificate_Mint covers the minting lane: the create-only
+// TestAccCertificate_Mint covers the creating lane: the create-only
 // parameters go up, the server answers with what it actually produced, and
 // — the point of the exercise — the parameters stay in state afterwards.
 //
-// The implicit post-apply plan check is the regression test. The mint
+// The implicit post-apply plan check is the regression test. The create
 // parameters are input-only and immutable; if a refresh nulled them, every
 // plan would be non-empty and would force replacement, which is what the
 // default Optional+Computed shape used to do.
@@ -118,7 +118,7 @@ resource "authwise_certificate" "signing" {
 			},
 			{
 				// Renaming patches in place. An update rather than a replace
-				// is the assertion: the immutable mint parameters must still
+				// is the assertion: the immutable create parameters must still
 				// match state, which they only do because the refresh left
 				// them alone.
 				Config: cert("SP signing (rotated set)"),
@@ -171,7 +171,7 @@ resource "authwise_certificate" "signing" {
 
 // TestAccCertificate_ImportPartnerPEM covers the other lane off the same
 // field: a non-empty import_certificate_pem adds a partner's trust anchor
-// instead of minting one. There is no ImportCertificate RPC.
+// instead of creating one. There is no ImportCertificate RPC.
 func TestAccCertificate_ImportPartnerPEM(t *testing.T) {
 
 	h := newHarness(t)
@@ -345,9 +345,9 @@ resource "authwise_provider" "partner" {
 	})
 }
 
-// TestAccSamlRelyingPartyConfig_Client runs the IdP role: kit issuing
+// TestAccSamlRelyingPartyConfig_Application runs the IdP role: kit issuing
 // assertions to a relying party, configured on a real client resource.
-func TestAccSamlRelyingPartyConfig_Client(t *testing.T) {
+func TestAccSamlRelyingPartyConfig_Application(t *testing.T) {
 
 	h := newHarness(t)
 
@@ -381,7 +381,7 @@ resource "authwise_audience" "app" {
   display_name = "SAML app"
 }
 
-resource "authwise_client" "app" {
+resource "authwise_application" "app" {
   display_name = "SAML app"
   audience_id  = authwise_audience.app.audience_id
   grant_types  = ["saml_idp"]

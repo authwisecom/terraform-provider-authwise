@@ -29,12 +29,6 @@ import (
 func AudienceResourceSchema() schema.Schema {
 	return schema.Schema{
 		Attributes: map[string]schema.Attribute{
-			"appearance_profile_id": schema.StringAttribute{
-				Computed:      true,
-				Optional:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
-				Validators:    []validator.String{tf.ReferenceID("ap", "appearance_profile", "authwise_appearance_profile.<name>.appearance_profile_id")},
-			},
 			"audience_id": schema.StringAttribute{
 				Computed:            true,
 				MarkdownDescription: "Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.",
@@ -77,6 +71,12 @@ func AudienceResourceSchema() schema.Schema {
 				PlanModifiers:       []planmodifier.String{tf.RequiresReplaceIfConfigured(), stringplanmodifier.UseStateForUnknown()},
 				Validators:          []validator.String{tf.ReferenceID("t", "tenant", "")},
 			},
+			"theme_variant_id": schema.StringAttribute{
+				Computed:      true,
+				Optional:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+				Validators:    []validator.String{tf.ReferenceID("ap", "theme_variant", "authwise_theme_variant.<name>.theme_variant_id")},
+			},
 		},
 		MarkdownDescription: "An API an issuer issues access tokens for, and the audience its Access catalog hangs off.",
 	}
@@ -84,27 +84,27 @@ func AudienceResourceSchema() schema.Schema {
 
 // AudienceModel is the Terraform plan/state model for Audience.
 type AudienceModel struct {
-	Name                types.String         `tfsdk:"name"`
-	AudienceId          types.String         `tfsdk:"audience_id"`
-	TenantId            types.String         `tfsdk:"tenant_id"`
-	IssuerId            types.String         `tfsdk:"issuer_id"`
-	Labels              types.Map            `tfsdk:"labels"`
-	DisplayName         types.String         `tfsdk:"display_name"`
-	AppearanceProfileId types.String         `tfsdk:"appearance_profile_id"`
-	Config              jsontypes.Normalized `tfsdk:"config"`
+	Name           types.String         `tfsdk:"name"`
+	AudienceId     types.String         `tfsdk:"audience_id"`
+	TenantId       types.String         `tfsdk:"tenant_id"`
+	IssuerId       types.String         `tfsdk:"issuer_id"`
+	Labels         types.Map            `tfsdk:"labels"`
+	DisplayName    types.String         `tfsdk:"display_name"`
+	ThemeVariantId types.String         `tfsdk:"theme_variant_id"`
+	Config         jsontypes.Normalized `tfsdk:"config"`
 }
 
 // NewAudienceModel returns a model with every attribute set to its typed null; collection types cannot be zero-valued.
 func NewAudienceModel() *AudienceModel {
 	return &AudienceModel{
-		AppearanceProfileId: types.StringNull(),
-		AudienceId:          types.StringNull(),
-		Config:              jsontypes.NewNormalizedNull(),
-		DisplayName:         types.StringNull(),
-		IssuerId:            types.StringNull(),
-		Labels:              types.MapNull(types.StringType),
-		Name:                types.StringNull(),
-		TenantId:            types.StringNull(),
+		AudienceId:     types.StringNull(),
+		Config:         jsontypes.NewNormalizedNull(),
+		DisplayName:    types.StringNull(),
+		IssuerId:       types.StringNull(),
+		Labels:         types.MapNull(types.StringType),
+		Name:           types.StringNull(),
+		TenantId:       types.StringNull(),
+		ThemeVariantId: types.StringNull(),
 	}
 }
 
@@ -117,7 +117,7 @@ func (m *AudienceModel) ToProto(ctx context.Context) (*v1alpha1.Audience, diag.D
 		diags.Append(m.Labels.ElementsAs(ctx, &out.Labels, false)...)
 	}
 	out.DisplayName = m.DisplayName.ValueString()
-	out.AppearanceProfileId = m.AppearanceProfileId.ValueString()
+	out.ThemeVariantId = m.ThemeVariantId.ValueString()
 	if !m.Config.IsNull() && !m.Config.IsUnknown() {
 		v := &v1alpha1.AudienceConfig{}
 		if err := protojson.Unmarshal([]byte(m.Config.ValueString()), v); err != nil {
@@ -147,10 +147,10 @@ func (m *AudienceModel) FromProto(ctx context.Context, e *v1alpha1.Audience) dia
 	} else {
 		m.DisplayName = types.StringValue(e.DisplayName)
 	}
-	if e.AppearanceProfileId == "" {
-		m.AppearanceProfileId = types.StringNull()
+	if e.ThemeVariantId == "" {
+		m.ThemeVariantId = types.StringNull()
 	} else {
-		m.AppearanceProfileId = types.StringValue(e.AppearanceProfileId)
+		m.ThemeVariantId = types.StringValue(e.ThemeVariantId)
 	}
 	if e.Config == nil {
 		m.Config = jsontypes.NewNormalizedNull()
@@ -187,8 +187,8 @@ func (m *AudienceModel) UpdateMask(ctx context.Context, prior *AudienceModel) []
 	if !m.DisplayName.Equal(prior.DisplayName) {
 		paths = append(paths, "display_name")
 	}
-	if !m.AppearanceProfileId.Equal(prior.AppearanceProfileId) {
-		paths = append(paths, "appearance_profile_id")
+	if !m.ThemeVariantId.Equal(prior.ThemeVariantId) {
+		paths = append(paths, "theme_variant_id")
 	}
 	if !m.Config.Equal(prior.Config) {
 		if eq, _ := m.Config.StringSemanticEquals(ctx, prior.Config); !eq {
@@ -323,7 +323,6 @@ func (r *audienceResource) ImportState(ctx context.Context, req resource.ImportS
 func AudienceDataSourceSchema() schema1.Schema {
 	return schema1.Schema{
 		Attributes: map[string]schema1.Attribute{
-			"appearance_profile_id": schema1.StringAttribute{Computed: true},
 			"audience_id": schema1.StringAttribute{
 				Computed:            true,
 				MarkdownDescription: "Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.",
@@ -342,7 +341,8 @@ func AudienceDataSourceSchema() schema1.Schema {
 				MarkdownDescription: "Full resource name of the object to read.",
 				Required:            true,
 			},
-			"tenant_id": schema1.StringAttribute{Computed: true},
+			"tenant_id":        schema1.StringAttribute{Computed: true},
+			"theme_variant_id": schema1.StringAttribute{Computed: true},
 		},
 		MarkdownDescription: "An API an issuer issues access tokens for, and the audience its Access catalog hangs off. This data source reads one by its full resource name.",
 	}
@@ -378,23 +378,23 @@ func (d *audienceDataSource) Read(ctx context.Context, req datasource.ReadReques
 
 // AudienceItemModel is one element of the audiences data source's "audiences" list.
 type AudienceItemModel struct {
-	AudienceId          types.String         `tfsdk:"audience_id"`
-	Name                types.String         `tfsdk:"name"`
-	Labels              types.Map            `tfsdk:"labels"`
-	DisplayName         types.String         `tfsdk:"display_name"`
-	AppearanceProfileId types.String         `tfsdk:"appearance_profile_id"`
-	Config              jsontypes.Normalized `tfsdk:"config"`
+	AudienceId     types.String         `tfsdk:"audience_id"`
+	Name           types.String         `tfsdk:"name"`
+	Labels         types.Map            `tfsdk:"labels"`
+	DisplayName    types.String         `tfsdk:"display_name"`
+	ThemeVariantId types.String         `tfsdk:"theme_variant_id"`
+	Config         jsontypes.Normalized `tfsdk:"config"`
 }
 
 // AudienceItemAttrTypes returns the attribute types of one audiences list element.
 func AudienceItemAttrTypes() map[string]attr.Type {
 	return map[string]attr.Type{
-		"appearance_profile_id": types.StringType,
-		"audience_id":           types.StringType,
-		"config":                jsontypes.NormalizedType{},
-		"display_name":          types.StringType,
-		"labels":                types.MapType{ElemType: types.StringType},
-		"name":                  types.StringType,
+		"audience_id":      types.StringType,
+		"config":           jsontypes.NormalizedType{},
+		"display_name":     types.StringType,
+		"labels":           types.MapType{ElemType: types.StringType},
+		"name":             types.StringType,
+		"theme_variant_id": types.StringType,
 	}
 }
 
@@ -413,7 +413,6 @@ func AudienceListDataSourceSchema() schema1.Schema {
 				Computed:            true,
 				MarkdownDescription: "Every audience under the parent, in the order the API lists them.",
 				NestedObject: schema1.NestedAttributeObject{Attributes: map[string]schema1.Attribute{
-					"appearance_profile_id": schema1.StringAttribute{Computed: true},
 					"audience_id": schema1.StringAttribute{
 						Computed:            true,
 						MarkdownDescription: "Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.",
@@ -431,6 +430,7 @@ func AudienceListDataSourceSchema() schema1.Schema {
 						Computed:            true,
 						MarkdownDescription: "Full resource name.",
 					},
+					"theme_variant_id": schema1.StringAttribute{Computed: true},
 				}},
 			},
 			"issuer_id": schema1.StringAttribute{
@@ -467,10 +467,10 @@ func audienceItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Audience
 	} else {
 		item.DisplayName = types.StringValue(e.DisplayName)
 	}
-	if e.AppearanceProfileId == "" {
-		item.AppearanceProfileId = types.StringNull()
+	if e.ThemeVariantId == "" {
+		item.ThemeVariantId = types.StringNull()
 	} else {
-		item.AppearanceProfileId = types.StringValue(e.AppearanceProfileId)
+		item.ThemeVariantId = types.StringValue(e.ThemeVariantId)
 	}
 	if e.Config == nil {
 		item.Config = jsontypes.NewNormalizedNull()

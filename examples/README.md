@@ -18,9 +18,9 @@ in-memory kit stub and requires a clean re-plan:
 | directory | what it shows |
 | --- | --- |
 | `authn` | factors, the realm authentication policy, a secret by reference |
-| `branding` | a logo, a theme from a layout starter, two appearance profiles |
+| `branding` | a logo, a theme from a layout starter, two theme variants |
 | `endpoints/{bearer,kit_token,mtls}` | outbound endpoints and their auth schemes |
-| `guard-catalog` | an Access catalog: permissions, a role, a binding, a client |
+| `guard-catalog` | an Access catalog: permissions, a role, a binding, an application |
 | `identifier-first` | routing logins between realms by email domain |
 | `passwordless` | magic link and passkeys |
 | `social` | Google, Microsoft, GitHub, Apple, OIDC and OAuth sign-in |

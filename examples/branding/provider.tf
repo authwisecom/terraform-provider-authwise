@@ -1,8 +1,8 @@
 # The scope the example inherits. Substitute your install's tenant and
 # issuer AWIDs.
 #
-# The theme and the asset are tenant-scoped; the appearance profiles, the
-# audience and the client belong to the issuer.
+# The theme and the asset are tenant-scoped; the theme variants, the
+# audience and the application belong to the issuer.
 #
 # Credentials come from the client_credentials lane (token_url / client_id /
 # client_secret, or the AUTHWISE_* environment variables).

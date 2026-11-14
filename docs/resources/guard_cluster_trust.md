@@ -3,7 +3,7 @@
 page_title: "authwise_guard_cluster_trust Resource - Authwise"
 subcategory: "Guard"
 description: |-
-  A Kubernetes cluster registered on a Guard network: its pods may join the network with their own projected service account token, under the trust's rules (authwise_guard_cluster_trust_rule). No secret is stored or handed out. The cluster mints the token for the network's audience, it lives minutes, and guard-control checks it against the cluster's signing keys.
+  A Kubernetes cluster registered on a Guard network: its pods may join the network with their own projected service account token, under the trust's rules (authwise_guard_cluster_trust_rule). No secret is stored or handed out. The cluster creates the token for the network's audience, it lives minutes, and guard-control checks it against the cluster's signing keys.
   The keys come from one of two places. discover = true reads the issuer's OIDC discovery document and keys, and reads them again as they rotate: GKE, EKS and AKS publish theirs. jwks uploads the keys, for a cluster whose issuer guard-control cannot reach (k3s, RKE2, kubeadm: kubectl get --raw /openid/v1/jwks). The upload is the keys until it is replaced, so when the cluster rotates its keys, change jwks and apply.
   This is how a cluster's trust is declared: the Guard operator in the cluster holds no Guard administrative credential.
   A trust is never deleted. Destroy revokes it: no pod joins through it again, and the nodes that joined stay until they are removed. A trust revoked out of band drops out of state at refresh, and the next apply registers the cluster again as a new trust. issuer never changes: a different issuer is a different cluster.
@@ -11,7 +11,7 @@ description: |-
 
 # authwise_guard_cluster_trust (Resource)
 
-A Kubernetes cluster registered on a Guard network: its pods may join the network with their own projected service account token, under the trust's rules (`authwise_guard_cluster_trust_rule`). No secret is stored or handed out. The cluster mints the token for the network's `audience`, it lives minutes, and guard-control checks it against the cluster's signing keys.
+A Kubernetes cluster registered on a Guard network: its pods may join the network with their own projected service account token, under the trust's rules (`authwise_guard_cluster_trust_rule`). No secret is stored or handed out. The cluster creates the token for the network's `audience`, it lives minutes, and guard-control checks it against the cluster's signing keys.
 
 The keys come from one of two places. `discover = true` reads the issuer's OIDC discovery document and keys, and reads them again as they rotate: GKE, EKS and AKS publish theirs. `jwks` uploads the keys, for a cluster whose issuer guard-control cannot reach (k3s, RKE2, kubeadm: `kubectl get --raw /openid/v1/jwks`). The upload is the keys until it is replaced, so when the cluster rotates its keys, change `jwks` and apply.
 

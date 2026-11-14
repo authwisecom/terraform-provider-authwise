@@ -279,9 +279,6 @@ var configJSONSpecs = []configJSONSpec{
 			"cimd.allow_any_host":                                        "Accept a document from any https host, the MCP \"open server\" posture: the deliberate way to open the issuer to every host, and the only one. kit refuses it beside a non-empty `trusted_domains`, and refuses `enabled` with neither, at apply.",
 			"persistent_session":                                         "Whether the session cookie survives a browser restart: at sign-in it is re-issued to last the session's remaining absolute lifetime (the realm's `session.absolute`). Default false: the cookie ends when the browser closes, the right answer on shared computers.",
 		}),
-		// Output only (kit#953): kit ignores a value sent, and
-		// authwise_issuer leaves it out of config.
-		omit: map[string]bool{issuerStartingProfileField: true},
 	},
 	{
 		typeName:    "realm_config",
@@ -332,7 +329,7 @@ var configJSONSpecs = []configJSONSpec{
 		attribute:   "authwise_tenant_config.config",
 		description: "A tenant's config: its brand, and the token lifetimes and CORS at the tenant, the outermost layer.",
 		descriptions: withTokenLifetimes(map[string]string{
-			"branding":                    "The tenant's own brand: what the admin console shows in place of the Authwise emblem, and what outbound mail falls back to when an appearance profile has no `main_logo`. **Deprecated:** set it with `authwise_tenant_branding` and leave it out here; kit refuses it here from the release train after 2026.11.3.",
+			"branding":                    "The tenant's own brand: what the admin console shows in place of the Authwise emblem, and what outbound mail falls back to when an theme variant has no `main_logo`. **Deprecated:** set it with `authwise_tenant_branding` and leave it out here; kit refuses it here from the release train after 2026.11.3.",
 			"branding.display_name":       "The brand's name, which mail shows and sends from (the From name). At most 64 characters on one line, none of `<`, `>` or `\"`.",
 			"branding.theme_id":           "The tenant's look: a theme of the tenant (`th-…`), from which mail takes its logo and colour. kit refuses deleting the theme while this names it.",
 			"branding.logo_asset_id":      "The id (`as-…`) of an image asset in this tenant, e.g. `authwise_asset_content.logo.asset_id`. kit refuses an id that names no image asset of the tenant, and refuses deleting or emptying the asset while this names it.",

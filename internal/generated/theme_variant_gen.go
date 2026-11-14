@@ -27,15 +27,10 @@ import (
 	structpb "google.golang.org/protobuf/types/known/structpb"
 )
 
-// AppearanceProfileResourceSchema returns the Terraform schema for the AppearanceProfile resource.
-func AppearanceProfileResourceSchema() schema.Schema {
+// ThemeVariantResourceSchema returns the Terraform schema for the ThemeVariant resource.
+func ThemeVariantResourceSchema() schema.Schema {
 	return schema.Schema{
 		Attributes: map[string]schema.Attribute{
-			"appearance_profile_id": schema.StringAttribute{
-				Computed:            true,
-				MarkdownDescription: "Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.",
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
-			},
 			"content": schema.StringAttribute{
 				Computed:            true,
 				CustomType:          jsontypes.NormalizedType{},
@@ -91,15 +86,20 @@ func AppearanceProfileResourceSchema() schema.Schema {
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 				Validators:    []validator.String{tf.ReferenceID("th", "theme", "authwise_theme.<name>.theme_id")},
 			},
+			"theme_variant_id": schema.StringAttribute{
+				Computed:            true,
+				MarkdownDescription: "Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.",
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
 		},
-		MarkdownDescription: "An issuer's appearance profile: a theme plus overrides of its `stylesheet_attributes` and `content`, key by key. The issuer's default profile (`is_default`) is the issuer's appearance; a client's or audience's `appearance_profile_id` overrides it.",
+		MarkdownDescription: "A theme variant: a theme, changed for one issuer. It names its base theme (`theme_id`) and holds only what differs, key by key, in `stylesheet_attributes` and `content`. What applies, in order: the application's variant (`theme_variant_id`), then the audience's, then the issuer's default variant (`is_default`), then the tenant's default theme.\n\nFormerly `authwise_appearance_profile` (kit#968): a `moved` block from `authwise_appearance_profile` carries the state across.",
 	}
 }
 
-// AppearanceProfileModel is the Terraform plan/state model for AppearanceProfile.
-type AppearanceProfileModel struct {
+// ThemeVariantModel is the Terraform plan/state model for ThemeVariant.
+type ThemeVariantModel struct {
 	Name                 types.String         `tfsdk:"name"`
-	AppearanceProfileId  types.String         `tfsdk:"appearance_profile_id"`
+	ThemeVariantId       types.String         `tfsdk:"theme_variant_id"`
 	TenantId             types.String         `tfsdk:"tenant_id"`
 	IssuerId             types.String         `tfsdk:"issuer_id"`
 	Labels               types.Map            `tfsdk:"labels"`
@@ -110,10 +110,9 @@ type AppearanceProfileModel struct {
 	IsDefault            types.Bool           `tfsdk:"is_default"`
 }
 
-// NewAppearanceProfileModel returns a model with every attribute set to its typed null; collection types cannot be zero-valued.
-func NewAppearanceProfileModel() *AppearanceProfileModel {
-	return &AppearanceProfileModel{
-		AppearanceProfileId:  types.StringNull(),
+// NewThemeVariantModel returns a model with every attribute set to its typed null; collection types cannot be zero-valued.
+func NewThemeVariantModel() *ThemeVariantModel {
+	return &ThemeVariantModel{
 		Content:              jsontypes.NewNormalizedNull(),
 		DisplayName:          types.StringNull(),
 		IsDefault:            types.BoolNull(),
@@ -123,13 +122,14 @@ func NewAppearanceProfileModel() *AppearanceProfileModel {
 		StylesheetAttributes: jsontypes.NewNormalizedNull(),
 		TenantId:             types.StringNull(),
 		ThemeId:              types.StringNull(),
+		ThemeVariantId:       types.StringNull(),
 	}
 }
 
 // ToProto converts the model to its proto message. Null and unknown attributes map to proto zero values.
-func (m *AppearanceProfileModel) ToProto(ctx context.Context) (*v1alpha1.AppearanceProfile, diag.Diagnostics) {
+func (m *ThemeVariantModel) ToProto(ctx context.Context) (*v1alpha1.ThemeVariant, diag.Diagnostics) {
 	var diags diag.Diagnostics
-	out := &v1alpha1.AppearanceProfile{}
+	out := &v1alpha1.ThemeVariant{}
 	out.Name = m.Name.ValueString()
 	if !m.Labels.IsNull() && !m.Labels.IsUnknown() {
 		diags.Append(m.Labels.ElementsAs(ctx, &out.Labels, false)...)
@@ -157,7 +157,7 @@ func (m *AppearanceProfileModel) ToProto(ctx context.Context) (*v1alpha1.Appeara
 }
 
 // FromProto populates the model from its proto message. Input-only attributes, and scope identifier attributes the entity does not carry, are left untouched.
-func (m *AppearanceProfileModel) FromProto(ctx context.Context, e *v1alpha1.AppearanceProfile) diag.Diagnostics {
+func (m *ThemeVariantModel) FromProto(ctx context.Context, e *v1alpha1.ThemeVariant) diag.Diagnostics {
 	var diags diag.Diagnostics
 	m.Name = types.StringValue(e.Name)
 	if len(e.Labels) == 0 {
@@ -204,12 +204,12 @@ func (m *AppearanceProfileModel) FromProto(ctx context.Context, e *v1alpha1.Appe
 }
 
 // GetName implements tf.Model.
-func (m *AppearanceProfileModel) GetName() types.String {
+func (m *ThemeVariantModel) GetName() types.String {
 	return m.Name
 }
 
 // ScopeIdentifiers implements tf.Model: per-resource scope attribute values, null as "".
-func (m *AppearanceProfileModel) ScopeIdentifiers() map[string]string {
+func (m *ThemeVariantModel) ScopeIdentifiers() map[string]string {
 	return map[string]string{
 		"issuer_id": m.IssuerId.ValueString(),
 		"tenant_id": m.TenantId.ValueString(),
@@ -217,7 +217,7 @@ func (m *AppearanceProfileModel) ScopeIdentifiers() map[string]string {
 }
 
 // UpdateMask implements tf.Model: proto field paths whose values differ from prior, skipping name and computed fields.
-func (m *AppearanceProfileModel) UpdateMask(ctx context.Context, prior *AppearanceProfileModel) []string {
+func (m *ThemeVariantModel) UpdateMask(ctx context.Context, prior *ThemeVariantModel) []string {
 	var paths []string
 	if !m.Labels.Equal(prior.Labels) {
 		paths = append(paths, "labels")
@@ -244,8 +244,8 @@ func (m *AppearanceProfileModel) UpdateMask(ctx context.Context, prior *Appearan
 	return paths
 }
 
-// newAppearanceProfileCrud builds the appearance_profile runtime from provider data; it returns nil (no error) before the provider is configured.
-func newAppearanceProfileCrud(providerData any) (*tf.Crud[*v1alpha1.AppearanceProfile, *AppearanceProfileModel], diag.Diagnostics) {
+// newThemeVariantCrud builds the theme_variant runtime from provider data; it returns nil (no error) before the provider is configured.
+func newThemeVariantCrud(providerData any) (*tf.Crud[*v1alpha1.ThemeVariant, *ThemeVariantModel], diag.Diagnostics) {
 	var diags diag.Diagnostics
 	if providerData == nil {
 		return nil, diags
@@ -260,119 +260,115 @@ func newAppearanceProfileCrud(providerData any) (*tf.Crud[*v1alpha1.AppearancePr
 		diags.AddError("missing client", "provider data key \"identity\" is not a git.authwise.com/authwise/apis/authwise/identity/v1alpha1.AuthwiseIdentityServiceClient")
 		return nil, diags
 	}
-	return tf.NewCrud(tf.CrudParams[*v1alpha1.AppearanceProfile, *AppearanceProfileModel]{
-		Client: tf.CrudClient[*v1alpha1.AppearanceProfile]{
-			Create: func(ctx context.Context, parent string, entity *v1alpha1.AppearanceProfile) (*v1alpha1.AppearanceProfile, error) {
-				return client.CreateAppearanceProfile(ctx, &v1alpha11.CreateAppearanceProfileRequest{
-					AppearanceProfile: entity,
-					Parent:            parent,
+	return tf.NewCrud(tf.CrudParams[*v1alpha1.ThemeVariant, *ThemeVariantModel]{
+		Client: tf.CrudClient[*v1alpha1.ThemeVariant]{
+			Create: func(ctx context.Context, parent string, entity *v1alpha1.ThemeVariant) (*v1alpha1.ThemeVariant, error) {
+				return client.CreateThemeVariant(ctx, &v1alpha11.CreateThemeVariantRequest{
+					Parent:       parent,
+					ThemeVariant: entity,
 				})
 			},
 			Delete: func(ctx context.Context, name string) error {
-				_, err := client.DeleteAppearanceProfile(ctx, &v1alpha11.DeleteAppearanceProfileRequest{Name: name})
+				_, err := client.DeleteThemeVariant(ctx, &v1alpha11.DeleteThemeVariantRequest{Name: name})
 				return err
 			},
-			Get: func(ctx context.Context, name string) (*v1alpha1.AppearanceProfile, error) {
-				return client.GetAppearanceProfile(ctx, &v1alpha11.GetAppearanceProfileRequest{Name: name})
+			Get: func(ctx context.Context, name string) (*v1alpha1.ThemeVariant, error) {
+				return client.GetThemeVariant(ctx, &v1alpha11.GetThemeVariantRequest{Name: name})
 			},
-			List: func(ctx context.Context, parent string, pageToken string) ([]*v1alpha1.AppearanceProfile, string, error) {
-				out, err := client.ListAppearanceProfiles(ctx, &v1alpha11.ListAppearanceProfilesRequest{
+			List: func(ctx context.Context, parent string, pageToken string) ([]*v1alpha1.ThemeVariant, string, error) {
+				out, err := client.ListThemeVariants(ctx, &v1alpha11.ListThemeVariantsRequest{
 					PageToken: pageToken,
 					Parent:    parent,
 				})
 				if err != nil {
 					return nil, "", err
 				}
-				return out.AppearanceProfiles, out.NextPageToken, nil
+				return out.ThemeVariants, out.NextPageToken, nil
 			},
-			Patch: func(ctx context.Context, name string, entity *v1alpha1.AppearanceProfile, mask []string) (*v1alpha1.AppearanceProfile, error) {
-				return client.PatchAppearanceProfile(ctx, &v1alpha11.PatchAppearanceProfileRequest{
-					AppearanceProfile: entity,
-					Name:              name,
-					UpdateMask:        &fieldmaskpb.FieldMask{Paths: mask},
+			Patch: func(ctx context.Context, name string, entity *v1alpha1.ThemeVariant, mask []string) (*v1alpha1.ThemeVariant, error) {
+				return client.PatchThemeVariant(ctx, &v1alpha11.PatchThemeVariantRequest{
+					Name:         name,
+					ThemeVariant: entity,
+					UpdateMask:   &fieldmaskpb.FieldMask{Paths: mask},
 				})
 			},
-			Update: func(ctx context.Context, name string, entity *v1alpha1.AppearanceProfile) (*v1alpha1.AppearanceProfile, error) {
-				return client.UpdateAppearanceProfile(ctx, &v1alpha11.UpdateAppearanceProfileRequest{
-					AppearanceProfile: entity,
-					Name:              name,
+			Update: func(ctx context.Context, name string, entity *v1alpha1.ThemeVariant) (*v1alpha1.ThemeVariant, error) {
+				return client.UpdateThemeVariant(ctx, &v1alpha11.UpdateThemeVariantRequest{
+					Name:         name,
+					ThemeVariant: entity,
 				})
 			},
 		},
-		Collection:       "appearance-profiles",
+		Collection:       "theme-variants",
 		Defaults:         pd.Defaults,
-		IDAttribute:      "appearance_profile_id",
-		NewModel:         NewAppearanceProfileModel,
+		IDAttribute:      "theme_variant_id",
+		NewModel:         NewThemeVariantModel,
 		ParentAttributes: []string{"tenant_id", "issuer_id"},
 		Scope:            tf.NewScope("tenants", "issuers"),
-		TypeName:         "appearance_profile",
+		TypeName:         "theme_variant",
 	}), diags
 }
 
-// appearanceProfileResource is the generated Terraform resource for AppearanceProfile.
-type appearanceProfileResource struct {
-	crud *tf.Crud[*v1alpha1.AppearanceProfile, *AppearanceProfileModel]
+// themeVariantResource is the generated Terraform resource for ThemeVariant.
+type themeVariantResource struct {
+	crud *tf.Crud[*v1alpha1.ThemeVariant, *ThemeVariantModel]
 }
 
-// NewAppearanceProfileResource returns the generated appearance_profile resource; its client and scope defaults arrive via Configure from tf.ProviderData.
-func NewAppearanceProfileResource() resource.Resource {
-	return &appearanceProfileResource{}
+// NewThemeVariantResource returns the generated theme_variant resource; its client and scope defaults arrive via Configure from tf.ProviderData.
+func NewThemeVariantResource() resource.Resource {
+	return &themeVariantResource{}
 }
-func (r *appearanceProfileResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
-	resp.TypeName = req.ProviderTypeName + "_appearance_profile"
+func (r *themeVariantResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_theme_variant"
 }
-func (r *appearanceProfileResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
-	resp.Schema = AppearanceProfileResourceSchema()
+func (r *themeVariantResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
+	resp.Schema = ThemeVariantResourceSchema()
 }
-func (r *appearanceProfileResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
-	crud, diags := newAppearanceProfileCrud(req.ProviderData)
+func (r *themeVariantResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
+	crud, diags := newThemeVariantCrud(req.ProviderData)
 	resp.Diagnostics.Append(diags...)
 	r.crud = crud
 }
-func (r *appearanceProfileResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+func (r *themeVariantResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	if r.crud == nil {
-		resp.Diagnostics.AddError("appearance_profile resource not configured", "Configure was not called with tf.ProviderData")
+		resp.Diagnostics.AddError("theme_variant resource not configured", "Configure was not called with tf.ProviderData")
 		return
 	}
 	r.crud.Create(ctx, req, resp)
 }
-func (r *appearanceProfileResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+func (r *themeVariantResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	if r.crud == nil {
-		resp.Diagnostics.AddError("appearance_profile resource not configured", "Configure was not called with tf.ProviderData")
+		resp.Diagnostics.AddError("theme_variant resource not configured", "Configure was not called with tf.ProviderData")
 		return
 	}
 	r.crud.Read(ctx, req, resp)
 }
-func (r *appearanceProfileResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+func (r *themeVariantResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	if r.crud == nil {
-		resp.Diagnostics.AddError("appearance_profile resource not configured", "Configure was not called with tf.ProviderData")
+		resp.Diagnostics.AddError("theme_variant resource not configured", "Configure was not called with tf.ProviderData")
 		return
 	}
 	r.crud.Update(ctx, req, resp)
 }
-func (r *appearanceProfileResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+func (r *themeVariantResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	if r.crud == nil {
-		resp.Diagnostics.AddError("appearance_profile resource not configured", "Configure was not called with tf.ProviderData")
+		resp.Diagnostics.AddError("theme_variant resource not configured", "Configure was not called with tf.ProviderData")
 		return
 	}
 	r.crud.Delete(ctx, req, resp)
 }
-func (r *appearanceProfileResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+func (r *themeVariantResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	if r.crud == nil {
-		resp.Diagnostics.AddError("appearance_profile resource not configured", "Configure was not called with tf.ProviderData")
+		resp.Diagnostics.AddError("theme_variant resource not configured", "Configure was not called with tf.ProviderData")
 		return
 	}
 	r.crud.ImportState(ctx, req, resp)
 }
 
-// AppearanceProfileDataSourceSchema returns the Terraform schema for the singular AppearanceProfile data source.
-func AppearanceProfileDataSourceSchema() schema1.Schema {
+// ThemeVariantDataSourceSchema returns the Terraform schema for the singular ThemeVariant data source.
+func ThemeVariantDataSourceSchema() schema1.Schema {
 	return schema1.Schema{
 		Attributes: map[string]schema1.Attribute{
-			"appearance_profile_id": schema1.StringAttribute{
-				Computed:            true,
-				MarkdownDescription: "Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.",
-			},
 			"content": schema1.StringAttribute{
 				Computed:   true,
 				CustomType: jsontypes.NormalizedType{},
@@ -394,42 +390,46 @@ func AppearanceProfileDataSourceSchema() schema1.Schema {
 			},
 			"tenant_id": schema1.StringAttribute{Computed: true},
 			"theme_id":  schema1.StringAttribute{Computed: true},
+			"theme_variant_id": schema1.StringAttribute{
+				Computed:            true,
+				MarkdownDescription: "Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.",
+			},
 		},
-		MarkdownDescription: "An issuer's appearance profile: a theme plus overrides of its `stylesheet_attributes` and `content`, key by key. The issuer's default profile (`is_default`) is the issuer's appearance; a client's or audience's `appearance_profile_id` overrides it. This data source reads one by its full resource name.",
+		MarkdownDescription: "A theme variant: a theme, changed for one issuer. It names its base theme (`theme_id`) and holds only what differs, key by key, in `stylesheet_attributes` and `content`. What applies, in order: the application's variant (`theme_variant_id`), then the audience's, then the issuer's default variant (`is_default`), then the tenant's default theme.\n\nFormerly `authwise_appearance_profile` (kit#968): a `moved` block from `authwise_appearance_profile` carries the state across. This data source reads one by its full resource name.",
 	}
 }
 
-// appearanceProfileDataSource is the generated singular data source for AppearanceProfile (Get by name).
-type appearanceProfileDataSource struct {
-	crud *tf.Crud[*v1alpha1.AppearanceProfile, *AppearanceProfileModel]
+// themeVariantDataSource is the generated singular data source for ThemeVariant (Get by name).
+type themeVariantDataSource struct {
+	crud *tf.Crud[*v1alpha1.ThemeVariant, *ThemeVariantModel]
 }
 
-// NewAppearanceProfileDataSource returns the generated appearance_profile data source.
-func NewAppearanceProfileDataSource() datasource.DataSource {
-	return &appearanceProfileDataSource{}
+// NewThemeVariantDataSource returns the generated theme_variant data source.
+func NewThemeVariantDataSource() datasource.DataSource {
+	return &themeVariantDataSource{}
 }
-func (d *appearanceProfileDataSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
-	resp.TypeName = req.ProviderTypeName + "_appearance_profile"
+func (d *themeVariantDataSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_theme_variant"
 }
-func (d *appearanceProfileDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
-	resp.Schema = AppearanceProfileDataSourceSchema()
+func (d *themeVariantDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
+	resp.Schema = ThemeVariantDataSourceSchema()
 }
-func (d *appearanceProfileDataSource) Configure(_ context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
-	crud, diags := newAppearanceProfileCrud(req.ProviderData)
+func (d *themeVariantDataSource) Configure(_ context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
+	crud, diags := newThemeVariantCrud(req.ProviderData)
 	resp.Diagnostics.Append(diags...)
 	d.crud = crud
 }
-func (d *appearanceProfileDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
+func (d *themeVariantDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
 	if d.crud == nil {
-		resp.Diagnostics.AddError("appearance_profile data source not configured", "Configure was not called with tf.ProviderData")
+		resp.Diagnostics.AddError("theme_variant data source not configured", "Configure was not called with tf.ProviderData")
 		return
 	}
 	d.crud.ReadDataSource(ctx, req, resp)
 }
 
-// AppearanceProfileItemModel is one element of the appearance_profiles data source's "appearance_profiles" list.
-type AppearanceProfileItemModel struct {
-	AppearanceProfileId  types.String         `tfsdk:"appearance_profile_id"`
+// ThemeVariantItemModel is one element of the theme_variants data source's "theme_variants" list.
+type ThemeVariantItemModel struct {
+	ThemeVariantId       types.String         `tfsdk:"theme_variant_id"`
 	Name                 types.String         `tfsdk:"name"`
 	Labels               types.Map            `tfsdk:"labels"`
 	DisplayName          types.String         `tfsdk:"display_name"`
@@ -439,10 +439,9 @@ type AppearanceProfileItemModel struct {
 	IsDefault            types.Bool           `tfsdk:"is_default"`
 }
 
-// AppearanceProfileItemAttrTypes returns the attribute types of one appearance_profiles list element.
-func AppearanceProfileItemAttrTypes() map[string]attr.Type {
+// ThemeVariantItemAttrTypes returns the attribute types of one theme_variants list element.
+func ThemeVariantItemAttrTypes() map[string]attr.Type {
 	return map[string]attr.Type{
-		"appearance_profile_id": types.StringType,
 		"content":               jsontypes.NormalizedType{},
 		"display_name":          types.StringType,
 		"is_default":            types.BoolType,
@@ -450,28 +449,35 @@ func AppearanceProfileItemAttrTypes() map[string]attr.Type {
 		"name":                  types.StringType,
 		"stylesheet_attributes": jsontypes.NormalizedType{},
 		"theme_id":              types.StringType,
+		"theme_variant_id":      types.StringType,
 	}
 }
 
-// AppearanceProfilesModel is the Terraform model of the appearance_profiles data source.
-type AppearanceProfilesModel struct {
+// ThemeVariantsModel is the Terraform model of the theme_variants data source.
+type ThemeVariantsModel struct {
 	TenantId types.String `tfsdk:"tenant_id"`
 	IssuerId types.String `tfsdk:"issuer_id"`
-	Items    types.List   `tfsdk:"appearance_profiles"`
+	Items    types.List   `tfsdk:"theme_variants"`
 }
 
-// AppearanceProfileListDataSourceSchema returns the Terraform schema for the appearance_profiles data source.
-func AppearanceProfileListDataSourceSchema() schema1.Schema {
+// ThemeVariantListDataSourceSchema returns the Terraform schema for the theme_variants data source.
+func ThemeVariantListDataSourceSchema() schema1.Schema {
 	return schema1.Schema{
 		Attributes: map[string]schema1.Attribute{
-			"appearance_profiles": schema1.ListNestedAttribute{
+			"issuer_id": schema1.StringAttribute{
+				MarkdownDescription: "Parent identifier `issuer_id`; overrides the provider default.",
+				Optional:            true,
+				Validators:          []validator.String{tf.ReferenceID("i", "issuer", "authwise_issuer.<name>.issuer_id")},
+			},
+			"tenant_id": schema1.StringAttribute{
+				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default.",
+				Optional:            true,
+				Validators:          []validator.String{tf.ReferenceID("t", "tenant", "")},
+			},
+			"theme_variants": schema1.ListNestedAttribute{
 				Computed:            true,
-				MarkdownDescription: "Every appearance_profile under the parent, in the order the API lists them.",
+				MarkdownDescription: "Every theme_variant under the parent, in the order the API lists them.",
 				NestedObject: schema1.NestedAttributeObject{Attributes: map[string]schema1.Attribute{
-					"appearance_profile_id": schema1.StringAttribute{
-						Computed:            true,
-						MarkdownDescription: "Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.",
-					},
 					"content": schema1.StringAttribute{
 						Computed:   true,
 						CustomType: jsontypes.NormalizedType{},
@@ -491,27 +497,21 @@ func AppearanceProfileListDataSourceSchema() schema1.Schema {
 						CustomType: jsontypes.NormalizedType{},
 					},
 					"theme_id": schema1.StringAttribute{Computed: true},
+					"theme_variant_id": schema1.StringAttribute{
+						Computed:            true,
+						MarkdownDescription: "Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.",
+					},
 				}},
 			},
-			"issuer_id": schema1.StringAttribute{
-				MarkdownDescription: "Parent identifier `issuer_id`; overrides the provider default.",
-				Optional:            true,
-				Validators:          []validator.String{tf.ReferenceID("i", "issuer", "authwise_issuer.<name>.issuer_id")},
-			},
-			"tenant_id": schema1.StringAttribute{
-				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default.",
-				Optional:            true,
-				Validators:          []validator.String{tf.ReferenceID("t", "tenant", "")},
-			},
 		},
-		MarkdownDescription: "An issuer's appearance profile: a theme plus overrides of its `stylesheet_attributes` and `content`, key by key. The issuer's default profile (`is_default`) is the issuer's appearance; a client's or audience's `appearance_profile_id` overrides it. This data source lists every one under a parent.",
+		MarkdownDescription: "A theme variant: a theme, changed for one issuer. It names its base theme (`theme_id`) and holds only what differs, key by key, in `stylesheet_attributes` and `content`. What applies, in order: the application's variant (`theme_variant_id`), then the audience's, then the issuer's default variant (`is_default`), then the tenant's default theme.\n\nFormerly `authwise_appearance_profile` (kit#968): a `moved` block from `authwise_appearance_profile` carries the state across. This data source lists every one under a parent.",
 	}
 }
 
-// appearanceProfileItemFromProto converts one listed AppearanceProfile into a appearance_profiles list element.
-func appearanceProfileItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.AppearanceProfile, *AppearanceProfileModel], e *v1alpha1.AppearanceProfile) (types.Object, diag.Diagnostics) {
+// themeVariantItemFromProto converts one listed ThemeVariant into a theme_variants list element.
+func themeVariantItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.ThemeVariant, *ThemeVariantModel], e *v1alpha1.ThemeVariant) (types.Object, diag.Diagnostics) {
 	var diags diag.Diagnostics
-	var item AppearanceProfileItemModel
+	var item ThemeVariantItemModel
 	item.Name = types.StringValue(e.Name)
 	if len(e.Labels) == 0 {
 		if !tf.KeepEmpty(item.Labels) {
@@ -555,40 +555,40 @@ func appearanceProfileItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1
 	item.IsDefault = types.BoolValue(e.IsDefault)
 	id, err := crud.IDFromName(e.Name)
 	if err != nil {
-		diags.AddError("unexpected appearance_profile name", err.Error())
+		diags.AddError("unexpected theme_variant name", err.Error())
 	}
-	item.AppearanceProfileId = types.StringValue(id)
-	obj, d := types.ObjectValueFrom(ctx, AppearanceProfileItemAttrTypes(), item)
+	item.ThemeVariantId = types.StringValue(id)
+	obj, d := types.ObjectValueFrom(ctx, ThemeVariantItemAttrTypes(), item)
 	diags.Append(d...)
 	return obj, diags
 }
 
-// appearanceProfilesDataSource is the generated plural data source for AppearanceProfile (List under a parent).
-type appearanceProfilesDataSource struct {
-	crud *tf.Crud[*v1alpha1.AppearanceProfile, *AppearanceProfileModel]
+// themeVariantsDataSource is the generated plural data source for ThemeVariant (List under a parent).
+type themeVariantsDataSource struct {
+	crud *tf.Crud[*v1alpha1.ThemeVariant, *ThemeVariantModel]
 }
 
-// NewAppearanceProfilesDataSource returns the generated appearance_profiles data source.
-func NewAppearanceProfilesDataSource() datasource.DataSource {
-	return &appearanceProfilesDataSource{}
+// NewThemeVariantsDataSource returns the generated theme_variants data source.
+func NewThemeVariantsDataSource() datasource.DataSource {
+	return &themeVariantsDataSource{}
 }
-func (d *appearanceProfilesDataSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
-	resp.TypeName = req.ProviderTypeName + "_appearance_profiles"
+func (d *themeVariantsDataSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_theme_variants"
 }
-func (d *appearanceProfilesDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
-	resp.Schema = AppearanceProfileListDataSourceSchema()
+func (d *themeVariantsDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
+	resp.Schema = ThemeVariantListDataSourceSchema()
 }
-func (d *appearanceProfilesDataSource) Configure(_ context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
-	crud, diags := newAppearanceProfileCrud(req.ProviderData)
+func (d *themeVariantsDataSource) Configure(_ context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
+	crud, diags := newThemeVariantCrud(req.ProviderData)
 	resp.Diagnostics.Append(diags...)
 	d.crud = crud
 }
-func (d *appearanceProfilesDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
+func (d *themeVariantsDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
 	if d.crud == nil {
-		resp.Diagnostics.AddError("appearance_profiles data source not configured", "Configure was not called with tf.ProviderData")
+		resp.Diagnostics.AddError("theme_variants data source not configured", "Configure was not called with tf.ProviderData")
 		return
 	}
-	var m AppearanceProfilesModel
+	var m ThemeVariantsModel
 	resp.Diagnostics.Append(req.Config.Get(ctx, &m)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -598,19 +598,19 @@ func (d *appearanceProfilesDataSource) Read(ctx context.Context, req datasource.
 		"tenant_id": m.TenantId.ValueString(),
 	})
 	if err != nil {
-		resp.Diagnostics.AddError("list appearance_profiles failed", err.Error())
+		resp.Diagnostics.AddError("list theme_variants failed", err.Error())
 		return
 	}
 	elems := make([]attr.Value, 0, len(entities))
 	for _, e := range entities {
-		obj, diags := appearanceProfileItemFromProto(ctx, d.crud, e)
+		obj, diags := themeVariantItemFromProto(ctx, d.crud, e)
 		resp.Diagnostics.Append(diags...)
 		elems = append(elems, obj)
 	}
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	list, diags := types.ListValue(types.ObjectType{AttrTypes: AppearanceProfileItemAttrTypes()}, elems)
+	list, diags := types.ListValue(types.ObjectType{AttrTypes: ThemeVariantItemAttrTypes()}, elems)
 	resp.Diagnostics.Append(diags...)
 	m.Items = list
 	resp.Diagnostics.Append(resp.State.Set(ctx, &m)...)

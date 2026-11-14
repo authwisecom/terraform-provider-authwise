@@ -37,22 +37,22 @@ Every resource has two identifiers. `name` is the full resource name
 (`tenants/t-01/issuers/i-01/audiences/a-01`), the Terraform ID and the
 import ID. `<type>_id` is its last segment, the resource's own id:
 `audience_id` on `authwise_audience`, `realm_id` on `authwise_realm`,
-`client_id` on `authwise_client`. Data sources carry both.
+`application_id` on `authwise_application`. Data sources carry both.
 
 The rule for references:
 
 - **A `*_id` attribute takes another resource's `<type>_id`**, never its
   `name`. That covers the parent attributes (`tenant_id`, `issuer_id`,
-  `realm_id`, `audience_id`, `client_id`) and the references kit resolves
-  by id (a client's `audience_id` and `appearance_profile_id`, an
-  appearance profile's `theme_id`, a binding's `condition_id`, the SAML
+  `realm_id`, `audience_id`, `application_id`) and the references kit resolves
+  by id (an application's `audience_id` and `theme_variant_id`, a
+  theme variant's `theme_id`, a binding's `condition_id`, the SAML
   configs' `*_certificate_id`).
 - **A `*_ref = { name = … }` block and the association resources**
   (`authwise_access_role_access_permissions`,
   `authwise_scope_access_permissions`) **take `name`.**
 
 ```hcl
-resource "authwise_client" "web" {
+resource "authwise_application" "web" {
   display_name = "web"
   audience_id  = authwise_audience.api.audience_id   # not .name
 }
@@ -187,15 +187,15 @@ credential. kit refuses to delete a secret while anything references it,
 so reference it by expression, as above: Terraform then destroys or
 repoints the referrer first.
 
-A client's own secret works the other way around. You don't supply it:
-kit creates it and returns it exactly once. So `authwise_client_secret` keeps
+An application's own secret (its OAuth `client_secret`) works the other way around. You don't supply it:
+kit creates it and returns it exactly once. So `authwise_application_secret` keeps
 its `secret` in state, as a sensitive attribute, which makes the state
 itself sensitive. Rotate it by changing a value in `keepers`:
 
 ```hcl
-resource "authwise_client_secret" "ci" {
-  client_id = authwise_client.ci.client_id
-  keepers   = { rotation = "2026-09" }
+resource "authwise_application_secret" "ci" {
+  application_id = authwise_application.ci.application_id
+  keepers        = { rotation = "2026-09" }
 
   lifecycle {
     create_before_destroy = true
@@ -242,9 +242,9 @@ Two lanes, the same bearer credentials as awctl:
   (or `AUTHWISE_TOKEN_URL`/`AUTHWISE_CLIENT_ID`/`AUTHWISE_CLIENT_SECRET`,
   plus optional `audience`). Partial configuration is an error naming the
   gaps. For CI, the credential is a service account (#37):
-  `authwise_service_account`, a client of the admin issuer the tenant
+  `authwise_service_account`, an application of the admin issuer the tenant
   owns, with the `roles` it holds there, and `authwise_service_account_secret`, its secret, created once and
-  kept in state like a client secret. Both go through the public tenancy
+  kept in state like an application secret. Both go through the public tenancy
   service on `endpoint`, at central only. Replacing the secret rotates it,
   and the old one keeps working for `grace`. Destroying it does not revoke
   it: the tenancy service has no per-secret revoke.

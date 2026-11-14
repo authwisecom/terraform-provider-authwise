@@ -17,7 +17,7 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
-// Domain, Scope and AppearanceProfile: the three resources whose keying and
+// Domain, Scope and ThemeVariant: the three resources whose keying and
 // collection the provider took from kit's proto http annotations without
 // exercising them (#15). The fakes enforce the same routes — the parent
 // pattern and, for the two caller-named ones, the id carried in the
@@ -318,22 +318,22 @@ func (f *fakeIdentityServer) scopePermissionsLocked(scope string) []string {
 	return out
 }
 
-// --- AppearanceProfile (issuer-scoped, collection "appearance-profiles") ---
+// --- ThemeVariant (issuer-scoped, collection "theme-variants") ---
 //
 // kit holds exactly one default per issuer once it has a profile (kit#680):
 // the first profile created is the default whatever is_default says; a write
 // that would make a second default, or a mask that clears the default's
 // flag, is FAILED_PRECONDITION; the default cannot be deleted while others
-// remain; and MakeDefaultAppearanceProfile moves it.
+// remain; and MakeDefaultThemeVariant moves it.
 
 // issuerOfProfile is the issuer a profile's name sits under.
 func issuerOfProfile(name string) string {
-	issuer, _, _ := strings.Cut(name, "/appearance-profiles/")
+	issuer, _, _ := strings.Cut(name, "/theme-variants/")
 	return issuer
 }
 
 // defaultProfileLocked is the issuer's default profile, or nil.
-func (f *fakeIdentityServer) defaultProfileLocked(issuer string) *corepb.AppearanceProfile {
+func (f *fakeIdentityServer) defaultProfileLocked(issuer string) *corepb.ThemeVariant {
 	for name, p := range f.profiles {
 		if issuerOfProfile(name) == issuer && p.GetIsDefault() {
 			return p
@@ -342,92 +342,92 @@ func (f *fakeIdentityServer) defaultProfileLocked(issuer string) *corepb.Appeara
 	return nil
 }
 
-func (f *fakeIdentityServer) GetAppearanceProfile(ctx context.Context, in *identitypb.GetAppearanceProfileRequest) (*corepb.AppearanceProfile, error) {
+func (f *fakeIdentityServer) GetThemeVariant(ctx context.Context, in *identitypb.GetThemeVariantRequest) (*corepb.ThemeVariant, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.recordAuth(ctx)
 	p, ok := f.profiles[in.GetName()]
 	if !ok {
-		return nil, status.Errorf(codes.NotFound, "appearance profile %q not found", in.GetName())
+		return nil, status.Errorf(codes.NotFound, "theme variant %q not found", in.GetName())
 	}
-	return proto.Clone(p).(*corepb.AppearanceProfile), nil
+	return proto.Clone(p).(*corepb.ThemeVariant), nil
 }
 
-func (f *fakeIdentityServer) CreateAppearanceProfile(ctx context.Context, in *identitypb.CreateAppearanceProfileRequest) (*corepb.AppearanceProfile, error) {
+func (f *fakeIdentityServer) CreateThemeVariant(ctx context.Context, in *identitypb.CreateThemeVariantRequest) (*corepb.ThemeVariant, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.recordAuth(ctx)
-	if err := checkParent("appearance profile", issuerParent, in.GetParent()); err != nil {
+	if err := checkParent("theme variant", issuerParent, in.GetParent()); err != nil {
 		return nil, err
 	}
-	p := proto.Clone(in.GetAppearanceProfile()).(*corepb.AppearanceProfile)
+	p := proto.Clone(in.GetThemeVariant()).(*corepb.ThemeVariant)
 	current := f.defaultProfileLocked(in.GetParent())
 	if p.GetIsDefault() && current != nil {
 		return nil, status.Errorf(codes.FailedPrecondition, "the issuer's default is %s; make this the default with :makeDefault", current.GetName())
 	}
 	p.IsDefault = current == nil
-	p.Name = in.GetParent() + "/appearance-profiles/" + f.nextID("ap")
+	p.Name = in.GetParent() + "/theme-variants/" + f.nextID("ap")
 	f.profiles[p.GetName()] = p
-	return proto.Clone(p).(*corepb.AppearanceProfile), nil
+	return proto.Clone(p).(*corepb.ThemeVariant), nil
 }
 
-func (f *fakeIdentityServer) PatchAppearanceProfile(ctx context.Context, in *identitypb.PatchAppearanceProfileRequest) (*corepb.AppearanceProfile, error) {
+func (f *fakeIdentityServer) PatchThemeVariant(ctx context.Context, in *identitypb.PatchThemeVariantRequest) (*corepb.ThemeVariant, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.recordAuth(ctx)
 	existing, ok := f.profiles[in.GetName()]
 	if !ok {
-		return nil, status.Errorf(codes.NotFound, "appearance profile %q not found", in.GetName())
+		return nil, status.Errorf(codes.NotFound, "theme variant %q not found", in.GetName())
 	}
 	for _, path := range in.GetUpdateMask().GetPaths() {
 		switch path {
 		case "labels":
-			existing.Labels = in.GetAppearanceProfile().GetLabels()
+			existing.Labels = in.GetThemeVariant().GetLabels()
 		case "display_name":
-			existing.DisplayName = in.GetAppearanceProfile().GetDisplayName()
+			existing.DisplayName = in.GetThemeVariant().GetDisplayName()
 		case "theme_id":
-			existing.ThemeId = in.GetAppearanceProfile().GetThemeId()
+			existing.ThemeId = in.GetThemeVariant().GetThemeId()
 		case "stylesheet_attributes":
-			existing.StylesheetAttributes = in.GetAppearanceProfile().GetStylesheetAttributes()
+			existing.StylesheetAttributes = in.GetThemeVariant().GetStylesheetAttributes()
 		case "content":
-			existing.Content = in.GetAppearanceProfile().GetContent()
+			existing.Content = in.GetThemeVariant().GetContent()
 		case "is_default":
-			if in.GetAppearanceProfile().GetIsDefault() != existing.GetIsDefault() {
+			if in.GetThemeVariant().GetIsDefault() != existing.GetIsDefault() {
 				return nil, status.Errorf(codes.FailedPrecondition, "is_default moves only through :makeDefault")
 			}
 		default:
 			return nil, status.Errorf(codes.InvalidArgument, "unsupported update_mask path %q", path)
 		}
 	}
-	return proto.Clone(existing).(*corepb.AppearanceProfile), nil
+	return proto.Clone(existing).(*corepb.ThemeVariant), nil
 }
 
-func (f *fakeIdentityServer) MakeDefaultAppearanceProfile(ctx context.Context, in *identitypb.MakeDefaultAppearanceProfileRequest) (*identitypb.MakeDefaultAppearanceProfileResponse, error) {
+func (f *fakeIdentityServer) MakeDefaultThemeVariant(ctx context.Context, in *identitypb.MakeDefaultThemeVariantRequest) (*identitypb.MakeDefaultThemeVariantResponse, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.recordAuth(ctx)
 	f.makeDefaults++
 	p, ok := f.profiles[in.GetName()]
 	if !ok {
-		return nil, status.Errorf(codes.NotFound, "appearance profile %q not found", in.GetName())
+		return nil, status.Errorf(codes.NotFound, "theme variant %q not found", in.GetName())
 	}
-	out := &identitypb.MakeDefaultAppearanceProfileResponse{}
+	out := &identitypb.MakeDefaultThemeVariantResponse{}
 	if previous := f.defaultProfileLocked(issuerOfProfile(in.GetName())); previous != nil && previous != p {
 		previous.IsDefault = false
-		out.Previous = proto.Clone(previous).(*corepb.AppearanceProfile)
+		out.Previous = proto.Clone(previous).(*corepb.ThemeVariant)
 	}
 	p.IsDefault = true
-	out.Default = proto.Clone(p).(*corepb.AppearanceProfile)
+	out.Default = proto.Clone(p).(*corepb.ThemeVariant)
 	return out, nil
 }
 
-func (f *fakeIdentityServer) DeleteAppearanceProfile(ctx context.Context, in *identitypb.DeleteAppearanceProfileRequest) (*emptypb.Empty, error) {
+func (f *fakeIdentityServer) DeleteThemeVariant(ctx context.Context, in *identitypb.DeleteThemeVariantRequest) (*emptypb.Empty, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.recordAuth(ctx)
 	p, ok := f.profiles[in.GetName()]
 	if !ok {
-		return nil, status.Errorf(codes.NotFound, "appearance profile %q not found", in.GetName())
+		return nil, status.Errorf(codes.NotFound, "theme variant %q not found", in.GetName())
 	}
 	if p.GetIsDefault() {
 		issuer := issuerOfProfile(in.GetName())

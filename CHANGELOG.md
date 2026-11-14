@@ -1,6 +1,83 @@
 ## 0.35.0 (Unreleased)
 
+BREAKING CHANGES:
+
+* **! One vocabulary (kit#968, train 2026.11.4).** An object now has one
+  noun everywhere: the console, the API, Terraform and awctl. There are no
+  aliases. The OAuth wire names stay (`client_id`, `client_secret`, the
+  provider's own `client_id` and `client_secret`), and the ids keep their
+  prefixes (`c-…`, `ap-…`).
+
+  | Was | Is |
+  | --- | --- |
+  | `authwise_client` (resource and data source), `authwise_clients` | `authwise_application`, `authwise_applications` |
+  | `authwise_client.client_id` | `authwise_application.application_id` (it is the OAuth `client_id`) |
+  | `authwise_client_secret`, `authwise_client_secrets` (`client_secrets`) | `authwise_application_secret`, `authwise_application_secrets` (`application_secrets`) |
+  | `client_id` on a secret | `application_id` |
+  | `authwise_appearance_profile` (resource and data source), `authwise_appearance_profiles` | `authwise_theme_variant`, `authwise_theme_variants` |
+  | `appearance_profile_id` (on the profile, an application, an audience) | `theme_variant_id` |
+  | import IDs `…/clients/c-…`, `…/client-secrets/cs-…`, `…/appearance-profiles/ap-…` | `…/applications/c-…`, `…/application-secrets/cs-…`, `…/theme-variants/ap-…` |
+
+  **Upgrading.** Rename the types and attributes in the configuration and
+  add a `moved` block for each renamed resource (Terraform 1.8 or later).
+  The provider carries the state across, so nothing is destroyed or
+  recreated, and an application secret keeps its `secret`:
+
+  ```terraform
+  moved {
+    from = authwise_client.console
+    to   = authwise_application.console
+  }
+
+  moved {
+    from = authwise_client_secret.ci
+    to   = authwise_application_secret.ci
+  }
+
+  moved {
+    from = authwise_appearance_profile.partners
+    to   = authwise_theme_variant.partners
+  }
+  ```
+
+  The next plan should show the moves and no other change. An audience's
+  `appearance_profile_id` becomes `theme_variant_id` in place: rename it in
+  the configuration and the refresh reads the value back. On an older
+  Terraform, remove the old addresses from state (`terraform state rm`) and
+  import the new ones with `import` blocks. An application secret
+  imported that way has no `secret` until a `keepers` change creates a new
+  one, so prefer `moved`.
+
+  **Kept names.** `authwise_interactive_client_config`, the data source
+  that builds an application's `config`, keeps its name: kit keeps the
+  names of the config messages packed into `Any`, because their type URLs
+  are stored in rows already written. The OAuth wire names stay as well:
+  `client_id`, `client_secret`, `account_client_id` in an issuer's config,
+  and the provider's own `client_id` and `client_secret`.
+
+* **! The permissions renamed with them.** kit renames them in every
+  tenant's catalog (its migration 020): `identity.clients.*` is
+  `identity.applications.*`, `identity.clientSecrets.*` is
+  `identity.applicationSecrets.*` (and `identity.clientSecrets.mint` is
+  `identity.applicationSecrets.create`), `identity.appearanceProfiles.*` is
+  `identity.themeVariants.*`, and `tenancy.serviceAccounts.mintSecret` is
+  `tenancy.serviceAccounts.createSecret`. An `authwise_access_role` or
+  `authwise_scope` that lists an old name must list the new one; kit's
+  catalogs are moved for you, a configuration is not.
+
+* **! The tenant's default theme (VS-D7).** A new issuer no longer gets a
+  "Default" theme variant. Where no variant applies, the pages use the
+  tenant's brand theme (`authwise_tenant_branding.theme_id`). A tenant
+  with one look needs no `authwise_theme_variant`. What applies, in order:
+  the application's variant, the audience's, the issuer's default variant,
+  then the tenant's default theme. `authwise_issuer.config` no longer
+  carries the starting profile's id.
+
 NOTES:
+
+* **apis v0.74.0** (from v0.73.0): kit v1.87.0's contract, the vocabulary
+  pass (kit#968). This release needs kit 1.87.0 or later; an older kit
+  answers the renamed calls with `Unimplemented`.
 
 * Release train 2026.11.GFK.1 (Guard for Kubernetes), stage GK5, built
   against apis v0.73.0. guard-control's servers for node groups, cluster
@@ -15,7 +92,7 @@ NOTES:
   schema changes.
 * A Terraform service account that manages these resources holds
   `guardcontrol.networkAdmin` (and `guardcontrol.tenantAdmin` for Guard
-  grants), bound to its client with `authwise_access_binding` and no
+  grants), bound to its application (`c-…`) with `authwise_access_binding` and no
   `condition_id`. The provider docs' Guard section says so (tf#74).
 
 FEATURES:

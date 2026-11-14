@@ -4,7 +4,7 @@ page_title: "authwise_tenant_branding Resource - Authwise"
 subcategory: "Identity"
 description: |-
   A tenant's brand: its name, its look, and its logo. Mail and the sign-in page read it: mail's From name and brand name, and the logo and colour from the theme.
-  The brand is authoritative: it becomes exactly this, a field left out is cleared, and destroying the resource clears the brand. A tenant created on kit with kit#953 starts with a theme "Brand" named here: leaving theme_id out clears it, so name it (import it as authwise_theme) to keep it. A new issuer of a tenant whose brand names a theme is given a "Default" appearance profile on that theme, which the configuration's first profile on the issuer replaces.
+  The brand is authoritative: it becomes exactly this, a field left out is cleared, and destroying the resource clears the brand. A tenant created on kit with kit#953 starts with a theme "Brand" named here: leaving theme_id out clears it, so name it (import it as authwise_theme) to keep it. The brand's theme is the tenant's default theme: it applies on every page where no theme variant does (kit#968), so a tenant with one look needs no authwise_theme_variant at all.
   Set a tenant's branding in one place. This resource and branding in authwise_tenant_config write the same stored value. branding there is deprecated: leave it out of that config, which then leaves the brand to this resource.
   Name the theme and the logos through their resources (authwise_theme.x.theme_id, authwise_asset_content.x.asset_id). kit refuses deleting a theme or emptying an asset the brand names, and the reference makes Terraform clear the brand before either goes.
   Writing the brand needs identity.themes.update at the tenant.
@@ -14,7 +14,7 @@ description: |-
 
 A tenant's brand: its name, its look, and its logo. Mail and the sign-in page read it: mail's From name and brand name, and the logo and colour from the theme.
 
-The brand is authoritative: it becomes exactly this, a field left out is cleared, and destroying the resource clears the brand. A tenant created on kit with kit#953 starts with a theme "Brand" named here: leaving `theme_id` out clears it, so name it (import it as `authwise_theme`) to keep it. A new issuer of a tenant whose brand names a theme is given a "Default" appearance profile on that theme, which the configuration's first profile on the issuer replaces.
+The brand is authoritative: it becomes exactly this, a field left out is cleared, and destroying the resource clears the brand. A tenant created on kit with kit#953 starts with a theme "Brand" named here: leaving `theme_id` out clears it, so name it (import it as `authwise_theme`) to keep it. The brand's theme is the tenant's **default theme**: it applies on every page where no theme variant does (kit#968), so a tenant with one look needs no `authwise_theme_variant` at all.
 
 **Set a tenant's branding in one place.** This resource and `branding` in `authwise_tenant_config` write the same stored value. `branding` there is deprecated: leave it out of that `config`, which then leaves the brand to this resource.
 
@@ -40,7 +40,7 @@ resource "authwise_tenant_branding" "this" {
 ### Optional
 
 - `display_name` (String) The brand's name, which mail shows and sends from (the From name). At most 64 characters on one line, none of `<`, `>` or `"`.
-- `logo_asset_id` (String) An image asset of the tenant (`as-…`): what the admin console shows in place of the Authwise emblem, and what mail falls back to when an appearance profile has no logo.
+- `logo_asset_id` (String) An image asset of the tenant (`as-…`): what the admin console shows in place of the Authwise emblem, and what mail falls back to when an theme variant has no logo.
 - `logo_dark_asset_id` (String) The same, for a dark colour scheme. kit refuses it without `logo_asset_id`.
 - `tenant_id` (String) The tenant; overrides the provider default. Changing it moves the brand: the old tenant's is cleared and the new one's written.
 - `theme_id` (String) The tenant's look: a theme of the tenant (`th-…`), from which mail takes its logo and colour.

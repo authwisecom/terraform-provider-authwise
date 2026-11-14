@@ -1,7 +1,10 @@
 # Branding the login pages
 
-The hosted login pages take their look from an **appearance profile**,
-which is a **theme** plus overrides.
+The hosted login pages take their look from a **theme**: the base of a
+brand. A **theme variant** is a theme changed for one issuer: it names its
+theme and holds only what differs. What applies, in order: the
+application's variant, then the audience's, then the issuer's default
+variant, then the tenant's default theme (`authwise_tenant_branding`).
 
 - **The logo** is an asset. The pages serve every asset under `/assets`,
   so `path = "/logo.svg"` is at `/assets/logo.svg`. That URL is what
@@ -19,20 +22,20 @@ which is a **theme** plus overrides.
   whole and overrides a few keys with `merge`. Colours are six hex digits
   without `#`, because the template adds it. `layout` is fixed at
   creation: to change layout, create another theme.
-- **The default profile** is the issuer's appearance. It overrides the
-  subheading.
-- **The partners profile** uses the same theme with a different colour
-  and heading. The partner portal client points at it through
-  `appearance_profile_id`.
+- **The default variant** is the issuer's. It overrides the subheading.
+- **The partners variant** uses the same theme with a different colour
+  and heading. The partner portal application points at it through
+  `theme_variant_id`.
 
-## Which profile is the default
+## Which variant is the default
 
-The issuer's first profile becomes the default, whatever its `is_default`
-says. Set `is_default = true` on the profile that should be the default,
+The issuer's first variant becomes the default, whatever its `is_default`
+says. Set `is_default = true` on the variant that should be the default,
 and leave it out on the others. To move the default, set it on the new
-profile and remove it from the old one in the same apply.
+variant and remove it from the old one in the same apply. An issuer with
+no variant uses the tenant's default theme.
 
 ## Overrides
 
-A profile's `stylesheet_attributes` and `content` override the theme's
-key by key. A key the profile leaves out takes the theme's value.
+A variant's `stylesheet_attributes` and `content` override the theme's
+key by key. A key the variant leaves out takes the theme's value.

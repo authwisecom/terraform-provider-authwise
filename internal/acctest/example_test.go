@@ -278,7 +278,7 @@ func TestAccGuardCatalogExample(t *testing.T) {
 		if got := c.GetGrantTypes(); !slices.Equal(got, []string{"authorization_code", "refresh_token"}) {
 			t.Errorf("client grant_types = %v", got)
 		}
-		if c.GetKind() != corepb.ClientKind_CLIENT_KIND_APPLICATION || c.GetTokenEndpointAuthMethod() != "none" {
+		if c.GetKind() != corepb.ApplicationKind_APPLICATION_KIND_INTERACTIVE || c.GetTokenEndpointAuthMethod() != "none" {
 			t.Errorf("client kind = %s, token_endpoint_auth_method = %q; want a public application", c.GetKind(), c.GetTokenEndpointAuthMethod())
 		}
 		if !strings.Contains(string(c.GetConfig().GetValue()), "guard-admin.example.com/") {
@@ -447,7 +447,7 @@ func TestAccEndpointExamples(t *testing.T) {
 			assert: func(t *testing.T, e *corepb.Endpoint, h *harness) {
 				c, ok := h.fake.certs[e.GetTls().GetClientCertificate()]
 				if !ok || !c.GetHasPrivateKey() {
-					t.Errorf("tls.client_certificate = %q does not name the minted certificate", e.GetTls().GetClientCertificate())
+					t.Errorf("tls.client_certificate = %q does not name the created certificate", e.GetTls().GetClientCertificate())
 				}
 				if !strings.Contains(e.GetTls().GetCaPem(), "BEGIN CERTIFICATE") {
 					t.Errorf("tls.ca_pem did not arrive: %q", e.GetTls().GetCaPem())
@@ -608,7 +608,7 @@ func TestAccSocialExample(t *testing.T) {
 }
 
 // TestAccBrandingExample applies examples/branding verbatim — a logo, a
-// theme from the center layout's starter, two appearance profiles and a
+// theme from the center layout's starter, two theme variants and a
 // client on the second — then asserts a re-plan is empty, which is the
 // proof that the theme's schemas and merged starter survive the round trip.
 func TestAccBrandingExample(t *testing.T) {
@@ -668,8 +668,8 @@ func TestAccBrandingExample(t *testing.T) {
 	for _, c := range h.fake.clients {
 		if c.GetDisplayName() == "Partner portal" {
 			portal++
-			if c.GetAppearanceProfileId() != byName["Example for partners"] {
-				t.Errorf("portal appearance_profile_id = %q, want the partners profile %q", c.GetAppearanceProfileId(), byName["Example for partners"])
+			if c.GetThemeVariantId() != byName["Example for partners"] {
+				t.Errorf("portal theme_variant_id = %q, want the partners profile %q", c.GetThemeVariantId(), byName["Example for partners"])
 			}
 		}
 	}

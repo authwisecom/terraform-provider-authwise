@@ -37,11 +37,11 @@ import (
 
 // The Authwise scope table (mirrors kit's families.Scope).
 var (
-	scopeTenant   = tf.NewScope("tenants")
-	scopeIssuer   = tf.NewScope("tenants", "issuers")
-	scopeRealm    = tf.NewScope("tenants", "realms")
-	scopeAudience = tf.NewScope("tenants", "issuers", "audiences")
-	scopeClient   = tf.NewScope("tenants", "issuers", "clients")
+	scopeTenant      = tf.NewScope("tenants")
+	scopeIssuer      = tf.NewScope("tenants", "issuers")
+	scopeRealm       = tf.NewScope("tenants", "realms")
+	scopeAudience    = tf.NewScope("tenants", "issuers", "audiences")
+	scopeApplication = tf.NewScope("tenants", "issuers", "applications")
 
 	// Guard's (guard-control): a network in a kit tenant (tf#65).
 	scopeGuardNetwork = tf.NewScope("tenants", "networks")
@@ -63,21 +63,21 @@ var (
 // `.name`; validating the id alone would break them. They join when kit
 // settles that exception, at its next breaking tag (D8).
 var (
-	refAudience          = gentf.Reference{Target: "audience", Prefix: "a"}
-	refAppearanceProfile = gentf.Reference{Target: "appearance_profile", Prefix: "ap"}
-	refTheme             = gentf.Reference{Target: "theme", Prefix: "th"}
-	refAccessCondition   = gentf.Reference{Target: "access_condition", Prefix: "axc"}
-	refDomain            = gentf.Reference{Target: "domain", Prefix: "d"}
+	refAudience        = gentf.Reference{Target: "audience", Prefix: "a"}
+	refThemeVariant    = gentf.Reference{Target: "theme_variant", Prefix: "ap"}
+	refTheme           = gentf.Reference{Target: "theme", Prefix: "th"}
+	refAccessCondition = gentf.Reference{Target: "access_condition", Prefix: "axc"}
+	refDomain          = gentf.Reference{Target: "domain", Prefix: "d"}
 
 	// The parent attributes: every resource's and every plural data
 	// source's.
 	scopeReferences = map[string]gentf.Reference{
-		"tenant_id":   {Target: "tenant", Prefix: "t"},
-		"issuer_id":   {Target: "issuer", Prefix: "i"},
-		"realm_id":    {Target: "realm", Prefix: "r"},
-		"audience_id": refAudience,
-		"client_id":   {Target: "client", Prefix: "c"},
-		"network_id":  {Target: "guard_network", Prefix: "n"},
+		"tenant_id":      {Target: "tenant", Prefix: "t"},
+		"issuer_id":      {Target: "issuer", Prefix: "i"},
+		"realm_id":       {Target: "realm", Prefix: "r"},
+		"audience_id":    refAudience,
+		"application_id": {Target: "application", Prefix: "c"},
+		"network_id":     {Target: "guard_network", Prefix: "n"},
 		// The hand-written authwise_guard_cluster_trust (its keys are a
 		// oneof).
 		"cluster_trust_id": {Target: "guard_cluster_trust", Prefix: "ct"},
@@ -176,7 +176,7 @@ func callerNamed(r *gentf.Resource) {
 }
 
 // withCollection overrides the derived AIP collection segment. kit's
-// collections are kebab-case ("access-roles", "appearance-profiles"), while
+// collections are kebab-case ("access-roles", "theme-variants"), while
 // tfinfra derives the AIP-122 lower-camel default.
 func withCollection(collection string) func(r *gentf.Resource) {
 	return func(r *gentf.Resource) { r.Collection = collection }
@@ -233,24 +233,25 @@ func withDescription(description string) func(r *gentf.Resource) {
 	return func(r *gentf.Resource) { r.Description = description }
 }
 
-// clientSecret is minted rather than created (kit#617): MintClientSecret
-// returns the secret exactly once, beside the row, and no read returns it
-// again, so it lives in state as a sensitive attribute (the ruling on #18).
-// It is built by hand rather than through crud because a minted entry takes
-// no singular data source: that would share the model, secret and all.
+// applicationSecret is created with its value rather than written (kit#617,
+// kit#968): CreateApplicationSecret returns the secret exactly once, beside
+// the row, and no read returns it again, so it lives in state as a sensitive
+// attribute (the ruling on #18). It is built by hand rather than through
+// crud because such an entry takes no singular data source: that would share
+// the model, secret and all.
 //
-// hash_enabled is kit's to set; the mint takes only expires_at, which
+// hash_enabled is kit's to set; the create takes only expires_at, which
 // patches in place. keepers is the rotation trigger, since kit offers no
 // rotate verb.
-func clientSecret() gentf.Entry {
-	r := resource(scopeClient)
-	r.Collection = "client-secrets"
+func applicationSecret() gentf.Entry {
+	r := resource(scopeApplication)
+	r.Collection = "application-secrets"
 	r.Computed = []string{"hash_enabled"}
-	r.Description = "A client's secret, for authenticating it to the token endpoint. " +
-		"kit creates it and returns it once, so the secret is kept in state: treat the state as sensitive."
-	r.Mint = &gentf.Mint{Method: "MintClientSecret", Once: []string{"secret"}}
+	r.Description = "An application's secret (its OAuth `client_secret`), for authenticating it to the token endpoint. " +
+		"kit creates it and returns it once, so the secret is kept in state: treat the state as sensitive.\n\nFormerly `authwise_client_secret` (kit#968): a `moved` block from `authwise_client_secret` carries the state across, `secret` included."
+	r.Mint = &gentf.Mint{Method: "CreateApplicationSecret", Once: []string{"secret"}}
 	return gentf.Entry{
-		Type:            reflect.TypeFor[corepb.ClientSecret](),
+		Type:            reflect.TypeFor[corepb.ApplicationSecret](),
 		Implementations: []any{r, gentf.DataSourceList{}},
 	}
 }
@@ -320,7 +321,7 @@ func main() {
 			// binding's host) change with binding resources in the same
 			// apply: volatile too.
 			crud[corepb.Issuer](scopeTenant,
-				withDescription("An OAuth 2.0 / OpenID Connect issuer: the login a set of clients shares, with its token lifetimes and which realm or realms people sign in to (`config`). It answers at the hosts its `authwise_issuer_domain_binding`s name (kit#911). Its appearance is whichever of its profiles is the default (`authwise_appearance_profile.is_default`)."), withJSON("config"),
+				withDescription("An OAuth 2.0 / OpenID Connect issuer: the login a set of applications shares, with its token lifetimes and which realm or realms people sign in to (`config`). It answers at the hosts its `authwise_issuer_domain_binding`s name (kit#911). Its pages use its default theme variant (`authwise_theme_variant.is_default`), or the tenant's default theme when it has none."), withJSON("config"),
 				withImmutable("domain_id", "path"), withComputed("account_client_id"), withVolatile("preferred_domain_id", "preferred_binding_id", "bindings", "domain_name"),
 				withReferences(map[string]gentf.Reference{"domain_id": refDomain})),
 			crud[corepb.Realm](scopeTenant,
@@ -342,7 +343,7 @@ func main() {
 			crud[corepb.Endpoint](scopeTenant,
 				withDescription("A service kit calls out to: its transport and address, how kit verifies it (`tls`), how kit authenticates to it (`auth`), and the per-call deadline (`timeout`)."), withJSON("auth")),
 			// The SAML trust anchors (kit#487). certificate_pem is the
-			// public certificate of any row, minted or imported, and is
+			// public certificate of any row, created or imported, and is
 			// read-only; importing a partner's PEM is a separate input-only
 			// field on create, not an RPC of its own.
 			crud[corepb.Certificate](scopeTenant,
@@ -350,7 +351,7 @@ func main() {
 				withRequired("display_name", "use"),
 				withComputed("key_id", "origin", "subject", "not_before", "not_after",
 					"fingerprint_sha256", "certificate_pem", "has_private_key"),
-				// The mint parameters describe how to make the key pair, not
+				// The create parameters describe how to make the key pair, not
 				// what was made, and kit only reads them on create.
 				withImmutable("subject_common_name", "validity_days", "key_size", "import_certificate_pem"),
 				withInputOnly("subject_common_name", "validity_days", "key_size", "import_certificate_pem")),
@@ -394,23 +395,23 @@ func main() {
 				withRequired("domain_id"), withImmutable("domain_id", "path"),
 				withComputed("hostname", "url", "routable", "created_at"),
 				withReferences(map[string]gentf.Reference{"domain_id": refDomain})),
-			crud[corepb.Client](scopeIssuer,
-				withDescription("An OAuth 2.0 client of an issuer: an application that signs people in or calls an API."), withJSON("config"),
+			crud[corepb.Application](scopeIssuer,
+				withDescription("An application of an issuer: something that signs people in or calls an API. On the wire it is an OAuth 2.0 client, and its identifier (`c-…`) is its `client_id`.\n\nFormerly `authwise_client` (kit#968): a `moved` block from `authwise_client` carries the state across, with `client_id` read as `application_id`."), withJSON("config"),
 				// owning_tenant_id marks a service account (kit#756): kit
 				// sets it on CreateServiceAccount and refuses it here.
 				withComputed("owning_tenant_id"),
-				withReferences(map[string]gentf.Reference{"audience_id": refAudience, "appearance_profile_id": refAppearanceProfile})),
-			clientSecret(),
+				withReferences(map[string]gentf.Reference{"audience_id": refAudience, "theme_variant_id": refThemeVariant})),
+			applicationSecret(),
 			crud[corepb.Audience](scopeIssuer,
 				withDescription("An API an issuer issues access tokens for, and the audience its Access catalog hangs off."), withJSON("config"),
-				withReferences(map[string]gentf.Reference{"appearance_profile_id": refAppearanceProfile})),
-			crud[corepb.AppearanceProfile](scopeIssuer,
-				// is_default is the issuer's appearance (kit#680, apis v0.18.0).
-				// kit holds exactly one default per issuer and moves it only
-				// through MakeDefaultAppearanceProfile; the wrapper in
+				withReferences(map[string]gentf.Reference{"theme_variant_id": refThemeVariant})),
+			crud[corepb.ThemeVariant](scopeIssuer,
+				// is_default is the issuer's default variant (kit#680, apis
+				// v0.18.0). kit holds at most one default per issuer and moves
+				// it only through MakeDefaultThemeVariant; the wrapper in
 				// internal/provider routes the flag there.
-				withDescription("An issuer's appearance profile: a theme plus overrides of its `stylesheet_attributes` and `content`, key by key. The issuer's default profile (`is_default`) is the issuer's appearance; a client's or audience's `appearance_profile_id` overrides it."),
-				withCollection("appearance-profiles"),
+				withDescription("A theme variant: a theme, changed for one issuer. It names its base theme (`theme_id`) and holds only what differs, key by key, in `stylesheet_attributes` and `content`. What applies, in order: the application's variant (`theme_variant_id`), then the audience's, then the issuer's default variant (`is_default`), then the tenant's default theme.\n\nFormerly `authwise_appearance_profile` (kit#968): a `moved` block from `authwise_appearance_profile` carries the state across."),
+				withCollection("theme-variants"),
 				withJSON("stylesheet_attributes", "content"),
 				withReferences(map[string]gentf.Reference{"theme_id": refTheme})),
 
@@ -573,7 +574,7 @@ func main() {
 			// GrantEnrolment.
 
 			// Config builder data sources for Any-packed configs
-			// (Provider.config, Client.config).
+			// (Provider.config, Application.config).
 			{
 				Type: reflect.TypeFor[corepb.ProviderAuthwise](),
 				Implementations: []any{
@@ -711,13 +712,13 @@ func main() {
 						// The proto documents the two refresh lifetimes in one
 						// comment, on the first, in kit's internal terms.
 						Descriptions: map[string]string{
-							"allowed_redirect_uris":                 "The redirect URIs /authorize accepts for this client.",
+							"allowed_redirect_uris":                 "The redirect URIs /authorize accepts for this application.",
 							"access_token_expire_seconds":           "Access token lifetime in seconds. Unset takes the value from the layer above (tenant, issuer, audience).",
 							"refresh_token_expire_seconds":          "Refresh token idle lifetime in seconds: it slides forward on every rotation. Unset takes the value from the layer above.",
 							"refresh_token_absolute_expire_seconds": "Hard cap on a refresh token family in seconds, set once when the family is created and never extended. Unset takes the value from the layer above.",
-							"cors":                                  "The browser origins allowed to call kit for this client.",
-							"flow_integration_config":               "The endpoint kit calls during this client's login flow.",
-							"require_consent":                       "Make /authorize ask the person to approve this client for the scopes it requests. Default false. `prompt=consent` asks regardless, so this is the floor, not the switch.",
+							"cors":                                  "The browser origins allowed to call kit for this application.",
+							"flow_integration_config":               "The endpoint kit calls during this application's login flow.",
+							"require_consent":                       "Make /authorize ask the person to approve this application for the scopes it requests. Default false. `prompt=consent` asks regardless, so this is the floor, not the switch.",
 						},
 					},
 				},

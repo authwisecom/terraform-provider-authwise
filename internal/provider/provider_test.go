@@ -51,7 +51,7 @@ func TestProviderSurface(t *testing.T) {
 		diags := s.Schema.ValidateImplementation(ctx)
 		require.False(t, diags.HasError(), "%s: %v", m.TypeName, diags)
 	}
-	// 19 generated entity resources (client_secret, minted, came with
+	// 19 generated entity resources (client_secret, created, came with
 	// kit#617), 2 association resources (scope_access_permissions,
 	// access_role_access_permissions), and the hand-written secret,
 	// realm_authentication_policy and asset_content. Guard (#32) adds four
@@ -95,7 +95,7 @@ func TestProviderSurface(t *testing.T) {
 		"authwise_guard_node_grants",
 		"authwise_guard_enrolment_grant",
 		"authwise_guard_tenant_settings",
-		"authwise_client_secret",
+		"authwise_application_secret",
 		"authwise_access_permission",
 		"authwise_access_role",
 		"authwise_access_role_access_permissions",
@@ -139,7 +139,7 @@ func TestProviderSurface(t *testing.T) {
 	}
 	// 18 generated singular data sources, 19 plural ones (tfinfra
 	// v0.0.15's DataSourceList; client_secret has only the plural, since
-	// a minted resource takes no singular one), 20 config builder data sources
+	// a created resource takes no singular one), 20 config builder data sources
 	// (provider_dropbox went with apis v0.8.0; provider_magic_link and
 	// provider_passkey came with #21; provider_apple, provider_oidc and
 	// provider_oauth with #20), and the hand-written secret and
@@ -167,9 +167,9 @@ func TestProviderSurface(t *testing.T) {
 	} {
 		assert.True(t, dataSourceTypes[want], "missing data source %s", want)
 	}
-	assert.False(t, dataSourceTypes["authwise_client_secret"], "a minted resource has no singular data source")
+	assert.False(t, dataSourceTypes["authwise_application_secret"], "a created resource has no singular data source")
 	for _, want := range []string{
-		"authwise_client_secrets",
+		"authwise_application_secrets",
 		"authwise_certificate",
 		"authwise_secret",
 		"authwise_realm_authentication_context_schema",

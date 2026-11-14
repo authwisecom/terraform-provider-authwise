@@ -1,4 +1,4 @@
-// authwise_client says what a client may do (apis v0.21.0, kit#404):
+// authwise_application says what a client may do (apis v0.21.0, kit#404):
 // grant_types, kind, token_endpoint_auth_method, status and expires_at.
 // kit derives the kind, method and status a config leaves out, so the
 // computed values must land in state and plan clean afterwards.
@@ -13,15 +13,15 @@ import (
 	"github.com/hashicorp/terraform-plugin-testing/plancheck"
 )
 
-const clientAddr = "authwise_client.app"
+const clientAddr = "authwise_application.app"
 
-func TestAccClient_FactsDefaultAndUpdate(t *testing.T) {
+func TestAccApplication_FactsDefaultAndUpdate(t *testing.T) {
 
 	h := newHarness(t)
 
 	config := func(extra string) string {
 		return h.providerConfig() + fmt.Sprintf(`
-resource "authwise_client" "app" {
+resource "authwise_application" "app" {
   display_name = "App"
   grant_types  = ["authorization_code", "refresh_token"]
 %s
@@ -38,9 +38,9 @@ resource "authwise_client" "app" {
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(clientAddr, "grant_types.#", "2"),
 					resource.TestCheckResourceAttr(clientAddr, "grant_types.1", "refresh_token"),
-					resource.TestCheckResourceAttr(clientAddr, "kind", "CLIENT_KIND_APPLICATION"),
+					resource.TestCheckResourceAttr(clientAddr, "kind", "APPLICATION_KIND_INTERACTIVE"),
 					resource.TestCheckResourceAttr(clientAddr, "token_endpoint_auth_method", "none"),
-					resource.TestCheckResourceAttr(clientAddr, "status", "CLIENT_STATUS_ACTIVE"),
+					resource.TestCheckResourceAttr(clientAddr, "status", "APPLICATION_STATUS_ACTIVE"),
 					resource.TestCheckNoResourceAttr(clientAddr, "expires_at"),
 				),
 			},
@@ -48,11 +48,11 @@ resource "authwise_client" "app" {
 				// A confidential application that is switched off and expires,
 				// changed in place.
 				Config: config(`  token_endpoint_auth_method = "client_secret_post"
-  status                     = "CLIENT_STATUS_DISABLED"
+  status                     = "APPLICATION_STATUS_DISABLED"
   expires_at                 = "2031-01-01T00:00:00Z"`),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(clientAddr, "token_endpoint_auth_method", "client_secret_post"),
-					resource.TestCheckResourceAttr(clientAddr, "status", "CLIENT_STATUS_DISABLED"),
+					resource.TestCheckResourceAttr(clientAddr, "status", "APPLICATION_STATUS_DISABLED"),
 					resource.TestCheckResourceAttr(clientAddr, "expires_at", "2031-01-01T00:00:00Z"),
 				),
 			},
@@ -69,7 +69,7 @@ resource "authwise_client" "app" {
 
 // A service registered for client_credentials alone is a SERVICE that
 // authenticates with Basic, and can be given a secret.
-func TestAccClient_ServiceDefaults(t *testing.T) {
+func TestAccApplication_ServiceDefaults(t *testing.T) {
 
 	h := newHarness(t)
 
@@ -77,13 +77,13 @@ func TestAccClient_ServiceDefaults(t *testing.T) {
 		ProtoV6ProviderFactories: protoFactories(),
 		Steps: []resource.TestStep{{
 			Config: h.providerConfig() + `
-resource "authwise_client" "app" {
+resource "authwise_application" "app" {
   display_name = "CI"
   grant_types  = ["client_credentials"]
 }
 `,
 			Check: resource.ComposeAggregateTestCheckFunc(
-				resource.TestCheckResourceAttr(clientAddr, "kind", "CLIENT_KIND_SERVICE"),
+				resource.TestCheckResourceAttr(clientAddr, "kind", "APPLICATION_KIND_SERVICE"),
 				resource.TestCheckResourceAttr(clientAddr, "token_endpoint_auth_method", "client_secret_basic"),
 			),
 		}},
@@ -91,7 +91,7 @@ resource "authwise_client" "app" {
 }
 
 // kit v1.38.0's refusals reach the apply.
-func TestAccClient_Refusals(t *testing.T) {
+func TestAccApplication_Refusals(t *testing.T) {
 
 	cases := map[string]struct {
 		config string
@@ -130,7 +130,7 @@ func TestAccClient_Refusals(t *testing.T) {
 				ProtoV6ProviderFactories: protoFactories(),
 				Steps: []resource.TestStep{{
 					Config: h.providerConfig() + fmt.Sprintf(`
-resource "authwise_client" "app" {
+resource "authwise_application" "app" {
   display_name = "App"
   %s
 }
@@ -142,8 +142,8 @@ resource "authwise_client" "app" {
 	}
 }
 
-// A public application holds no secret: kit refuses to mint one.
-func TestAccClient_PublicHoldsNoSecret(t *testing.T) {
+// A public application holds no secret: kit refuses to create one.
+func TestAccApplication_PublicHoldsNoSecret(t *testing.T) {
 
 	h := newHarness(t)
 
@@ -151,13 +151,13 @@ func TestAccClient_PublicHoldsNoSecret(t *testing.T) {
 		ProtoV6ProviderFactories: protoFactories(),
 		Steps: []resource.TestStep{{
 			Config: h.providerConfig() + `
-resource "authwise_client" "app" {
+resource "authwise_application" "app" {
   display_name = "SPA"
   grant_types  = ["authorization_code"]
 }
 
-resource "authwise_client_secret" "app" {
-  client_id = authwise_client.app.client_id
+resource "authwise_application_secret" "app" {
+  application_id = authwise_application.app.application_id
 }
 `,
 			ExpectError: regexp.MustCompile(`(?s)is\s+public\s+\(token_endpoint_auth_method\s+none\)`),
@@ -165,13 +165,13 @@ resource "authwise_client_secret" "app" {
 	})
 }
 
-// TestAccClient_ConfigAnyStableSpelling pins how a config data source spells
+// TestAccApplication_ConfigAnyStableSpelling pins how a config data source spells
 // `any`. protojson varies its whitespace with the binary, and Terraform
 // compares the configured string with state as written, so a spelling that
 // moved between builds showed as a whitespace-only diff after an upgrade.
 // A test binary only ever sees one of protojson's spellings, so this pins
 // the spelling rather than reproducing the flip.
-func TestAccClient_ConfigAnyStableSpelling(t *testing.T) {
+func TestAccApplication_ConfigAnyStableSpelling(t *testing.T) {
 
 	h := newHarness(t)
 
@@ -180,7 +180,7 @@ data "authwise_interactive_client_config" "c" {
   allowed_redirect_uris = ["https://a.example/cb", "https://b.example/cb"]
 }
 
-resource "authwise_client" "app" {
+resource "authwise_application" "app" {
   display_name = "App"
   grant_types  = ["authorization_code"]
   config       = data.authwise_interactive_client_config.c.any

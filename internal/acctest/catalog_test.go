@@ -1,7 +1,7 @@
-// Domain, Scope and AppearanceProfile (#15): the keying and collections the
+// Domain, Scope and ThemeVariant (#15): the keying and collections the
 // provider took from kit's http annotations — a domain keyed by its AWID
 // with the hostname beside it (#47, kit#808), caller-named scope ids, and
-// appearance profiles under the issuer in "appearance-profiles" — exercised
+// theme variants under the issuer in "theme-variants" — exercised
 // end to end, import included.
 package acctest_test
 
@@ -216,13 +216,13 @@ resource "authwise_scope_access_permissions" "read" {
 	})
 }
 
-func TestAccAppearanceProfile_IssuerScoped(t *testing.T) {
+func TestAccThemeVariant_IssuerScoped(t *testing.T) {
 
 	h := newHarness(t)
 
 	profile := func(displayName string) string {
 		return h.providerConfig() + fmt.Sprintf(`
-resource "authwise_appearance_profile" "brand" {
+resource "authwise_theme_variant" "brand" {
   display_name = %q
   content      = jsonencode({ headline = "Welcome back" })
 }
@@ -234,17 +234,17 @@ resource "authwise_appearance_profile" "brand" {
 		Steps: []resource.TestStep{
 			{
 				Config: profile("Brand"),
-				Check: resource.TestMatchResourceAttr("authwise_appearance_profile.brand", "name",
-					regexp.MustCompile(`^tenants/t-1/issuers/i-1/appearance-profiles/ap-\d+$`)),
+				Check: resource.TestMatchResourceAttr("authwise_theme_variant.brand", "name",
+					regexp.MustCompile(`^tenants/t-1/issuers/i-1/theme-variants/ap-\d+$`)),
 			},
 			{
 				Config: profile("Brand 2"),
-				Check:  resource.TestCheckResourceAttr("authwise_appearance_profile.brand", "display_name", "Brand 2"),
+				Check:  resource.TestCheckResourceAttr("authwise_theme_variant.brand", "display_name", "Brand 2"),
 			},
 			{
-				ResourceName:                         "authwise_appearance_profile.brand",
+				ResourceName:                         "authwise_theme_variant.brand",
 				ImportState:                          true,
-				ImportStateIdFunc:                    importByName("authwise_appearance_profile.brand"),
+				ImportStateIdFunc:                    importByName("authwise_theme_variant.brand"),
 				ImportStateVerify:                    true,
 				ImportStateVerifyIdentifierAttribute: "name",
 				// content is JSON: an import reads protojson's formatting.
@@ -253,7 +253,7 @@ resource "authwise_appearance_profile" "brand" {
 		},
 		CheckDestroy: func(_ *terraform.State) error {
 			if n := len(h.fake.profiles); n != 0 {
-				return fmt.Errorf("%d appearance profiles left", n)
+				return fmt.Errorf("%d theme variants left", n)
 			}
 			return nil
 		},

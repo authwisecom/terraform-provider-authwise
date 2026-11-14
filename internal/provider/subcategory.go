@@ -21,9 +21,9 @@ const (
 var identityTypes = map[string]bool{
 	"domain": true, "issuer": true, "realm": true, "audience": true,
 	"scope": true, "scope_access_permissions": true, "theme": true,
-	"appearance_profile": true, "asset": true, "asset_content": true,
-	"secret": true, "certificate": true, "endpoint": true, "client": true,
-	"client_secret": true, "interactive_client_config": true,
+	"theme_variant": true, "asset": true, "asset_content": true,
+	"secret": true, "certificate": true, "endpoint": true, "application": true,
+	"application_secret": true, "interactive_client_config": true,
 	"saml_relying_party_config": true, "user": true,
 	"realm_authentication_policy": true, "realm_authentication_context_schema": true,
 	"service_account": true, "service_account_secret": true, "issuer_domain_binding": true, "issuer_preferred_binding": true,

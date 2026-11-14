@@ -30,15 +30,14 @@ import (
 	"time"
 )
 
-// ClientResourceSchema returns the Terraform schema for the Client resource.
-func ClientResourceSchema() schema.Schema {
+// ApplicationResourceSchema returns the Terraform schema for the Application resource.
+func ApplicationResourceSchema() schema.Schema {
 	return schema.Schema{
 		Attributes: map[string]schema.Attribute{
-			"appearance_profile_id": schema.StringAttribute{
-				Computed:      true,
-				Optional:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
-				Validators:    []validator.String{tf.ReferenceID("ap", "appearance_profile", "authwise_appearance_profile.<name>.appearance_profile_id")},
+			"application_id": schema.StringAttribute{
+				Computed:            true,
+				MarkdownDescription: "Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.",
+				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"application_url": schema.StringAttribute{
 				Computed:      true,
@@ -50,11 +49,6 @@ func ClientResourceSchema() schema.Schema {
 				Optional:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 				Validators:    []validator.String{tf.ReferenceID("a", "audience", "authwise_audience.<name>.audience_id")},
-			},
-			"client_id": schema.StringAttribute{
-				Computed:            true,
-				MarkdownDescription: "Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.",
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"config": schema.StringAttribute{
 				Computed:            true,
@@ -91,7 +85,7 @@ func ClientResourceSchema() schema.Schema {
 				Computed:      true,
 				Optional:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
-				Validators:    []validator.String{stringvalidator.OneOf("CLIENT_KIND_UNSPECIFIED", "CLIENT_KIND_APPLICATION", "CLIENT_KIND_SERVICE", "CLIENT_KIND_AGENT")},
+				Validators:    []validator.String{stringvalidator.OneOf("APPLICATION_KIND_UNSPECIFIED", "APPLICATION_KIND_INTERACTIVE", "APPLICATION_KIND_SERVICE", "APPLICATION_KIND_AGENT")},
 			},
 			"labels": schema.MapAttribute{
 				Computed:      true,
@@ -123,7 +117,7 @@ func ClientResourceSchema() schema.Schema {
 				Computed:      true,
 				Optional:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
-				Validators:    []validator.String{stringvalidator.OneOf("CLIENT_STATUS_UNSPECIFIED", "CLIENT_STATUS_ACTIVE", "CLIENT_STATUS_DISABLED", "CLIENT_STATUS_QUARANTINED")},
+				Validators:    []validator.String{stringvalidator.OneOf("APPLICATION_STATUS_UNSPECIFIED", "APPLICATION_STATUS_ACTIVE", "APPLICATION_STATUS_DISABLED", "APPLICATION_STATUS_QUARANTINED")},
 			},
 			"tenant_id": schema.StringAttribute{
 				Computed:            true,
@@ -132,20 +126,26 @@ func ClientResourceSchema() schema.Schema {
 				PlanModifiers:       []planmodifier.String{tf.RequiresReplaceIfConfigured(), stringplanmodifier.UseStateForUnknown()},
 				Validators:          []validator.String{tf.ReferenceID("t", "tenant", "")},
 			},
+			"theme_variant_id": schema.StringAttribute{
+				Computed:      true,
+				Optional:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+				Validators:    []validator.String{tf.ReferenceID("ap", "theme_variant", "authwise_theme_variant.<name>.theme_variant_id")},
+			},
 			"token_endpoint_auth_method": schema.StringAttribute{
 				Computed:      true,
 				Optional:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 		},
-		MarkdownDescription: "An OAuth 2.0 client of an issuer: an application that signs people in or calls an API.",
+		MarkdownDescription: "An application of an issuer: something that signs people in or calls an API. On the wire it is an OAuth 2.0 client, and its identifier (`c-…`) is its `client_id`.\n\nFormerly `authwise_client` (kit#968): a `moved` block from `authwise_client` carries the state across, with `client_id` read as `application_id`.",
 	}
 }
 
-// ClientModel is the Terraform plan/state model for Client.
-type ClientModel struct {
+// ApplicationModel is the Terraform plan/state model for Application.
+type ApplicationModel struct {
 	Name                    types.String         `tfsdk:"name"`
-	ClientId                types.String         `tfsdk:"client_id"`
+	ApplicationId           types.String         `tfsdk:"application_id"`
 	TenantId                types.String         `tfsdk:"tenant_id"`
 	IssuerId                types.String         `tfsdk:"issuer_id"`
 	Labels                  types.Map            `tfsdk:"labels"`
@@ -154,7 +154,7 @@ type ClientModel struct {
 	ApplicationUrl          types.String         `tfsdk:"application_url"`
 	LoginUrl                types.String         `tfsdk:"login_url"`
 	PostLogoutRedirectUris  types.List           `tfsdk:"post_logout_redirect_uris"`
-	AppearanceProfileId     types.String         `tfsdk:"appearance_profile_id"`
+	ThemeVariantId          types.String         `tfsdk:"theme_variant_id"`
 	Config                  jsontypes.Normalized `tfsdk:"config"`
 	GrantTypes              types.List           `tfsdk:"grant_types"`
 	Kind                    types.String         `tfsdk:"kind"`
@@ -164,13 +164,12 @@ type ClientModel struct {
 	OwningTenantId          types.String         `tfsdk:"owning_tenant_id"`
 }
 
-// NewClientModel returns a model with every attribute set to its typed null; collection types cannot be zero-valued.
-func NewClientModel() *ClientModel {
-	return &ClientModel{
-		AppearanceProfileId:     types.StringNull(),
+// NewApplicationModel returns a model with every attribute set to its typed null; collection types cannot be zero-valued.
+func NewApplicationModel() *ApplicationModel {
+	return &ApplicationModel{
+		ApplicationId:           types.StringNull(),
 		ApplicationUrl:          types.StringNull(),
 		AudienceId:              types.StringNull(),
-		ClientId:                types.StringNull(),
 		Config:                  jsontypes.NewNormalizedNull(),
 		DisplayName:             types.StringNull(),
 		ExpiresAt:               types.StringNull(),
@@ -184,14 +183,15 @@ func NewClientModel() *ClientModel {
 		PostLogoutRedirectUris:  types.ListNull(types.StringType),
 		Status:                  types.StringNull(),
 		TenantId:                types.StringNull(),
+		ThemeVariantId:          types.StringNull(),
 		TokenEndpointAuthMethod: types.StringNull(),
 	}
 }
 
 // ToProto converts the model to its proto message. Null and unknown attributes map to proto zero values.
-func (m *ClientModel) ToProto(ctx context.Context) (*v1alpha1.Client, diag.Diagnostics) {
+func (m *ApplicationModel) ToProto(ctx context.Context) (*v1alpha1.Application, diag.Diagnostics) {
 	var diags diag.Diagnostics
-	out := &v1alpha1.Client{}
+	out := &v1alpha1.Application{}
 	out.Name = m.Name.ValueString()
 	if !m.Labels.IsNull() && !m.Labels.IsUnknown() {
 		diags.Append(m.Labels.ElementsAs(ctx, &out.Labels, false)...)
@@ -203,7 +203,7 @@ func (m *ClientModel) ToProto(ctx context.Context) (*v1alpha1.Client, diag.Diagn
 	if !m.PostLogoutRedirectUris.IsNull() && !m.PostLogoutRedirectUris.IsUnknown() {
 		diags.Append(m.PostLogoutRedirectUris.ElementsAs(ctx, &out.PostLogoutRedirectUris, false)...)
 	}
-	out.AppearanceProfileId = m.AppearanceProfileId.ValueString()
+	out.ThemeVariantId = m.ThemeVariantId.ValueString()
 	if !m.Config.IsNull() && !m.Config.IsUnknown() {
 		v := &anypb.Any{}
 		if err := protojson.Unmarshal([]byte(m.Config.ValueString()), v); err != nil {
@@ -216,11 +216,11 @@ func (m *ClientModel) ToProto(ctx context.Context) (*v1alpha1.Client, diag.Diagn
 		diags.Append(m.GrantTypes.ElementsAs(ctx, &out.GrantTypes, false)...)
 	}
 	if !m.Kind.IsNull() && !m.Kind.IsUnknown() {
-		out.Kind = v1alpha1.ClientKind(v1alpha1.ClientKind_value[m.Kind.ValueString()])
+		out.Kind = v1alpha1.ApplicationKind(v1alpha1.ApplicationKind_value[m.Kind.ValueString()])
 	}
 	out.TokenEndpointAuthMethod = m.TokenEndpointAuthMethod.ValueString()
 	if !m.Status.IsNull() && !m.Status.IsUnknown() {
-		out.Status = v1alpha1.ClientStatus(v1alpha1.ClientStatus_value[m.Status.ValueString()])
+		out.Status = v1alpha1.ApplicationStatus(v1alpha1.ApplicationStatus_value[m.Status.ValueString()])
 	}
 	if !m.ExpiresAt.IsNull() && !m.ExpiresAt.IsUnknown() {
 		t, err := time.Parse(time.RFC3339, m.ExpiresAt.ValueString())
@@ -235,7 +235,7 @@ func (m *ClientModel) ToProto(ctx context.Context) (*v1alpha1.Client, diag.Diagn
 }
 
 // FromProto populates the model from its proto message. Input-only attributes, and scope identifier attributes the entity does not carry, are left untouched.
-func (m *ClientModel) FromProto(ctx context.Context, e *v1alpha1.Client) diag.Diagnostics {
+func (m *ApplicationModel) FromProto(ctx context.Context, e *v1alpha1.Application) diag.Diagnostics {
 	var diags diag.Diagnostics
 	m.Name = types.StringValue(e.Name)
 	if len(e.Labels) == 0 {
@@ -276,10 +276,10 @@ func (m *ClientModel) FromProto(ctx context.Context, e *v1alpha1.Client) diag.Di
 		diags.Append(d...)
 		m.PostLogoutRedirectUris = v
 	}
-	if e.AppearanceProfileId == "" {
-		m.AppearanceProfileId = types.StringNull()
+	if e.ThemeVariantId == "" {
+		m.ThemeVariantId = types.StringNull()
 	} else {
-		m.AppearanceProfileId = types.StringValue(e.AppearanceProfileId)
+		m.ThemeVariantId = types.StringValue(e.ThemeVariantId)
 	}
 	if e.Config == nil {
 		m.Config = jsontypes.NewNormalizedNull()
@@ -321,12 +321,12 @@ func (m *ClientModel) FromProto(ctx context.Context, e *v1alpha1.Client) diag.Di
 }
 
 // GetName implements tf.Model.
-func (m *ClientModel) GetName() types.String {
+func (m *ApplicationModel) GetName() types.String {
 	return m.Name
 }
 
 // ScopeIdentifiers implements tf.Model: per-resource scope attribute values, null as "".
-func (m *ClientModel) ScopeIdentifiers() map[string]string {
+func (m *ApplicationModel) ScopeIdentifiers() map[string]string {
 	return map[string]string{
 		"issuer_id": m.IssuerId.ValueString(),
 		"tenant_id": m.TenantId.ValueString(),
@@ -334,7 +334,7 @@ func (m *ClientModel) ScopeIdentifiers() map[string]string {
 }
 
 // UpdateMask implements tf.Model: proto field paths whose values differ from prior, skipping name and computed fields.
-func (m *ClientModel) UpdateMask(ctx context.Context, prior *ClientModel) []string {
+func (m *ApplicationModel) UpdateMask(ctx context.Context, prior *ApplicationModel) []string {
 	var paths []string
 	if !m.Labels.Equal(prior.Labels) {
 		paths = append(paths, "labels")
@@ -354,8 +354,8 @@ func (m *ClientModel) UpdateMask(ctx context.Context, prior *ClientModel) []stri
 	if !m.PostLogoutRedirectUris.Equal(prior.PostLogoutRedirectUris) {
 		paths = append(paths, "post_logout_redirect_uris")
 	}
-	if !m.AppearanceProfileId.Equal(prior.AppearanceProfileId) {
-		paths = append(paths, "appearance_profile_id")
+	if !m.ThemeVariantId.Equal(prior.ThemeVariantId) {
+		paths = append(paths, "theme_variant_id")
 	}
 	if !m.Config.Equal(prior.Config) {
 		if eq, _ := m.Config.StringSemanticEquals(ctx, prior.Config); !eq {
@@ -380,8 +380,8 @@ func (m *ClientModel) UpdateMask(ctx context.Context, prior *ClientModel) []stri
 	return paths
 }
 
-// newClientCrud builds the client runtime from provider data; it returns nil (no error) before the provider is configured.
-func newClientCrud(providerData any) (*tf.Crud[*v1alpha1.Client, *ClientModel], diag.Diagnostics) {
+// newApplicationCrud builds the application runtime from provider data; it returns nil (no error) before the provider is configured.
+func newApplicationCrud(providerData any) (*tf.Crud[*v1alpha1.Application, *ApplicationModel], diag.Diagnostics) {
 	var diags diag.Diagnostics
 	if providerData == nil {
 		return nil, diags
@@ -396,122 +396,121 @@ func newClientCrud(providerData any) (*tf.Crud[*v1alpha1.Client, *ClientModel], 
 		diags.AddError("missing client", "provider data key \"identity\" is not a git.authwise.com/authwise/apis/authwise/identity/v1alpha1.AuthwiseIdentityServiceClient")
 		return nil, diags
 	}
-	return tf.NewCrud(tf.CrudParams[*v1alpha1.Client, *ClientModel]{
-		Client: tf.CrudClient[*v1alpha1.Client]{
-			Create: func(ctx context.Context, parent string, entity *v1alpha1.Client) (*v1alpha1.Client, error) {
-				return client.CreateClient(ctx, &v1alpha11.CreateClientRequest{
-					Client: entity,
-					Parent: parent,
+	return tf.NewCrud(tf.CrudParams[*v1alpha1.Application, *ApplicationModel]{
+		Client: tf.CrudClient[*v1alpha1.Application]{
+			Create: func(ctx context.Context, parent string, entity *v1alpha1.Application) (*v1alpha1.Application, error) {
+				return client.CreateApplication(ctx, &v1alpha11.CreateApplicationRequest{
+					Application: entity,
+					Parent:      parent,
 				})
 			},
 			Delete: func(ctx context.Context, name string) error {
-				_, err := client.DeleteClient(ctx, &v1alpha11.DeleteClientRequest{Name: name})
+				_, err := client.DeleteApplication(ctx, &v1alpha11.DeleteApplicationRequest{Name: name})
 				return err
 			},
-			Get: func(ctx context.Context, name string) (*v1alpha1.Client, error) {
-				return client.GetClient(ctx, &v1alpha11.GetClientRequest{Name: name})
+			Get: func(ctx context.Context, name string) (*v1alpha1.Application, error) {
+				return client.GetApplication(ctx, &v1alpha11.GetApplicationRequest{Name: name})
 			},
-			List: func(ctx context.Context, parent string, pageToken string) ([]*v1alpha1.Client, string, error) {
-				out, err := client.ListClients(ctx, &v1alpha11.ListClientsRequest{
+			List: func(ctx context.Context, parent string, pageToken string) ([]*v1alpha1.Application, string, error) {
+				out, err := client.ListApplications(ctx, &v1alpha11.ListApplicationsRequest{
 					PageToken: pageToken,
 					Parent:    parent,
 				})
 				if err != nil {
 					return nil, "", err
 				}
-				return out.Clients, out.NextPageToken, nil
+				return out.Applications, out.NextPageToken, nil
 			},
-			Patch: func(ctx context.Context, name string, entity *v1alpha1.Client, mask []string) (*v1alpha1.Client, error) {
-				return client.PatchClient(ctx, &v1alpha11.PatchClientRequest{
-					Client:     entity,
-					Name:       name,
-					UpdateMask: &fieldmaskpb.FieldMask{Paths: mask},
+			Patch: func(ctx context.Context, name string, entity *v1alpha1.Application, mask []string) (*v1alpha1.Application, error) {
+				return client.PatchApplication(ctx, &v1alpha11.PatchApplicationRequest{
+					Application: entity,
+					Name:        name,
+					UpdateMask:  &fieldmaskpb.FieldMask{Paths: mask},
 				})
 			},
-			Update: func(ctx context.Context, name string, entity *v1alpha1.Client) (*v1alpha1.Client, error) {
-				return client.UpdateClient(ctx, &v1alpha11.UpdateClientRequest{
-					Client: entity,
-					Name:   name,
+			Update: func(ctx context.Context, name string, entity *v1alpha1.Application) (*v1alpha1.Application, error) {
+				return client.UpdateApplication(ctx, &v1alpha11.UpdateApplicationRequest{
+					Application: entity,
+					Name:        name,
 				})
 			},
 		},
-		Collection:       "clients",
+		Collection:       "applications",
 		Defaults:         pd.Defaults,
-		IDAttribute:      "client_id",
-		NewModel:         NewClientModel,
+		IDAttribute:      "application_id",
+		NewModel:         NewApplicationModel,
 		ParentAttributes: []string{"tenant_id", "issuer_id"},
 		Scope:            tf.NewScope("tenants", "issuers"),
-		TypeName:         "client",
+		TypeName:         "application",
 	}), diags
 }
 
-// clientResource is the generated Terraform resource for Client.
-type clientResource struct {
-	crud *tf.Crud[*v1alpha1.Client, *ClientModel]
+// applicationResource is the generated Terraform resource for Application.
+type applicationResource struct {
+	crud *tf.Crud[*v1alpha1.Application, *ApplicationModel]
 }
 
-// NewClientResource returns the generated client resource; its client and scope defaults arrive via Configure from tf.ProviderData.
-func NewClientResource() resource.Resource {
-	return &clientResource{}
+// NewApplicationResource returns the generated application resource; its client and scope defaults arrive via Configure from tf.ProviderData.
+func NewApplicationResource() resource.Resource {
+	return &applicationResource{}
 }
-func (r *clientResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
-	resp.TypeName = req.ProviderTypeName + "_client"
+func (r *applicationResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_application"
 }
-func (r *clientResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
-	resp.Schema = ClientResourceSchema()
+func (r *applicationResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
+	resp.Schema = ApplicationResourceSchema()
 }
-func (r *clientResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
-	crud, diags := newClientCrud(req.ProviderData)
+func (r *applicationResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
+	crud, diags := newApplicationCrud(req.ProviderData)
 	resp.Diagnostics.Append(diags...)
 	r.crud = crud
 }
-func (r *clientResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
+func (r *applicationResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	if r.crud == nil {
-		resp.Diagnostics.AddError("client resource not configured", "Configure was not called with tf.ProviderData")
+		resp.Diagnostics.AddError("application resource not configured", "Configure was not called with tf.ProviderData")
 		return
 	}
 	r.crud.Create(ctx, req, resp)
 }
-func (r *clientResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+func (r *applicationResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 	if r.crud == nil {
-		resp.Diagnostics.AddError("client resource not configured", "Configure was not called with tf.ProviderData")
+		resp.Diagnostics.AddError("application resource not configured", "Configure was not called with tf.ProviderData")
 		return
 	}
 	r.crud.Read(ctx, req, resp)
 }
-func (r *clientResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+func (r *applicationResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	if r.crud == nil {
-		resp.Diagnostics.AddError("client resource not configured", "Configure was not called with tf.ProviderData")
+		resp.Diagnostics.AddError("application resource not configured", "Configure was not called with tf.ProviderData")
 		return
 	}
 	r.crud.Update(ctx, req, resp)
 }
-func (r *clientResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
+func (r *applicationResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
 	if r.crud == nil {
-		resp.Diagnostics.AddError("client resource not configured", "Configure was not called with tf.ProviderData")
+		resp.Diagnostics.AddError("application resource not configured", "Configure was not called with tf.ProviderData")
 		return
 	}
 	r.crud.Delete(ctx, req, resp)
 }
-func (r *clientResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+func (r *applicationResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	if r.crud == nil {
-		resp.Diagnostics.AddError("client resource not configured", "Configure was not called with tf.ProviderData")
+		resp.Diagnostics.AddError("application resource not configured", "Configure was not called with tf.ProviderData")
 		return
 	}
 	r.crud.ImportState(ctx, req, resp)
 }
 
-// ClientDataSourceSchema returns the Terraform schema for the singular Client data source.
-func ClientDataSourceSchema() schema1.Schema {
+// ApplicationDataSourceSchema returns the Terraform schema for the singular Application data source.
+func ApplicationDataSourceSchema() schema1.Schema {
 	return schema1.Schema{
 		Attributes: map[string]schema1.Attribute{
-			"appearance_profile_id": schema1.StringAttribute{Computed: true},
-			"application_url":       schema1.StringAttribute{Computed: true},
-			"audience_id":           schema1.StringAttribute{Computed: true},
-			"client_id": schema1.StringAttribute{
+			"application_id": schema1.StringAttribute{
 				Computed:            true,
 				MarkdownDescription: "Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.",
 			},
+			"application_url": schema1.StringAttribute{Computed: true},
+			"audience_id":     schema1.StringAttribute{Computed: true},
 			"config": schema1.StringAttribute{
 				Computed:   true,
 				CustomType: jsontypes.NormalizedType{},
@@ -540,43 +539,44 @@ func ClientDataSourceSchema() schema1.Schema {
 			},
 			"status":                     schema1.StringAttribute{Computed: true},
 			"tenant_id":                  schema1.StringAttribute{Computed: true},
+			"theme_variant_id":           schema1.StringAttribute{Computed: true},
 			"token_endpoint_auth_method": schema1.StringAttribute{Computed: true},
 		},
-		MarkdownDescription: "An OAuth 2.0 client of an issuer: an application that signs people in or calls an API. This data source reads one by its full resource name.",
+		MarkdownDescription: "An application of an issuer: something that signs people in or calls an API. On the wire it is an OAuth 2.0 client, and its identifier (`c-…`) is its `client_id`.\n\nFormerly `authwise_client` (kit#968): a `moved` block from `authwise_client` carries the state across, with `client_id` read as `application_id`. This data source reads one by its full resource name.",
 	}
 }
 
-// clientDataSource is the generated singular data source for Client (Get by name).
-type clientDataSource struct {
-	crud *tf.Crud[*v1alpha1.Client, *ClientModel]
+// applicationDataSource is the generated singular data source for Application (Get by name).
+type applicationDataSource struct {
+	crud *tf.Crud[*v1alpha1.Application, *ApplicationModel]
 }
 
-// NewClientDataSource returns the generated client data source.
-func NewClientDataSource() datasource.DataSource {
-	return &clientDataSource{}
+// NewApplicationDataSource returns the generated application data source.
+func NewApplicationDataSource() datasource.DataSource {
+	return &applicationDataSource{}
 }
-func (d *clientDataSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
-	resp.TypeName = req.ProviderTypeName + "_client"
+func (d *applicationDataSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_application"
 }
-func (d *clientDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
-	resp.Schema = ClientDataSourceSchema()
+func (d *applicationDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
+	resp.Schema = ApplicationDataSourceSchema()
 }
-func (d *clientDataSource) Configure(_ context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
-	crud, diags := newClientCrud(req.ProviderData)
+func (d *applicationDataSource) Configure(_ context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
+	crud, diags := newApplicationCrud(req.ProviderData)
 	resp.Diagnostics.Append(diags...)
 	d.crud = crud
 }
-func (d *clientDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
+func (d *applicationDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
 	if d.crud == nil {
-		resp.Diagnostics.AddError("client data source not configured", "Configure was not called with tf.ProviderData")
+		resp.Diagnostics.AddError("application data source not configured", "Configure was not called with tf.ProviderData")
 		return
 	}
 	d.crud.ReadDataSource(ctx, req, resp)
 }
 
-// ClientItemModel is one element of the clients data source's "clients" list.
-type ClientItemModel struct {
-	ClientId                types.String         `tfsdk:"client_id"`
+// ApplicationItemModel is one element of the applications data source's "applications" list.
+type ApplicationItemModel struct {
+	ApplicationId           types.String         `tfsdk:"application_id"`
 	Name                    types.String         `tfsdk:"name"`
 	Labels                  types.Map            `tfsdk:"labels"`
 	AudienceId              types.String         `tfsdk:"audience_id"`
@@ -584,7 +584,7 @@ type ClientItemModel struct {
 	ApplicationUrl          types.String         `tfsdk:"application_url"`
 	LoginUrl                types.String         `tfsdk:"login_url"`
 	PostLogoutRedirectUris  types.List           `tfsdk:"post_logout_redirect_uris"`
-	AppearanceProfileId     types.String         `tfsdk:"appearance_profile_id"`
+	ThemeVariantId          types.String         `tfsdk:"theme_variant_id"`
 	Config                  jsontypes.Normalized `tfsdk:"config"`
 	GrantTypes              types.List           `tfsdk:"grant_types"`
 	Kind                    types.String         `tfsdk:"kind"`
@@ -594,13 +594,12 @@ type ClientItemModel struct {
 	OwningTenantId          types.String         `tfsdk:"owning_tenant_id"`
 }
 
-// ClientItemAttrTypes returns the attribute types of one clients list element.
-func ClientItemAttrTypes() map[string]attr.Type {
+// ApplicationItemAttrTypes returns the attribute types of one applications list element.
+func ApplicationItemAttrTypes() map[string]attr.Type {
 	return map[string]attr.Type{
-		"appearance_profile_id":      types.StringType,
+		"application_id":             types.StringType,
 		"application_url":            types.StringType,
 		"audience_id":                types.StringType,
-		"client_id":                  types.StringType,
 		"config":                     jsontypes.NormalizedType{},
 		"display_name":               types.StringType,
 		"expires_at":                 types.StringType,
@@ -612,32 +611,32 @@ func ClientItemAttrTypes() map[string]attr.Type {
 		"owning_tenant_id":           types.StringType,
 		"post_logout_redirect_uris":  types.ListType{ElemType: types.StringType},
 		"status":                     types.StringType,
+		"theme_variant_id":           types.StringType,
 		"token_endpoint_auth_method": types.StringType,
 	}
 }
 
-// ClientsModel is the Terraform model of the clients data source.
-type ClientsModel struct {
+// ApplicationsModel is the Terraform model of the applications data source.
+type ApplicationsModel struct {
 	TenantId types.String `tfsdk:"tenant_id"`
 	IssuerId types.String `tfsdk:"issuer_id"`
-	Items    types.List   `tfsdk:"clients"`
+	Items    types.List   `tfsdk:"applications"`
 }
 
-// ClientListDataSourceSchema returns the Terraform schema for the clients data source.
-func ClientListDataSourceSchema() schema1.Schema {
+// ApplicationListDataSourceSchema returns the Terraform schema for the applications data source.
+func ApplicationListDataSourceSchema() schema1.Schema {
 	return schema1.Schema{
 		Attributes: map[string]schema1.Attribute{
-			"clients": schema1.ListNestedAttribute{
+			"applications": schema1.ListNestedAttribute{
 				Computed:            true,
-				MarkdownDescription: "Every client under the parent, in the order the API lists them.",
+				MarkdownDescription: "Every application under the parent, in the order the API lists them.",
 				NestedObject: schema1.NestedAttributeObject{Attributes: map[string]schema1.Attribute{
-					"appearance_profile_id": schema1.StringAttribute{Computed: true},
-					"application_url":       schema1.StringAttribute{Computed: true},
-					"audience_id":           schema1.StringAttribute{Computed: true},
-					"client_id": schema1.StringAttribute{
+					"application_id": schema1.StringAttribute{
 						Computed:            true,
 						MarkdownDescription: "Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.",
 					},
+					"application_url": schema1.StringAttribute{Computed: true},
+					"audience_id":     schema1.StringAttribute{Computed: true},
 					"config": schema1.StringAttribute{
 						Computed:   true,
 						CustomType: jsontypes.NormalizedType{},
@@ -664,6 +663,7 @@ func ClientListDataSourceSchema() schema1.Schema {
 						ElementType: types.StringType,
 					},
 					"status":                     schema1.StringAttribute{Computed: true},
+					"theme_variant_id":           schema1.StringAttribute{Computed: true},
 					"token_endpoint_auth_method": schema1.StringAttribute{Computed: true},
 				}},
 			},
@@ -678,14 +678,14 @@ func ClientListDataSourceSchema() schema1.Schema {
 				Validators:          []validator.String{tf.ReferenceID("t", "tenant", "")},
 			},
 		},
-		MarkdownDescription: "An OAuth 2.0 client of an issuer: an application that signs people in or calls an API. This data source lists every one under a parent.",
+		MarkdownDescription: "An application of an issuer: something that signs people in or calls an API. On the wire it is an OAuth 2.0 client, and its identifier (`c-…`) is its `client_id`.\n\nFormerly `authwise_client` (kit#968): a `moved` block from `authwise_client` carries the state across, with `client_id` read as `application_id`. This data source lists every one under a parent.",
 	}
 }
 
-// clientItemFromProto converts one listed Client into a clients list element.
-func clientItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Client, *ClientModel], e *v1alpha1.Client) (types.Object, diag.Diagnostics) {
+// applicationItemFromProto converts one listed Application into a applications list element.
+func applicationItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Application, *ApplicationModel], e *v1alpha1.Application) (types.Object, diag.Diagnostics) {
 	var diags diag.Diagnostics
-	var item ClientItemModel
+	var item ApplicationItemModel
 	item.Name = types.StringValue(e.Name)
 	if len(e.Labels) == 0 {
 		if !tf.KeepEmpty(item.Labels) {
@@ -725,10 +725,10 @@ func clientItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Client, *C
 		diags.Append(d...)
 		item.PostLogoutRedirectUris = v
 	}
-	if e.AppearanceProfileId == "" {
-		item.AppearanceProfileId = types.StringNull()
+	if e.ThemeVariantId == "" {
+		item.ThemeVariantId = types.StringNull()
 	} else {
-		item.AppearanceProfileId = types.StringValue(e.AppearanceProfileId)
+		item.ThemeVariantId = types.StringValue(e.ThemeVariantId)
 	}
 	if e.Config == nil {
 		item.Config = jsontypes.NewNormalizedNull()
@@ -768,40 +768,40 @@ func clientItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Client, *C
 	}
 	id, err := crud.IDFromName(e.Name)
 	if err != nil {
-		diags.AddError("unexpected client name", err.Error())
+		diags.AddError("unexpected application name", err.Error())
 	}
-	item.ClientId = types.StringValue(id)
-	obj, d := types.ObjectValueFrom(ctx, ClientItemAttrTypes(), item)
+	item.ApplicationId = types.StringValue(id)
+	obj, d := types.ObjectValueFrom(ctx, ApplicationItemAttrTypes(), item)
 	diags.Append(d...)
 	return obj, diags
 }
 
-// clientsDataSource is the generated plural data source for Client (List under a parent).
-type clientsDataSource struct {
-	crud *tf.Crud[*v1alpha1.Client, *ClientModel]
+// applicationsDataSource is the generated plural data source for Application (List under a parent).
+type applicationsDataSource struct {
+	crud *tf.Crud[*v1alpha1.Application, *ApplicationModel]
 }
 
-// NewClientsDataSource returns the generated clients data source.
-func NewClientsDataSource() datasource.DataSource {
-	return &clientsDataSource{}
+// NewApplicationsDataSource returns the generated applications data source.
+func NewApplicationsDataSource() datasource.DataSource {
+	return &applicationsDataSource{}
 }
-func (d *clientsDataSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
-	resp.TypeName = req.ProviderTypeName + "_clients"
+func (d *applicationsDataSource) Metadata(_ context.Context, req datasource.MetadataRequest, resp *datasource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_applications"
 }
-func (d *clientsDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
-	resp.Schema = ClientListDataSourceSchema()
+func (d *applicationsDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, resp *datasource.SchemaResponse) {
+	resp.Schema = ApplicationListDataSourceSchema()
 }
-func (d *clientsDataSource) Configure(_ context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
-	crud, diags := newClientCrud(req.ProviderData)
+func (d *applicationsDataSource) Configure(_ context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
+	crud, diags := newApplicationCrud(req.ProviderData)
 	resp.Diagnostics.Append(diags...)
 	d.crud = crud
 }
-func (d *clientsDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
+func (d *applicationsDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
 	if d.crud == nil {
-		resp.Diagnostics.AddError("clients data source not configured", "Configure was not called with tf.ProviderData")
+		resp.Diagnostics.AddError("applications data source not configured", "Configure was not called with tf.ProviderData")
 		return
 	}
-	var m ClientsModel
+	var m ApplicationsModel
 	resp.Diagnostics.Append(req.Config.Get(ctx, &m)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -811,19 +811,19 @@ func (d *clientsDataSource) Read(ctx context.Context, req datasource.ReadRequest
 		"tenant_id": m.TenantId.ValueString(),
 	})
 	if err != nil {
-		resp.Diagnostics.AddError("list clients failed", err.Error())
+		resp.Diagnostics.AddError("list applications failed", err.Error())
 		return
 	}
 	elems := make([]attr.Value, 0, len(entities))
 	for _, e := range entities {
-		obj, diags := clientItemFromProto(ctx, d.crud, e)
+		obj, diags := applicationItemFromProto(ctx, d.crud, e)
 		resp.Diagnostics.Append(diags...)
 		elems = append(elems, obj)
 	}
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	list, diags := types.ListValue(types.ObjectType{AttrTypes: ClientItemAttrTypes()}, elems)
+	list, diags := types.ListValue(types.ObjectType{AttrTypes: ApplicationItemAttrTypes()}, elems)
 	resp.Diagnostics.Append(diags...)
 	m.Items = list
 	resp.Diagnostics.Append(resp.State.Set(ctx, &m)...)

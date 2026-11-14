@@ -2,7 +2,7 @@
 // exports its own id as <type>_id, a reference attribute takes it, and one
 // handed a full name fails in plan with the attribute to use. kit#620
 // refuses the same at apply, and an audience of another issuer too; the
-// fake admits Client.audience_id the same way.
+// fake admits Application.audience_id the same way.
 package acctest_test
 
 import (
@@ -44,7 +44,7 @@ resource "authwise_audience" "api" {
   display_name = "API"
 }
 
-resource "authwise_client" "web" {
+resource "authwise_application" "web" {
   display_name = "web"
   grant_types  = ["client_credentials"]
   audience_id  = %s
@@ -63,9 +63,9 @@ data "authwise_audience" "api" {
 				Config: config("authwise_audience.api.audience_id"),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					checkIDIsLastSegment("authwise_audience.api", "audience_id", "a"),
-					checkIDIsLastSegment("authwise_client.web", "client_id", "c"),
+					checkIDIsLastSegment("authwise_application.web", "application_id", "c"),
 					checkIDIsLastSegment("data.authwise_audience.api", "audience_id", "a"),
-					resource.TestCheckResourceAttrPair("authwise_client.web", "audience_id", "authwise_audience.api", "audience_id"),
+					resource.TestCheckResourceAttrPair("authwise_application.web", "audience_id", "authwise_audience.api", "audience_id"),
 				),
 			},
 			{
@@ -106,7 +106,7 @@ resource "authwise_audience" "api" {
   display_name = "API"
 }
 
-resource "authwise_client" "elsewhere" {
+resource "authwise_application" "elsewhere" {
   issuer_id    = "i-2"
   display_name = "elsewhere"
   grant_types  = ["client_credentials"]

@@ -27,7 +27,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-// certNotBefore is the fixed issue instant the fake stamps on every minted
+// certNotBefore is the fixed issue instant the fake stamps on every created
 // certificate, so not_before and not_after are assertable.
 var certNotBefore = time.Date(2026, 9, 14, 0, 0, 0, 0, time.UTC)
 
@@ -44,7 +44,7 @@ type fakeIdentityServer struct {
 	issuers  map[string]*corepb.Issuer
 	domains  map[string]*corepb.Domain
 	scopes   map[string]*corepb.Scope
-	profiles map[string]*corepb.AppearanceProfile
+	profiles map[string]*corepb.ThemeVariant
 	themes   map[string]*corepb.Theme
 	// messages are the tenants' message templates (tf#75), by name.
 	messages map[string]*corepb.MessageTemplate
@@ -57,14 +57,14 @@ type fakeIdentityServer struct {
 	// scopePerms holds each scope's access-permission set, by name.
 	scopePerms map[string]map[string]bool
 	audiences  map[string]*corepb.Audience
-	clients    map[string]*corepb.Client
-	// clientSecrets are the minted rows. Like kit's they hold no
-	// credential: the secret exists on the wire only in the mint response.
-	clientSecrets map[string]*corepb.ClientSecret
-	// mints counts MintClientSecret calls, so a test can tell a
+	clients    map[string]*corepb.Application
+	// clientSecrets are the created rows. Like kit's they hold no
+	// credential: the secret exists on the wire only in the create response.
+	clientSecrets map[string]*corepb.ApplicationSecret
+	// creates counts CreateApplicationSecret calls, so a test can tell a
 	// replacement from an in-place update.
-	mints int
-	// makeDefaults counts MakeDefaultAppearanceProfile calls.
+	creates int
+	// makeDefaults counts MakeDefaultThemeVariant calls.
 	makeDefaults int
 	providers    map[string]*corepb.Provider
 	certs        map[string]*corepb.Certificate
@@ -111,12 +111,6 @@ type fakeIdentityServer struct {
 	// fake tenancy server's.
 	brandHolding func(asset string) error
 
-	// brandedTenant has CreateIssuer give a new issuer kit's starting
-	// appearance profile, as kit#953 does when the tenant's brand names a
-	// theme: only the config's output-only id, which is what the provider
-	// sees.
-	brandedTenant bool
-
 	// tenancy holds the tenants, whose config.branding the branding
 	// singleton reads and writes (kit#953): one stored value.
 	tenancy *fakeTenancyServer
@@ -128,13 +122,13 @@ func newFakeIdentityServer() *fakeIdentityServer {
 		issuers:       map[string]*corepb.Issuer{},
 		domains:       map[string]*corepb.Domain{},
 		scopes:        map[string]*corepb.Scope{},
-		profiles:      map[string]*corepb.AppearanceProfile{},
+		profiles:      map[string]*corepb.ThemeVariant{},
 		themes:        map[string]*corepb.Theme{},
 		messages:      map[string]*corepb.MessageTemplate{},
 		scopePerms:    map[string]map[string]bool{},
 		audiences:     map[string]*corepb.Audience{},
-		clients:       map[string]*corepb.Client{},
-		clientSecrets: map[string]*corepb.ClientSecret{},
+		clients:       map[string]*corepb.Application{},
+		clientSecrets: map[string]*corepb.ApplicationSecret{},
 		providers:     map[string]*corepb.Provider{},
 		certs:         map[string]*corepb.Certificate{},
 		endpoints:     map[string]*corepb.Endpoint{},
@@ -292,7 +286,7 @@ func (f *fakeIdentityServer) DeleteRealm(ctx context.Context, in *identitypb.Del
 	return &emptypb.Empty{}, nil
 }
 
-// --- Audience and Client (issuer-scoped; the console pair guard needs) ---
+// --- Audience and Application (issuer-scoped; the console pair guard needs) ---
 
 // --- Issuer (tenant-scoped; an endpoint's kit_token names one) ---
 
@@ -413,17 +407,6 @@ func (f *fakeIdentityServer) CreateIssuer(ctx context.Context, in *identitypb.Cr
 	i.DomainId, i.Path, i.DomainName, i.PreferredDomainId, i.PreferredBindingId, i.Bindings = "", "", "", "", "", nil
 	// account_client_id is kit's to set (kit#827); a value sent is ignored.
 	i.AccountClientId = ""
-	// kit#953: a new issuer of a branded tenant is given a profile, named
-	// in its config, output only.
-	if i.GetConfig() != nil {
-		i.Config.StartingAppearanceProfileId = ""
-	}
-	if f.brandedTenant {
-		if i.GetConfig() == nil {
-			i.Config = &corepb.IssuerConfig{}
-		}
-		i.Config.StartingAppearanceProfileId = f.nextID("ap-start")
-	}
 	f.issuers[name] = i
 	if domainID != "" {
 		f.bindLocked(name, domainID, path)
@@ -458,16 +441,7 @@ func (f *fakeIdentityServer) PatchIssuer(ctx context.Context, in *identitypb.Pat
 			if err := f.admitSelectorLocked(tenantOf(in.GetName()), in.GetIssuer().GetConfig().GetMultiRealmProviderSelector()); err != nil {
 				return nil, err
 			}
-			// starting_appearance_profile_id is output only (kit#953):
-			// the stored one stays, whatever is sent.
-			start := existing.GetConfig().GetStartingAppearanceProfileId()
 			existing.Config = proto.Clone(in.GetIssuer().GetConfig()).(*corepb.IssuerConfig)
-			if existing.GetConfig() == nil && start != "" {
-				existing.Config = &corepb.IssuerConfig{}
-			}
-			if existing.GetConfig() != nil {
-				existing.Config.StartingAppearanceProfileId = start
-			}
 		case "preferred_domain_id":
 			// Deprecated (kit#911): resolved to the issuer's binding on
 			// that domain.
@@ -550,8 +524,8 @@ func (f *fakeIdentityServer) CreateAudience(ctx context.Context, in *identitypb.
 	// creates the Account Security client, which needs an audience, and
 	// sets the issuer's account_client_id.
 	if i, ok := f.issuers[in.GetParent()]; ok && i.GetAccountClientId() == "" {
-		c := &corepb.Client{
-			Name:                    in.GetParent() + "/clients/" + f.nextID("c"),
+		c := &corepb.Application{
+			Name:                    in.GetParent() + "/applications/" + f.nextID("c"),
 			DisplayName:             "Account Security",
 			AudienceId:              a.GetName()[strings.LastIndex(a.GetName(), "/")+1:],
 			GrantTypes:              []string{"authorization_code", "refresh_token"},
@@ -582,8 +556,8 @@ func (f *fakeIdentityServer) PatchAudience(ctx context.Context, in *identitypb.P
 				return nil, err
 			}
 			existing.Config = in.GetAudience().GetConfig()
-		case "appearance_profile_id":
-			existing.AppearanceProfileId = in.GetAudience().GetAppearanceProfileId()
+		case "theme_variant_id":
+			existing.ThemeVariantId = in.GetAudience().GetThemeVariantId()
 		default:
 			return nil, status.Errorf(codes.InvalidArgument, "unsupported update_mask path %q", path)
 		}
@@ -602,7 +576,7 @@ func (f *fakeIdentityServer) DeleteAudience(ctx context.Context, in *identitypb.
 	return &emptypb.Empty{}, nil
 }
 
-func (f *fakeIdentityServer) GetClient(ctx context.Context, in *identitypb.GetClientRequest) (*corepb.Client, error) {
+func (f *fakeIdentityServer) GetApplication(ctx context.Context, in *identitypb.GetApplicationRequest) (*corepb.Application, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.recordAuth(ctx)
@@ -610,26 +584,26 @@ func (f *fakeIdentityServer) GetClient(ctx context.Context, in *identitypb.GetCl
 	if !ok {
 		return nil, status.Errorf(codes.NotFound, "client %q not found", in.GetName())
 	}
-	return proto.Clone(c).(*corepb.Client), nil
+	return proto.Clone(c).(*corepb.Application), nil
 }
 
-func (f *fakeIdentityServer) CreateClient(ctx context.Context, in *identitypb.CreateClientRequest) (*corepb.Client, error) {
+func (f *fakeIdentityServer) CreateApplication(ctx context.Context, in *identitypb.CreateApplicationRequest) (*corepb.Application, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.recordAuth(ctx)
-	c := proto.Clone(in.GetClient()).(*corepb.Client)
+	c := proto.Clone(in.GetApplication()).(*corepb.Application)
 	if err := f.admitAudience(in.GetParent(), c.GetAudienceId()); err != nil {
 		return nil, err
 	}
 	if err := admitClient(c); err != nil {
 		return nil, err
 	}
-	c.Name = in.GetParent() + "/clients/" + f.nextID("c")
+	c.Name = in.GetParent() + "/applications/" + f.nextID("c")
 	f.clients[c.GetName()] = c
-	return proto.Clone(c).(*corepb.Client), nil
+	return proto.Clone(c).(*corepb.Application), nil
 }
 
-// admitAudience is kit#620's scope admission for Client.audience_id: an
+// admitAudience is kit#620's scope admission for Application.audience_id: an
 // audience of the client's own issuer, by bare id. A full name, a missing
 // audience and one under another issuer get the same refusal, as in kit.
 // Unset passes; the fake does not model kit's required-field check.
@@ -643,7 +617,7 @@ func (f *fakeIdentityServer) admitAudience(issuer, id string) error {
 	return nil
 }
 
-func (f *fakeIdentityServer) PatchClient(ctx context.Context, in *identitypb.PatchClientRequest) (*corepb.Client, error) {
+func (f *fakeIdentityServer) PatchApplication(ctx context.Context, in *identitypb.PatchApplicationRequest) (*corepb.Application, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.recordAuth(ctx)
@@ -651,31 +625,31 @@ func (f *fakeIdentityServer) PatchClient(ctx context.Context, in *identitypb.Pat
 	if !ok {
 		return nil, status.Errorf(codes.NotFound, "client %q not found", in.GetName())
 	}
-	existing := proto.Clone(stored).(*corepb.Client)
+	existing := proto.Clone(stored).(*corepb.Application)
 	for _, path := range in.GetUpdateMask().GetPaths() {
 		switch path {
 		case "display_name":
-			existing.DisplayName = in.GetClient().GetDisplayName()
+			existing.DisplayName = in.GetApplication().GetDisplayName()
 		case "audience_id":
-			issuer := in.GetName()[:strings.LastIndex(in.GetName(), "/clients/")]
-			if err := f.admitAudience(issuer, in.GetClient().GetAudienceId()); err != nil {
+			issuer := in.GetName()[:strings.LastIndex(in.GetName(), "/applications/")]
+			if err := f.admitAudience(issuer, in.GetApplication().GetAudienceId()); err != nil {
 				return nil, err
 			}
-			existing.AudienceId = in.GetClient().GetAudienceId()
+			existing.AudienceId = in.GetApplication().GetAudienceId()
 		case "grant_types":
-			existing.GrantTypes = in.GetClient().GetGrantTypes()
+			existing.GrantTypes = in.GetApplication().GetGrantTypes()
 		case "kind":
-			existing.Kind = in.GetClient().GetKind()
+			existing.Kind = in.GetApplication().GetKind()
 		case "token_endpoint_auth_method":
-			existing.TokenEndpointAuthMethod = in.GetClient().GetTokenEndpointAuthMethod()
+			existing.TokenEndpointAuthMethod = in.GetApplication().GetTokenEndpointAuthMethod()
 		case "status":
-			existing.Status = in.GetClient().GetStatus()
+			existing.Status = in.GetApplication().GetStatus()
 		case "expires_at":
-			existing.ExpiresAt = in.GetClient().GetExpiresAt()
+			existing.ExpiresAt = in.GetApplication().GetExpiresAt()
 		case "config":
-			existing.Config = in.GetClient().GetConfig()
+			existing.Config = in.GetApplication().GetConfig()
 		case "labels":
-			existing.Labels = in.GetClient().GetLabels()
+			existing.Labels = in.GetApplication().GetLabels()
 		default:
 			return nil, status.Errorf(codes.InvalidArgument, "unsupported update_mask path %q", path)
 		}
@@ -684,10 +658,10 @@ func (f *fakeIdentityServer) PatchClient(ctx context.Context, in *identitypb.Pat
 		return nil, err
 	}
 	f.clients[in.GetName()] = existing
-	return proto.Clone(existing).(*corepb.Client), nil
+	return proto.Clone(existing).(*corepb.Application), nil
 }
 
-func (f *fakeIdentityServer) DeleteClient(ctx context.Context, in *identitypb.DeleteClientRequest) (*emptypb.Empty, error) {
+func (f *fakeIdentityServer) DeleteApplication(ctx context.Context, in *identitypb.DeleteApplicationRequest) (*emptypb.Empty, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.recordAuth(ctx)
@@ -899,7 +873,7 @@ func (f *fakeIdentityServer) ListCertificates(ctx context.Context, in *identityp
 
 // CreateCertificate mirrors kit's two modes off one field: a non-empty
 // import_certificate_pem imports the partner's certificate, an empty one
-// mints a key pair. Either way the input-only fields are consumed and never
+// creates a key pair. Either way the input-only fields are consumed and never
 // stored, which is what the provider's InputOnly markers are built against.
 func (f *fakeIdentityServer) CreateCertificate(ctx context.Context, in *identitypb.CreateCertificateRequest) (*corepb.Certificate, error) {
 
@@ -1057,7 +1031,7 @@ func newHarness(t *testing.T) *harness {
 const accTestBearer = "Bearer acc-test-token"
 
 // requireBearer refuses, as kit's authenticator does, any call, unary or
-// streaming, that does not carry the token the fake token endpoint mints.
+// streaming, that does not carry the token the fake token endpoint creates.
 // Without it an unauthenticated stream passes against the fakes (#39).
 func requireBearer() []grpc.ServerOption {
 	check := func(ctx context.Context) error {

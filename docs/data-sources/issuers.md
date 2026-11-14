@@ -3,12 +3,12 @@
 page_title: "authwise_issuers Data Source - Authwise"
 subcategory: "Identity"
 description: |-
-  An OAuth 2.0 / OpenID Connect issuer: the login a set of clients shares, with its token lifetimes and which realm or realms people sign in to (config). It answers at the hosts its authwise_issuer_domain_bindings name (kit#911). Its appearance is whichever of its profiles is the default (authwise_appearance_profile.is_default). This data source lists every one under a parent.
+  An OAuth 2.0 / OpenID Connect issuer: the login a set of applications shares, with its token lifetimes and which realm or realms people sign in to (config). It answers at the hosts its authwise_issuer_domain_bindings name (kit#911). Its pages use its default theme variant (authwise_theme_variant.is_default), or the tenant's default theme when it has none. This data source lists every one under a parent.
 ---
 
 # authwise_issuers (Data Source)
 
-An OAuth 2.0 / OpenID Connect issuer: the login a set of clients shares, with its token lifetimes and which realm or realms people sign in to (`config`). It answers at the hosts its `authwise_issuer_domain_binding`s name (kit#911). Its appearance is whichever of its profiles is the default (`authwise_appearance_profile.is_default`). This data source lists every one under a parent.
+An OAuth 2.0 / OpenID Connect issuer: the login a set of applications shares, with its token lifetimes and which realm or realms people sign in to (`config`). It answers at the hosts its `authwise_issuer_domain_binding`s name (kit#911). Its pages use its default theme variant (`authwise_theme_variant.is_default`), or the tenant's default theme when it has none. This data source lists every one under a parent.
 
 
 

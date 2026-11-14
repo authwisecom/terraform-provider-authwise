@@ -25,26 +25,26 @@ var clientGrantTypes = []string{grantAuthCode, grantRefresh, grantClientCC, gran
 
 // setClientDefaults fills what a client may leave unset: its kind from its
 // grants, its method from its kind, and active.
-func setClientDefaults(c *corepb.Client) {
-	if c.GetKind() == corepb.ClientKind_CLIENT_KIND_UNSPECIFIED && len(c.GetGrantTypes()) > 0 {
-		c.Kind = corepb.ClientKind_CLIENT_KIND_APPLICATION
+func setClientDefaults(c *corepb.Application) {
+	if c.GetKind() == corepb.ApplicationKind_APPLICATION_KIND_UNSPECIFIED && len(c.GetGrantTypes()) > 0 {
+		c.Kind = corepb.ApplicationKind_APPLICATION_KIND_INTERACTIVE
 		if len(c.GetGrantTypes()) == 1 && c.GetGrantTypes()[0] == grantClientCC {
-			c.Kind = corepb.ClientKind_CLIENT_KIND_SERVICE
+			c.Kind = corepb.ApplicationKind_APPLICATION_KIND_SERVICE
 		}
 	}
-	if c.GetTokenEndpointAuthMethod() == "" && c.GetKind() != corepb.ClientKind_CLIENT_KIND_UNSPECIFIED {
+	if c.GetTokenEndpointAuthMethod() == "" && c.GetKind() != corepb.ApplicationKind_APPLICATION_KIND_UNSPECIFIED {
 		c.TokenEndpointAuthMethod = "client_secret_basic"
-		if c.GetKind() == corepb.ClientKind_CLIENT_KIND_APPLICATION {
+		if c.GetKind() == corepb.ApplicationKind_APPLICATION_KIND_INTERACTIVE {
 			c.TokenEndpointAuthMethod = authMethodNone
 		}
 	}
-	if c.GetStatus() == corepb.ClientStatus_CLIENT_STATUS_UNSPECIFIED {
-		c.Status = corepb.ClientStatus_CLIENT_STATUS_ACTIVE
+	if c.GetStatus() == corepb.ApplicationStatus_APPLICATION_STATUS_UNSPECIFIED {
+		c.Status = corepb.ApplicationStatus_APPLICATION_STATUS_ACTIVE
 	}
 }
 
 // admitClient fills a client's defaults and refuses what kit refuses.
-func admitClient(c *corepb.Client) error {
+func admitClient(c *corepb.Application) error {
 
 	setClientDefaults(c)
 
@@ -65,14 +65,14 @@ func admitClient(c *corepb.Client) error {
 		return status.Error(codes.InvalidArgument, "grant_types: a saml_idp client is a SAML relying party and has no OAuth grants")
 	}
 
-	if c.GetKind() == corepb.ClientKind_CLIENT_KIND_UNSPECIFIED {
+	if c.GetKind() == corepb.ApplicationKind_APPLICATION_KIND_UNSPECIFIED {
 		return status.Error(codes.InvalidArgument, `kind: "" is not application, service or agent`)
 	}
 
 	switch c.GetTokenEndpointAuthMethod() {
 	case "client_secret_basic", "client_secret_post":
 	case authMethodNone:
-		if c.GetKind() != corepb.ClientKind_CLIENT_KIND_APPLICATION {
+		if c.GetKind() != corepb.ApplicationKind_APPLICATION_KIND_INTERACTIVE {
 			return status.Errorf(codes.InvalidArgument, "token_endpoint_auth_method: none is for an application; a %s authenticates", c.GetKind())
 		}
 		if seen[grantClientCC] {

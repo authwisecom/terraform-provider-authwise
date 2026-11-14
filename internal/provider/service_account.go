@@ -173,7 +173,7 @@ func (r *serviceAccountResource) Schema(_ context.Context, _ resource.SchemaRequ
 				PlanModifiers: []planmodifier.Set{setplanmodifier.UseStateForUnknown()},
 			},
 			"client_id": computed("The client's id (`c-…`): the `client_id` at the token endpoint, and the subject its tokens carry, which an `authwise_access_binding` names with `subject_type = \"client\"`."),
-			"status":    computed("`CLIENT_STATUS_ACTIVE` unless an operator disabled or quarantined the client, as on `authwise_client`."),
+			"status":    computed("`APPLICATION_STATUS_ACTIVE` unless an operator disabled or quarantined the client, as on `authwise_application`."),
 			"secrets": schema.ListNestedAttribute{
 				Computed:            true,
 				MarkdownDescription: "The live secrets, newest last: unexpired, and never the plaintext.",
@@ -436,8 +436,8 @@ func (m *serviceAccountModel) fromProto(ctx context.Context, e *tenancypb.Servic
 
 // --- authwise_service_account_secret ---
 
-// serviceAccountSecretResource mints a secret for a service account. The
-// secret is returned once, by the mint, so it lives in state. The tenancy
+// serviceAccountSecretResource creates a secret for a service account. The
+// secret is returned once, by the create, so it lives in state. The tenancy
 // service has no read or revoke of one secret: Read finds it among the
 // account's live secrets, and Delete only forgets it.
 type serviceAccountSecretResource struct {
@@ -547,7 +547,7 @@ func (r *serviceAccountSecretResource) Create(ctx context.Context, req resource.
 		return
 	}
 
-	mint := &tenancypb.MintServiceAccountSecretRequest{
+	create := &tenancypb.CreateServiceAccountSecretRequest{
 		Name:      plan.ServiceAccount.ValueString(),
 		ExpiresAt: parseTimestamp(plan.ExpiresAt, path.Root(expiresAtAttribute), &resp.Diagnostics),
 		Rotate:    plan.Rotate.ValueBool(),
@@ -557,13 +557,13 @@ func (r *serviceAccountSecretResource) Create(ctx context.Context, req resource.
 		if err != nil {
 			resp.Diagnostics.AddAttributeError(path.Root("grace"), "not a duration", err.Error())
 		}
-		mint.Grace = durationpb.New(d)
+		create.Grace = durationpb.New(d)
 	}
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	out, err := r.client.MintServiceAccountSecret(ctx, mint)
+	out, err := r.client.CreateServiceAccountSecret(ctx, create)
 	if err != nil {
 		resp.Diagnostics.AddError("create service account secret failed", tenancyErrorDetail(err))
 		return
@@ -584,7 +584,7 @@ func (r *serviceAccountSecretResource) Create(ctx context.Context, req resource.
 
 // Read keeps the secret while the account lists it as live. Once it has
 // expired or lapsed after a rotation it is gone from state, and the next
-// apply mints another.
+// apply creates another.
 func (r *serviceAccountSecretResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
 
 	if !r.configured(&resp.Diagnostics) {
@@ -615,7 +615,7 @@ func (r *serviceAccountSecretResource) Read(ctx context.Context, req resource.Re
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
-// Update carries the mint-only arguments, rotate and grace, into state; no
+// Update carries the create-only arguments, rotate and grace, into state; no
 // call is made.
 func (r *serviceAccountSecretResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 

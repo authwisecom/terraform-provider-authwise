@@ -45,7 +45,7 @@ resource "authwise_service_account" "ci" {
 - `created_at` (String)
 - `name` (String) Full resource name (`tenants/{t}/service-accounts/{c}`); serves as the Terraform ID, and is what `authwise_service_account_secret` takes.
 - `secrets` (Attributes List) The live secrets, newest last: unexpired, and never the plaintext. (see [below for nested schema](#nestedatt--secrets))
-- `status` (String) `CLIENT_STATUS_ACTIVE` unless an operator disabled or quarantined the client, as on `authwise_client`.
+- `status` (String) `APPLICATION_STATUS_ACTIVE` unless an operator disabled or quarantined the client, as on `authwise_application`.
 - `updated_at` (String)
 
 <a id="nestedatt--secrets"></a>

@@ -109,7 +109,7 @@ locals {
   # non-wildcard redirect URIs exactly, so the trailing slash is required.
   console_redirect_uri = "https://guard-admin.example.com/"
 
-  # The audience AWID kit created, which the client and any token request
+  # The audience AWID kit created, which the application and any token request
   # reference.
   console_audience_id = authwise_audience.console.audience_id
 }
@@ -153,7 +153,7 @@ resource "authwise_access_binding" "guardcontrol_admin" {
   role_name    = authwise_access_role.guardcontrol_admin.access_role_id
 }
 
-# 5. The console's audience and OIDC client. Without these the console cannot
+# 5. The console's audience and application (an OIDC client). Without these the console cannot
 #    start a login at all. Unlike the entries above — which are the install
 #    learning Guard's vocabulary, once per install — this pair carries one
 #    deployment's URLs.
@@ -165,8 +165,8 @@ data "authwise_interactive_client_config" "console" {
   allowed_redirect_uris = [local.console_redirect_uri]
 }
 
-# guard-admin is a public SPA client: authorization_code + PKCE, no secret.
-resource "authwise_client" "console" {
+# guard-admin is a public SPA application: authorization_code + PKCE, no secret.
+resource "authwise_application" "console" {
   display_name = "guard-admin"
   audience_id  = local.console_audience_id
   grant_types  = ["authorization_code", "refresh_token"]
@@ -175,7 +175,7 @@ resource "authwise_client" "console" {
 
 output "console_client_id" {
   description = "Configure guard-admin with this (VITE_CLIENT_ID, or the operator CR's spec.admin.clientId)."
-  value       = authwise_client.console.client_id
+  value       = authwise_application.console.application_id
 }
 
 output "console_audience_id" {

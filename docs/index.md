@@ -1,7 +1,7 @@
 ---
 page_title: "Authwise Provider"
 description: |-
-  Manage Authwise identity and access configuration: tenants' issuers, realms, providers, clients, the Access catalog, secrets and endpoints; and Guard networks.
+  Manage Authwise identity and access configuration: tenants' issuers, realms, providers, applications, the Access catalog, secrets and endpoints; and Guard networks.
 ---
 
 # Authwise Provider
@@ -9,14 +9,14 @@ description: |-
 The Authwise provider manages an Authwise install's identity and access
 configuration over its published gRPC API. That covers issuers and their
 login routing, realms and the providers and factors people sign in with,
-clients and audiences, the Access catalog, and the secrets and endpoints
+applications and audiences, the Access catalog, and the secrets and endpoints
 these depend on. It also manages Guard, Authwise's mesh VPN: a tenant's settings,
 networks, relays, resources and relay pools, over guard-control's API.
 
 The resources and data sources are grouped by what they manage:
 
-* **Identity**: tenants' issuers, realms, clients, audiences, scopes, users,
-  secrets, certificates, endpoints and appearance.
+* **Identity**: tenants' issuers, realms, applications, audiences, scopes, users,
+  secrets, certificates, endpoints, themes and theme variants.
 * **Sign-in providers**: `authwise_provider` and the data sources that build
   each provider type's config.
 * **Factors**: `authwise_factor` and the data sources that build each factor
@@ -101,7 +101,7 @@ reference, for example, needs `identity.secrets.use`.
 ### A home service account
 
 A tenant with home administration (`authwise_tenant_home_administration`)
-can also run Terraform with a **home service account**: a service client of
+can also run Terraform with a **home service account**: a service application of
 the tenant's own issuer, created by one of the tenant's own administrators
 in the console's Access page, with no Authwise owner involved (kit#939). Its
 token comes from the tenant's issuer, for the tenant's administration
@@ -119,9 +119,9 @@ roles reaches:
 Its roles are bindings in the administration audience at the tenant
 (`administration.admin`, `administration.identity`, `administration.viewer`
 or a narrower role of the tenant's), with no condition: the step-up condition
-tests a person's sign-in, which a client never has.
+tests a person's sign-in, which an application never has.
 
-**What it reaches.** Identity providers, SAML, audiences, clients and their
+**What it reaches.** Identity providers, SAML, audiences, applications and their
 secrets, certificates, secrets, endpoints, realms, factors, users, groups,
 themes, assets, message templates, domains and their issuer bindings, and
 access bindings in the tenant's own audiences, Guard's administrative roles
@@ -176,12 +176,12 @@ rewrite it.
 
 **A service account's Guard roles.** A Terraform service account that
 manages a tenant's Guard holds Guard's ordinary administrative roles, bound
-to its client with `authwise_access_binding` and no `condition_id`:
+to its application (`c-…`) with `authwise_access_binding` and no `condition_id`:
 `guardcontrol.networkAdmin` for networks, nodes, resources, node groups,
 enrollment keys, cluster trusts and their rules, and
 `guardcontrol.tenantAdmin` only if it also manages Guard grants. There is no
 special role for automation. The step-up condition that a person's binding
-of these roles carries tests a sign-in, which a client never has, so a
+of these roles carries tests a sign-in, which an application never has, so a
 service account's binding carries none. `authwise_guard_enrolment_grant`
 binds people and groups only; it is not the path for a service account.
 
@@ -217,7 +217,7 @@ and they carry a required `<type>_id` attribute for it:
 
 ## Configs built by data sources
 
-Providers, factors and clients carry a type-specific config, packed as a
+Providers, factors and applications carry a type-specific config, packed as a
 `google.protobuf.Any`. Each config type has a data source that builds it
 with typed, validated attributes and makes no API call. Reference its `any`
 output:

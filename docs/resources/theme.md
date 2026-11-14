@@ -19,7 +19,7 @@ A tenant theme: the stylesheet and content the hosted login pages render with. S
 #   curl -s https://login.example.com/api/v1/ui/layouts \
 #     | jq '.layouts[] | select(.key == "center")' > center.json
 #
-# examples/branding applies this with its logo and appearance profiles.
+# examples/branding applies this with its logo and theme variants.
 locals {
   center = jsondecode(file("${path.module}/center.json"))
 }

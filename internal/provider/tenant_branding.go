@@ -69,7 +69,7 @@ func (r *tenantBrandingResource) Schema(_ context.Context, _ resource.SchemaRequ
 			"mail's From name and brand name, and the logo and colour from the theme.\n\n" +
 			"The brand is authoritative: it becomes exactly this, a field left out is cleared, and destroying the resource clears the brand. " +
 			"A tenant created on kit with kit#953 starts with a theme \"Brand\" named here: leaving `theme_id` out clears it, so name it (import it as `authwise_theme`) to keep it. " +
-			"A new issuer of a tenant whose brand names a theme is given a \"Default\" appearance profile on that theme, which the configuration's first profile on the issuer replaces.\n\n" +
+			"The brand's theme is the tenant's **default theme**: it applies on every page where no theme variant does (kit#968), so a tenant with one look needs no `authwise_theme_variant` at all.\n\n" +
 			"**Set a tenant's branding in one place.** This resource and `branding` in `authwise_tenant_config` write the same stored value. " +
 			"`branding` there is deprecated: leave it out of that `config`, which then leaves the brand to this resource.\n\n" +
 			"Name the theme and the logos through their resources (`authwise_theme.x.theme_id`, `authwise_asset_content.x.asset_id`). " +
@@ -99,7 +99,7 @@ func (r *tenantBrandingResource) Schema(_ context.Context, _ resource.SchemaRequ
 			},
 			"logo_asset_id": schema.StringAttribute{
 				Optional:            true,
-				MarkdownDescription: "An image asset of the tenant (`as-…`): what the admin console shows in place of the Authwise emblem, and what mail falls back to when an appearance profile has no logo.",
+				MarkdownDescription: "An image asset of the tenant (`as-…`): what the admin console shows in place of the Authwise emblem, and what mail falls back to when an theme variant has no logo.",
 				Validators:          []validator.String{stringvalidator.LengthAtLeast(1)},
 			},
 			"logo_dark_asset_id": schema.StringAttribute{

@@ -6,7 +6,7 @@ with separate trust:
 | Role | Authwise is | Configured on | Data source |
 |---|---|---|---|
 | SP | the consumer — your users log in through a partner IdP | a `provider` | `authwise_provider_saml` |
-| IdP | the issuer — a partner's app logs its users in with Authwise | a `client` | `authwise_saml_relying_party_config` |
+| IdP | the issuer — a partner's app logs its users in with Authwise | an `application` | `authwise_saml_relying_party_config` |
 
 `main.tf` sets up one of each against the same fictional partner.
 
@@ -72,8 +72,8 @@ It renders the document you hand the partner:
 awctl identity providers export-saml-metadata "$(terraform output -raw provider_name)" \
   --tenant-id t-01 --realm-id r-01 --out sp-metadata.xml
 
-# The IdP metadata for a client Terraform owns
-awctl identity clients export-saml-metadata "$(terraform output -raw client_name)" \
+# The IdP metadata for an application Terraform owns
+awctl identity applications export-saml-metadata "$(terraform output -raw application_name)" \
   --tenant-id t-01 --issuer-id i-01 --out idp-metadata.xml
 ```
 
@@ -98,13 +98,13 @@ Pick one owner per connection:
     --tenant-id t-01 --realm-id r-01 --file idp-metadata.xml --dry-run
   ```
 
-- **awctl owns it**: keep the provider or client out of Terraform entirely.
+- **awctl owns it**: keep the provider or application out of Terraform entirely.
   A half-managed connection is the bad case.
 
 A principal calling import also needs `identity.certificates.create`, since
 import creates Certificate rows. The two import permissions
 (`identity.providers.importSamlMetadata`,
-`identity.clients.importSamlMetadata`) are separate precisely so granting
+`identity.applications.importSamlMetadata`) are separate precisely so granting
 metadata import is not a side door into adding a trust anchor — grant them
 together with `certificates.create`, as the default catalog does.
 
