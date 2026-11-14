@@ -48,6 +48,15 @@ BREAKING CHANGES:
   imported that way has no `secret` until a `keepers` change creates a new
   one, so prefer `moved`.
 
+  **Where the move was exercised.** With the Terraform CLI, on a real
+  state written by provider 0.21.1 before the rename (Authwise's test01
+  install, on kit's v1.87.0 line): an application, a confidential
+  application and its secret moved with `Plan: 0 to add, 0 to change, 0
+  to destroy`, and the secret kept its id and value. 0.21.1 and 0.34.0
+  write the same attributes for all three former types. The theme-variant move from `authwise_appearance_profile` is
+  covered by the provider's tests only: test01 has no appearance profile
+  in Terraform.
+
   **Kept names.** `authwise_interactive_client_config`, the data source
   that builds an application's `config`, keeps its name: kit keeps the
   names of the config messages packed into `Any`, because their type URLs
