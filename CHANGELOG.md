@@ -64,6 +64,12 @@ BREAKING CHANGES:
   `client_id`, `client_secret`, `account_client_id` in an issuer's config,
   and the provider's own `client_id` and `client_secret`.
 
+  **Not renamed yet.** `authwise_guard_enrolment_grant` keeps its
+  British spelling in this release. guard-control renames its Enrolment
+  names to Enrollment in a later release train (2026.11.5), and the
+  provider follows in a later release with its own `moved` support and
+  upgrade notes. Nothing changes for it in 0.35.0.
+
 * **! The permissions renamed with them.** kit renames them in every
   tenant's catalog (its migration 020): `identity.clients.*` is
   `identity.applications.*`, `identity.clientSecrets.*` is
