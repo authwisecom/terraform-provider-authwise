@@ -13,6 +13,10 @@ NOTES:
   and snake-case parent attributes for camelCase collections
   (`cluster_trust_id`, not `clusterTrust_id`). No existing resource's
   schema changes.
+* A Terraform service account that manages these resources holds
+  `guardcontrol.networkAdmin` (and `guardcontrol.tenantAdmin` for Guard
+  grants), bound to its client with `authwise_access_binding` and no
+  `condition_id`. The provider docs' Guard section says so (tf#74).
 
 FEATURES:
 
