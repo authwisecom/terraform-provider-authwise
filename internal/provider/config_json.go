@@ -284,7 +284,7 @@ var configJSONSpecs = []configJSONSpec{
 		typeName:    "realm_config",
 		message:     &corepb.RealmConfig{},
 		attribute:   "authwise_realm.config",
-		description: "A realm's config: provisioning, recovery, bot protection, SMS and the default locale. The authentication policy is not part of it: declare an `authwise_realm_authentication_policy`.",
+		description: "A realm's config: provisioning, recovery, bot protection, SMS, sign-up and the default locale. The authentication policy is not part of it: declare an `authwise_realm_authentication_policy`.",
 		descriptions: map[string]string{
 			"default_locale":                          "The BCP 47 tag the realm writes to its people in when nothing better is known. Unset is no realm default, which is not the same as `en`.",
 			"provisioning":                            "How an account comes to exist in the realm.",
@@ -299,6 +299,8 @@ var configJSONSpecs = []configJSONSpec{
 			"bot_protection.secret_ref":    "The provider's secret key, for `TURNSTILE` and `HCAPTCHA`, as `{ name = authwise_secret.x.name }`.",
 			"bot_protection.endpoint_name": "The endpoint serving AuthwiseBotCheckService, for `ENDPOINT`.",
 			"sms":                          "Where the realm will send an SMS, and how many per destination prefix.",
+			"signup":                       "What kit does around a person's own sign-up in this realm (kit#952). Whether sign-up is allowed at all stays `provisioning.self_signup`.",
+			"signup.welcome_message":       "Send the `welcome` catalog message once to a person whose account this realm created by their own action: sign-up by form (after the address is proven, when the realm requires that), first sign-in through a federated provider, or accepting an invitation. Never for an account an administrator or SCIM creates, and never twice: the send is recorded on the account. Default false. Takes effect on kit 1.87.0 or later.",
 		},
 		omit: map[string]bool{authenticationKey: true},
 		// kit's reserved ProvisioningPolicy fields

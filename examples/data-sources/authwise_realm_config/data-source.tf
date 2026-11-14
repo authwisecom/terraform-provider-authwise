@@ -17,6 +17,11 @@ data "authwise_realm_config" "this" {
     site_key   = "0x4AAAAAAA"
     secret_ref = { name = authwise_secret.turnstile.name }
   }
+
+  # Send the welcome message once to a person who signs up themselves.
+  signup = {
+    welcome_message = true
+  }
 }
 
 resource "authwise_realm" "this" {

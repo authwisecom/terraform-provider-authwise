@@ -20,7 +20,8 @@ resource "authwise_application_secret" "ci" {
   }
 }
 
-output "ci_client_secret" # the OAuth client_secret {
+# the OAuth client_secret
+output "ci_client_secret" {
   value     = authwise_application_secret.ci.secret
   sensitive = true
 }

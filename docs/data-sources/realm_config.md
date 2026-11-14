@@ -3,13 +3,13 @@
 page_title: "authwise_realm_config Data Source - Authwise"
 subcategory: "Identity"
 description: |-
-  A realm's config: provisioning, recovery, bot protection, SMS and the default locale. The authentication policy is not part of it: declare an authwise_realm_authentication_policy. Builds the RealmConfig message and exposes its protojson encoding as json, the value authwise_realm.config takes. Makes no API calls.
+  A realm's config: provisioning, recovery, bot protection, SMS, sign-up and the default locale. The authentication policy is not part of it: declare an authwise_realm_authentication_policy. Builds the RealmConfig message and exposes its protojson encoding as json, the value authwise_realm.config takes. Makes no API calls.
   When a resource named in its arguments has a change planned, Terraform reads this data source at apply rather than at plan, even though every argument is known: json shows as (known after apply), and authwise_realm.config plans an update that applies as a no-op when nothing else changed. The function provider::authwise::realm_config takes the same arguments as an object, returns the same string, and is evaluated at plan: use it to keep those plans quiet (Terraform 1.8 or later).
 ---
 
 # authwise_realm_config (Data Source)
 
-A realm's config: provisioning, recovery, bot protection, SMS and the default locale. The authentication policy is not part of it: declare an `authwise_realm_authentication_policy`. Builds the RealmConfig message and exposes its protojson encoding as `json`, the value `authwise_realm.config` takes. Makes no API calls.
+A realm's config: provisioning, recovery, bot protection, SMS, sign-up and the default locale. The authentication policy is not part of it: declare an `authwise_realm_authentication_policy`. Builds the RealmConfig message and exposes its protojson encoding as `json`, the value `authwise_realm.config` takes. Makes no API calls.
 
 When a resource named in its arguments has a change planned, Terraform reads this data source at apply rather than at plan, even though every argument is known: `json` shows as (known after apply), and `authwise_realm.config` plans an update that applies as a no-op when nothing else changed. The function `provider::authwise::realm_config` takes the same arguments as an object, returns the same string, and is evaluated at plan: use it to keep those plans quiet (Terraform 1.8 or later).
 
@@ -35,6 +35,11 @@ data "authwise_realm_config" "this" {
     site_key   = "0x4AAAAAAA"
     secret_ref = { name = authwise_secret.turnstile.name }
   }
+
+  # Send the welcome message once to a person who signs up themselves.
+  signup = {
+    welcome_message = true
+  }
 }
 
 resource "authwise_realm" "this" {
@@ -52,6 +57,7 @@ resource "authwise_realm" "this" {
 - `default_locale` (String) The BCP 47 tag the realm writes to its people in when nothing better is known. Unset is no realm default, which is not the same as `en`.
 - `provisioning` (Attributes) How an account comes to exist in the realm. (see [below for nested schema](#nestedatt--provisioning))
 - `recovery` (Attributes) Whether a person may reset a forgotten password from the login page, and how long the link lives. Absent is off. (see [below for nested schema](#nestedatt--recovery))
+- `signup` (Attributes) What kit does around a person's own sign-up in this realm (kit#952). Whether sign-up is allowed at all stays `provisioning.self_signup`. (see [below for nested schema](#nestedatt--signup))
 - `sms` (Attributes) Where the realm will send an SMS, and how many per destination prefix. (see [below for nested schema](#nestedatt--sms))
 
 ### Read-Only
@@ -127,6 +133,14 @@ Optional:
 - `reset_ttl` (String) A Go duration string, e.g. `90s`, `15m`, `12h`.
 - `self_service_reset` (Boolean)
 - `support_contact` (String)
+
+
+<a id="nestedatt--signup"></a>
+### Nested Schema for `signup`
+
+Optional:
+
+- `welcome_message` (Boolean) Send the `welcome` catalog message once to a person whose account this realm created by their own action: sign-up by form (after the address is proven, when the realm requires that), first sign-in through a federated provider, or accepting an invitation. Never for an account an administrator or SCIM creates, and never twice: the send is recorded on the account. Default false. Takes effect on kit 1.87.0 or later.
 
 
 <a id="nestedatt--sms"></a>

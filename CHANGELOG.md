@@ -73,11 +73,23 @@ BREAKING CHANGES:
   then the tenant's default theme. `authwise_issuer.config` no longer
   carries the starting profile's id.
 
+FEATURES:
+
+* **A realm's welcome message (kit#952, train 2026.11.4).**
+  `authwise_realm_config` takes `signup = { welcome_message = true }`:
+  the realm then sends the `welcome` catalog message once to a person whose
+  account their own action created (sign-up by form after the address is
+  proven, first federated sign-in, an accepted invitation), never to one an
+  administrator or SCIM creates. Off by default; a realm that never sets it
+  plans no change. Whether sign-up is allowed at all stays
+  `provisioning.self_signup`.
+
 NOTES:
 
-* **apis v0.74.0** (from v0.73.0): kit v1.87.0's contract, the vocabulary
-  pass (kit#968). This release needs kit 1.87.0 or later; an older kit
-  answers the renamed calls with `Unimplemented`.
+* **apis v0.75.0** (from v0.73.0): kit v1.87.0's contract, the vocabulary
+  pass (kit#968, apis v0.74.0), and `RealmConfig.signup` (kit#952, apis
+  v0.75.0). This release needs kit 1.87.0 or later; an older kit answers
+  the renamed calls with `Unimplemented`.
 
 * Release train 2026.11.GFK.1 (Guard for Kubernetes), stage GK5, built
   against apis v0.73.0. guard-control's servers for node groups, cluster

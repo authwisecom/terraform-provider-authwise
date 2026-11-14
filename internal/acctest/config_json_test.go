@@ -54,6 +54,10 @@ data "authwise_realm_config" "signup" {
     allowed_regions           = ["US", "CA"]
     sends_per_prefix_per_hour = 50
   }
+
+  signup = {
+    welcome_message = true
+  }
 }
 
 resource "authwise_realm" "signup" {
@@ -87,6 +91,8 @@ resource "authwise_realm" "signup" {
 						return fmt.Errorf("bot_protection on the row = %v", bp)
 					case len(c.GetSms().GetAllowedRegions()) != 2 || c.GetSms().GetSendsPerPrefixPerHour() != 50:
 						return fmt.Errorf("sms on the row = %v", c.GetSms())
+					case !c.GetSignup().GetWelcomeMessage():
+						return fmt.Errorf("signup on the row = %v", c.GetSignup())
 					}
 				}
 				return nil
