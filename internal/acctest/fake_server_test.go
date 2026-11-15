@@ -39,6 +39,10 @@ var certNotBefore = time.Date(2026, 9, 14, 0, 0, 0, 0, time.UTC)
 type fakeIdentityServer struct {
 	identitypb.UnimplementedAuthwiseIdentityServiceServer
 
+	// capabilities answers GetInstallCapabilities; nil is a kit before
+	// kit#968 (fake_capabilities_test.go).
+	capabilities func() (*identitypb.InstallCapabilities, error)
+
 	mu       sync.Mutex
 	realms   map[string]*corepb.Realm
 	issuers  map[string]*corepb.Issuer

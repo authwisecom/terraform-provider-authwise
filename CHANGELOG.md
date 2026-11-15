@@ -1,3 +1,25 @@
+## 0.34.1 (Unreleased)
+
+BUG FIXES:
+
+* **A clear refusal from kit 1.87.0 and later.** kit 1.87.0 renames
+  clients to applications with no aliases (kit#968), so 0.34.x would get
+  `Unimplemented` on every renamed call. Before its first call to kit in a
+  run, the provider now asks kit's `GetInstallCapabilities` whether it
+  lists the `identity.vocabulary` feature. When it does, the provider
+  stops with one error: "this provider (0.34.1) is too old for kit 1.87.0
+  or later, which renamed clients to applications (kit#968); this install
+  runs kit 1.87.x. Upgrade to provider 0.35.0 and add the moved blocks",
+  with a link to 0.35.0's upgrade notes. Against kit 1.86 and earlier
+  nothing changes. It asks once per run, under the provider's `tenant_id`
+  (or the first tenant a request names), and a check it cannot make, such
+  as one the credential is not permitted, does not block.
+
+NOTES:
+
+* Built from 0.34.0 with this change alone: same apis (v0.67.0), same kit
+  floor (1.86.0), same schemas.
+
 ## 0.34.0 (November 12, 2026)
 
 FEATURES:
