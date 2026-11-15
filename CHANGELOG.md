@@ -8,8 +8,8 @@ BUG FIXES:
   run, the provider now asks kit's `GetInstallCapabilities` whether it
   lists the `identity.vocabulary` feature. When it does, the provider
   stops with one error: "this provider (0.34.1) is too old for kit 1.87.0
-  or later, which renamed clients to applications (kit#968); this install
-  runs kit 1.87.x. Upgrade to provider 0.35.0 and add the moved blocks",
+  or later, which renamed clients to applications; this install runs kit
+  1.87.x. Upgrade to provider 0.35.0 and add the moved blocks",
   with a link to 0.35.0's upgrade notes. Against kit 1.86 and earlier
   nothing changes. It asks once per run, under the provider's `tenant_id`
   (or the first tenant a request names), and a check it cannot make, such

@@ -98,7 +98,7 @@ func (k *kitCompat) refusal(kitVersion string) error {
 		installed = "kit " + v
 	}
 	return status.Errorf(codes.FailedPrecondition,
-		"this provider (%s) is too old for kit 1.87.0 or later, which renamed clients to applications (kit#968); this install runs %s. "+
+		"this provider (%s) is too old for kit 1.87.0 or later, which renamed clients to applications; this install runs %s. "+
 			"Upgrade to provider 0.35.0 and add the moved blocks: %s (0.35.0, BREAKING CHANGES).",
 		k.providerVersion, installed, upgradeNotes)
 }
