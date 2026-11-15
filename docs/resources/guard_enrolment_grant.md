@@ -6,7 +6,7 @@ description: |-
   Binds one Guard role to a user or group of a kit tenant, in kit, through guard-control. By default the role is guardcontrol.user at the tenant: the subject may enroll devices. guardcontrol.tenantAdmin (at the tenant), guardcontrol.networkAdmin (at a network, network_id) and guardcontrol.viewer (either) let the subject administer the tenant's Guard, or part of it.
   Where the roles land. guardcontrol.user is bound in the tenant's Guard audience. The administrative roles are bound in the tenant's administration audience, beside its own people's identity roles, so the tenant needs home administration (authwise_tenant_home_administration); without it guard-control refuses the grant with FAILED_PRECONDITION and its reason. A tenant's central administrators (its owner and tenant.admin seats) hold Guard's tenant administrator role through kit, from their seat; they need no grant here.
   One way, not both. This is the same binding an authwise_access_binding with that role writes: in the administration audience for an administrative role, in the Guard audience for guardcontrol.user. Declare a grant one way only, or the two will fight.
-  A service account. This resource binds people and groups. Bind a service account's Guard role with authwise_access_binding to its application (c-…), with no condition_id: the step-up condition tests a person's sign-in, which an application never has.
+  A service account. This resource binds people and groups only. Bind a service account's Guard role with authwise_access_binding to its application (c-…), with no condition_id: the step-up condition tests a person's sign-in, which an application never has. guard-control 0.31.1 also accepts a client subject on its role grant; this resource does not take one, so that authwise_access_binding stays the one way to bind a service account.
   Who may apply it. Each call is admitted at guard-control, then by kit on the same bearer, so the provider's credential must administer the tenant's bindings in kit; otherwise it is refused with PermissionDenied.
   Versions. A role other than guardcontrol.user, or a grant at a network, needs guard-control with role grants (guard-control#59); an older one refuses it with Unimplemented. An administrative role in the administration audience needs guard-control 0.28.0 or later (guard-control#95); an older one binds it in the Guard audience. guardcontrol.tenantAdmin and guardcontrol.networkAdmin carry the administration audience's step-up condition (administration.stepUp, condition_id); guardcontrol.viewer carries none.
   Moved grants. When home administration is turned on, kit moves the tenant's existing administrative Guard bindings into the administration audience as new bindings. A grant in state is found again by its subject, role and anchor, so the plan shows no change and binding takes the new name.
@@ -21,7 +21,7 @@ Binds one Guard role to a user or group of a kit tenant, in kit, through guard-c
 
 **One way, not both.** This is the same binding an `authwise_access_binding` with that role writes: in the administration audience for an administrative role, in the Guard audience for `guardcontrol.user`. Declare a grant one way only, or the two will fight.
 
-**A service account.** This resource binds people and groups. Bind a service account's Guard role with `authwise_access_binding` to its application (`c-…`), with no `condition_id`: the step-up condition tests a person's sign-in, which an application never has.
+**A service account.** This resource binds people and groups only. Bind a service account's Guard role with `authwise_access_binding` to its application (`c-…`), with no `condition_id`: the step-up condition tests a person's sign-in, which an application never has. guard-control 0.31.1 also accepts a `client` subject on its role grant; this resource does not take one, so that `authwise_access_binding` stays the one way to bind a service account.
 
 **Who may apply it.** Each call is admitted at guard-control, then by kit on the same bearer, so the provider's credential must administer the tenant's bindings in kit; otherwise it is refused with PermissionDenied.
 
@@ -78,7 +78,7 @@ resource "authwise_guard_enrolment_grant" "office_admin" {
 ### Required
 
 - `subject_id` (String) The user's (`u-…`) or group's (`g-…`) id, in one of the tenant's realms; kit refuses any other. Changing it replaces the grant.
-- `subject_type` (String) `user` or `group`. Changing it replaces the grant.
+- `subject_type` (String) `user` or `group`. Changing it replaces the grant. A service account is bound with `authwise_access_binding` instead.
 - `tenant_id` (String) The kit tenant's id (`t-…`) the Guard row belongs to. Guard has no tenant of its own since the tenant collapse (tf#65). The provider's `tenant_id` is not used. Changing it replaces the resource.
 
 ### Optional
