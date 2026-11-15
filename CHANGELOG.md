@@ -112,10 +112,14 @@ FEATURES:
 
 NOTES:
 
-* **apis v0.75.0** (from v0.73.0): kit v1.87.0's contract, the vocabulary
-  pass (kit#968, apis v0.74.0), and `RealmConfig.signup` (kit#952, apis
-  v0.75.0). This release needs kit 1.87.0 or later; an older kit answers
-  the renamed calls with `Unimplemented`.
+* **apis v0.76.0** (from v0.73.0): kit v1.87.0's contract, the vocabulary
+  pass (kit#968, apis v0.74.0), `RealmConfig.signup` (kit#952, apis
+  v0.75.0) and guard-control v0.31.1's additive contract (apis v0.76.0).
+  This release needs kit 1.87.0 or later; an older kit answers the renamed
+  calls with `Unimplemented`. A cluster trust rule with no
+  `node_name_prefix` names its nodes `<trust>-<pod name>` from guard-control
+  0.31.1 (guard-control#100), where earlier releases used the pod name
+  alone.
 
 * Release train 2026.11.GFK.1 (Guard for Kubernetes), stage GK5, built
   against apis v0.73.0. guard-control's servers for node groups, cluster

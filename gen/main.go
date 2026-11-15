@@ -561,7 +561,8 @@ func main() {
 			// rule's identity; the rest applies to joins from now on.
 			crud[guardpb.ClusterTrustRule](scopeGuardClusterTrust,
 				withDescription("A rule of a Guard cluster trust: pods of one namespace running as one service account (or `*`, any of the namespace's) may join the network with their projected service account token. "+
-					"The node is named `<node_name_prefix>-<pod name>`, runs on platform `KUBERNETES`, is added to `node_group`, and counts against `max_nodes` (1 to 1000; unset is 100). "+
+					"The node is named `<node_name_prefix>-<pod name>`, with the trust's `display_name` as a DNS label for the prefix when `node_name_prefix` is unset, so a pod name repeated across clusters says which cluster joined it (guard-control#100). "+
+					"It runs on platform `KUBERNETES`, is added to `node_group`, and counts against `max_nodes` (1 to 1000; unset is 100). "+
 					"`ephemeral` removes a node once it has been offline an hour, or as soon as its pod leaves: for Deployment and Job pods, not StatefulSet pods, which keep their node across restarts. "+
 					"Changes apply to joins from now on; joined nodes keep what they joined with. Deleting a rule stops further joins; joined nodes stay."),
 				guardVia("cluster_trust_rule", guardClusterTrustRuleClient, "guard_cluster_trust_rule"), guardList("cluster_trust_rules"),
