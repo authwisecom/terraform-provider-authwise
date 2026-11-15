@@ -93,9 +93,9 @@ func (k *kitCompat) check(ctx context.Context, method string, req any, cc *grpc.
 const upgradeNotes = "https://git.authwise.com/authwise/terraform-provider-authwise/-/blob/main/CHANGELOG.md"
 
 func (k *kitCompat) refusal(kitVersion string) error {
-	installed := "kit " + kitVersion
-	if kitVersion == "" {
-		installed = "a kit with kit#968's names"
+	installed := "a kit with kit#968's names"
+	if v := strings.TrimPrefix(kitVersion, "v"); v != "" {
+		installed = "kit " + v
 	}
 	return status.Errorf(codes.FailedPrecondition,
 		"this provider (%s) is too old for kit 1.87.0 or later, which renamed clients to applications (kit#968); this install runs %s. "+
