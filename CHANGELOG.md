@@ -104,8 +104,8 @@ FEATURES:
   `GetInstallCapabilities` whether it lists the `identity.vocabulary`
   feature (kit#968's names). A kit that does not gets one clear error in
   place of `Unimplemented` on every renamed call: "this provider (0.35.0)
-  needs kit 1.87.0 or later, which renamed clients to applications
-  (kit#968); this install runs kit 1.86.x". It asks once per run, under the
+  needs kit 1.87.0 or later, which renamed clients to applications; this
+  install runs kit 1.86.x", in the same words as awctl's. It asks once per run, under the
   provider's `tenant_id` (or the first tenant a request names), and a check
   it cannot make, such as one the credential is not permitted, does not
   block.

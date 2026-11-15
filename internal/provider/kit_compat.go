@@ -72,14 +72,11 @@ func (k *kitCompat) check(ctx context.Context, method string, req any, cc *grpc.
 	switch status.Code(err) {
 	case codes.OK:
 		if !slices.Contains(got.GetFeatures(), featureVocabulary) {
-			installed := "kit " + got.GetKitVersion()
-			if got.GetKitVersion() == "" {
-				installed = "a kit that does not say its version"
-			}
-			k.err = k.refusal(installed)
+			k.err = k.refusal(got.GetKitVersion())
 		}
 	case codes.Unimplemented:
-		k.err = k.refusal("an older kit")
+		// Older than the question itself.
+		k.err = k.refusal("")
 	case codes.Unavailable, codes.DeadlineExceeded, codes.Canceled:
 		// Not an answer: the next call asks again.
 		return nil
@@ -91,9 +88,15 @@ func (k *kitCompat) check(ctx context.Context, method string, req any, cc *grpc.
 	return k.err
 }
 
-func (k *kitCompat) refusal(installed string) error {
+// refusal is awctl's sentence (custom/vocabulary_gate.go), so both tools
+// refuse an old kit in the same words, then what to do about it here.
+func (k *kitCompat) refusal(kitVersion string) error {
+	installed := "an earlier kit"
+	if v := strings.TrimPrefix(kitVersion, "v"); v != "" {
+		installed = "kit " + v
+	}
 	return status.Errorf(codes.FailedPrecondition,
-		"this provider (%s) needs kit 1.87.0 or later, which renamed clients to applications (kit#968); this install runs %s. "+
+		"this provider (%s) needs kit 1.87.0 or later, which renamed clients to applications; this install runs %s. "+
 			"Upgrade kit, or stay on provider 0.34.x until it is upgraded.",
 		k.providerVersion, installed)
 }

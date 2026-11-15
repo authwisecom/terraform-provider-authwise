@@ -22,15 +22,15 @@ func TestAccKitCompat(t *testing.T) {
 	}{
 		"kit 1.86 lists no identity.vocabulary": {
 			capabilities: func() (*identitypb.InstallCapabilities, error) {
-				return &identitypb.InstallCapabilities{Features: []string{"guard.tenant-collapse"}, KitVersion: "1.86.3"}, nil
+				return &identitypb.InstallCapabilities{Features: []string{"guard.tenant-collapse"}, KitVersion: "v1.86.3-c46ab5f9"}, nil
 			},
-			want: regexp.MustCompile(`needs\s+kit\s+1\.87\.0\s+or\s+later[\s\S]*this\s+install\s+runs\s+kit\s+1\.86\.3`),
+			want: regexp.MustCompile(`needs\s+kit\s+1\.87\.0\s+or\s+later[\s\S]*this\s+install\s+runs\s+kit\s+1\.86\.3-c46ab5f9`),
 		},
 		"a kit without GetInstallCapabilities": {
 			capabilities: func() (*identitypb.InstallCapabilities, error) {
 				return nil, status.Error(codes.Unimplemented, "unknown method")
 			},
-			want: regexp.MustCompile(`needs\s+kit\s+1\.87\.0\s+or\s+later[\s\S]*this\s+install\s+runs\s+an\s+older\s+kit`),
+			want: regexp.MustCompile(`needs\s+kit\s+1\.87\.0\s+or\s+later[\s\S]*this\s+install\s+runs\s+an\s+earlier\s+kit`),
 		},
 		"a credential that may not ask": {
 			capabilities: func() (*identitypb.InstallCapabilities, error) {
