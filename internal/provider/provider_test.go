@@ -81,8 +81,9 @@ func TestProviderSurface(t *testing.T) {
 	// cluster trusts) guard_trusted_issuer_rule, the hand-written
 	// guard_trusted_issuer and guard_enrollment_key, and the
 	// associations guard_node_group_members, guard_node_group_grants and
-	// guard_resource_node_groups.
-	assert.Len(t, resourceTypes, 54)
+	// guard_resource_node_groups. Inbound SCIM (tf#18) adds the generated
+	// scim_connection and scim_token.
+	assert.Len(t, resourceTypes, 56)
 	assert.False(t, resourceTypes["authwise_issuer_domain"], "issuer domains are bindings (#69)")
 	assert.False(t, resourceTypes["authwise_guard_tenant"], "there is no Guard tenant (#65)")
 	assert.False(t, resourceTypes["authwise_guard_invite"], "Guard's Invite is retired (#67)")
@@ -156,8 +157,10 @@ func TestProviderSurface(t *testing.T) {
 	// the hand-written guard_allowed_relay_pools. The Invite's retirement
 	// (#67) removes guard_invite and guard_invites. Bindings (#69) add a
 	// pair for issuer_domain_binding. Guard for Kubernetes (2026.11.GFK.1)
-	// adds a pair each for node_group and trusted_issuer_rule.
-	assert.Len(t, dataSourceTypes, 85)
+	// adds a pair each for node_group and trusted_issuer_rule. Inbound
+	// SCIM (tf#18) adds a pair for scim_connection and the plural
+	// scim_tokens (a token, like an application secret, has no singular).
+	assert.Len(t, dataSourceTypes, 88)
 	for _, gone := range []string{"authwise_guard_tenant", "authwise_guard_tenants", "authwise_guard_deprovisioning"} {
 		assert.False(t, dataSourceTypes[gone], "%s went with the tenant collapse (#65)", gone)
 	}

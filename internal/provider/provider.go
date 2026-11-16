@@ -232,7 +232,12 @@ func (p *AuthwiseProvider) Configure(ctx context.Context, req provider.Configure
 		return
 	}
 
-	guardConn, guardConfigured, err := guardConnFor(config, dial)
+	// guard-control: trusted issuers need kit's guard.trusted-issuers
+	// feature, which kit answers for.
+	guardDial := func(target string, opts ...grpc.DialOption) (*grpc.ClientConn, error) {
+		return dial(target, append(opts, grpc.WithChainUnaryInterceptor(compat.gatedUnary(conn)))...)
+	}
+	guardConn, guardConfigured, err := guardConnFor(config, guardDial)
 	if err != nil {
 		resp.Diagnostics.AddAttributeError(path.Root("guard_endpoint"), "cannot create guard-control gRPC client", err.Error())
 		return

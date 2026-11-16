@@ -65,6 +65,10 @@ type fakeIdentityServer struct {
 	// clientSecrets are the created rows. Like kit's they hold no
 	// credential: the secret exists on the wire only in the create response.
 	clientSecrets map[string]*corepb.ApplicationSecret
+	// scimConnections and scimTokens are inbound SCIM's rows (tf#18); a
+	// token row, like kit's, holds no credential.
+	scimConnections map[string]*corepb.ScimConnection
+	scimTokens      map[string]*corepb.ScimToken
 	// creates counts CreateApplicationSecret calls, so a test can tell a
 	// replacement from an in-place update.
 	creates int
@@ -122,29 +126,31 @@ type fakeIdentityServer struct {
 
 func newFakeIdentityServer() *fakeIdentityServer {
 	return &fakeIdentityServer{
-		realms:        map[string]*corepb.Realm{},
-		issuers:       map[string]*corepb.Issuer{},
-		domains:       map[string]*corepb.Domain{},
-		scopes:        map[string]*corepb.Scope{},
-		profiles:      map[string]*corepb.ThemeVariant{},
-		themes:        map[string]*corepb.Theme{},
-		messages:      map[string]*corepb.MessageTemplate{},
-		scopePerms:    map[string]map[string]bool{},
-		audiences:     map[string]*corepb.Audience{},
-		clients:       map[string]*corepb.Application{},
-		clientSecrets: map[string]*corepb.ApplicationSecret{},
-		providers:     map[string]*corepb.Provider{},
-		certs:         map[string]*corepb.Certificate{},
-		endpoints:     map[string]*corepb.Endpoint{},
-		factors:       map[string]*corepb.Factor{},
-		secrets:       map[string]*corepb.Secret{},
-		assets:        map[string]*corepb.Asset{},
-		users:         map[string]*corepb.User{},
-		bindings:      map[string]*corepb.IssuerDomainBinding{},
-		contact:       map[string]string{},
-		blobs:         map[string][]byte{},
-		material:      map[string][]string{},
-		pinned:        map[string]bool{},
+		realms:          map[string]*corepb.Realm{},
+		issuers:         map[string]*corepb.Issuer{},
+		domains:         map[string]*corepb.Domain{},
+		scopes:          map[string]*corepb.Scope{},
+		profiles:        map[string]*corepb.ThemeVariant{},
+		themes:          map[string]*corepb.Theme{},
+		messages:        map[string]*corepb.MessageTemplate{},
+		scopePerms:      map[string]map[string]bool{},
+		audiences:       map[string]*corepb.Audience{},
+		clients:         map[string]*corepb.Application{},
+		clientSecrets:   map[string]*corepb.ApplicationSecret{},
+		scimConnections: map[string]*corepb.ScimConnection{},
+		scimTokens:      map[string]*corepb.ScimToken{},
+		providers:       map[string]*corepb.Provider{},
+		certs:           map[string]*corepb.Certificate{},
+		endpoints:       map[string]*corepb.Endpoint{},
+		factors:         map[string]*corepb.Factor{},
+		secrets:         map[string]*corepb.Secret{},
+		assets:          map[string]*corepb.Asset{},
+		users:           map[string]*corepb.User{},
+		bindings:        map[string]*corepb.IssuerDomainBinding{},
+		contact:         map[string]string{},
+		blobs:           map[string][]byte{},
+		material:        map[string][]string{},
+		pinned:          map[string]bool{},
 	}
 }
 

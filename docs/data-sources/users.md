@@ -35,6 +35,7 @@ Read-Only:
 - `email` (String)
 - `email_verified` (Boolean)
 - `enrollment` (String)
+- `external_id` (String)
 - `extra_fields` (String)
 - `family_name` (String)
 - `gender` (String)

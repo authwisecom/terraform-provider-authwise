@@ -68,6 +68,7 @@ var (
 	refTheme           = gentf.Reference{Target: "theme", Prefix: "th"}
 	refAccessCondition = gentf.Reference{Target: "access_condition", Prefix: "axc"}
 	refDomain          = gentf.Reference{Target: "domain", Prefix: "d"}
+	refScimConnection  = gentf.Reference{Target: "scim_connection", Prefix: "sc"}
 
 	// The parent attributes: every resource's and every plural data
 	// source's.
@@ -256,6 +257,32 @@ func applicationSecret() gentf.Entry {
 	}
 }
 
+// scimToken is a SCIM connection's bearer token (tf#18, kit#532, SCIM.md
+// D12): CreateScimToken returns the secret exactly once, beside the row, so
+// it lives in state as a sensitive attribute, as applicationSecret's does.
+// There is no update: every argument replaces the token. Like
+// applicationSecret it takes no singular data source, which would share the
+// model, secret and all.
+func scimToken() gentf.Entry {
+	r := resource(scopeRealm)
+	r.Collection = "scim-tokens"
+	r.Ops = gentf.OpGet | gentf.OpList | gentf.OpCreate | gentf.OpDelete
+	r.Required = []string{"scim_connection_id"}
+	r.Immutable = []string{"scim_connection_id", "expires_at"}
+	r.Computed = []string{"last_used_at", "created_at"}
+	r.References = map[string]gentf.Reference{"scim_connection_id": refScimConnection}
+	r.Description = "A bearer token a directory pushes users and groups with, for one `authwise_scim_connection`. " +
+		"kit creates it and returns it once, as `<id>_<secret>`, so **the token is kept in state**, marked sensitive: protect the state as you would the token, since anyone who reads it can write the realm's users. " +
+		"Paste `secret` into the directory with the connection's `base_url`. " +
+		"There is no update: changing `scim_connection_id` or `expires_at` replaces the token, and the old one stops working when it is destroyed. " +
+		"To rotate, add a second token, move the directory to it, then remove the first."
+	r.Mint = &gentf.Mint{Method: "CreateScimToken", Once: []string{"secret"}}
+	return gentf.Entry{
+		Type:            reflect.TypeFor[corepb.ScimToken](),
+		Implementations: []any{r, gentf.DataSourceList{}},
+	}
+}
+
 // samlBindings are the SAML 2.0 bindings kit sends and receives on, as the
 // URNs it takes, with the short names its documentation uses standing for
 // them.
@@ -382,6 +409,25 @@ func main() {
 				withRequired("display_name", "factor_type"),
 				withImmutable("factor_type"),
 				withJSON("config")),
+			// Inbound SCIM (tf#18, kit#532, SCIM.md): a directory pushes a
+			// realm's users and groups to base_url with an
+			// authwise_scim_token. identifier_attribute, on_delete and
+			// status default on the server.
+			crud[corepb.ScimConnection](scopeRealm,
+				withDescription("A connection an upstream directory (Entra ID, Okta, Google Workspace, OneLogin, JumpCloud) pushes a realm's users and groups through, over SCIM 2.0. "+
+					"Give the directory `base_url` and the secret of an `authwise_scim_token` for this connection. `base_url` is empty until the issuer has a host.\n\n"+
+					"`provider_id` names the realm's federated provider that pushed users sign in through: each user's identifier is written under it, taken from `identifier_attribute` (`userName`, the default; `externalId`; or `emails.primary`). "+
+					"Without it the connection keeps profiles only, a directory mirror. "+
+					"`on_delete` is what the directory's delete does: `deactivate` (the default) or `delete`. "+
+					"`status = \"disabled\"` refuses every request and keeps the tokens."),
+				withCollection("scim-connections"),
+				withRequired("display_name", "issuer_id"),
+				withComputed("base_url"),
+				withReferences(map[string]gentf.Reference{
+					"issuer_id":   {Target: "issuer", Prefix: "i"},
+					"provider_id": {Target: "provider", Prefix: "p"},
+				})),
+			scimToken(),
 
 			// Issuer-scoped.
 			// An issuer's host and path (kit#911, TENANT_DOMAINS.md): one

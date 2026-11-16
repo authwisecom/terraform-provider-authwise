@@ -90,6 +90,34 @@ BREAKING CHANGES:
 
 FEATURES:
 
+* **New resource: `authwise_scim_connection`** (tf#18, kit#532, train
+  2026.11.5). An upstream directory (Entra ID, Okta, Google Workspace,
+  OneLogin, JumpCloud) pushes a realm's users and groups through it over
+  SCIM 2.0. `issuer_id` names the issuer whose host serves `base_url`
+  (computed: what the directory is given). `provider_id` names the
+  federated provider pushed users sign in through, with their identifier
+  from `identifier_attribute` (`userName`, the default; `externalId`;
+  `emails.primary`); without it the connection keeps profiles only.
+  `on_delete` is `deactivate` (the default) or `delete`; `status` is
+  `active` or `disabled`. Data sources: `authwise_scim_connection` and
+  `authwise_scim_connections`.
+
+* **New resource: `authwise_scim_token`**. A connection's bearer token.
+  kit returns it once, as `<id>_<secret>`, so `secret` is kept in state,
+  marked sensitive (SCIM.md D12): protect the state as you would the
+  token. There is no update: `scim_connection_id` and `expires_at` replace
+  the token, and `keepers` rotates it. An imported token has no `secret`.
+  Data source: `authwise_scim_tokens`.
+
+* **`authwise_user`: `external_id`**, the directory's own id for a
+  SCIM-pushed user.
+
+* **Google reCAPTCHA as a bot check.** `authwise_realm_config`'s
+  `bot_protection` takes `provider = "RECAPTCHA"` with
+  `recaptcha_key_type` (`CHECKBOX` or `SCORE`, required for reCAPTCHA) and,
+  for a score key, `min_score` (0 to 1; unset is 0.5). `secret_ref` names
+  reCAPTCHA's legacy secret key.
+
 * **A realm's welcome message (kit#952, train 2026.11.4).**
   `authwise_realm_config` takes `signup = { welcome_message = true }`:
   the realm then sends the `welcome` catalog message once to a person whose
@@ -112,17 +140,26 @@ FEATURES:
 
 NOTES:
 
-* **apis v0.77.0** (from v0.73.0): kit v1.87.0's contract, the vocabulary
+* **apis v0.78.0** (from v0.73.0): kit v1.87.0's contract, the vocabulary
   pass (kit#968, apis v0.74.0), `RealmConfig.signup` (kit#952, apis
-  v0.75.0), guard-control v0.31.1's additive contract (apis v0.76.0) and
-  guard-control's trusted issuers (apis v0.77.0, train 2026.11.5).
+  v0.75.0), guard-control v0.31.1's additive contract (apis v0.76.0),
+  guard-control's trusted issuers (apis v0.77.0) and kit's SCIM admin API
+  and reCAPTCHA (apis v0.78.0, train 2026.11.5).
   This release needs kit 1.87.0 or later; an older kit answers the renamed
   calls with `Unimplemented`.
 
-* **Trusted issuers need a guard-control that serves
-  `GuardTrustedIssuerService`** and, for a service account managing them,
-  kit v1.88.0, which carries the `guardcontrol.trustedIssuers.*` and
-  `guardcontrol.trustedIssuerRules.*` permissions.
+* **Some resources need a newer kit than the rest, and say so.** The
+  provider still works with kit 1.87.0, but these resources refuse by name,
+  before calling, when kit's `GetInstallCapabilities` does not list the
+  feature they need:
+  * trusted issuers (`authwise_guard_trusted_issuer`,
+    `authwise_guard_trusted_issuer_rule` and their data sources) need
+    `guard.trusted-issuers` (kit 1.89.0), and guard-control v0.32.0;
+  * SCIM (`authwise_scim_connection`, `authwise_scim_token` and their data
+    sources) needs `identity.scim` (kit 1.89.0).
+
+  As with the vocabulary check, a check the credential may not make does
+  not block.
 
 * Release train 2026.11.GFK.1 (Guard for Kubernetes), stage GK5, built
   against apis v0.73.0. guard-control's servers for node groups and

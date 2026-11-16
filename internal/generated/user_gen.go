@@ -60,6 +60,11 @@ func UserResourceSchema() schema.Schema {
 				Computed:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
+			"external_id": schema.StringAttribute{
+				Computed:      true,
+				Optional:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
 			"extra_fields": schema.StringAttribute{
 				Computed:            true,
 				CustomType:          jsontypes.NormalizedType{},
@@ -217,6 +222,7 @@ type UserModel struct {
 	Origin               types.String         `tfsdk:"origin"`
 	Enrollment           types.String         `tfsdk:"enrollment"`
 	CredentialsChangedAt types.String         `tfsdk:"credentials_changed_at"`
+	ExternalId           types.String         `tfsdk:"external_id"`
 }
 
 // NewUserModel returns a model with every attribute set to its typed null; collection types cannot be zero-valued.
@@ -228,6 +234,7 @@ func NewUserModel() *UserModel {
 		Email:                types.StringNull(),
 		EmailVerified:        types.BoolNull(),
 		Enrollment:           types.StringNull(),
+		ExternalId:           types.StringNull(),
 		ExtraFields:          jsontypes.NewNormalizedNull(),
 		FamilyName:           types.StringNull(),
 		Gender:               types.StringNull(),
@@ -314,6 +321,7 @@ func (m *UserModel) ToProto(ctx context.Context) (*v1alpha1.User, diag.Diagnosti
 			out.CredentialsChangedAt = timestamppb.New(t)
 		}
 	}
+	out.ExternalId = m.ExternalId.ValueString()
 	return out, diags
 }
 
@@ -452,6 +460,11 @@ func (m *UserModel) FromProto(ctx context.Context, e *v1alpha1.User) diag.Diagno
 	} else {
 		m.CredentialsChangedAt = types.StringValue(e.CredentialsChangedAt.AsTime().Format(time.RFC3339))
 	}
+	if e.ExternalId == "" {
+		m.ExternalId = types.StringNull()
+	} else {
+		m.ExternalId = types.StringValue(e.ExternalId)
+	}
 	return diags
 }
 
@@ -525,6 +538,9 @@ func (m *UserModel) UpdateMask(ctx context.Context, prior *UserModel) []string {
 	}
 	if !m.Status.Equal(prior.Status) {
 		paths = append(paths, "status")
+	}
+	if !m.ExternalId.Equal(prior.ExternalId) {
+		paths = append(paths, "external_id")
 	}
 	return paths
 }
@@ -660,6 +676,7 @@ func UserDataSourceSchema() schema1.Schema {
 			"email":                  schema1.StringAttribute{Computed: true},
 			"email_verified":         schema1.BoolAttribute{Computed: true},
 			"enrollment":             schema1.StringAttribute{Computed: true},
+			"external_id":            schema1.StringAttribute{Computed: true},
 			"extra_fields": schema1.StringAttribute{
 				Computed:   true,
 				CustomType: jsontypes.NormalizedType{},
@@ -760,6 +777,7 @@ type UserItemModel struct {
 	Origin               types.String         `tfsdk:"origin"`
 	Enrollment           types.String         `tfsdk:"enrollment"`
 	CredentialsChangedAt types.String         `tfsdk:"credentials_changed_at"`
+	ExternalId           types.String         `tfsdk:"external_id"`
 }
 
 // UserItemAttrTypes returns the attribute types of one users list element.
@@ -771,6 +789,7 @@ func UserItemAttrTypes() map[string]attr.Type {
 		"email":                  types.StringType,
 		"email_verified":         types.BoolType,
 		"enrollment":             types.StringType,
+		"external_id":            types.StringType,
 		"extra_fields":           jsontypes.NormalizedType{},
 		"family_name":            types.StringType,
 		"gender":                 types.StringType,
@@ -826,6 +845,7 @@ func UserListDataSourceSchema() schema1.Schema {
 					"email":                  schema1.StringAttribute{Computed: true},
 					"email_verified":         schema1.BoolAttribute{Computed: true},
 					"enrollment":             schema1.StringAttribute{Computed: true},
+					"external_id":            schema1.StringAttribute{Computed: true},
 					"extra_fields": schema1.StringAttribute{
 						Computed:   true,
 						CustomType: jsontypes.NormalizedType{},
@@ -1004,6 +1024,11 @@ func userItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.User, *UserM
 		item.CredentialsChangedAt = types.StringNull()
 	} else {
 		item.CredentialsChangedAt = types.StringValue(e.CredentialsChangedAt.AsTime().Format(time.RFC3339))
+	}
+	if e.ExternalId == "" {
+		item.ExternalId = types.StringNull()
+	} else {
+		item.ExternalId = types.StringValue(e.ExternalId)
 	}
 	id, err := crud.IDFromName(e.Name)
 	if err != nil {

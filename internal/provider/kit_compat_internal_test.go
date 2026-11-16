@@ -6,6 +6,7 @@ import (
 	"sync"
 	"testing"
 
+	guardpb "git.authwise.com/authwise/apis/authwise/guardcontrol/v1alpha1"
 	identitypb "git.authwise.com/authwise/apis/authwise/identity/v1alpha1"
 	corepb "git.authwise.com/authwise/apis/authwise/types/core/v1alpha1"
 	"github.com/stretchr/testify/assert"
@@ -38,6 +39,10 @@ func (k *capabilitiesKit) GetInstallCapabilities(_ context.Context, req *identit
 
 func (k *capabilitiesKit) GetRealm(_ context.Context, req *identitypb.GetRealmRequest) (*corepb.Realm, error) {
 	return &corepb.Realm{Name: req.GetName()}, nil
+}
+
+func (k *capabilitiesKit) GetScimConnection(_ context.Context, req *identitypb.GetScimConnectionRequest) (*corepb.ScimConnection, error) {
+	return &corepb.ScimConnection{Name: req.GetName()}, nil
 }
 
 func compatClient(t *testing.T, kit *capabilitiesKit, tenant string) identitypb.AuthwiseIdentityServiceClient {
@@ -110,4 +115,69 @@ func TestTenantOf(t *testing.T) {
 	assert.Equal(t, "t-2", tenantOf(&identitypb.ListRealmsRequest{Parent: "tenants/t-2"}))
 	assert.Empty(t, tenantOf(&identitypb.GetRealmRequest{Name: "realms/r-1"}))
 	assert.Empty(t, tenantOf(nil))
+}
+
+// TestKitCompat_GatedFeature: a SCIM call needs identity.scim; without it
+// the call is refused by name and never reaches kit, while the rest of the
+// provider keeps working against that kit.
+func TestKitCompat_GatedFeature(t *testing.T) {
+	scim := &identitypb.GetScimConnectionRequest{Name: "tenants/t-1/realms/r-1/scim-connections/sc-1"}
+
+	kit := &capabilitiesKit{features: []string{featureVocabulary}}
+	c := compatClient(t, kit, "t-1")
+	_, err := c.GetScimConnection(t.Context(), scim)
+	assert.Equal(t, codes.FailedPrecondition, status.Code(err))
+	assert.Contains(t, err.Error(), "identity.scim")
+	assert.Contains(t, err.Error(), "authwise_scim_connection")
+	assert.Contains(t, err.Error(), "kit 1.86.3")
+	_, err = c.GetRealm(t.Context(), &identitypb.GetRealmRequest{Name: "tenants/t-1/realms/r-1"})
+	require.NoError(t, err)
+	assert.Len(t, kit.parents, 1)
+
+	kit = &capabilitiesKit{features: []string{featureVocabulary, "identity.scim"}}
+	c = compatClient(t, kit, "t-1")
+	_, err = c.GetScimConnection(t.Context(), scim)
+	require.NoError(t, err)
+}
+
+// TestKitCompat_GatedUnanswered: a check that could not be made refuses no
+// gated call either.
+func TestKitCompat_GatedUnanswered(t *testing.T) {
+	kit := &capabilitiesKit{err: status.Error(codes.PermissionDenied, "PermissionDenied")}
+	c := compatClient(t, kit, "t-1")
+	_, err := c.GetScimConnection(t.Context(), &identitypb.GetScimConnectionRequest{Name: "tenants/t-1/realms/r-1/scim-connections/sc-1"})
+	require.NoError(t, err)
+}
+
+// TestKitCompat_GatedUnaryGuard: on guard-control's connection only the
+// trusted issuer calls are checked, and the question goes to kit.
+func TestKitCompat_GatedUnaryGuard(t *testing.T) {
+	lis, err := new(net.ListenConfig).Listen(t.Context(), "tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	kit := &capabilitiesKit{features: []string{featureVocabulary}}
+	s := grpc.NewServer()
+	identitypb.RegisterAuthwiseIdentityServiceServer(s, kit)
+	go func() { _ = s.Serve(lis) }()
+	t.Cleanup(s.Stop)
+	kitConn, err := grpc.NewClient(lis.Addr().String(), grpc.WithTransportCredentials(insecure.NewCredentials()))
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = kitConn.Close() })
+
+	gated := newKitCompat("0.35.0", "t-1").gatedUnary(kitConn)
+	invoked := 0
+	invoker := func(context.Context, string, any, any, *grpc.ClientConn, ...grpc.CallOption) error {
+		invoked++
+		return nil
+	}
+
+	err = gated(t.Context(), guardpb.GuardControlService_GetNetwork_FullMethodName,
+		&guardpb.GetNetworkRequest{Name: "tenants/t-1/networks/n-1"}, nil, nil, invoker)
+	require.NoError(t, err)
+	assert.Empty(t, kit.parents, "an ungated guard call asks kit nothing")
+
+	err = gated(t.Context(), guardpb.GuardTrustedIssuerService_GetTrustedIssuer_FullMethodName,
+		&guardpb.GetTrustedIssuerRequest{Name: "tenants/t-1/networks/n-1/trustedIssuers/ti-1"}, nil, nil, invoker)
+	assert.Equal(t, codes.FailedPrecondition, status.Code(err))
+	assert.Contains(t, err.Error(), "guard.trusted-issuers")
+	assert.Equal(t, 1, invoked)
 }

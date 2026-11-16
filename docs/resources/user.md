@@ -19,6 +19,7 @@ A user in a realm.
 
 - `birthdate` (String)
 - `display_name` (String)
+- `external_id` (String)
 - `extra_fields` (String) `extra_fields` as a JSON object.
 - `family_name` (String)
 - `gender` (String)

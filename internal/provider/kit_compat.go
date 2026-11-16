@@ -6,6 +6,7 @@ import (
 	"strings"
 	"sync"
 
+	guardpb "git.authwise.com/authwise/apis/authwise/guardcontrol/v1alpha1"
 	identitypb "git.authwise.com/authwise/apis/authwise/identity/v1alpha1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -18,6 +19,42 @@ import (
 // in GetInstallCapabilities. This provider speaks only those names, so a kit
 // without it answers every renamed call with Unimplemented.
 const featureVocabulary = "identity.vocabulary"
+
+// gatedFeatures are the install features a call needs beyond the
+// vocabulary, by the call's full method (train 2026.11.5, plan's ruling):
+// the resources that make it refuse on a kit without the feature, and
+// everything else in the provider keeps working against that kit. Never
+// the kit version: the contract says to read features.
+var gatedFeatures = func() map[string]gatedFeature {
+	scim := gatedFeature{feature: "identity.scim", what: "SCIM (authwise_scim_connection, authwise_scim_token)"}
+	issuers := gatedFeature{feature: "guard.trusted-issuers", what: "trusted issuers (authwise_guard_trusted_issuer, authwise_guard_trusted_issuer_rule)"}
+	m := map[string]gatedFeature{}
+	for _, method := range []string{
+		identitypb.AuthwiseIdentityService_GetScimConnection_FullMethodName,
+		identitypb.AuthwiseIdentityService_ListScimConnections_FullMethodName,
+		identitypb.AuthwiseIdentityService_CreateScimConnection_FullMethodName,
+		identitypb.AuthwiseIdentityService_UpdateScimConnection_FullMethodName,
+		identitypb.AuthwiseIdentityService_PatchScimConnection_FullMethodName,
+		identitypb.AuthwiseIdentityService_DeleteScimConnection_FullMethodName,
+		identitypb.AuthwiseIdentityService_GetScimToken_FullMethodName,
+		identitypb.AuthwiseIdentityService_ListScimTokens_FullMethodName,
+		identitypb.AuthwiseIdentityService_CreateScimToken_FullMethodName,
+		identitypb.AuthwiseIdentityService_DeleteScimToken_FullMethodName,
+	} {
+		m[method] = scim
+	}
+	for _, md := range guardpb.GuardTrustedIssuerService_ServiceDesc.Methods {
+		m["/"+guardpb.GuardTrustedIssuerService_ServiceDesc.ServiceName+"/"+md.MethodName] = issuers
+	}
+	return m
+}()
+
+// gatedFeature is one install feature a group of calls needs, and how the
+// refusal names them.
+type gatedFeature struct {
+	feature string
+	what    string
+}
 
 // getInstallCapabilitiesMethod is the check's own call, which the check
 // must not check.
@@ -39,14 +76,21 @@ type kitCompat struct {
 	mu   sync.Mutex
 	done bool
 	err  error
+	// answered is whether kit said which features it lists; features and
+	// kitVersion are its answer. A check that could not be made leaves it
+	// false, and no gated call is refused for want of an answer.
+	answered   bool
+	features   []string
+	kitVersion string
 }
 
 func newKitCompat(providerVersion, tenantID string) *kitCompat {
 	return &kitCompat{providerVersion: providerVersion, tenantID: tenantID}
 }
 
-// check returns the refusal, if any, for a call carrying req.
-func (k *kitCompat) check(ctx context.Context, method string, req any, cc *grpc.ClientConn) error {
+// check returns the refusal, if any, for a call carrying req. cc is kit's
+// connection, which the question goes to.
+func (k *kitCompat) check(ctx context.Context, method string, req any, cc grpc.ClientConnInterface) error {
 
 	if method == getInstallCapabilitiesMethod {
 		return nil
@@ -54,6 +98,19 @@ func (k *kitCompat) check(ctx context.Context, method string, req any, cc *grpc.
 
 	k.mu.Lock()
 	defer k.mu.Unlock()
+	if err := k.askLocked(ctx, req, cc); err != nil {
+		return err
+	}
+	if g, ok := gatedFeatures[method]; ok && k.answered && !slices.Contains(k.features, g.feature) {
+		return k.gatedRefusal(g)
+	}
+	return nil
+}
+
+// askLocked asks kit once per run and returns the vocabulary refusal, if
+// any.
+func (k *kitCompat) askLocked(ctx context.Context, req any, cc grpc.ClientConnInterface) error {
+
 	if k.done {
 		return k.err
 	}
@@ -71,6 +128,7 @@ func (k *kitCompat) check(ctx context.Context, method string, req any, cc *grpc.
 		&identitypb.GetInstallCapabilitiesRequest{Parent: "tenants/" + tenant})
 	switch status.Code(err) {
 	case codes.OK:
+		k.answered, k.features, k.kitVersion = true, got.GetFeatures(), got.GetKitVersion()
 		if !slices.Contains(got.GetFeatures(), featureVocabulary) {
 			k.err = k.refusal(got.GetKitVersion())
 		}
@@ -88,6 +146,18 @@ func (k *kitCompat) check(ctx context.Context, method string, req any, cc *grpc.
 	return k.err
 }
 
+// gatedRefusal says which feature the install lacks and what needs it.
+func (k *kitCompat) gatedRefusal(g gatedFeature) error {
+	installed := "this kit"
+	if v := strings.TrimPrefix(k.kitVersion, "v"); v != "" {
+		installed = "kit " + v
+	}
+	return status.Errorf(codes.FailedPrecondition,
+		"%s needs a kit that lists the %s install feature; this install runs %s, which does not. "+
+			"Upgrade kit to use them; the rest of this provider works with it as it is.",
+		g.what, g.feature, installed)
+}
+
 // refusal is awctl's sentence (custom/vocabulary_gate.go), so both tools
 // refuse an old kit in the same words, then what to do about it here.
 func (k *kitCompat) refusal(kitVersion string) error {
@@ -99,6 +169,20 @@ func (k *kitCompat) refusal(kitVersion string) error {
 		"this provider (%s) needs kit 1.87.0 or later, which renamed clients to applications; this install runs %s. "+
 			"Upgrade kit, or stay on provider 0.34.x until it is upgraded.",
 		k.providerVersion, installed)
+}
+
+// gatedUnary is for another service's connection (guard-control): only the
+// calls gatedFeatures names are checked, and the question goes to kit on
+// kitConn.
+func (k *kitCompat) gatedUnary(kitConn grpc.ClientConnInterface) grpc.UnaryClientInterceptor {
+	return func(ctx context.Context, method string, req, reply any, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
+		if _, ok := gatedFeatures[method]; ok {
+			if err := k.check(ctx, method, req, kitConn); err != nil {
+				return err
+			}
+		}
+		return invoker(ctx, method, req, reply, cc, opts...)
+	}
 }
 
 func (k *kitCompat) unary() grpc.UnaryClientInterceptor {

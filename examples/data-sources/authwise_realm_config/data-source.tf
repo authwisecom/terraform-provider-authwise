@@ -28,3 +28,16 @@ resource "authwise_realm" "this" {
   display_name = "Customers"
   config       = data.authwise_realm_config.this.json
 }
+
+# Google reCAPTCHA with a v3 score key: no widget, and a sign-up whose
+# token scores below 0.7 is refused.
+data "authwise_realm_config" "recaptcha" {
+  bot_protection = {
+    mode               = "ALWAYS"
+    provider           = "RECAPTCHA"
+    site_key           = "6LcAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    secret_ref         = { name = authwise_secret.recaptcha.name }
+    recaptcha_key_type = "SCORE"
+    min_score          = 0.7
+  }
+}
