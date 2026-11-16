@@ -1013,7 +1013,6 @@ func newHarness(t *testing.T) *harness {
 	guardpb.RegisterGuardNodeServiceServer(gs, h.guard)
 	guardpb.RegisterGuardRelayPoolServiceServer(gs, h.guard)
 	guardpb.RegisterGuardNodeGroupServiceServer(gs, h.guard)
-	guardpb.RegisterGuardClusterTrustServiceServer(gs, h.guard)
 	guardpb.RegisterGuardEnrollmentKeyServiceServer(gs, h.guard)
 	go func() { _ = gs.Serve(guardLis) }()
 	t.Cleanup(gs.Stop)

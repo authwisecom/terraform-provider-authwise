@@ -45,9 +45,6 @@ var (
 
 	// Guard's (guard-control): a network in a kit tenant (tf#65).
 	scopeGuardNetwork = tf.NewScope("tenants", "networks")
-	// A network's cluster trust (train 2026.11.GFK.1): its rules live under
-	// it.
-	scopeGuardClusterTrust = tf.NewScope("tenants", "networks", "clusterTrusts")
 )
 
 // References: the bare-AWID fields and what they hold, from kit's
@@ -78,9 +75,6 @@ var (
 		"audience_id":    refAudience,
 		"application_id": {Target: "application", Prefix: "c"},
 		"network_id":     {Target: "guard_network", Prefix: "n"},
-		// The hand-written authwise_guard_cluster_trust (its keys are a
-		// oneof).
-		"cluster_trust_id": {Target: "guard_cluster_trust", Prefix: "ct"},
 	}
 )
 
@@ -92,8 +86,7 @@ var (
 	// guard-control's hand-authored services, adapted to the generator's
 	// Patch shape (internal/guardadapt). The keys are the provider's
 	// ProviderData.Clients keys.
-	guardNodeGroupClient        = reflect.TypeFor[guardadapt.NodeGroupClient]()
-	guardClusterTrustRuleClient = reflect.TypeFor[guardadapt.ClusterTrustRuleClient]()
+	guardNodeGroupClient = reflect.TypeFor[guardadapt.NodeGroupClient]()
 )
 
 // resource builds the standard identity resource marker.
@@ -536,6 +529,9 @@ func main() {
 				// How a node joined and what it reports (train 2026.11.GFK.1):
 				// read only. node_groups and capabilities move with group
 				// membership and the agent's reports, not with a write here.
+				// cluster_trust_rule is apis v0.76.0's spelling of the issuer
+				// rule a node joined by; guard-control#102 renames it, and
+				// 0.35.0 is not tagged before that bump (TI-D5).
 				withComputed("allowed_ips", "owner_id", "state", "roles", "auth_code", "auth_code_expires_at", "last_seen_at", "platform",
 					"enrollment_key", "cluster_trust_rule", "ephemeral"),
 				withVolatile("node_groups", "capabilities"),
@@ -545,31 +541,16 @@ func main() {
 			// named set of a network's nodes that grants and serving name as
 			// one. Members are authwise_guard_node_group_members, the group's
 			// own grants authwise_guard_node_group_grants (hand-written).
-			// Enrollment keys and cluster trust rules that name a group add
-			// what they enroll.
+			// Enrollment keys that name a group add what they enroll.
 			crud[guardpb.NodeGroup](scopeGuardNetwork,
 				withDescription("A Guard node group: a named set of a network's nodes that grants and serving name as one. "+
 					"A group may be granted what its members reach (`authwise_guard_node_group_grants`), be granted to a node or another group (members are reached as one), and serve a resource (`authwise_guard_resource_node_groups`: every member serves it). "+
-					"Members are added by hand (`authwise_guard_node_group_members`) or by the credential a node joins with: an `authwise_guard_enrollment_key` or `authwise_guard_cluster_trust_rule` that names the group adds each node it enrolls, so a pod that joins is reachable and served at once. "+
-					"A group named by an unrevoked enrollment key or a cluster trust rule is not deleted (`NODE_GROUP_IN_USE`): Terraform's dependency order removes those first when they reference this resource. Deleting a group removes its memberships, grants and serving; the nodes stay."),
+					"Members are added by hand (`authwise_guard_node_group_members`) or by the credential a node joins with: an `authwise_guard_enrollment_key` that names the group adds each node it enrolls, so a node that joins is reachable and served at once. "+
+					"A group named by an unrevoked enrollment key is not deleted (`NODE_GROUP_IN_USE`): Terraform's dependency order removes it first when they reference this resource. Deleting a group removes its memberships, grants and serving; the nodes stay."),
 				guardVia("node_group", guardNodeGroupClient, "guard_node_group"), guardList("node_groups"),
 				withRequired("display_name"),
 				withComputed("created_by", "created_at"),
 				withVolatile("member_count", "updated_at")),
-			// A cluster trust's rules (GK2): one namespace's service account
-			// joins through the trust. namespace and service_account are the
-			// rule's identity; the rest applies to joins from now on.
-			crud[guardpb.ClusterTrustRule](scopeGuardClusterTrust,
-				withDescription("A rule of a Guard cluster trust: pods of one namespace running as one service account (or `*`, any of the namespace's) may join the network with their projected service account token. "+
-					"The node is named `<node_name_prefix>-<pod name>`, with the trust's `display_name` as a DNS label for the prefix when `node_name_prefix` is unset, so a pod name repeated across clusters says which cluster joined it (guard-control#100). "+
-					"It runs on platform `KUBERNETES`, is added to `node_group`, and counts against `max_nodes` (1 to 1000; unset is 100). "+
-					"`ephemeral` removes a node once it has been offline an hour, or as soon as its pod leaves: for Deployment and Job pods, not StatefulSet pods, which keep their node across restarts. "+
-					"Changes apply to joins from now on; joined nodes keep what they joined with. Deleting a rule stops further joins; joined nodes stay."),
-				guardVia("cluster_trust_rule", guardClusterTrustRuleClient, "guard_cluster_trust_rule"), guardList("cluster_trust_rules"),
-				withCollection("rules"),
-				withRequired("namespace", "service_account"), withImmutable("namespace", "service_account"),
-				withComputed("created_by", "created_at"),
-				withVolatile("node_count")),
 			// No Invite: Guard's Invite entity is retired (kit#902 D5, tf#67).
 			// A person is invited by kit's InviteUser and granted with
 			// GrantEnrolment.

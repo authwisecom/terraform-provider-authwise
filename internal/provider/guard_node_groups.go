@@ -121,7 +121,7 @@ func newGuardNodeGroupMembersResource() resource.Resource {
 		attribute:       guardNodesAttribute,
 		description: "The nodes of a Guard node group, by full name (`authwise_guard_node.<name>.name`), as an authoritative set: a member added out of band is removed on the next apply. " +
 			"A node may be in any number of groups.\n\n" +
-			"**Not for groups that credentials fill.** A node that joins with an `authwise_guard_enrollment_key` or under an `authwise_guard_cluster_trust_rule` naming the group is added to it at join, and this resource would remove it on the next apply. " +
+			"**Not for groups that credentials fill.** A node that joins with an `authwise_guard_enrollment_key` naming the group is added to it at join, and this resource would remove it on the next apply. " +
 			"Use it for groups of nodes you register yourself.",
 		build: func(pd *tfruntime.ProviderData) *tfruntime.Association {
 			groups, ok := pd.Clients[guardNodeGroupServiceKey].(guardpb.GuardNodeGroupServiceClient)

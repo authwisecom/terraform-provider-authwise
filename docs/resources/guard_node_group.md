@@ -3,19 +3,19 @@
 page_title: "authwise_guard_node_group Resource - Authwise"
 subcategory: "Guard"
 description: |-
-  A Guard node group: a named set of a network's nodes that grants and serving name as one. A group may be granted what its members reach (authwise_guard_node_group_grants), be granted to a node or another group (members are reached as one), and serve a resource (authwise_guard_resource_node_groups: every member serves it). Members are added by hand (authwise_guard_node_group_members) or by the credential a node joins with: an authwise_guard_enrollment_key or authwise_guard_cluster_trust_rule that names the group adds each node it enrolls, so a pod that joins is reachable and served at once. A group named by an unrevoked enrollment key or a cluster trust rule is not deleted (NODE_GROUP_IN_USE): Terraform's dependency order removes those first when they reference this resource. Deleting a group removes its memberships, grants and serving; the nodes stay.
+  A Guard node group: a named set of a network's nodes that grants and serving name as one. A group may be granted what its members reach (authwise_guard_node_group_grants), be granted to a node or another group (members are reached as one), and serve a resource (authwise_guard_resource_node_groups: every member serves it). Members are added by hand (authwise_guard_node_group_members) or by the credential a node joins with: an authwise_guard_enrollment_key that names the group adds each node it enrolls, so a node that joins is reachable and served at once. A group named by an unrevoked enrollment key is not deleted (NODE_GROUP_IN_USE): Terraform's dependency order removes it first when they reference this resource. Deleting a group removes its memberships, grants and serving; the nodes stay.
 ---
 
 # authwise_guard_node_group (Resource)
 
-A Guard node group: a named set of a network's nodes that grants and serving name as one. A group may be granted what its members reach (`authwise_guard_node_group_grants`), be granted to a node or another group (members are reached as one), and serve a resource (`authwise_guard_resource_node_groups`: every member serves it). Members are added by hand (`authwise_guard_node_group_members`) or by the credential a node joins with: an `authwise_guard_enrollment_key` or `authwise_guard_cluster_trust_rule` that names the group adds each node it enrolls, so a pod that joins is reachable and served at once. A group named by an unrevoked enrollment key or a cluster trust rule is not deleted (`NODE_GROUP_IN_USE`): Terraform's dependency order removes those first when they reference this resource. Deleting a group removes its memberships, grants and serving; the nodes stay.
+A Guard node group: a named set of a network's nodes that grants and serving name as one. A group may be granted what its members reach (`authwise_guard_node_group_grants`), be granted to a node or another group (members are reached as one), and serve a resource (`authwise_guard_resource_node_groups`: every member serves it). Members are added by hand (`authwise_guard_node_group_members`) or by the credential a node joins with: an `authwise_guard_enrollment_key` that names the group adds each node it enrolls, so a node that joins is reachable and served at once. A group named by an unrevoked enrollment key is not deleted (`NODE_GROUP_IN_USE`): Terraform's dependency order removes it first when they reference this resource. Deleting a group removes its memberships, grants and serving; the nodes stay.
 
 ## Example Usage
 
 ```terraform
-# The pods of one Kubernetes cluster that join the network. A cluster trust
-# rule or an enrollment key that names the group adds each node it enrolls,
-# so a pod that joins is served and reachable at once.
+# The pods of one Kubernetes cluster that join the network. An enrollment
+# key that names the group adds each node it enrolls, so a pod that joins is
+# served and reachable at once.
 resource "authwise_guard_node_group" "gfk_pods" {
   tenant_id    = "t-01"
   network_id   = authwise_guard_network.office.guard_network_id

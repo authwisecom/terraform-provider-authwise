@@ -1,5 +1,5 @@
 # A group of servers registered by hand. Don't manage the members of a
-# group that an enrollment key or a cluster trust rule fills: this resource
+# group that an enrollment key fills: this resource
 # would remove the nodes they add.
 resource "authwise_guard_node_group" "ops" {
   tenant_id    = "t-01"
