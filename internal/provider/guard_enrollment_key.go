@@ -23,11 +23,6 @@ import (
 )
 
 const (
-	// attrName and attrDescription are the Guard GFK resources' own
-	// attributes of those names.
-	attrName        = "name"
-	attrDescription = "description"
-
 	// guardEnrollmentKeyClientKey is GuardEnrollmentKeyService
 	// (guard-control#98).
 	guardEnrollmentKeyClientKey = "guard_enrollment_key"

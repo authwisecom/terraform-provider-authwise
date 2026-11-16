@@ -2,6 +2,7 @@ package acctest_test
 
 import (
 	"context"
+	"fmt"
 	"regexp"
 	"slices"
 	"strings"
@@ -16,27 +17,31 @@ import (
 )
 
 // Guard for Kubernetes (train 2026.11.GFK.1) as apis v0.73.0 states it:
-// node groups (GuardNodeGroupService), enrollment keys
-// (GuardEnrollmentKeyService, guard-control#98) and translated applications
-// on Resource. guard-control's
+// node groups (GuardNodeGroupService), trusted issuers and their rules
+// (GuardTrustedIssuerService), enrollment keys (GuardEnrollmentKeyService,
+// guard-control#98) and translated applications on Resource. guard-control's
 // servers were not built when this was written (feat/gfk1 has the contract
 // only), so the rules are the proto comments', not a server's.
 
 const (
 	nodeGroupsSeg     = "/nodeGroups/"
+	trustedIssuersSeg = "/trustedIssuers/"
 	enrollmentKeysSeg = "/enrollmentKeys/"
 
 	reasonNodeGroupInUse      = "NODE_GROUP_IN_USE"
 	reasonNodeLacksCapability = "NODE_LACKS_CAPABILITY"
 	capabilityAppTranslate    = "app-translate"
 
-	maxKeyUses     = 1000
-	defaultKeyLife = 30 * 24 * time.Hour
-	maxKeyLife     = 90 * 24 * time.Hour
+	defaultRuleMaxNodes = 100
+	maxRuleMaxNodes     = 1000
+	maxKeyUses          = 1000
+	defaultKeyLife      = 30 * 24 * time.Hour
+	maxKeyLife          = 90 * 24 * time.Hour
 )
 
 var (
-	dnsLabel32 = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,30}[a-z0-9])?$`)
+	guardIssuerParent = regexp.MustCompile(`^tenants/[^/]+/networks/[^/]+/trustedIssuers/[^/]+$`)
+	dnsLabel32        = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,30}[a-z0-9])?$`)
 )
 
 // fakeGuardK8s is the GFK half of fakeGuardServer's state.
@@ -44,6 +49,8 @@ type fakeGuardK8s struct {
 	groups map[string]*guardpb.NodeGroup
 	// members are each group's node names.
 	members map[string][]string
+	issuers map[string]*guardpb.TrustedIssuer
+	rules   map[string]*guardpb.TrustedIssuerRule
 	keys    map[string]*guardpb.EnrollmentKey
 }
 
@@ -51,6 +58,8 @@ func newFakeGuardK8s() *fakeGuardK8s {
 	return &fakeGuardK8s{
 		groups:  map[string]*guardpb.NodeGroup{},
 		members: map[string][]string{},
+		issuers: map[string]*guardpb.TrustedIssuer{},
+		rules:   map[string]*guardpb.TrustedIssuerRule{},
 		keys:    map[string]*guardpb.EnrollmentKey{},
 	}
 }
@@ -173,6 +182,11 @@ func (f *fakeGuardServer) DeleteNodeGroup(ctx context.Context, in *guardpb.Delet
 			return nil, guardRefusal(codes.FailedPrecondition, reasonNodeGroupInUse, "enrollment key "+k.GetName()+" names the group")
 		}
 	}
+	for _, r := range f.k8s.rules {
+		if r.GetNodeGroup() == name {
+			return nil, guardRefusal(codes.FailedPrecondition, reasonNodeGroupInUse, "trusted issuer rule "+r.GetName()+" names the group")
+		}
+	}
 	delete(f.k8s.groups, name)
 	delete(f.k8s.members, name)
 	delete(f.grants, name)
@@ -266,6 +280,244 @@ func (f *fakeGuardServer) AssociateGrantsToNodeGroup(ctx context.Context, in *gu
 	}
 	slices.Sort(targets)
 	f.grants[in.GetName()] = targets
+	return &emptypb.Empty{}, nil
+}
+
+// --- GuardTrustedIssuerService ---
+
+func (f *fakeGuardServer) checkIssuerKeysLocked(t *guardpb.TrustedIssuer) error {
+	switch k := t.GetKeys().(type) {
+	case *guardpb.TrustedIssuer_Discover:
+		if !k.Discover {
+			return status.Error(codes.InvalidArgument, "discover: true or absent")
+		}
+		if !strings.HasPrefix(t.GetIssuer(), "https://") {
+			return status.Error(codes.InvalidArgument, "issuer: discover needs an https issuer")
+		}
+		t.KeyIds = []string{"kid-discovered"}
+		t.KeysUpdatedAt = timestamppb.Now()
+	case *guardpb.TrustedIssuer_Jwks:
+		if !strings.Contains(string(k.Jwks), `"keys"`) || len(k.Jwks) > 64<<10 {
+			return status.Error(codes.InvalidArgument, "jwks: not a JWKS document of at most 64 KiB")
+		}
+		t.KeyIds = []string{fmt.Sprintf("kid-uploaded-%d", len(k.Jwks))}
+		t.KeysUpdatedAt = timestamppb.Now()
+	default:
+		return status.Error(codes.InvalidArgument, "keys: give discover or jwks")
+	}
+	return nil
+}
+
+// issuerOut never returns the uploaded jwks.
+func issuerOut(t *guardpb.TrustedIssuer) *guardpb.TrustedIssuer {
+	out := proto.Clone(t).(*guardpb.TrustedIssuer)
+	if _, ok := out.GetKeys().(*guardpb.TrustedIssuer_Jwks); ok {
+		out.Keys = nil
+	}
+	return out
+}
+
+func (f *fakeGuardServer) CreateTrustedIssuer(ctx context.Context, in *guardpb.CreateTrustedIssuerRequest) (*guardpb.TrustedIssuer, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.record(ctx)
+	if _, err := f.parentNetwork(in.GetParent()); err != nil {
+		return nil, err
+	}
+	t := proto.Clone(in.GetTrustedIssuer()).(*guardpb.TrustedIssuer)
+	if t.GetDisplayName() == "" || t.GetIssuer() == "" {
+		return nil, status.Error(codes.InvalidArgument, "display_name and issuer are required")
+	}
+	if err := f.checkIssuerKeysLocked(t); err != nil {
+		return nil, err
+	}
+	t.Name = in.GetParent() + trustedIssuersSeg + f.nextID("ti")
+	t.Audience = "guard:" + in.GetParent()
+	t.CreatedBy = "c-terraform"
+	t.CreatedAt = timestamppb.Now()
+	f.k8s.issuers[t.GetName()] = t
+	return issuerOut(t), nil
+}
+
+func (f *fakeGuardServer) GetTrustedIssuer(ctx context.Context, in *guardpb.GetTrustedIssuerRequest) (*guardpb.TrustedIssuer, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.record(ctx)
+	t, ok := f.k8s.issuers[in.GetName()]
+	if !ok {
+		return nil, status.Errorf(codes.NotFound, "trusted issuer %q not found", in.GetName())
+	}
+	return issuerOut(t), nil
+}
+
+func (f *fakeGuardServer) ListTrustedIssuers(ctx context.Context, in *guardpb.ListTrustedIssuersRequest) (*guardpb.ListTrustedIssuersResponse, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.record(ctx)
+	out := &guardpb.ListTrustedIssuersResponse{}
+	for _, t := range children(f.k8s.issuers, in.GetParent()+trustedIssuersSeg) {
+		out.TrustedIssuers = append(out.TrustedIssuers, issuerOut(t))
+	}
+	return out, nil
+}
+
+func (f *fakeGuardServer) UpdateTrustedIssuer(ctx context.Context, in *guardpb.UpdateTrustedIssuerRequest) (*guardpb.TrustedIssuer, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.record(ctx)
+	src := in.GetTrustedIssuer()
+	t, ok := f.k8s.issuers[src.GetName()]
+	if !ok {
+		return nil, status.Errorf(codes.NotFound, "trusted issuer %q not found", src.GetName())
+	}
+	next := proto.Clone(t).(*guardpb.TrustedIssuer)
+	keys := false
+	for _, p := range in.GetUpdateMask().GetPaths() {
+		switch p {
+		case "display_name":
+			next.DisplayName = src.GetDisplayName()
+		case "description":
+			next.Description = src.GetDescription()
+		case "discover", "jwks":
+			next.Keys, keys = src.GetKeys(), true
+		default:
+			return nil, status.Errorf(codes.InvalidArgument, "update_mask: unknown path %q (issuer never changes)", p)
+		}
+	}
+	if keys {
+		if err := f.checkIssuerKeysLocked(next); err != nil {
+			return nil, err
+		}
+	}
+	f.k8s.issuers[src.GetName()] = next
+	return issuerOut(next), nil
+}
+
+func (f *fakeGuardServer) RevokeTrustedIssuer(ctx context.Context, in *guardpb.RevokeTrustedIssuerRequest) (*guardpb.TrustedIssuer, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.record(ctx)
+	t, ok := f.k8s.issuers[in.GetName()]
+	if !ok {
+		return nil, status.Errorf(codes.NotFound, "trusted issuer %q not found", in.GetName())
+	}
+	if t.GetRevokedAt() == nil {
+		t.RevokedAt = timestamppb.Now()
+		t.RevokedBy = "c-terraform"
+	}
+	return issuerOut(t), nil
+}
+
+func (f *fakeGuardServer) checkRuleLocked(network string, r *guardpb.TrustedIssuerRule) error {
+	if r.GetNodeNamePrefix() != "" && (!dnsLabel32.MatchString(r.GetNodeNamePrefix()) || r.GetNodeNamePrefix() == "nd") {
+		return status.Errorf(codes.InvalidArgument, "node_name_prefix: %q is not a DNS label of at most 32 characters, or is nd", r.GetNodeNamePrefix())
+	}
+	if r.GetMaxNodes() < 1 || r.GetMaxNodes() > maxRuleMaxNodes {
+		return status.Errorf(codes.InvalidArgument, "max_nodes: 1 to %d", maxRuleMaxNodes)
+	}
+	if g := r.GetNodeGroup(); g != "" {
+		if _, ok := f.k8s.groups[g]; !ok || networkOf(g) != network {
+			return status.Errorf(codes.InvalidArgument, "node_group: %s is not a node group of %s", g, network)
+		}
+	}
+	return nil
+}
+
+func (f *fakeGuardServer) CreateTrustedIssuerRule(ctx context.Context, in *guardpb.CreateTrustedIssuerRuleRequest) (*guardpb.TrustedIssuerRule, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.record(ctx)
+	if !guardIssuerParent.MatchString(in.GetParent()) {
+		return nil, status.Errorf(codes.InvalidArgument, "parent %q is not a trusted issuer", in.GetParent())
+	}
+	if _, ok := f.k8s.issuers[in.GetParent()]; !ok {
+		return nil, status.Errorf(codes.NotFound, "trusted issuer %q not found", in.GetParent())
+	}
+	r := proto.Clone(in.GetRule()).(*guardpb.TrustedIssuerRule)
+	if r.GetSubject() == "" || len(r.GetSubject()) > 512 {
+		return nil, status.Error(codes.InvalidArgument, "subject: required, at most 512 characters")
+	}
+	for _, other := range children(f.k8s.rules, in.GetParent()+"/rules/") {
+		if other.GetSubject() == r.GetSubject() {
+			return nil, status.Errorf(codes.AlreadyExists, "a rule for %s exists in the issuer", r.GetSubject())
+		}
+	}
+	if r.GetMaxNodes() == 0 {
+		r.MaxNodes = defaultRuleMaxNodes
+	}
+	if err := f.checkRuleLocked(networkOf(in.GetParent()), r); err != nil {
+		return nil, err
+	}
+	r.Name = in.GetParent() + "/rules/" + f.nextID("tir")
+	r.CreatedBy = "c-terraform"
+	r.CreatedAt = timestamppb.Now()
+	f.k8s.rules[r.GetName()] = r
+	return proto.Clone(r).(*guardpb.TrustedIssuerRule), nil
+}
+
+func (f *fakeGuardServer) GetTrustedIssuerRule(ctx context.Context, in *guardpb.GetTrustedIssuerRuleRequest) (*guardpb.TrustedIssuerRule, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.record(ctx)
+	r, ok := f.k8s.rules[in.GetName()]
+	if !ok {
+		return nil, status.Errorf(codes.NotFound, "rule %q not found", in.GetName())
+	}
+	return proto.Clone(r).(*guardpb.TrustedIssuerRule), nil
+}
+
+func (f *fakeGuardServer) ListTrustedIssuerRules(ctx context.Context, in *guardpb.ListTrustedIssuerRulesRequest) (*guardpb.ListTrustedIssuerRulesResponse, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.record(ctx)
+	out := &guardpb.ListTrustedIssuerRulesResponse{}
+	for _, r := range children(f.k8s.rules, in.GetParent()+"/rules/") {
+		out.Rules = append(out.Rules, proto.Clone(r).(*guardpb.TrustedIssuerRule))
+	}
+	return out, nil
+}
+
+func (f *fakeGuardServer) UpdateTrustedIssuerRule(ctx context.Context, in *guardpb.UpdateTrustedIssuerRuleRequest) (*guardpb.TrustedIssuerRule, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.record(ctx)
+	src := in.GetRule()
+	r, ok := f.k8s.rules[src.GetName()]
+	if !ok {
+		return nil, status.Errorf(codes.NotFound, "rule %q not found", src.GetName())
+	}
+	next := proto.Clone(r).(*guardpb.TrustedIssuerRule)
+	for _, p := range in.GetUpdateMask().GetPaths() {
+		switch p {
+		case "node_name_prefix":
+			next.NodeNamePrefix = src.GetNodeNamePrefix()
+		case "ephemeral":
+			next.Ephemeral = src.GetEphemeral()
+		case "node_group":
+			next.NodeGroup = src.GetNodeGroup()
+		case "max_nodes":
+			next.MaxNodes = src.GetMaxNodes()
+		case "description":
+			next.Description = src.GetDescription()
+		default:
+			return nil, status.Errorf(codes.InvalidArgument, "update_mask: unknown path %q (subject never changes)", p)
+		}
+	}
+	if err := f.checkRuleLocked(networkOf(src.GetName()), next); err != nil {
+		return nil, err
+	}
+	f.k8s.rules[src.GetName()] = next
+	return proto.Clone(next).(*guardpb.TrustedIssuerRule), nil
+}
+
+func (f *fakeGuardServer) DeleteTrustedIssuerRule(ctx context.Context, in *guardpb.DeleteTrustedIssuerRuleRequest) (*emptypb.Empty, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.record(ctx)
+	if _, ok := f.k8s.rules[in.GetName()]; !ok {
+		return nil, status.Errorf(codes.NotFound, "rule %q not found", in.GetName())
+	}
+	delete(f.k8s.rules, in.GetName())
 	return &emptypb.Empty{}, nil
 }
 
@@ -420,6 +672,13 @@ func (f *fakeGuardServer) expireKey(key string) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.k8s.keys[key].ExpiresAt = timestamppb.New(time.Now().Add(-time.Minute))
+}
+
+// revokeIssuer revokes an issuer out of band, as the console would.
+func (f *fakeGuardServer) revokeIssuer(trust string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.k8s.issuers[trust].RevokedAt = timestamppb.Now()
 }
 
 // --- Resource: translated applications and serving groups ---

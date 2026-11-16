@@ -31,6 +31,7 @@ type fakeGuardServer struct {
 	guardpb.UnimplementedGuardNodeServiceServer
 	guardpb.UnimplementedGuardRelayPoolServiceServer
 	guardpb.UnimplementedGuardNodeGroupServiceServer
+	guardpb.UnimplementedGuardTrustedIssuerServiceServer
 	guardpb.UnimplementedGuardEnrollmentKeyServiceServer
 
 	mu        sync.Mutex

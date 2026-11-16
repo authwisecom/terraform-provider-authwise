@@ -112,11 +112,17 @@ FEATURES:
 
 NOTES:
 
-* **apis v0.76.0** (from v0.73.0): kit v1.87.0's contract, the vocabulary
+* **apis v0.77.0** (from v0.73.0): kit v1.87.0's contract, the vocabulary
   pass (kit#968, apis v0.74.0), `RealmConfig.signup` (kit#952, apis
-  v0.75.0) and guard-control v0.31.1's additive contract (apis v0.76.0).
+  v0.75.0), guard-control v0.31.1's additive contract (apis v0.76.0) and
+  guard-control's trusted issuers (apis v0.77.0, train 2026.11.5).
   This release needs kit 1.87.0 or later; an older kit answers the renamed
   calls with `Unimplemented`.
+
+* **Trusted issuers need a guard-control that serves
+  `GuardTrustedIssuerService`** and, for a service account managing them,
+  kit v1.88.0, which carries the `guardcontrol.trustedIssuers.*` and
+  `guardcontrol.trustedIssuerRules.*` permissions.
 
 * Release train 2026.11.GFK.1 (Guard for Kubernetes), stage GK5, built
   against apis v0.73.0. guard-control's servers for node groups and
@@ -126,8 +132,9 @@ NOTES:
   is set when that release is tagged.
 * Built on tfinfra with two generator changes, released separately:
   proto3 `optional bool` fields (`authwise_guard_resource.translated`),
-  and snake-case parent attributes for camelCase collections. No existing
-  resource's schema changes.
+  and snake-case parent attributes for camelCase collections
+  (`trusted_issuer_id`, not `trustedIssuer_id`). No existing resource's
+  schema changes.
 * A Terraform service account that manages these resources holds
   `guardcontrol.networkAdmin` (and `guardcontrol.tenantAdmin` for Guard
   grants), bound to its application (`c-…`) with `authwise_access_binding` and no
@@ -138,10 +145,26 @@ FEATURES:
 * **New resource: `authwise_guard_node_group`**. A named set of a Guard
   network's nodes that grants and serving refer to as one. Its members
   are `authwise_guard_node_group_members` (for nodes registered by hand),
-  or the nodes that an enrollment key naming the group enrolls. What the group's members may reach is
+  or the nodes that an enrollment key or trusted issuer rule naming the
+  group enrolls. What the group's members may reach is
   `authwise_guard_node_group_grants`. A group serves a resource through
   `authwise_guard_resource_node_groups`. Data sources:
   `authwise_guard_node_group` and `authwise_guard_node_groups`.
+
+* **New resource: `authwise_guard_trusted_issuer`** (train 2026.11.5).
+  A token issuer registered on a network: a machine holding a short-lived
+  token the issuer signed joins with it, so no secret is stored. Its keys
+  come from the issuer's discovery document (`discover = true`) or an
+  uploaded `jwks` (an issuer guard-control cannot reach); uploading again
+  renews rotated keys. `issuer` never changes. Destroy revokes the issuer,
+  and an issuer revoked out of band drops out of state.
+
+* **New resource: `authwise_guard_trusted_issuer_rule`**. Lets the holder
+  of one `subject`'s token (the token's `sub`, matched exactly) join
+  through an issuer, with `node_name_prefix`, `ephemeral`, `node_group`
+  and `max_nodes` (unset is 100). Changing `subject` replaces the rule.
+  Data sources: `authwise_guard_trusted_issuer_rule` and
+  `authwise_guard_trusted_issuer_rules`.
 
 * **New resource: `authwise_guard_enrollment_key`** (tf#74,
   guard-control#98). A secret that lets machines join a network as server
@@ -159,7 +182,7 @@ FEATURES:
   `virtual_address` (computed). `serving_node_groups` is read-only.
 
 * **`authwise_guard_node`: how a node joined.** Read-only
-  `enrollment_key`, `ephemeral`, `node_groups` and
+  `enrollment_key`, `trusted_issuer_rule`, `ephemeral`, `node_groups` and
   `capabilities`. `platform` gains `PLATFORM_KUBERNETES`.
 
 * **`authwise_guard_node_grants` and `authwise_guard_node_group_grants`

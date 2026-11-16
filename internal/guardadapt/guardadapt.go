@@ -2,9 +2,9 @@
 // generator's client shape (train 2026.11.GFK.1, GK5).
 //
 // tfinfra reads a client interface by reflection and expects AIP's Patch
-// shape: a request with `name`, the entity and `update_mask`. The service
+// shape: a request with `name`, the entity and `update_mask`. The services
 // guard-control writes by hand beside the generated GuardControlService
-// (GuardNodeGroupService) carries the name inside the
+// (GuardNodeGroupService, GuardTrustedIssuerService) carry the name inside the
 // entity instead (`UpdateNodeGroupRequest{node_group, update_mask}`). Each
 // client here is the generated one with its Update re-exposed as Patch over a
 // request of the expected shape. Get, List, Create and Delete pass through
@@ -54,4 +54,40 @@ func (c nodeGroupClient) PatchNodeGroup(ctx context.Context, in *PatchNodeGroupR
 	}
 	g.Name = in.Name
 	return c.UpdateNodeGroup(ctx, &guardpb.UpdateNodeGroupRequest{NodeGroup: g, UpdateMask: in.UpdateMask}, opts...)
+}
+
+// PatchTrustedIssuerRuleRequest is UpdateTrustedIssuerRuleRequest with the
+// name beside the entity.
+type PatchTrustedIssuerRuleRequest struct {
+	Name       string                     `protobuf:"bytes,1,opt,name=name,proto3"`
+	Rule       *guardpb.TrustedIssuerRule `protobuf:"bytes,2,opt,name=rule,proto3"`
+	UpdateMask *fieldmaskpb.FieldMask     `protobuf:"bytes,3,opt,name=update_mask,proto3"`
+}
+
+// TrustedIssuerRuleClient is the rule half of GuardTrustedIssuerService in the
+// generator's shape. The issuer itself is hand-written: its keys are a oneof.
+type TrustedIssuerRuleClient interface {
+	GetTrustedIssuerRule(ctx context.Context, in *guardpb.GetTrustedIssuerRuleRequest, opts ...grpc.CallOption) (*guardpb.TrustedIssuerRule, error)
+	ListTrustedIssuerRules(ctx context.Context, in *guardpb.ListTrustedIssuerRulesRequest, opts ...grpc.CallOption) (*guardpb.ListTrustedIssuerRulesResponse, error)
+	CreateTrustedIssuerRule(ctx context.Context, in *guardpb.CreateTrustedIssuerRuleRequest, opts ...grpc.CallOption) (*guardpb.TrustedIssuerRule, error)
+	PatchTrustedIssuerRule(ctx context.Context, in *PatchTrustedIssuerRuleRequest, opts ...grpc.CallOption) (*guardpb.TrustedIssuerRule, error)
+	DeleteTrustedIssuerRule(ctx context.Context, in *guardpb.DeleteTrustedIssuerRuleRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+}
+
+type trustedIssuerRuleClient struct {
+	guardpb.GuardTrustedIssuerServiceClient
+}
+
+// NewTrustedIssuerRuleClient adapts guard-control's trusted issuer client.
+func NewTrustedIssuerRuleClient(c guardpb.GuardTrustedIssuerServiceClient) TrustedIssuerRuleClient {
+	return trustedIssuerRuleClient{c}
+}
+
+func (c trustedIssuerRuleClient) PatchTrustedIssuerRule(ctx context.Context, in *PatchTrustedIssuerRuleRequest, opts ...grpc.CallOption) (*guardpb.TrustedIssuerRule, error) {
+	r := in.Rule
+	if r == nil {
+		r = &guardpb.TrustedIssuerRule{}
+	}
+	r.Name = in.Name
+	return c.UpdateTrustedIssuerRule(ctx, &guardpb.UpdateTrustedIssuerRuleRequest{Rule: r, UpdateMask: in.UpdateMask}, opts...)
 }

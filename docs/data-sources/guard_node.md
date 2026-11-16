@@ -26,7 +26,6 @@ A server's node in a Guard network, registered ahead of time. Created without a 
 - `auth_code` (String, Sensitive)
 - `auth_code_expires_at` (String)
 - `capabilities` (List of String)
-- `cluster_trust_rule` (String)
 - `config` (String)
 - `display_name` (String)
 - `endpoint` (String)
@@ -45,3 +44,4 @@ A server's node in a Guard network, registered ahead of time. Created without a 
 - `slug` (String)
 - `state` (String)
 - `tenant_id` (String)
+- `trusted_issuer_rule` (String)

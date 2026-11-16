@@ -35,7 +35,8 @@ const (
 
 	guardTypePrefix = providerTypeName + "_guard_"
 
-	networkIDAttribute = "network_id"
+	networkIDAttribute       = "network_id"
+	trustedIssuerIDAttribute = "trusted_issuer_id"
 
 	guardTenantIDDescription = "The kit tenant's id (`t-…`) the Guard row belongs to. Guard has no tenant of its own since the tenant collapse (tf#65). The provider's `tenant_id` is not used."
 )
@@ -173,6 +174,12 @@ func (r *guardResource) Schema(ctx context.Context, req resource.SchemaRequest, 
 		a.MarkdownDescription = guardTenantIDDescription + " Changing it replaces the resource."
 		a.Validators = []validator.String{guardTenantReference}
 		resp.Schema.Attributes[tenantIDAttribute] = a
+	}
+	// A trusted issuer rule's issuer has no provider default either.
+	if a, ok := resp.Schema.Attributes[trustedIssuerIDAttribute].(schema.StringAttribute); ok {
+		a.Required, a.Optional, a.Computed = true, false, false
+		a.MarkdownDescription = "The trusted issuer's id, `authwise_guard_trusted_issuer.<name>.guard_trusted_issuer_id`. Changing it replaces the resource."
+		resp.Schema.Attributes[trustedIssuerIDAttribute] = a
 	}
 	if _, optional := r.inner.(optionalNetworkResource); optional {
 		return

@@ -37,7 +37,6 @@ Read-Only:
 - `auth_code` (String, Sensitive)
 - `auth_code_expires_at` (String)
 - `capabilities` (List of String)
-- `cluster_trust_rule` (String)
 - `config` (String)
 - `display_name` (String)
 - `endpoint` (String)
@@ -55,3 +54,4 @@ Read-Only:
 - `roles` (List of String)
 - `slug` (String)
 - `state` (String)
+- `trusted_issuer_rule` (String)

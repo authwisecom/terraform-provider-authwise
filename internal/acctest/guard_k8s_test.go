@@ -1,6 +1,6 @@
 // Guard for Kubernetes (train 2026.11.GFK.1, GK5): node groups, their
-// members and grants, an enrollment key that fills a group, and a
-// translated application served by a group. Against
+// members and grants, a trusted issuer and its rule, an enrollment key that
+// fills a group, and a translated application served by a group. Against
 // the fake's reading of apis v0.73.0: guard-control's servers were not
 // built yet.
 package acctest_test
@@ -18,17 +18,22 @@ import (
 const (
 	gkPodsAddr    = "authwise_guard_node_group.pods"
 	gkAdminsAddr  = "authwise_guard_node_group.admins"
+	gkIssuerAddr  = "authwise_guard_trusted_issuer.gke"
+	gkRuleAddr    = "authwise_guard_trusted_issuer_rule.argocd"
 	gkKeyAddr     = "authwise_guard_enrollment_key.connector"
 	gkPromAddr    = "authwise_guard_resource.prometheus"
 	gkMembersAddr = "authwise_guard_node_group_members.admins"
+	gkIssuer      = "https://container.googleapis.com/v1/projects/p/locations/us-central1-a/clusters/gfk"
+	gkJWKS        = `{"keys":[{"kty":"RSA","kid":"k1","n":"AQAB","e":"AQAB"}]}`
 )
 
-// guardK8sConfig is a network with two groups, a key filling "pods", a
+// guardK8sConfig is a network with two groups, a trusted issuer with its
+// keys given by keys (an HCL line), a rule and a key filling "pods", a
 // translated application served by "pods", and an admin node in "admins",
 // which may reach "pods".
-func (h *harness) guardK8sConfig() string {
-	return h.providerConfig() + `
-` + guardTenantHCL + `
+func (h *harness) guardK8sConfig(keys, ruleMax string) string {
+	return h.providerConfig() + fmt.Sprintf(`
+`+guardTenantHCL+`
 resource "authwise_guard_network" "office" {
   tenant_id    = local.guard_tenant_id
   display_name = "Office"
@@ -70,6 +75,25 @@ resource "authwise_guard_node_group_grants" "pods" {
   grants     = [authwise_guard_resource.prometheus.name]
 }
 
+resource "authwise_guard_trusted_issuer" "gke" {
+  tenant_id    = local.guard_tenant_id
+  network_id   = authwise_guard_network.office.guard_network_id
+  display_name = "gfk-nonprod-uc1"
+  issuer       = %q
+  %s
+}
+
+resource "authwise_guard_trusted_issuer_rule" "argocd" {
+  tenant_id        = local.guard_tenant_id
+  network_id       = authwise_guard_network.office.guard_network_id
+  trusted_issuer_id = authwise_guard_trusted_issuer.gke.guard_trusted_issuer_id
+  subject          = "system:serviceaccount:argocd:argocd-application-controller"
+  node_name_prefix = "argocd"
+  ephemeral        = true
+  node_group       = authwise_guard_node_group.pods.name
+  %s
+}
+
 resource "authwise_guard_enrollment_key" "connector" {
   tenant_id        = local.guard_tenant_id
   network_id       = authwise_guard_network.office.guard_network_id
@@ -94,25 +118,32 @@ resource "authwise_guard_resource_node_groups" "prometheus" {
   resource    = authwise_guard_resource.prometheus.name
   node_groups = [authwise_guard_node_group.pods.name]
 }
-`
+`, gkIssuer, keys, ruleMax)
 }
 
-func TestAccGuardK8s_GroupsKey(t *testing.T) {
+func TestAccGuardK8s_GroupsIssuerKey(t *testing.T) {
 
 	h := newHarness(t)
 
-	var keyName, secret string
+	var keyName, secret, issuerName, issuerID string
 	var joined []string
-	config := h.guardK8sConfig()
+	discover := h.guardK8sConfig("discover = true", "")
 
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: protoFactories(),
 		Steps: []resource.TestStep{
 			{
-				Config: config,
+				Config: discover,
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestMatchResourceAttr(gkPodsAddr, "guard_node_group_id", regexp.MustCompile(`^ng-`)),
 					resource.TestCheckResourceAttr(gkPodsAddr, "member_count", "0"),
+					resource.TestMatchResourceAttr(gkIssuerAddr, "guard_trusted_issuer_id", regexp.MustCompile(`^ti-`)),
+					resource.TestMatchResourceAttr(gkIssuerAddr, "audience", regexp.MustCompile(`^guard:tenants/t-1/networks/n-`)),
+					resource.TestCheckResourceAttr(gkIssuerAddr, "key_ids.0", "kid-discovered"),
+					resource.TestCheckNoResourceAttr(gkIssuerAddr, "keys_error"),
+					resource.TestCheckResourceAttr(gkRuleAddr, "max_nodes", "100"),
+					resource.TestCheckResourceAttr(gkRuleAddr, "node_count", "0"),
+					resource.TestMatchResourceAttr(gkRuleAddr, "name", regexp.MustCompile(`/trustedIssuers/ti-[0-9]+/rules/tir-`)),
 					resource.TestMatchResourceAttr(gkKeyAddr, "secret", regexp.MustCompile(`^gk_`)),
 					resource.TestCheckResourceAttr(gkKeyAddr, "state", "ACTIVE"),
 					resource.TestCheckResourceAttr(gkKeyAddr, "uses", "0"),
@@ -122,6 +153,8 @@ func TestAccGuardK8s_GroupsKey(t *testing.T) {
 					resource.TestCheckResourceAttr(gkPromAddr, "published_name", "prometheus.monitoring.office.acme.guard.example"),
 					resource.TestCheckResourceAttrWith(gkKeyAddr, "name", func(v string) error { keyName = v; return nil }),
 					resource.TestCheckResourceAttrWith(gkKeyAddr, "secret", func(v string) error { secret = v; return nil }),
+					resource.TestCheckResourceAttrWith(gkIssuerAddr, "name", func(v string) error { issuerName = v; return nil }),
+					resource.TestCheckResourceAttrWith(gkIssuerAddr, "guard_trusted_issuer_id", func(v string) error { issuerID = v; return nil }),
 				),
 			},
 			{
@@ -131,7 +164,7 @@ func TestAccGuardK8s_GroupsKey(t *testing.T) {
 				// Computed values other resources set (members, serving
 				// groups) read back on this refresh.
 				PreConfig: func() { joined = append(joined, h.guard.joinWithKey(keyName, "conn-0")) },
-				Config:    config,
+				Config:    discover,
 				ConfigPlanChecks: resource.ConfigPlanChecks{
 					PreApply: []plancheck.PlanCheck{plancheck.ExpectEmptyPlan()},
 				},
@@ -144,10 +177,30 @@ func TestAccGuardK8s_GroupsKey(t *testing.T) {
 				),
 			},
 			{
+				// The rule's cap changes in place, for joins from now on.
+				Config: h.guardK8sConfig("discover = true", "max_nodes = 20"),
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{plancheck.ExpectResourceAction(gkRuleAddr, plancheck.ResourceActionUpdate)},
+				},
+				Check: resource.TestCheckResourceAttr(gkRuleAddr, "max_nodes", "20"),
+			},
+			{
+				// A private cluster's keys: the trust moves to an upload in
+				// place, and keeps its id.
+				Config: h.guardK8sConfig("jwks = "+fmt.Sprintf("%q", gkJWKS), "max_nodes = 20"),
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{plancheck.ExpectResourceAction(gkIssuerAddr, plancheck.ResourceActionUpdate)},
+				},
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestMatchResourceAttr(gkIssuerAddr, "key_ids.0", regexp.MustCompile(`^kid-uploaded-`)),
+					resource.TestCheckResourceAttrWith(gkIssuerAddr, "guard_trusted_issuer_id", equalTo(&issuerID)),
+				),
+			},
+			{
 				// The key expires: the refresh drops it, and the apply makes
 				// a new one with a new secret.
 				PreConfig: func() { h.guard.expireKey(keyName) },
-				Config:    config,
+				Config:    h.guardK8sConfig("jwks = "+fmt.Sprintf("%q", gkJWKS), "max_nodes = 20"),
 				ConfigPlanChecks: resource.ConfigPlanChecks{
 					PreApply: []plancheck.PlanCheck{plancheck.ExpectResourceAction(gkKeyAddr, plancheck.ResourceActionCreate)},
 				},
@@ -157,27 +210,60 @@ func TestAccGuardK8s_GroupsKey(t *testing.T) {
 				),
 			},
 			{
+				// The trust is revoked in the console: Terraform registers
+				// the cluster again, and the rule follows its new trust.
+				PreConfig: func() { h.guard.revokeIssuer(issuerName) },
+				Config:    h.guardK8sConfig("jwks = "+fmt.Sprintf("%q", gkJWKS), "max_nodes = 20"),
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{
+						plancheck.ExpectResourceAction(gkIssuerAddr, plancheck.ResourceActionCreate),
+						plancheck.ExpectResourceAction(gkRuleAddr, plancheck.ResourceActionReplace),
+					},
+				},
+				Check: resource.TestCheckResourceAttrWith(gkIssuerAddr, "guard_trusted_issuer_id", notEqualTo(&issuerID)),
+			},
+			{
 				ResourceName:      gkPodsAddr,
 				ImportState:       true,
 				ImportStateKind:   resource.ImportBlockWithID,
 				ImportStateIdFunc: importByName(gkPodsAddr),
-				Config:            config,
+				Config:            h.guardK8sConfig("jwks = "+fmt.Sprintf("%q", gkJWKS), "max_nodes = 20"),
+			},
+			{
+				ResourceName:      gkRuleAddr,
+				ImportState:       true,
+				ImportStateKind:   resource.ImportBlockWithID,
+				ImportStateIdFunc: importByName(gkRuleAddr),
+				Config:            h.guardK8sConfig("jwks = "+fmt.Sprintf("%q", gkJWKS), "max_nodes = 20"),
+			},
+			{
+				// A discovering trust imports with nothing to change. (An
+				// uploaded one would plan its jwks again, which is never
+				// read back.)
+				Config: discover,
+			},
+			{
+				ResourceName:      gkIssuerAddr,
+				ImportState:       true,
+				ImportStateKind:   resource.ImportBlockWithID,
+				ImportStateIdFunc: importByName(gkIssuerAddr),
+				Config:            discover,
 			},
 			{
 				ResourceName:      gkMembersAddr,
 				ImportState:       true,
 				ImportStateKind:   resource.ImportBlockWithID,
 				ImportStateIdFunc: importByName(gkAdminsAddr),
-				Config:            config,
+				Config:            discover,
 			},
 			{
-				// Joined nodes stay when their key goes; an
+				// Joined nodes stay when their key or trust goes; an
 				// administrator removes them, here before the network is
 				// destroyed.
-				// The key that expired in step 3 left state unrevoked; it no
+				// The key that expired in step 5 left state unrevoked; it no
 				// longer holds the group, so the destroy below deletes it.
 				PreConfig: func() { h.guard.dropNodes(joined...) },
-				Config:    config,
+				Config:    discover,
 			},
 		},
 		CheckDestroy: func(_ *terraform.State) error {
@@ -185,6 +271,14 @@ func TestAccGuardK8s_GroupsKey(t *testing.T) {
 			defer h.guard.mu.Unlock()
 			if n := len(h.guard.k8s.groups); n != 0 {
 				return fmt.Errorf("%d node groups left", n)
+			}
+			if n := len(h.guard.k8s.rules); n != 0 {
+				return fmt.Errorf("%d rules left", n)
+			}
+			for name, tr := range h.guard.k8s.issuers {
+				if tr.GetRevokedAt() == nil {
+					return fmt.Errorf("issuer %s not revoked", name)
+				}
 			}
 			for name, k := range h.guard.k8s.keys {
 				if k.GetRevokedAt() == nil && name != keyName {
@@ -205,10 +299,24 @@ resource "authwise_guard_network" "office" {
   display_name = "Office"
 }
 `
+	issuer := func(keys string) string {
+		return network + fmt.Sprintf(`
+resource "authwise_guard_trusted_issuer" "c" {
+  tenant_id    = local.guard_tenant_id
+  network_id   = authwise_guard_network.office.guard_network_id
+  display_name = "c"
+  issuer       = %q
+  %s
+}
+`, gkIssuer, keys)
+	}
 
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: protoFactories(),
 		Steps: []resource.TestStep{
+			{Config: issuer(""), PlanOnly: true, ExpectError: regexp.MustCompile(`the issuer needs its keys`)},
+			{Config: issuer("discover = true\n  jwks = \"{}\""), PlanOnly: true, ExpectError: regexp.MustCompile(`discover and jwks are exclusive`)},
+			{Config: issuer("discover = false"), PlanOnly: true, ExpectError: regexp.MustCompile(`discover = false is not a choice`)},
 			{
 				Config: network + `
 resource "authwise_guard_enrollment_key" "k" {

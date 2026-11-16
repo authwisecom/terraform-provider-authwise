@@ -177,8 +177,9 @@ rewrite it.
 **A service account's Guard roles.** A Terraform service account that
 manages a tenant's Guard holds Guard's ordinary administrative roles, bound
 to its application (`c-…`) with `authwise_access_binding` and no `condition_id`:
-`guardcontrol.networkAdmin` for networks, nodes, resources, node groups and
-enrollment keys, and `guardcontrol.tenantAdmin` only if it also manages Guard grants. There is no
+`guardcontrol.networkAdmin` for networks, nodes, resources, node groups,
+enrollment keys, trusted issuers and their rules, and
+`guardcontrol.tenantAdmin` only if it also manages Guard grants. There is no
 special role for automation. The step-up condition that a person's binding
 of these roles carries tests a sign-in, which an application never has, so a
 service account's binding carries none. `authwise_guard_enrolment_grant`

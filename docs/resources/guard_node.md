@@ -53,7 +53,6 @@ output "gateway_auth_code" {
 - `auth_code` (String, Sensitive)
 - `auth_code_expires_at` (String) `auth_code_expires_at` as an RFC 3339 timestamp.
 - `capabilities` (List of String)
-- `cluster_trust_rule` (String)
 - `enrollment_key` (String)
 - `ephemeral` (Boolean)
 - `guard_node_id` (String) Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.
@@ -64,6 +63,7 @@ output "gateway_auth_code" {
 - `platform` (String)
 - `roles` (List of String)
 - `state` (String)
+- `trusted_issuer_rule` (String)
 
 ## Import
 
