@@ -185,6 +185,14 @@ of these roles carries tests a sign-in, which an application never has, so a
 service account's binding carries none. `authwise_guard_enrolment_grant`
 binds people and groups only; it is not the path for a service account.
 
+**Writes that need a stepped-up sign-in.** From guard-control v0.32.0,
+creating, changing and revoking enrollment keys, trusted issuers and their
+rules refuses a person's credential that was not stepped up
+(`PERMISSION_DENIED`, reason `STEP_UP_REQUIRED`). A service account is
+exempt. When Terraform runs on a person's `awctl auth login`, these
+resources fail at apply with guard-control's message; run them with a
+service account.
+
 Estate relay pools (`authwise_guard_relay_pool`, `authwise_guard_pool_relay`,
 `authwise_guard_relay_pool_access`) sit at the estate's root, not under a
 tenant. guard-control admits them for an operator's credential only. A

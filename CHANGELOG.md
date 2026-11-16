@@ -161,6 +161,12 @@ NOTES:
   As with the vocabulary check, a check the credential may not make does
   not block.
 
+* **guard-control v0.32.0 refuses a person's unstepped writes** of
+  enrollment keys, trusted issuers and their rules (`PERMISSION_DENIED`,
+  reason `STEP_UP_REQUIRED`). A service account, Terraform's usual
+  credential, is exempt. With a person's `awctl auth login` sign-in these
+  resources fail at apply with guard-control's own message.
+
 * Release train 2026.11.GFK.1 (Guard for Kubernetes), stage GK5, built
   against apis v0.73.0. guard-control's servers for node groups and
   enrollment keys were still being built on its `feat/gfk1`
