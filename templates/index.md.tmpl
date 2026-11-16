@@ -157,7 +157,8 @@ binds people and groups only; it is not the path for a service account.
 
 **Writes that need a stepped-up sign-in.** From guard-control v0.32.0,
 creating, changing and revoking enrollment keys, trusted issuers and their
-rules refuses a person's credential that was not stepped up
+rules, and creating an `authwise_guard_node` without a `public_key` (which
+mints an auth code), refuses a person's credential that was not stepped up
 (`PERMISSION_DENIED`, reason `STEP_UP_REQUIRED`). A service account is
 exempt. When Terraform runs on a person's `awctl auth login`, these
 resources fail at apply with guard-control's message; run them with a

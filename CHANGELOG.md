@@ -162,8 +162,9 @@ NOTES:
   not block.
 
 * **guard-control v0.32.0 refuses a person's unstepped writes** of
-  enrollment keys, trusted issuers and their rules (`PERMISSION_DENIED`,
-  reason `STEP_UP_REQUIRED`). A service account, Terraform's usual
+  enrollment keys, trusted issuers and their rules, and the create of an
+  `authwise_guard_node` without a `public_key`, which mints an auth code
+  (`PERMISSION_DENIED`, reason `STEP_UP_REQUIRED`). A service account, Terraform's usual
   credential, is exempt. With a person's `awctl auth login` sign-in these
   resources fail at apply with guard-control's own message.
 
