@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	tfruntime "github.com/activatedio/tfinfra/pkg/tf"
 	"github.com/hashicorp/terraform-plugin-framework-jsontypes/jsontypes"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
@@ -542,7 +543,14 @@ func fieldToValue(fd protoreflect.FieldDescriptor, pv protoreflect.Value, typ tf
 			// A Struct holds only JSON values, so it always encodes.
 			panic(fmt.Sprintf("protoattr: %s: %v", fd.FullName(), err))
 		}
-		return tftypes.NewValue(tftypes.String, string(b))
+		// protojson varies its whitespace by build; the sorted, compact
+		// form is jsonencode's, so a value written with it reads back as
+		// written (tf#78).
+		s, err := tfruntime.SortedJSON(string(b))
+		if err != nil {
+			panic(fmt.Sprintf("protoattr: %s: %v", fd.FullName(), err))
+		}
+		return tftypes.NewValue(tftypes.String, s)
 	case fd.Kind() == protoreflect.MessageKind:
 		return protoToValue(pv.Message(), typ.(tftypes.Object))
 	default:

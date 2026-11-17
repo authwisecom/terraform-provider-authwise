@@ -1,15 +1,14 @@
 package provider
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"maps"
 	"slices"
 	"strings"
 
 	corepb "git.authwise.com/authwise/apis/authwise/types/core/v1alpha1"
+	tfruntime "github.com/activatedio/tfinfra/pkg/tf"
 	"github.com/hashicorp/terraform-plugin-framework-jsontypes/jsontypes"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
@@ -203,20 +202,7 @@ func configJSON(m proto.Message) (string, error) {
 	if err != nil {
 		return "", err
 	}
-
-	dec := json.NewDecoder(bytes.NewReader(b))
-	dec.UseNumber()
-	var doc any
-	if err := dec.Decode(&doc); err != nil {
-		return "", err
-	}
-
-	out, err := json.Marshal(doc)
-	if err != nil {
-		return "", err
-	}
-
-	return string(out), nil
+	return tfruntime.SortedJSON(string(b))
 }
 
 // The token lifetimes kit resolves tenant, issuer, audience, client: zero

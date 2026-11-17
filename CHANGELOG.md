@@ -1,3 +1,27 @@
+## 0.35.1 (Unreleased)
+
+BUG FIXES:
+
+* **No whitespace-only update after an out-of-band change to a JSON
+  config (tf#78).** When a config was changed outside Terraform
+  (`authwise_realm.config`, `authwise_issuer.config` and every other JSON
+  attribute), refresh stored kit's value with its keys in protobuf field
+  order. A config written with `jsonencode` or a config data source such as
+  `authwise_realm_config` sorts its keys, so even once the code matched the
+  live config again, the plan showed `# whitespace changes` and an update,
+  and deferred everything that read the resource. Refresh now keeps the
+  form the value already had in state: sorted when it was sorted, so it
+  plans empty. Nothing you wrote is rewritten. A hand-formatted heredoc
+  can still plan one whitespace update after an out-of-band change: Terraform plans a
+  configured value exactly as written. JSON values inside
+  `authwise_realm_authentication_policy` (rule `parameters`) read back
+  compact and sorted, in the same form as `jsonencode`.
+
+NOTES:
+
+* tfinfra v0.0.25 (from v0.0.24): only this change. No schema changes,
+  and nothing to migrate: a state written by 0.35.0 plans the same.
+
 ## 0.35.0 (November 17, 2026)
 
 BREAKING CHANGES:
