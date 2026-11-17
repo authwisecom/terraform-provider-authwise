@@ -4,7 +4,7 @@ page_title: "authwise_guard_trusted_issuer Resource - Authwise"
 subcategory: "Guard"
 description: |-
   A token issuer registered on a Guard network: a machine holding a token the issuer signed may join the network with it, under the issuer's rules (authwise_guard_trusted_issuer_rule), each naming one subject. No secret is stored or handed out. The token is short-lived (at most an hour), carries the network's audience, and guard-control checks it against the issuer's signing keys.
-  The keys come from one of two places. discover = true reads the issuer's OIDC discovery document and keys, and reads them again as they rotate. jwks uploads the keys, for an issuer guard-control cannot reach. The upload is the keys until it is replaced, so when the issuer rotates its keys, change jwks and apply.
+  The keys come from one of three places. discover = true reads the issuer's OIDC discovery document and keys, and reads them again as they rotate. jwks uploads the keys, for an issuer guard-control cannot reach. The upload is the keys until it is replaced, so when the issuer rotates its keys, change jwks and apply. key_source_node names a node of the network that reads the keys where it runs and reports them, so an issuer guard-control cannot reach stays current with no upload (guard-control v0.32.0 or later).
   Two issuers of one network may share an issuer address; their key ids must not overlap, and a join picks the issuer by the token's kid.
   An issuer is never deleted. Destroy revokes it: no machine joins through it again, and the nodes that joined stay until they are removed. An issuer revoked out of band drops out of state at refresh, and the next apply registers it again as a new issuer. issuer never changes: a different address is a different issuer.
 ---
@@ -13,7 +13,7 @@ description: |-
 
 A token issuer registered on a Guard network: a machine holding a token the issuer signed may join the network with it, under the issuer's rules (`authwise_guard_trusted_issuer_rule`), each naming one subject. No secret is stored or handed out. The token is short-lived (at most an hour), carries the network's `audience`, and guard-control checks it against the issuer's signing keys.
 
-The keys come from one of two places. `discover = true` reads the issuer's OIDC discovery document and keys, and reads them again as they rotate. `jwks` uploads the keys, for an issuer guard-control cannot reach. The upload is the keys until it is replaced, so when the issuer rotates its keys, change `jwks` and apply.
+The keys come from one of three places. `discover = true` reads the issuer's OIDC discovery document and keys, and reads them again as they rotate. `jwks` uploads the keys, for an issuer guard-control cannot reach. The upload is the keys until it is replaced, so when the issuer rotates its keys, change `jwks` and apply. `key_source_node` names a node of the network that reads the keys where it runs and reports them, so an issuer guard-control cannot reach stays current with no upload (guard-control v0.32.0 or later).
 
 Two issuers of one network may share an issuer address; their key ids must not overlap, and a join picks the issuer by the token's `kid`.
 
@@ -41,6 +41,18 @@ resource "authwise_guard_trusted_issuer" "ops" {
   jwks         = file("${path.module}/ops-jwks.json")
 }
 
+# An issuer guard-control cannot reach, whose keys a node of the network
+# reports: the node reads them where it runs, so they stay current with no
+# upload. The issuer starts with no keys; the node's first report supplies
+# them.
+resource "authwise_guard_trusted_issuer" "lab" {
+  tenant_id       = "t-01"
+  network_id      = authwise_guard_network.office.guard_network_id
+  display_name    = "lab"
+  issuer          = "https://id.lab.internal"
+  key_source_node = authwise_guard_node.lab_reporter.name
+}
+
 # The audience a joining machine's token must carry.
 output "build_audience" {
   value = authwise_guard_trusted_issuer.build.audience
@@ -62,6 +74,7 @@ output "build_audience" {
 - `description` (String)
 - `discover` (Boolean) `true` to read the issuer's discovery document and its keys. Give this or `jwks`.
 - `jwks` (String) The issuer's JWKS document, as JSON: at most 64 KiB and 16 keys, each RSA of 2048 bits or more or EC P-256. Give this or `discover`. guard-control never returns it: `key_ids` says which keys it holds. After an import it is unknown to Terraform, so the next apply uploads the configured document again.
+- `key_source_node` (String) A node of the network that reports the issuer's keys, by full name (`authwise_guard_node.<name>.name`), for an issuer guard-control cannot reach: the node reads the keys where it runs and sends them on its own connection, so they stay current with no upload. The node must be persistent and must not have joined by a rule of this issuer. Give this, `discover` or `jwks`: they are exclusive here, because with a key source **the keys come from that node's reports**, and an uploaded `jwks` would replace them on every change. Without other keys the issuer starts empty, and the node's first report supplies them. Changing it is made in place; removing it stops the reports and keeps the keys last reported. An issuer that discovers its keys cannot take a key source: moving from `discover` to `key_source_node` replaces the issuer. A report that would remove every key the issuer holds is held (`held_key_ids`) for an administrator to adopt in the console or with awctl. Needs guard-control v0.32.0 or later.
 
 ### Read-Only
 
@@ -69,8 +82,10 @@ output "build_audience" {
 - `created_at` (String)
 - `created_by` (String)
 - `guard_trusted_issuer_id` (String) The issuer's id, `ti-…`: a rule's `trusted_issuer_id`.
+- `held_key_ids` (List of String) The key ids of a report the key source node sent that would have removed every key the issuer holds, held for an administrator; empty when nothing is held. Read only: adopt or drop it in the console or with awctl.
 - `key_ids` (List of String) The `kid` of each key in use.
 - `keys_error` (String) Why the last read of the keys failed; null when it worked.
+- `keys_held_at` (String) When the held report arrived, RFC 3339; null when nothing is held.
 - `keys_updated_at` (String) When the keys were last read or uploaded, RFC 3339.
 - `last_join_at` (String) When a machine last joined through the issuer, RFC 3339.
 - `name` (String) The issuer's full name, `tenants/t-…/networks/n-…/trustedIssuers/ti-…`.

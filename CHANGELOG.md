@@ -219,6 +219,15 @@ FEATURES:
   renews rotated keys. `issuer` never changes. Destroy revokes the issuer,
   and an issuer revoked out of band drops out of state.
 
+  A third key source, `key_source_node` (TI7, guard-control v0.32.0): a
+  node of the network reads the issuer's keys where it runs and reports
+  them, so an issuer guard-control cannot reach stays current with no
+  upload. It is exclusive with `discover` and `jwks` here, since the
+  node's reports are the keys; the issuer may start with none. A report
+  that would remove every key is held: `held_key_ids` and `keys_held_at`
+  are read only, adopted in the console or with awctl. Against an earlier
+  guard-control, a write that sets it is refused by name.
+
 * **New resource: `authwise_guard_trusted_issuer_rule`**. Lets the holder
   of one `subject`'s token (the token's `sub`, matched exactly) join
   through an issuer, with `node_name_prefix`, `ephemeral`, `node_group`

@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"slices"
 
 	guardpb "git.authwise.com/authwise/apis/authwise/guardcontrol/v1alpha1"
 	"github.com/activatedio/tfinfra/pkg/aip"
@@ -16,6 +17,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/fieldmaskpb"
 )
 
@@ -31,6 +34,8 @@ const (
 	attrDiscover = "discover"
 	attrJWKS     = "jwks"
 	attrIssuer   = "issuer"
+	// attrKeySourceNode is TI7's node that reports the issuer's keys.
+	attrKeySourceNode = "key_source_node"
 
 	// attrName and attrDescription are the Guard GFK resources' own
 	// attributes of those names.
@@ -50,8 +55,10 @@ var (
 // 2026.11.5, TI3; the cluster trust of GFK.1 renamed before it was ever
 // published): a token issuer registered on a network, whose signed tokens
 // let machines join under the issuer's rules
-// (authwise_guard_trusted_issuer_rule, generated). key_source_node and the
-// held keys (TI7) are left out until guard-control serves them.
+// (authwise_guard_trusted_issuer_rule, generated). key_source_node (TI7,
+// guard-control v0.32.0) is a third key source beside discover and jwks;
+// the held keys it may leave are read only, adopted in the console or
+// awctl.
 //
 // Hand-written because its keys are a oneof (discover, or an uploaded
 // JWKS), which tfinfra does not generate. An issuer is never deleted, only
@@ -75,6 +82,9 @@ type guardTrustedIssuerModel struct {
 	KeyIDs        types.List   `tfsdk:"key_ids"`
 	KeysUpdatedAt types.String `tfsdk:"keys_updated_at"`
 	KeysError     types.String `tfsdk:"keys_error"`
+	KeySourceNode types.String `tfsdk:"key_source_node"`
+	HeldKeyIDs    types.List   `tfsdk:"held_key_ids"`
+	KeysHeldAt    types.String `tfsdk:"keys_held_at"`
 	LastJoinAt    types.String `tfsdk:"last_join_at"`
 	CreatedBy     types.String `tfsdk:"created_by"`
 	CreatedAt     types.String `tfsdk:"created_at"`
@@ -96,9 +106,10 @@ func (r *guardTrustedIssuerResource) Schema(_ context.Context, _ resource.Schema
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "A token issuer registered on a Guard network: a machine holding a token the issuer signed may join the network with it, under the issuer's rules (`authwise_guard_trusted_issuer_rule`), each naming one subject. " +
 			"No secret is stored or handed out. The token is short-lived (at most an hour), carries the network's `audience`, and guard-control checks it against the issuer's signing keys.\n\n" +
-			"The keys come from one of two places. `discover = true` reads the issuer's OIDC discovery document and keys, and reads them again as they rotate. " +
+			"The keys come from one of three places. `discover = true` reads the issuer's OIDC discovery document and keys, and reads them again as they rotate. " +
 			"`jwks` uploads the keys, for an issuer guard-control cannot reach. " +
-			"The upload is the keys until it is replaced, so when the issuer rotates its keys, change `jwks` and apply.\n\n" +
+			"The upload is the keys until it is replaced, so when the issuer rotates its keys, change `jwks` and apply. " +
+			"`key_source_node` names a node of the network that reads the keys where it runs and reports them, so an issuer guard-control cannot reach stays current with no upload (guard-control v0.32.0 or later).\n\n" +
 			"Two issuers of one network may share an issuer address; their key ids must not overlap, and a join picks the issuer by the token's `kid`.\n\n" +
 			"An issuer is never deleted. **Destroy revokes it**: no machine joins through it again, and the nodes that joined stay until they are removed. " +
 			"An issuer revoked out of band drops out of state at refresh, and the next apply registers it again as a new issuer. " +
@@ -159,6 +170,23 @@ func (r *guardTrustedIssuerResource) Schema(_ context.Context, _ resource.Schema
 				Computed:            true,
 				MarkdownDescription: "When the keys were last read or uploaded, RFC 3339.",
 			},
+			attrKeySourceNode: schema.StringAttribute{
+				Optional: true,
+				MarkdownDescription: "A node of the network that reports the issuer's keys, by full name (`authwise_guard_node.<name>.name`), for an issuer guard-control cannot reach: the node reads the keys where it runs and sends them on its own connection, so they stay current with no upload. " +
+					"The node must be persistent and must not have joined by a rule of this issuer. Give this, `discover` or `jwks`: they are exclusive here, because with a key source **the keys come from that node's reports**, and an uploaded `jwks` would replace them on every change. " +
+					"Without other keys the issuer starts empty, and the node's first report supplies them. Changing it is made in place; removing it stops the reports and keeps the keys last reported. " +
+					"An issuer that discovers its keys cannot take a key source: moving from `discover` to `key_source_node` replaces the issuer. " +
+					"A report that would remove every key the issuer holds is held (`held_key_ids`) for an administrator to adopt in the console or with awctl. Needs guard-control v0.32.0 or later.",
+			},
+			"held_key_ids": schema.ListAttribute{
+				Computed:            true,
+				ElementType:         types.StringType,
+				MarkdownDescription: "The key ids of a report the key source node sent that would have removed every key the issuer holds, held for an administrator; empty when nothing is held. Read only: adopt or drop it in the console or with awctl.",
+			},
+			"keys_held_at": schema.StringAttribute{
+				Computed:            true,
+				MarkdownDescription: "When the held report arrived, RFC 3339; null when nothing is held.",
+			},
 			"keys_error": schema.StringAttribute{
 				Computed:            true,
 				MarkdownDescription: "Why the last read of the keys failed; null when it worked.",
@@ -197,24 +225,46 @@ func (r *guardTrustedIssuerResource) configured(diags *diag.Diagnostics) bool {
 func (r *guardTrustedIssuerResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
 
 	var discover types.Bool
-	var jwks types.String
+	var jwks, source types.String
 	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root(attrDiscover), &discover)...)
 	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root(attrJWKS), &jwks)...)
+	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root(attrKeySourceNode), &source)...)
 	if resp.Diagnostics.HasError() || discover.IsUnknown() || jwks.IsUnknown() {
 		return
 	}
 
+	if at, summary, detail, bad := keysConflict(discover, jwks, source); bad {
+		resp.Diagnostics.AddAttributeError(path.Root(at), summary, detail)
+	}
+}
+
+// keysConflict holds the key sources: exactly one of discover = true, jwks
+// and key_source_node. It names the attribute at fault.
+func keysConflict(discover types.Bool, jwks, source types.String) (at, summary, detail string, bad bool) {
+	if !source.IsNull() {
+		switch {
+		case discover.ValueBool():
+			return attrKeySourceNode, "discover and key_source_node are exclusive",
+				"An issuer that discovers its keys takes no key source. Give one of discover, jwks and key_source_node.", true
+		case !jwks.IsNull():
+			return attrJWKS, "jwks and key_source_node are exclusive",
+				"With a key source the keys come from that node's reports; an uploaded jwks would replace them. Give one of discover, jwks and key_source_node.", true
+		}
+		// A key source alone: the issuer may start with no keys.
+		return "", "", "", false
+	}
 	switch {
 	case discover.ValueBool() && !jwks.IsNull():
-		resp.Diagnostics.AddAttributeError(path.Root(attrJWKS), "discover and jwks are exclusive",
-			"Give discover = true to read the issuer's keys, or jwks to upload them, not both.")
+		return attrJWKS, "discover and jwks are exclusive",
+			"Give discover = true to read the issuer's keys, or jwks to upload them, not both.", true
 	case !discover.IsNull() && !discover.ValueBool():
-		resp.Diagnostics.AddAttributeError(path.Root(attrDiscover), "discover = false is not a choice",
-			"Leave discover out and give jwks to upload the issuer's keys.")
+		return attrDiscover, "discover = false is not a choice",
+			"Leave discover out and give jwks to upload the issuer's keys.", true
 	case discover.IsNull() && jwks.IsNull():
-		resp.Diagnostics.AddAttributeError(path.Root(attrDiscover), "the issuer needs its keys",
-			"Give discover = true to read the issuer's keys, or jwks to upload them (an issuer guard-control cannot reach).")
+		return attrDiscover, "the issuer needs its keys",
+			"Give discover = true to read the issuer's keys, jwks to upload them, or key_source_node to have a node report them (an issuer guard-control cannot reach).", true
 	}
+	return "", "", "", false
 }
 
 // ModifyPlan plans key_ids unknown when the keys change: an upload, or a
@@ -232,17 +282,35 @@ func (r *guardTrustedIssuerResource) ModifyPlan(ctx context.Context, req resourc
 		return
 	}
 
-	if plan.Discover.Equal(state.Discover) && plan.JWKS.Equal(state.JWKS) {
+	// guard-control stops discovering only on an upload, so a move from
+	// discover to a key source is a new issuer.
+	if discoverToSource(&plan, &state) {
+		resp.RequiresReplace = append(resp.RequiresReplace, path.Root(attrKeySourceNode))
+	}
+
+	if !keysChange(&plan, &state) {
 		return
 	}
 	resp.Diagnostics.Append(resp.Plan.SetAttribute(ctx, path.Root("key_ids"), types.ListUnknown(types.StringType))...)
 }
 
+// discoverToSource is a move from discovery to a key source, with no upload
+// between: guard-control stops discovering only on an upload.
+func discoverToSource(plan, state *guardTrustedIssuerModel) bool {
+	return state.Discover.ValueBool() && !plan.Discover.ValueBool() && plan.JWKS.IsNull() && !plan.KeySourceNode.IsNull()
+}
+
+// keysChange is whether the plan changes where the keys come from.
+func keysChange(plan, state *guardTrustedIssuerModel) bool {
+	return !plan.Discover.Equal(state.Discover) || !plan.JWKS.Equal(state.JWKS) || !plan.KeySourceNode.Equal(state.KeySourceNode)
+}
+
 func (m *guardTrustedIssuerModel) toProto() *guardpb.TrustedIssuer {
 	t := &guardpb.TrustedIssuer{
-		DisplayName: m.DisplayName.ValueString(),
-		Description: m.Description.ValueString(),
-		Issuer:      m.Issuer.ValueString(),
+		DisplayName:   m.DisplayName.ValueString(),
+		Description:   m.Description.ValueString(),
+		Issuer:        m.Issuer.ValueString(),
+		KeySourceNode: m.KeySourceNode.ValueString(),
 	}
 	if m.Discover.ValueBool() {
 		t.Keys = &guardpb.TrustedIssuer_Discover{Discover: true}
@@ -280,6 +348,15 @@ func (m *guardTrustedIssuerModel) fromProto(t *guardpb.TrustedIssuer) diag.Diagn
 	m.KeyIDs = list
 	m.KeysUpdatedAt = timestampString(t.GetKeysUpdatedAt())
 	m.KeysError = optionalString(t.GetKeysError())
+	m.KeySourceNode = optionalString(t.GetKeySourceNode())
+	held := make([]attr.Value, 0, len(t.GetHeldKeyIds()))
+	for _, k := range t.GetHeldKeyIds() {
+		held = append(held, types.StringValue(k))
+	}
+	heldList, d := types.ListValue(types.StringType, held)
+	diags.Append(d...)
+	m.HeldKeyIDs = heldList
+	m.KeysHeldAt = timestampString(t.GetKeysHeldAt())
 	m.LastJoinAt = timestampString(t.GetLastJoinAt())
 	m.CreatedBy = types.StringValue(t.GetCreatedBy())
 	m.CreatedAt = timestampString(t.GetCreatedAt())
@@ -318,7 +395,7 @@ func (r *guardTrustedIssuerResource) Create(ctx context.Context, req resource.Cr
 
 	out, err := r.client.CreateTrustedIssuer(ctx, &guardpb.CreateTrustedIssuerRequest{Parent: parent, TrustedIssuer: plan.toProto()})
 	if err != nil {
-		resp.Diagnostics.AddError("registering the trusted issuer failed", err.Error())
+		resp.Diagnostics.AddError("registering the trusted issuer failed", keySourceError(err, !plan.KeySourceNode.IsNull()))
 		return
 	}
 
@@ -373,7 +450,21 @@ func (m *guardTrustedIssuerModel) updateMask(prior *guardTrustedIssuerModel) []s
 	case !m.JWKS.IsNull() && !m.JWKS.Equal(prior.JWKS):
 		paths = append(paths, attrJWKS)
 	}
+	if !m.KeySourceNode.Equal(prior.KeySourceNode) {
+		paths = append(paths, attrKeySourceNode)
+	}
 	return paths
+}
+
+// keySourceError names the cause when a guard-control that does not serve
+// key sources (before v0.32.0: it answers Unimplemented) refuses a write
+// that sets one; any other error is guard-control's own.
+func keySourceError(err error, setsSource bool) string {
+	if setsSource && status.Code(err) == codes.Unimplemented {
+		return "key_source_node needs guard-control v0.32.0 or later, which serves key sources (TI7); this guard-control does not. " +
+			"Leave key_source_node out, or upgrade guard-control. (" + err.Error() + ")"
+	}
+	return err.Error()
 }
 
 func (r *guardTrustedIssuerResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
@@ -395,7 +486,7 @@ func (r *guardTrustedIssuerResource) Update(ctx context.Context, req resource.Up
 
 	out, err := r.client.UpdateTrustedIssuer(ctx, &guardpb.UpdateTrustedIssuerRequest{TrustedIssuer: t, UpdateMask: &fieldmaskpb.FieldMask{Paths: mask}})
 	if err != nil {
-		resp.Diagnostics.AddError("updating trusted issuer "+t.GetName()+" failed", err.Error())
+		resp.Diagnostics.AddError("updating trusted issuer "+t.GetName()+" failed", keySourceError(err, slices.Contains(mask, attrKeySourceNode) && !plan.KeySourceNode.IsNull()))
 		return
 	}
 

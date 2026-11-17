@@ -52,6 +52,9 @@ type fakeGuardK8s struct {
 	issuers map[string]*guardpb.TrustedIssuer
 	rules   map[string]*guardpb.TrustedIssuerRule
 	keys    map[string]*guardpb.EnrollmentKey
+	// noKeySource plays a guard-control before v0.32.0, which answers
+	// Unimplemented to a write that sets key_source_node.
+	noKeySource bool
 }
 
 func newFakeGuardK8s() *fakeGuardK8s {
@@ -302,10 +305,46 @@ func (f *fakeGuardServer) checkIssuerKeysLocked(t *guardpb.TrustedIssuer) error 
 		}
 		t.KeyIds = []string{fmt.Sprintf("kid-uploaded-%d", len(k.Jwks))}
 		t.KeysUpdatedAt = timestamppb.Now()
-	default:
-		return status.Error(codes.InvalidArgument, "keys: give discover or jwks")
+	case nil:
+		if t.GetKeySourceNode() == "" {
+			return status.Error(codes.InvalidArgument, "keys: give discover or jwks, or a key_source_node")
+		}
 	}
 	return nil
+}
+
+// checkKeySourceLocked holds TI7's rules for key_source_node.
+func (f *fakeGuardServer) checkKeySourceLocked(t *guardpb.TrustedIssuer) error {
+	src := t.GetKeySourceNode()
+	if src == "" {
+		return nil
+	}
+	if f.k8s.noKeySource {
+		return status.Error(codes.Unimplemented, "key_source_node is not served yet (TI7)")
+	}
+	if t.GetDiscover() {
+		return status.Error(codes.InvalidArgument, "keySourceNode: an issuer that discovers its keys takes no key source")
+	}
+	n, ok := f.nodes[src]
+	if !ok || n.GetEphemeral() || (t.GetName() != "" && strings.HasPrefix(n.GetTrustedIssuerRule(), t.GetName()+"/rules/")) {
+		return status.Errorf(codes.InvalidArgument, "keySourceNode: %q is not a persistent node of the network outside this issuer's rules", src)
+	}
+	return nil
+}
+
+// reportKeys is the key source node's report, as ReportIssuerKeys would
+// apply it: one that would remove every key the issuer holds is held for
+// an administrator instead.
+func (f *fakeGuardServer) reportKeys(issuer string, kids ...string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	t := f.k8s.issuers[issuer]
+	kept := slices.ContainsFunc(kids, func(k string) bool { return slices.Contains(t.GetKeyIds(), k) })
+	if len(t.GetKeyIds()) > 0 && !kept {
+		t.HeldKeyIds, t.KeysHeldAt = kids, timestamppb.Now()
+		return
+	}
+	t.KeyIds, t.KeysUpdatedAt = kids, timestamppb.Now()
 }
 
 // issuerOut never returns the uploaded jwks.
@@ -327,6 +366,9 @@ func (f *fakeGuardServer) CreateTrustedIssuer(ctx context.Context, in *guardpb.C
 	t := proto.Clone(in.GetTrustedIssuer()).(*guardpb.TrustedIssuer)
 	if t.GetDisplayName() == "" || t.GetIssuer() == "" {
 		return nil, status.Error(codes.InvalidArgument, "display_name and issuer are required")
+	}
+	if err := f.checkKeySourceLocked(t); err != nil {
+		return nil, err
 	}
 	if err := f.checkIssuerKeysLocked(t); err != nil {
 		return nil, err
@@ -380,6 +422,13 @@ func (f *fakeGuardServer) UpdateTrustedIssuer(ctx context.Context, in *guardpb.U
 			next.Description = src.GetDescription()
 		case "discover", "jwks":
 			next.Keys, keys = src.GetKeys(), true
+			next.HeldKeyIds, next.KeysHeldAt = nil, nil
+		case "key_source_node":
+			next.KeySourceNode = src.GetKeySourceNode()
+			next.HeldKeyIds, next.KeysHeldAt = nil, nil
+			if err := f.checkKeySourceLocked(next); err != nil {
+				return nil, err
+			}
 		default:
 			return nil, status.Errorf(codes.InvalidArgument, "update_mask: unknown path %q (issuer never changes)", p)
 		}
