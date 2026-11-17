@@ -56,8 +56,7 @@ var (
 )
 
 // guardTrustedIssuerResource is authwise_guard_trusted_issuer (train
-// 2026.11.5, TI3; the cluster trust of GFK.1 renamed before it was ever
-// published): a token issuer registered on a network, whose signed tokens
+// 2026.11.5, TI3): a token issuer registered on a network, whose signed tokens
 // let machines join under the issuer's rules
 // (authwise_guard_trusted_issuer_rule, generated). key_source_node (TI7,
 // guard-control v0.32.0) is a third key source beside discover and jwks;
