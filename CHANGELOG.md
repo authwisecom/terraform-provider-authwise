@@ -1,4 +1,4 @@
-## 0.35.0 (Unreleased)
+## 0.35.0 (November 17, 2026)
 
 BREAKING CHANGES:
 
@@ -150,6 +150,22 @@ FEATURES:
 
 NOTES:
 
+* **Server floors.** This release may reach an install before the servers
+  its new resources need. The provider itself needs kit 1.87.0. Each
+  feature below needs the server versions listed; on an older server it
+  is refused by name, or guard-control answers `Unimplemented`.
+
+  | Feature | kit | guard-control |
+  | --- | --- | --- |
+  | Everything (the vocabulary) | 1.87.0 | |
+  | `authwise_scim_connection`, `authwise_scim_token`, `authwise_user.external_id`, `provisioning.scim` | 1.89.0 (1.90.0 for `provisioning.scim`) | |
+  | reCAPTCHA in `bot_protection` | 1.89.0 | |
+  | `status` on `authwise_issuer`, `authwise_realm`, `authwise_audience` | 1.91.0 | |
+  | `authwise_guard_enrollment_key` | 1.87.0 | v0.30.0 |
+  | `authwise_guard_node_group` and its members, grants and serving; `translated` on `authwise_guard_resource`; how a node joined | 1.87.0 | v0.31.0 |
+  | `authwise_guard_trusted_issuer`, `authwise_guard_trusted_issuer_rule` | 1.89.0 | v0.32.0 |
+  | `key_source_node` on `authwise_guard_trusted_issuer` | 1.89.0 | v0.32.0 |
+
 * **apis v0.80.0** (from v0.73.0): kit v1.87.0's contract, the vocabulary
   pass (kit#968, apis v0.74.0), `RealmConfig.signup` (kit#952, apis
   v0.75.0), guard-control v0.31.1's additive contract (apis v0.76.0),
@@ -184,12 +200,10 @@ NOTES:
   credential, is exempt. With a person's `awctl auth login` sign-in these
   resources fail at apply with guard-control's own message.
 
-* Release train 2026.11.GFK.1 (Guard for Kubernetes), stage GK5, built
-  against apis v0.73.0. guard-control's servers for node groups and
-  enrollment keys were still being built on its `feat/gfk1`
-  branch: these resources are tested against the acceptance fake's reading
-  of the contract, not a running guard-control. The guard-control minimum
-  is set when that release is tagged.
+* Release train 2026.11.GFK.1 (Guard for Kubernetes) and 2026.11.5. The
+  Guard resources below need the guard-control versions in the server
+  floors table above: enrollment keys v0.30.0, node groups and
+  translated applications v0.31.0, trusted issuers v0.32.0.
 * Built on tfinfra with two generator changes, released separately:
   proto3 `optional bool` fields (`authwise_guard_resource.translated`),
   and snake-case parent attributes for camelCase collections
