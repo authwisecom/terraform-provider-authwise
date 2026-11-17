@@ -99,7 +99,9 @@ FEATURES:
   from `identifier_attribute` (`userName`, the default; `externalId`;
   `emails.primary`); without it the connection keeps profiles only.
   `on_delete` is `deactivate` (the default) or `delete`; `status` is
-  `active` or `disabled`. Data sources: `authwise_scim_connection` and
+  `active` or `disabled`. A realm creates pushed users only with
+  `authwise_realm_config`'s `provisioning.scim = true`, which the provider
+  no longer refuses as reserved (kit 1.90.0 serves SCIM and accepts it). Data sources: `authwise_scim_connection` and
   `authwise_scim_connections`.
 
 * **New resource: `authwise_scim_token`**. A connection's bearer token.

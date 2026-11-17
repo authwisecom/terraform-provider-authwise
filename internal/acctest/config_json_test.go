@@ -149,9 +149,9 @@ data "authwise_realm_config" "x" {
 		"a reserved switch on": {
 			config: `
 data "authwise_realm_config" "x" {
-  provisioning = { scim = true }
+  provisioning = { admin_direct = true }
 }`,
-			want: regexp.MustCompile(`(?s)not yet supported.*kit#192`),
+			want: regexp.MustCompile(`(?s)not yet supported.*admin-direct`),
 		},
 		"a SAML binding that is not one": {
 			config: `

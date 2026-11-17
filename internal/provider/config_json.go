@@ -303,6 +303,7 @@ var configJSONSpecs = []configJSONSpec{
 				"A Google Cloud project without billing past Google's free monthly quota answers every token with a static score; kit counts that as a failed check, so the fix is billing on the project.",
 			"bot_protection.min_score": "The lowest score a `SCORE` key's token may carry, 0 to 1; a lower one is refused like a failed check. Unset or 0 is 0.5. Refused for anything but a `SCORE` key.",
 			"sms":                      "Where the realm will send an SMS, and how many per destination prefix.",
+			"provisioning.scim":        "Let the realm's `authwise_scim_connection`s create users: with it off, a directory's create is refused (403) and only existing users are updated. Default false. kit 1.90.0 or later; an earlier kit refuses it set.",
 			"signup":                   "What kit does around a person's own sign-up in this realm (kit#952). Whether sign-up is allowed at all stays `provisioning.self_signup`.",
 			"signup.welcome_message":   "Send the `welcome` catalog message once to a person whose account this realm created by their own action: sign-up by form (after the address is proven, when the realm requires that), first sign-in through a federated provider, or accepting an invitation. Never for an account an administrator or SCIM creates, and never twice: the send is recorded on the account. Default false. Takes effect on kit 1.87.0 or later.",
 		},
@@ -311,7 +312,6 @@ var configJSONSpecs = []configJSONSpec{
 		// (pkg/engine/provisioning/reserved.go), with its reasons.
 		reserved: map[string]string{
 			"provisioning.admin_direct":                 "awaits an admin-direct credential surface",
-			"provisioning.scim":                         "awaits an inbound SCIM channel (kit#192)",
 			"provisioning.admin_set_permanent_password": "rides `admin_direct`, which has no surface yet",
 			"provisioning.allowed_provider_types":       "awaits the per-realm provider policy surface (kit#222)",
 		},

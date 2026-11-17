@@ -418,6 +418,7 @@ func main() {
 					"Give the directory `base_url` and the secret of an `authwise_scim_token` for this connection. `base_url` is empty until the issuer has a host.\n\n"+
 					"`provider_id` names the realm's federated provider that pushed users sign in through: each user's identifier is written under it, taken from `identifier_attribute` (`userName`, the default; `externalId`; or `emails.primary`). "+
 					"Without it the connection keeps profiles only, a directory mirror. "+
+					"The realm creates pushed users only with `provisioning = { scim = true }` in its `authwise_realm_config` (kit 1.90.0 or later); without it, the directory can update existing users but not create them. "+
 					"`on_delete` is what the directory's delete does: `deactivate` (the default) or `delete`. "+
 					"`status = \"disabled\"` refuses every request and keeps the tokens."),
 				withCollection("scim-connections"),

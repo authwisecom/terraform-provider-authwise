@@ -118,7 +118,7 @@ Optional:
 - `password_validators` (Attributes List) The realm's own password rules. With a catalog set they are extras that can only tighten it, merged per type with the strongest winning: the larger `min_length`, the smaller `max_length`, and every `regexp` and `entropy` rule kept. Under `custom` they are the whole policy above the built-in floor. (see [below for nested schema](#nestedatt--provisioning--password_validators))
 - `provisioning_integration_config` (Attributes) (see [below for nested schema](#nestedatt--provisioning--provisioning_integration_config))
 - `require_email_verification` (Boolean)
-- `scim` (Boolean) Not yet supported: no kit build acts on it, so kit refuses it set; it awaits an inbound SCIM channel (kit#192).
+- `scim` (Boolean) Let the realm's `authwise_scim_connection`s create users: with it off, a directory's create is refused (403) and only existing users are updated. Default false. kit 1.90.0 or later; an earlier kit refuses it set.
 - `self_signup` (Boolean)
 
 <a id="nestedatt--provisioning--password_validators"></a>
