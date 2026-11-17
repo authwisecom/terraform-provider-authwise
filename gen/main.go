@@ -348,11 +348,11 @@ func main() {
 			// binding's host) change with binding resources in the same
 			// apply: volatile too.
 			crud[corepb.Issuer](scopeTenant,
-				withDescription("An OAuth 2.0 / OpenID Connect issuer: the login a set of applications shares, with its token lifetimes and which realm or realms people sign in to (`config`). It answers at the hosts its `authwise_issuer_domain_binding`s name (kit#911). Its pages use its default theme variant (`authwise_theme_variant.is_default`), or the tenant's default theme when it has none."), withJSON("config"),
+				withDescription("An OAuth 2.0 / OpenID Connect issuer: the login a set of applications shares, with its token lifetimes and which realm or realms people sign in to (`config`). It answers at the hosts its `authwise_issuer_domain_binding`s name (kit#911). Its pages use its default theme variant (`authwise_theme_variant.is_default`), or the tenant's default theme when it has none.\n\n`status` is `active` (the default) or `disabled`: sign-in, token issue, discovery and every hosted page on a disabled issuer's hosts stop at once. Changing it is made in place and keeps everything under it; kit 1.91.0 or later (the `identity.object-status` feature), and the administration tenant's own objects cannot be turned off."), withJSON("config"),
 				withImmutable("domain_id", "path"), withComputed("account_client_id"), withVolatile("preferred_domain_id", "preferred_binding_id", "bindings", "domain_name"),
 				withReferences(map[string]gentf.Reference{"domain_id": refDomain})),
 			crud[corepb.Realm](scopeTenant,
-				withDescription("A realm: a population of users with its own providers, factors and authentication policy."), withJSON("config")),
+				withDescription("A realm: a population of users with its own providers, factors and authentication policy.\n\n`status` is `active` (the default) or `disabled`: a disabled realm's people cannot sign in, and their refresh grants are refused. Changing it is made in place and keeps everything under it; kit 1.91.0 or later (the `identity.object-status` feature), and the administration tenant's own objects cannot be turned off."), withJSON("config")),
 			crud[corepb.Theme](scopeTenant,
 				withDescription("A tenant theme: the stylesheet and content the hosted login pages render with. Start from a layout's starter (`GET {issuer}/api/v1/ui/layouts`): its stylesheet template, `stylesheet_attributes` and `content`, and its two schemas. `layout` is fixed at creation; kit refuses a change, so another layout is another theme. Colours in `stylesheet_attributes` are six hex digits without `#`. An asset is named in `content` by its served URL, `/assets` plus the asset's `path`."), withJSON(
 					"stylesheet_attributes", "content",
@@ -450,7 +450,7 @@ func main() {
 				withReferences(map[string]gentf.Reference{"audience_id": refAudience, "theme_variant_id": refThemeVariant})),
 			applicationSecret(),
 			crud[corepb.Audience](scopeIssuer,
-				withDescription("An API an issuer issues access tokens for, and the audience its Access catalog hangs off."), withJSON("config"),
+				withDescription("An API an issuer issues access tokens for, and the audience its Access catalog hangs off.\n\n`status` is `active` (the default) or `disabled`: no token is issued for a disabled audience, refresh grants included. Changing it is made in place and keeps everything under it; kit 1.91.0 or later (the `identity.object-status` feature), and the administration tenant's own objects cannot be turned off."), withJSON("config"),
 				withReferences(map[string]gentf.Reference{"theme_variant_id": refThemeVariant})),
 			crud[corepb.ThemeVariant](scopeIssuer,
 				// is_default is the issuer's default variant (kit#680, apis

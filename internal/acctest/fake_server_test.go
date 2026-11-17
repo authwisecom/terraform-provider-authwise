@@ -241,6 +241,11 @@ func (f *fakeIdentityServer) CreateRealm(ctx context.Context, in *identitypb.Cre
 		return nil, err
 	}
 	r := proto.Clone(in.GetRealm()).(*corepb.Realm)
+	st, err := objectStatus(r.GetStatus())
+	if err != nil {
+		return nil, err
+	}
+	r.Status = st
 	r.Name = in.GetParent() + "/realms/" + f.nextID("r")
 	f.realms[r.GetName()] = r
 	return proto.Clone(r).(*corepb.Realm), nil
@@ -275,6 +280,12 @@ func (f *fakeIdentityServer) PatchRealm(ctx context.Context, in *identitypb.Patc
 			existing.Config.Authentication = in.GetRealm().GetConfig().GetAuthentication()
 		case "labels":
 			existing.Labels = in.GetRealm().GetLabels()
+		case "status":
+			st, err := objectStatus(in.GetRealm().GetStatus())
+			if err != nil {
+				return nil, err
+			}
+			existing.Status = st
 		default:
 			return nil, status.Errorf(codes.InvalidArgument, "unsupported update_mask path %q", path)
 		}
@@ -417,6 +428,11 @@ func (f *fakeIdentityServer) CreateIssuer(ctx context.Context, in *identitypb.Cr
 	i.DomainId, i.Path, i.DomainName, i.PreferredDomainId, i.PreferredBindingId, i.Bindings = "", "", "", "", "", nil
 	// account_client_id is kit's to set (kit#827); a value sent is ignored.
 	i.AccountClientId = ""
+	st, err := objectStatus(i.GetStatus())
+	if err != nil {
+		return nil, err
+	}
+	i.Status = st
 	f.issuers[name] = i
 	if domainID != "" {
 		f.bindLocked(name, domainID, path)
@@ -460,6 +476,12 @@ func (f *fakeIdentityServer) PatchIssuer(ctx context.Context, in *identitypb.Pat
 				return nil, err
 			}
 			existing.PreferredBindingId = b
+		case "status":
+			st, err := objectStatus(in.GetIssuer().GetStatus())
+			if err != nil {
+				return nil, err
+			}
+			stored.Status = st
 		default:
 			if strings.HasPrefix(path, "config.multiRealmProviderSelector.") || strings.HasPrefix(path, "config.multi_realm_provider_selector.") {
 				return nil, status.Errorf(codes.InvalidArgument,
@@ -528,6 +550,11 @@ func (f *fakeIdentityServer) CreateAudience(ctx context.Context, in *identitypb.
 		return nil, err
 	}
 	a := proto.Clone(in.GetAudience()).(*corepb.Audience)
+	st, err := objectStatus(a.GetStatus())
+	if err != nil {
+		return nil, err
+	}
+	a.Status = st
 	a.Name = in.GetParent() + "/audiences/" + f.nextID("a")
 	f.audiences[a.GetName()] = a
 	// The issuer's first audience enables its account page (kit#827): kit
@@ -568,6 +595,12 @@ func (f *fakeIdentityServer) PatchAudience(ctx context.Context, in *identitypb.P
 			existing.Config = in.GetAudience().GetConfig()
 		case "theme_variant_id":
 			existing.ThemeVariantId = in.GetAudience().GetThemeVariantId()
+		case "status":
+			st, err := objectStatus(in.GetAudience().GetStatus())
+			if err != nil {
+				return nil, err
+			}
+			existing.Status = st
 		default:
 			return nil, status.Errorf(codes.InvalidArgument, "unsupported update_mask path %q", path)
 		}
@@ -1101,4 +1134,15 @@ func admitAudienceConfig(c *corepb.AudienceConfig) error {
 		seen[s] = true
 	}
 	return nil
+}
+
+// objectStatus is kit#972's status as kit stores it: empty reads as active.
+func objectStatus(s string) (string, error) {
+	switch s {
+	case "", "active":
+		return "active", nil
+	case "disabled":
+		return s, nil
+	}
+	return "", status.Errorf(codes.InvalidArgument, "status: active or disabled, got %q", s)
 }

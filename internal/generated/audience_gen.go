@@ -64,6 +64,11 @@ func AudienceResourceSchema() schema.Schema {
 				MarkdownDescription: "Full resource name; serves as the Terraform ID.",
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
+			"status": schema.StringAttribute{
+				Computed:      true,
+				Optional:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
 			"tenant_id": schema.StringAttribute{
 				Computed:            true,
 				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default, and reads back from the name. Changing a configured one replaces the resource.",
@@ -78,7 +83,7 @@ func AudienceResourceSchema() schema.Schema {
 				Validators:    []validator.String{tf.ReferenceID("ap", "theme_variant", "authwise_theme_variant.<name>.theme_variant_id")},
 			},
 		},
-		MarkdownDescription: "An API an issuer issues access tokens for, and the audience its Access catalog hangs off.",
+		MarkdownDescription: "An API an issuer issues access tokens for, and the audience its Access catalog hangs off.\n\n`status` is `active` (the default) or `disabled`: no token is issued for a disabled audience, refresh grants included. Changing it is made in place and keeps everything under it; kit 1.91.0 or later (the `identity.object-status` feature), and the administration tenant's own objects cannot be turned off.",
 	}
 }
 
@@ -92,6 +97,7 @@ type AudienceModel struct {
 	DisplayName    types.String         `tfsdk:"display_name"`
 	ThemeVariantId types.String         `tfsdk:"theme_variant_id"`
 	Config         jsontypes.Normalized `tfsdk:"config"`
+	Status         types.String         `tfsdk:"status"`
 }
 
 // NewAudienceModel returns a model with every attribute set to its typed null; collection types cannot be zero-valued.
@@ -103,6 +109,7 @@ func NewAudienceModel() *AudienceModel {
 		IssuerId:       types.StringNull(),
 		Labels:         types.MapNull(types.StringType),
 		Name:           types.StringNull(),
+		Status:         types.StringNull(),
 		TenantId:       types.StringNull(),
 		ThemeVariantId: types.StringNull(),
 	}
@@ -126,6 +133,7 @@ func (m *AudienceModel) ToProto(ctx context.Context) (*v1alpha1.Audience, diag.D
 			out.Config = v
 		}
 	}
+	out.Status = m.Status.ValueString()
 	return out, diags
 }
 
@@ -162,6 +170,11 @@ func (m *AudienceModel) FromProto(ctx context.Context, e *v1alpha1.Audience) dia
 			m.Config = jsontypes.NewNormalizedValue(string(b))
 		}
 	}
+	if e.Status == "" {
+		m.Status = types.StringNull()
+	} else {
+		m.Status = types.StringValue(e.Status)
+	}
 	return diags
 }
 
@@ -194,6 +207,9 @@ func (m *AudienceModel) UpdateMask(ctx context.Context, prior *AudienceModel) []
 		if eq, _ := m.Config.StringSemanticEquals(ctx, prior.Config); !eq {
 			paths = append(paths, "config")
 		}
+	}
+	if !m.Status.Equal(prior.Status) {
+		paths = append(paths, "status")
 	}
 	return paths
 }
@@ -341,10 +357,11 @@ func AudienceDataSourceSchema() schema1.Schema {
 				MarkdownDescription: "Full resource name of the object to read.",
 				Required:            true,
 			},
+			"status":           schema1.StringAttribute{Computed: true},
 			"tenant_id":        schema1.StringAttribute{Computed: true},
 			"theme_variant_id": schema1.StringAttribute{Computed: true},
 		},
-		MarkdownDescription: "An API an issuer issues access tokens for, and the audience its Access catalog hangs off. This data source reads one by its full resource name.",
+		MarkdownDescription: "An API an issuer issues access tokens for, and the audience its Access catalog hangs off.\n\n`status` is `active` (the default) or `disabled`: no token is issued for a disabled audience, refresh grants included. Changing it is made in place and keeps everything under it; kit 1.91.0 or later (the `identity.object-status` feature), and the administration tenant's own objects cannot be turned off. This data source reads one by its full resource name.",
 	}
 }
 
@@ -384,6 +401,7 @@ type AudienceItemModel struct {
 	DisplayName    types.String         `tfsdk:"display_name"`
 	ThemeVariantId types.String         `tfsdk:"theme_variant_id"`
 	Config         jsontypes.Normalized `tfsdk:"config"`
+	Status         types.String         `tfsdk:"status"`
 }
 
 // AudienceItemAttrTypes returns the attribute types of one audiences list element.
@@ -394,6 +412,7 @@ func AudienceItemAttrTypes() map[string]attr.Type {
 		"display_name":     types.StringType,
 		"labels":           types.MapType{ElemType: types.StringType},
 		"name":             types.StringType,
+		"status":           types.StringType,
 		"theme_variant_id": types.StringType,
 	}
 }
@@ -430,6 +449,7 @@ func AudienceListDataSourceSchema() schema1.Schema {
 						Computed:            true,
 						MarkdownDescription: "Full resource name.",
 					},
+					"status":           schema1.StringAttribute{Computed: true},
 					"theme_variant_id": schema1.StringAttribute{Computed: true},
 				}},
 			},
@@ -444,7 +464,7 @@ func AudienceListDataSourceSchema() schema1.Schema {
 				Validators:          []validator.String{tf.ReferenceID("t", "tenant", "")},
 			},
 		},
-		MarkdownDescription: "An API an issuer issues access tokens for, and the audience its Access catalog hangs off. This data source lists every one under a parent.",
+		MarkdownDescription: "An API an issuer issues access tokens for, and the audience its Access catalog hangs off.\n\n`status` is `active` (the default) or `disabled`: no token is issued for a disabled audience, refresh grants included. Changing it is made in place and keeps everything under it; kit 1.91.0 or later (the `identity.object-status` feature), and the administration tenant's own objects cannot be turned off. This data source lists every one under a parent.",
 	}
 }
 
@@ -481,6 +501,11 @@ func audienceItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Audience
 		} else {
 			item.Config = jsontypes.NewNormalizedValue(string(b))
 		}
+	}
+	if e.Status == "" {
+		item.Status = types.StringNull()
+	} else {
+		item.Status = types.StringValue(e.Status)
 	}
 	id, err := crud.IDFromName(e.Name)
 	if err != nil {

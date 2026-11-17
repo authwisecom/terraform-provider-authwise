@@ -49,6 +49,77 @@ var gatedFeatures = func() map[string]gatedFeature {
 	return m
 }()
 
+// objectStatus is kit#972's status on an issuer, realm or audience (apis
+// v0.80.0). A kit before it drops the field, so a write that sets it would
+// look applied and read back unset: such a write needs the feature. Every
+// other call to these objects goes through.
+var objectStatus = gatedFeature{
+	feature: "identity.object-status",
+	what:    "`status` on authwise_issuer, authwise_realm and authwise_audience",
+}
+
+// statusWrites are the writes objectStatus gates, when they set status.
+var statusWrites = map[string]bool{
+	identitypb.AuthwiseIdentityService_CreateIssuer_FullMethodName:   true,
+	identitypb.AuthwiseIdentityService_UpdateIssuer_FullMethodName:   true,
+	identitypb.AuthwiseIdentityService_PatchIssuer_FullMethodName:    true,
+	identitypb.AuthwiseIdentityService_CreateRealm_FullMethodName:    true,
+	identitypb.AuthwiseIdentityService_UpdateRealm_FullMethodName:    true,
+	identitypb.AuthwiseIdentityService_PatchRealm_FullMethodName:     true,
+	identitypb.AuthwiseIdentityService_CreateAudience_FullMethodName: true,
+	identitypb.AuthwiseIdentityService_UpdateAudience_FullMethodName: true,
+	identitypb.AuthwiseIdentityService_PatchAudience_FullMethodName:  true,
+}
+
+// statusField is kit#972's field on Issuer, Realm and Audience.
+const statusField = "status"
+
+// setsStatus is whether a write names status: in its update mask, or as a
+// non-empty status on the object it carries.
+func setsStatus(req any) bool {
+	m, ok := req.(proto.Message)
+	if !ok || m == nil {
+		return false
+	}
+	r := m.ProtoReflect()
+	fields := r.Descriptor().Fields()
+	for i := range fields.Len() {
+		if fieldSetsStatus(r, fields.Get(i)) {
+			return true
+		}
+	}
+	return false
+}
+
+// fieldSetsStatus is whether one field of a write names status: the update
+// mask listing it, or the carried object holding a non-empty one.
+func fieldSetsStatus(r protoreflect.Message, fd protoreflect.FieldDescriptor) bool {
+	if fd.Kind() != protoreflect.MessageKind || fd.IsList() || fd.IsMap() || !r.Has(fd) {
+		return false
+	}
+	sub := r.Get(fd).Message()
+	if fd.Name() == "update_mask" {
+		return maskNames(sub, statusField)
+	}
+	st := sub.Descriptor().Fields().ByName(statusField)
+	return st != nil && st.Kind() == protoreflect.StringKind && sub.Get(st).String() != ""
+}
+
+// maskNames is whether a FieldMask lists path.
+func maskNames(mask protoreflect.Message, path string) bool {
+	paths := mask.Descriptor().Fields().ByName("paths")
+	if paths == nil {
+		return false
+	}
+	list := mask.Get(paths).List()
+	for j := range list.Len() {
+		if list.Get(j).String() == path {
+			return true
+		}
+	}
+	return false
+}
+
 // gatedFeature is one install feature a group of calls needs, and how the
 // refusal names them.
 type gatedFeature struct {
@@ -103,6 +174,9 @@ func (k *kitCompat) check(ctx context.Context, method string, req any, cc grpc.C
 	}
 	if g, ok := gatedFeatures[method]; ok && k.answered && !slices.Contains(k.features, g.feature) {
 		return k.gatedRefusal(g)
+	}
+	if statusWrites[method] && k.answered && !slices.Contains(k.features, objectStatus.feature) && setsStatus(req) {
+		return k.gatedRefusal(objectStatus)
 	}
 	return nil
 }

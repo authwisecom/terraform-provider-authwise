@@ -114,6 +114,14 @@ FEATURES:
 * **`authwise_user`: `external_id`**, the directory's own id for a
   SCIM-pushed user.
 
+* **`authwise_issuer`, `authwise_realm` and `authwise_audience`: `status`**
+  (kit#972, apis v0.80.0): `active` (the default) or `disabled`, changed
+  in place. A disabled issuer stops sign-in, token issue, discovery and its
+  hosted pages; a disabled realm's people cannot sign in; no token is
+  issued for a disabled audience. Everything under the object is kept, and
+  turning it back on restores it. The administration tenant's own objects
+  cannot be turned off.
+
 * **Google reCAPTCHA as a bot check.** `authwise_realm_config`'s
   `bot_protection` takes `provider = "RECAPTCHA"` with
   `recaptcha_key_type` (`CHECKBOX` or `SCORE`, required for reCAPTCHA) and,
@@ -142,11 +150,13 @@ FEATURES:
 
 NOTES:
 
-* **apis v0.78.0** (from v0.73.0): kit v1.87.0's contract, the vocabulary
+* **apis v0.80.0** (from v0.73.0): kit v1.87.0's contract, the vocabulary
   pass (kit#968, apis v0.74.0), `RealmConfig.signup` (kit#952, apis
   v0.75.0), guard-control v0.31.1's additive contract (apis v0.76.0),
-  guard-control's trusted issuers (apis v0.77.0) and kit's SCIM admin API
-  and reCAPTCHA (apis v0.78.0, train 2026.11.5).
+  guard-control's trusted issuers (apis v0.77.0), kit's SCIM admin API
+  and reCAPTCHA (apis v0.78.0), guard-control's step-up floor comments
+  (apis v0.79.0) and `status` on issuer, realm and audience (apis v0.80.0,
+  train 2026.11.5).
   This release needs kit 1.87.0 or later; an older kit answers the renamed
   calls with `Unimplemented`.
 
@@ -159,6 +169,10 @@ NOTES:
     `guard.trusted-issuers` (kit 1.89.0), and guard-control v0.32.0;
   * SCIM (`authwise_scim_connection`, `authwise_scim_token` and their data
     sources) needs `identity.scim` (kit 1.89.0).
+  * setting `status` on `authwise_issuer`, `authwise_realm` or
+    `authwise_audience` needs `identity.object-status` (kit 1.91.0); an
+    earlier kit would drop the field, so the write is refused instead. The
+    resources otherwise work with it as before.
 
   As with the vocabulary check, a check the credential may not make does
   not block.

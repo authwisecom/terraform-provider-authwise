@@ -3,12 +3,15 @@
 page_title: "authwise_audience Data Source - Authwise"
 subcategory: "Identity"
 description: |-
-  An API an issuer issues access tokens for, and the audience its Access catalog hangs off. This data source reads one by its full resource name.
+  An API an issuer issues access tokens for, and the audience its Access catalog hangs off.
+  status is active (the default) or disabled: no token is issued for a disabled audience, refresh grants included. Changing it is made in place and keeps everything under it; kit 1.91.0 or later (the identity.object-status feature), and the administration tenant's own objects cannot be turned off. This data source reads one by its full resource name.
 ---
 
 # authwise_audience (Data Source)
 
-An API an issuer issues access tokens for, and the audience its Access catalog hangs off. This data source reads one by its full resource name.
+An API an issuer issues access tokens for, and the audience its Access catalog hangs off.
+
+`status` is `active` (the default) or `disabled`: no token is issued for a disabled audience, refresh grants included. Changing it is made in place and keeps everything under it; kit 1.91.0 or later (the `identity.object-status` feature), and the administration tenant's own objects cannot be turned off. This data source reads one by its full resource name.
 
 
 
@@ -26,5 +29,6 @@ An API an issuer issues access tokens for, and the audience its Access catalog h
 - `display_name` (String)
 - `issuer_id` (String)
 - `labels` (Map of String)
+- `status` (String)
 - `tenant_id` (String)
 - `theme_variant_id` (String)

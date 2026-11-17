@@ -3,11 +3,14 @@ page_title: "authwise_realm Resource - Authwise"
 subcategory: "Identity"
 description: |-
   A realm: a population of users with its own providers, factors and authentication policy.
+  status is active (the default) or disabled: a disabled realm's people cannot sign in, and their refresh grants are refused. Changing it is made in place and keeps everything under it; kit 1.91.0 or later (the identity.object-status feature), and the administration tenant's own objects cannot be turned off.
 ---
 
 # authwise_realm (Resource)
 
 A realm: a population of users with its own providers, factors and authentication policy.
+
+`status` is `active` (the default) or `disabled`: a disabled realm's people cannot sign in, and their refresh grants are refused. Changing it is made in place and keeps everything under it; kit 1.91.0 or later (the `identity.object-status` feature), and the administration tenant's own objects cannot be turned off.
 
 ## Example Usage
 
@@ -108,6 +111,7 @@ are checked against it.
 - `config` (String) `config` as the protojson encoding of RealmConfig.
 - `display_name` (String)
 - `labels` (Map of String)
+- `status` (String)
 - `tenant_id` (String) Parent identifier `tenant_id`; overrides the provider default, and reads back from the name. Changing a configured one replaces the resource.
 
 ### Read-Only

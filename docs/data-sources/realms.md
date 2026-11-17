@@ -3,12 +3,15 @@
 page_title: "authwise_realms Data Source - Authwise"
 subcategory: "Identity"
 description: |-
-  A realm: a population of users with its own providers, factors and authentication policy. This data source lists every one under a parent.
+  A realm: a population of users with its own providers, factors and authentication policy.
+  status is active (the default) or disabled: a disabled realm's people cannot sign in, and their refresh grants are refused. Changing it is made in place and keeps everything under it; kit 1.91.0 or later (the identity.object-status feature), and the administration tenant's own objects cannot be turned off. This data source lists every one under a parent.
 ---
 
 # authwise_realms (Data Source)
 
-A realm: a population of users with its own providers, factors and authentication policy. This data source lists every one under a parent.
+A realm: a population of users with its own providers, factors and authentication policy.
+
+`status` is `active` (the default) or `disabled`: a disabled realm's people cannot sign in, and their refresh grants are refused. Changing it is made in place and keeps everything under it; kit 1.91.0 or later (the `identity.object-status` feature), and the administration tenant's own objects cannot be turned off. This data source lists every one under a parent.
 
 
 
@@ -33,3 +36,4 @@ Read-Only:
 - `labels` (Map of String)
 - `name` (String) Full resource name.
 - `realm_id` (String) Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.
+- `status` (String)

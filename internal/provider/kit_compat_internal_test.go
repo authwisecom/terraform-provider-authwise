@@ -15,6 +15,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/fieldmaskpb"
 )
 
 // capabilitiesKit counts the check's questions and the tenants they name.
@@ -180,4 +181,39 @@ func TestKitCompat_GatedUnaryGuard(t *testing.T) {
 	assert.Equal(t, codes.FailedPrecondition, status.Code(err))
 	assert.Contains(t, err.Error(), "guard.trusted-issuers")
 	assert.Equal(t, 1, invoked)
+}
+
+// TestKitCompat_StatusWrites: on a kit without identity.object-status, a
+// write that sets status, in its object or its mask, is refused by name;
+// the same write without status, and every read, reaches kit.
+func TestKitCompat_StatusWrites(t *testing.T) {
+	kit := &capabilitiesKit{features: []string{featureVocabulary}}
+	c := compatClient(t, kit, "t-1")
+	realm := "tenants/t-1/realms/r-1"
+
+	_, err := c.PatchRealm(t.Context(), &identitypb.PatchRealmRequest{
+		Name: realm, Realm: &corepb.Realm{}, UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{statusField}},
+	})
+	assert.Equal(t, codes.FailedPrecondition, status.Code(err))
+	assert.Contains(t, err.Error(), "identity.object-status")
+
+	_, err = c.CreateIssuer(t.Context(), &identitypb.CreateIssuerRequest{
+		Parent: "tenants/t-1", Issuer: &corepb.Issuer{Status: "disabled"},
+	})
+	assert.Equal(t, codes.FailedPrecondition, status.Code(err))
+
+	// No status: kit is reached (this fake answers Unimplemented).
+	_, err = c.PatchRealm(t.Context(), &identitypb.PatchRealmRequest{
+		Name: realm, Realm: &corepb.Realm{DisplayName: "x"}, UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{displayName}},
+	})
+	assert.Equal(t, codes.Unimplemented, status.Code(err))
+	_, err = c.GetRealm(t.Context(), &identitypb.GetRealmRequest{Name: realm})
+	require.NoError(t, err)
+
+	kit = &capabilitiesKit{features: []string{featureVocabulary, "identity.object-status"}}
+	c = compatClient(t, kit, "t-1")
+	_, err = c.PatchRealm(t.Context(), &identitypb.PatchRealmRequest{
+		Name: realm, Realm: &corepb.Realm{Status: "disabled"}, UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{statusField}},
+	})
+	assert.Equal(t, codes.Unimplemented, status.Code(err))
 }

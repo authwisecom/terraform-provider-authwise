@@ -4,11 +4,14 @@ page_title: "authwise_audience Resource - Authwise"
 subcategory: "Identity"
 description: |-
   An API an issuer issues access tokens for, and the audience its Access catalog hangs off.
+  status is active (the default) or disabled: no token is issued for a disabled audience, refresh grants included. Changing it is made in place and keeps everything under it; kit 1.91.0 or later (the identity.object-status feature), and the administration tenant's own objects cannot be turned off.
 ---
 
 # authwise_audience (Resource)
 
 An API an issuer issues access tokens for, and the audience its Access catalog hangs off.
+
+`status` is `active` (the default) or `disabled`: no token is issued for a disabled audience, refresh grants included. Changing it is made in place and keeps everything under it; kit 1.91.0 or later (the `identity.object-status` feature), and the administration tenant's own objects cannot be turned off.
 
 
 
@@ -21,6 +24,7 @@ An API an issuer issues access tokens for, and the audience its Access catalog h
 - `display_name` (String)
 - `issuer_id` (String) Parent identifier `issuer_id`; overrides the provider default, and reads back from the name. Changing a configured one replaces the resource.
 - `labels` (Map of String)
+- `status` (String)
 - `tenant_id` (String) Parent identifier `tenant_id`; overrides the provider default, and reads back from the name. Changing a configured one replaces the resource.
 - `theme_variant_id` (String)
 

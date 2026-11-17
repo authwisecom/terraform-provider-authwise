@@ -3,6 +3,7 @@ page_title: "authwise_issuer Resource - Authwise"
 subcategory: "Identity"
 description: |-
   An OAuth 2.0 / OpenID Connect issuer: the login a set of applications shares, with its token lifetimes and which realm or realms people sign in to (config). It answers at the hosts its authwise_issuer_domain_bindings name (kit#911). Its pages use its default theme variant (authwise_theme_variant.is_default), or the tenant's default theme when it has none.
+  status is active (the default) or disabled: sign-in, token issue, discovery and every hosted page on a disabled issuer's hosts stop at once. Changing it is made in place and keeps everything under it; kit 1.91.0 or later (the identity.object-status feature), and the administration tenant's own objects cannot be turned off.
 ---
 
 # authwise_issuer (Resource)
@@ -245,6 +246,7 @@ resource "authwise_issuer_preferred_binding" "login" {
 - `domain_id` (String, Deprecated) **Deprecated** (kit#911): use `authwise_issuer_domain_binding`. On create, the domain (`d-…`) the issuer's first binding is made on, at `path`; optional, since an issuer may exist with no binding. It keeps the value it was created with; `bindings` shows where the issuer answers now. Changing a configured value replaces the issuer.
 - `labels` (Map of String)
 - `path` (String, Deprecated) **Deprecated** (kit#911): use `authwise_issuer_domain_binding`. On create, the first binding's path: `""` (or unset) for the domain's root, else a path such as `/customers` (see `authwise_issuer_domain_binding.path`). It keeps the value it was created with. Changing a configured value replaces the issuer.
+- `status` (String)
 - `tenant_id` (String) Parent identifier `tenant_id`; overrides the provider default, and reads back from the name. Changing a configured one replaces the resource.
 
 ### Read-Only

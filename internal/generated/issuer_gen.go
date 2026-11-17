@@ -109,6 +109,11 @@ func IssuerResourceSchema() schema.Schema {
 			},
 			"preferred_binding_id": schema.StringAttribute{Computed: true},
 			"preferred_domain_id":  schema.StringAttribute{Computed: true},
+			"status": schema.StringAttribute{
+				Computed:      true,
+				Optional:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
 			"tenant_id": schema.StringAttribute{
 				Computed:            true,
 				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default, and reads back from the name. Changing a configured one replaces the resource.",
@@ -117,7 +122,7 @@ func IssuerResourceSchema() schema.Schema {
 				Validators:          []validator.String{tf.ReferenceID("t", "tenant", "")},
 			},
 		},
-		MarkdownDescription: "An OAuth 2.0 / OpenID Connect issuer: the login a set of applications shares, with its token lifetimes and which realm or realms people sign in to (`config`). It answers at the hosts its `authwise_issuer_domain_binding`s name (kit#911). Its pages use its default theme variant (`authwise_theme_variant.is_default`), or the tenant's default theme when it has none.",
+		MarkdownDescription: "An OAuth 2.0 / OpenID Connect issuer: the login a set of applications shares, with its token lifetimes and which realm or realms people sign in to (`config`). It answers at the hosts its `authwise_issuer_domain_binding`s name (kit#911). Its pages use its default theme variant (`authwise_theme_variant.is_default`), or the tenant's default theme when it has none.\n\n`status` is `active` (the default) or `disabled`: sign-in, token issue, discovery and every hosted page on a disabled issuer's hosts stop at once. Changing it is made in place and keeps everything under it; kit 1.91.0 or later (the `identity.object-status` feature), and the administration tenant's own objects cannot be turned off.",
 	}
 }
 
@@ -161,6 +166,7 @@ type IssuerModel struct {
 	PreferredDomainId  types.String         `tfsdk:"preferred_domain_id"`
 	PreferredBindingId types.String         `tfsdk:"preferred_binding_id"`
 	Bindings           types.List           `tfsdk:"bindings"`
+	Status             types.String         `tfsdk:"status"`
 }
 
 // NewIssuerModel returns a model with every attribute set to its typed null; collection types cannot be zero-valued.
@@ -177,6 +183,7 @@ func NewIssuerModel() *IssuerModel {
 		Path:               types.StringNull(),
 		PreferredBindingId: types.StringNull(),
 		PreferredDomainId:  types.StringNull(),
+		Status:             types.StringNull(),
 		TenantId:           types.StringNull(),
 	}
 }
@@ -226,6 +233,7 @@ func (m *IssuerModel) ToProto(ctx context.Context) (*v1alpha1.Issuer, diag.Diagn
 			out.Bindings = append(out.Bindings, v)
 		}
 	}
+	out.Status = m.Status.ValueString()
 	return out, diags
 }
 
@@ -335,6 +343,11 @@ func (m *IssuerModel) FromProto(ctx context.Context, e *v1alpha1.Issuer) diag.Di
 		diags.Append(d...)
 		m.Bindings = list
 	}
+	if e.Status == "" {
+		m.Status = types.StringNull()
+	} else {
+		m.Status = types.StringValue(e.Status)
+	}
 	return diags
 }
 
@@ -364,6 +377,9 @@ func (m *IssuerModel) UpdateMask(ctx context.Context, prior *IssuerModel) []stri
 	}
 	if !m.DomainId.Equal(prior.DomainId) {
 		paths = append(paths, "domain_id")
+	}
+	if !m.Status.Equal(prior.Status) {
+		paths = append(paths, "status")
 	}
 	return paths
 }
@@ -528,9 +544,10 @@ func IssuerDataSourceSchema() schema1.Schema {
 			"path":                 schema1.StringAttribute{Computed: true},
 			"preferred_binding_id": schema1.StringAttribute{Computed: true},
 			"preferred_domain_id":  schema1.StringAttribute{Computed: true},
+			"status":               schema1.StringAttribute{Computed: true},
 			"tenant_id":            schema1.StringAttribute{Computed: true},
 		},
-		MarkdownDescription: "An OAuth 2.0 / OpenID Connect issuer: the login a set of applications shares, with its token lifetimes and which realm or realms people sign in to (`config`). It answers at the hosts its `authwise_issuer_domain_binding`s name (kit#911). Its pages use its default theme variant (`authwise_theme_variant.is_default`), or the tenant's default theme when it has none. This data source reads one by its full resource name.",
+		MarkdownDescription: "An OAuth 2.0 / OpenID Connect issuer: the login a set of applications shares, with its token lifetimes and which realm or realms people sign in to (`config`). It answers at the hosts its `authwise_issuer_domain_binding`s name (kit#911). Its pages use its default theme variant (`authwise_theme_variant.is_default`), or the tenant's default theme when it has none.\n\n`status` is `active` (the default) or `disabled`: sign-in, token issue, discovery and every hosted page on a disabled issuer's hosts stop at once. Changing it is made in place and keeps everything under it; kit 1.91.0 or later (the `identity.object-status` feature), and the administration tenant's own objects cannot be turned off. This data source reads one by its full resource name.",
 	}
 }
 
@@ -575,6 +592,7 @@ type IssuerItemModel struct {
 	PreferredDomainId  types.String         `tfsdk:"preferred_domain_id"`
 	PreferredBindingId types.String         `tfsdk:"preferred_binding_id"`
 	Bindings           types.List           `tfsdk:"bindings"`
+	Status             types.String         `tfsdk:"status"`
 }
 
 // IssuerItemAttrTypes returns the attribute types of one issuers list element.
@@ -591,6 +609,7 @@ func IssuerItemAttrTypes() map[string]attr.Type {
 		"path":                 types.StringType,
 		"preferred_binding_id": types.StringType,
 		"preferred_domain_id":  types.StringType,
+		"status":               types.StringType,
 	}
 }
 
@@ -643,6 +662,7 @@ func IssuerListDataSourceSchema() schema1.Schema {
 					"path":                 schema1.StringAttribute{Computed: true},
 					"preferred_binding_id": schema1.StringAttribute{Computed: true},
 					"preferred_domain_id":  schema1.StringAttribute{Computed: true},
+					"status":               schema1.StringAttribute{Computed: true},
 				}},
 			},
 			"tenant_id": schema1.StringAttribute{
@@ -651,7 +671,7 @@ func IssuerListDataSourceSchema() schema1.Schema {
 				Validators:          []validator.String{tf.ReferenceID("t", "tenant", "")},
 			},
 		},
-		MarkdownDescription: "An OAuth 2.0 / OpenID Connect issuer: the login a set of applications shares, with its token lifetimes and which realm or realms people sign in to (`config`). It answers at the hosts its `authwise_issuer_domain_binding`s name (kit#911). Its pages use its default theme variant (`authwise_theme_variant.is_default`), or the tenant's default theme when it has none. This data source lists every one under a parent.",
+		MarkdownDescription: "An OAuth 2.0 / OpenID Connect issuer: the login a set of applications shares, with its token lifetimes and which realm or realms people sign in to (`config`). It answers at the hosts its `authwise_issuer_domain_binding`s name (kit#911). Its pages use its default theme variant (`authwise_theme_variant.is_default`), or the tenant's default theme when it has none.\n\n`status` is `active` (the default) or `disabled`: sign-in, token issue, discovery and every hosted page on a disabled issuer's hosts stop at once. Changing it is made in place and keeps everything under it; kit 1.91.0 or later (the `identity.object-status` feature), and the administration tenant's own objects cannot be turned off. This data source lists every one under a parent.",
 	}
 }
 
@@ -761,6 +781,11 @@ func issuerItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Issuer, *I
 		list, d := types.ListValueFrom(ctx, types.ObjectType{AttrTypes: IssuerBindingsAttrTypes()}, items)
 		diags.Append(d...)
 		item.Bindings = list
+	}
+	if e.Status == "" {
+		item.Status = types.StringNull()
+	} else {
+		item.Status = types.StringValue(e.Status)
 	}
 	id, err := crud.IDFromName(e.Name)
 	if err != nil {

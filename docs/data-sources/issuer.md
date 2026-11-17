@@ -3,12 +3,15 @@
 page_title: "authwise_issuer Data Source - Authwise"
 subcategory: "Identity"
 description: |-
-  An OAuth 2.0 / OpenID Connect issuer: the login a set of applications shares, with its token lifetimes and which realm or realms people sign in to (config). It answers at the hosts its authwise_issuer_domain_bindings name (kit#911). Its pages use its default theme variant (authwise_theme_variant.is_default), or the tenant's default theme when it has none. This data source reads one by its full resource name.
+  An OAuth 2.0 / OpenID Connect issuer: the login a set of applications shares, with its token lifetimes and which realm or realms people sign in to (config). It answers at the hosts its authwise_issuer_domain_bindings name (kit#911). Its pages use its default theme variant (authwise_theme_variant.is_default), or the tenant's default theme when it has none.
+  status is active (the default) or disabled: sign-in, token issue, discovery and every hosted page on a disabled issuer's hosts stop at once. Changing it is made in place and keeps everything under it; kit 1.91.0 or later (the identity.object-status feature), and the administration tenant's own objects cannot be turned off. This data source reads one by its full resource name.
 ---
 
 # authwise_issuer (Data Source)
 
-An OAuth 2.0 / OpenID Connect issuer: the login a set of applications shares, with its token lifetimes and which realm or realms people sign in to (`config`). It answers at the hosts its `authwise_issuer_domain_binding`s name (kit#911). Its pages use its default theme variant (`authwise_theme_variant.is_default`), or the tenant's default theme when it has none. This data source reads one by its full resource name.
+An OAuth 2.0 / OpenID Connect issuer: the login a set of applications shares, with its token lifetimes and which realm or realms people sign in to (`config`). It answers at the hosts its `authwise_issuer_domain_binding`s name (kit#911). Its pages use its default theme variant (`authwise_theme_variant.is_default`), or the tenant's default theme when it has none.
+
+`status` is `active` (the default) or `disabled`: sign-in, token issue, discovery and every hosted page on a disabled issuer's hosts stop at once. Changing it is made in place and keeps everything under it; kit 1.91.0 or later (the `identity.object-status` feature), and the administration tenant's own objects cannot be turned off. This data source reads one by its full resource name.
 
 
 
@@ -31,6 +34,7 @@ An OAuth 2.0 / OpenID Connect issuer: the login a set of applications shares, wi
 - `path` (String)
 - `preferred_binding_id` (String)
 - `preferred_domain_id` (String)
+- `status` (String)
 - `tenant_id` (String)
 
 <a id="nestedatt--bindings"></a>

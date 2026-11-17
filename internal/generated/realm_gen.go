@@ -57,6 +57,11 @@ func RealmResourceSchema() schema.Schema {
 				MarkdownDescription: "Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.",
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
+			"status": schema.StringAttribute{
+				Computed:      true,
+				Optional:      true,
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+			},
 			"tenant_id": schema.StringAttribute{
 				Computed:            true,
 				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default, and reads back from the name. Changing a configured one replaces the resource.",
@@ -65,7 +70,7 @@ func RealmResourceSchema() schema.Schema {
 				Validators:          []validator.String{tf.ReferenceID("t", "tenant", "")},
 			},
 		},
-		MarkdownDescription: "A realm: a population of users with its own providers, factors and authentication policy.",
+		MarkdownDescription: "A realm: a population of users with its own providers, factors and authentication policy.\n\n`status` is `active` (the default) or `disabled`: a disabled realm's people cannot sign in, and their refresh grants are refused. Changing it is made in place and keeps everything under it; kit 1.91.0 or later (the `identity.object-status` feature), and the administration tenant's own objects cannot be turned off.",
 	}
 }
 
@@ -77,6 +82,7 @@ type RealmModel struct {
 	Labels      types.Map            `tfsdk:"labels"`
 	DisplayName types.String         `tfsdk:"display_name"`
 	Config      jsontypes.Normalized `tfsdk:"config"`
+	Status      types.String         `tfsdk:"status"`
 }
 
 // NewRealmModel returns a model with every attribute set to its typed null; collection types cannot be zero-valued.
@@ -87,6 +93,7 @@ func NewRealmModel() *RealmModel {
 		Labels:      types.MapNull(types.StringType),
 		Name:        types.StringNull(),
 		RealmId:     types.StringNull(),
+		Status:      types.StringNull(),
 		TenantId:    types.StringNull(),
 	}
 }
@@ -108,6 +115,7 @@ func (m *RealmModel) ToProto(ctx context.Context) (*v1alpha1.Realm, diag.Diagnos
 			out.Config = v
 		}
 	}
+	out.Status = m.Status.ValueString()
 	return out, diags
 }
 
@@ -139,6 +147,11 @@ func (m *RealmModel) FromProto(ctx context.Context, e *v1alpha1.Realm) diag.Diag
 			m.Config = jsontypes.NewNormalizedValue(string(b))
 		}
 	}
+	if e.Status == "" {
+		m.Status = types.StringNull()
+	} else {
+		m.Status = types.StringValue(e.Status)
+	}
 	return diags
 }
 
@@ -165,6 +178,9 @@ func (m *RealmModel) UpdateMask(ctx context.Context, prior *RealmModel) []string
 		if eq, _ := m.Config.StringSemanticEquals(ctx, prior.Config); !eq {
 			paths = append(paths, "config")
 		}
+	}
+	if !m.Status.Equal(prior.Status) {
+		paths = append(paths, "status")
 	}
 	return paths
 }
@@ -311,9 +327,10 @@ func RealmDataSourceSchema() schema1.Schema {
 				Computed:            true,
 				MarkdownDescription: "Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.",
 			},
+			"status":    schema1.StringAttribute{Computed: true},
 			"tenant_id": schema1.StringAttribute{Computed: true},
 		},
-		MarkdownDescription: "A realm: a population of users with its own providers, factors and authentication policy. This data source reads one by its full resource name.",
+		MarkdownDescription: "A realm: a population of users with its own providers, factors and authentication policy.\n\n`status` is `active` (the default) or `disabled`: a disabled realm's people cannot sign in, and their refresh grants are refused. Changing it is made in place and keeps everything under it; kit 1.91.0 or later (the `identity.object-status` feature), and the administration tenant's own objects cannot be turned off. This data source reads one by its full resource name.",
 	}
 }
 
@@ -352,6 +369,7 @@ type RealmItemModel struct {
 	Labels      types.Map            `tfsdk:"labels"`
 	DisplayName types.String         `tfsdk:"display_name"`
 	Config      jsontypes.Normalized `tfsdk:"config"`
+	Status      types.String         `tfsdk:"status"`
 }
 
 // RealmItemAttrTypes returns the attribute types of one realms list element.
@@ -362,6 +380,7 @@ func RealmItemAttrTypes() map[string]attr.Type {
 		"labels":       types.MapType{ElemType: types.StringType},
 		"name":         types.StringType,
 		"realm_id":     types.StringType,
+		"status":       types.StringType,
 	}
 }
 
@@ -396,6 +415,7 @@ func RealmListDataSourceSchema() schema1.Schema {
 						Computed:            true,
 						MarkdownDescription: "Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.",
 					},
+					"status": schema1.StringAttribute{Computed: true},
 				}},
 			},
 			"tenant_id": schema1.StringAttribute{
@@ -404,7 +424,7 @@ func RealmListDataSourceSchema() schema1.Schema {
 				Validators:          []validator.String{tf.ReferenceID("t", "tenant", "")},
 			},
 		},
-		MarkdownDescription: "A realm: a population of users with its own providers, factors and authentication policy. This data source lists every one under a parent.",
+		MarkdownDescription: "A realm: a population of users with its own providers, factors and authentication policy.\n\n`status` is `active` (the default) or `disabled`: a disabled realm's people cannot sign in, and their refresh grants are refused. Changing it is made in place and keeps everything under it; kit 1.91.0 or later (the `identity.object-status` feature), and the administration tenant's own objects cannot be turned off. This data source lists every one under a parent.",
 	}
 }
 
@@ -436,6 +456,11 @@ func realmItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Realm, *Rea
 		} else {
 			item.Config = jsontypes.NewNormalizedValue(string(b))
 		}
+	}
+	if e.Status == "" {
+		item.Status = types.StringNull()
+	} else {
+		item.Status = types.StringValue(e.Status)
 	}
 	id, err := crud.IDFromName(e.Name)
 	if err != nil {
