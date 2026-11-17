@@ -1,3 +1,25 @@
+## 0.36.0 (Unreleased)
+
+FEATURES:
+
+* **New data source: `authwise_install_status`** (tf#77, kit#657). This is the
+  install's license state (`absent`, `valid`, `grace`, `expired`, `revoked`
+  or `invalid`, with its id, organization, plan, expiry and the key set it
+  was checked against) and its registration with the portal that issued
+  the license (`enabled`, the last attempt and its result). `registration.payload` is the exact JSON the
+  install sends to the portal; an install that cannot reach the portal
+  uploads it as is. Only the install's operators may read it: any other
+  credential is refused by name, as is a kit that does not serve the call.
+  The license itself is kit configuration the operator sets, so there is
+  no resource.
+
+NOTES:
+
+* **apis v0.81.0** (from v0.80.0): kit's `GetInstallStatus`. The data
+  source needs kit 1.94.0 or later (registration results from 1.95.0);
+  kit lists no feature for it, so an earlier kit is known by its
+  `Unimplemented` answer. Nothing else changes.
+
 ## 0.35.1 (November 17, 2026)
 
 BUG FIXES:

@@ -160,7 +160,8 @@ func TestProviderSurface(t *testing.T) {
 	// adds a pair each for node_group and trusted_issuer_rule. Inbound
 	// SCIM (tf#18) adds a pair for scim_connection and the plural
 	// scim_tokens (a token, like an application secret, has no singular).
-	assert.Len(t, dataSourceTypes, 88)
+	// tf#77 adds the hand-written install_status.
+	assert.Len(t, dataSourceTypes, 89)
 	for _, gone := range []string{"authwise_guard_tenant", "authwise_guard_tenants", "authwise_guard_deprovisioning"} {
 		assert.False(t, dataSourceTypes[gone], "%s went with the tenant collapse (#65)", gone)
 	}

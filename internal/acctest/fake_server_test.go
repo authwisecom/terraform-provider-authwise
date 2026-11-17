@@ -42,6 +42,9 @@ type fakeIdentityServer struct {
 	// capabilities answers GetInstallCapabilities; nil is a kit with
 	// kit#968's names (fake_capabilities_test.go).
 	capabilities func() (*identitypb.InstallCapabilities, error)
+	// installStatus answers GetInstallStatus; nil is an operator's read of
+	// a licensed install (fake_install_status_test.go).
+	installStatus func() (*identitypb.InstallStatus, error)
 
 	mu       sync.Mutex
 	realms   map[string]*corepb.Realm

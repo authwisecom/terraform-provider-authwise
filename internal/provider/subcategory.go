@@ -29,7 +29,7 @@ var identityTypes = map[string]bool{
 	"service_account": true, "service_account_secret": true, "issuer_domain_binding": true, "issuer_preferred_binding": true,
 	"domain_activation": true, "issuer_preferred_domain": true, "issuer_config": true, "realm_config": true, "audience_config": true,
 	"endpoint_auth": true, "tenant_config": true, "tenant_home_administration": true, "message": true, "tenant_branding": true,
-	"scim_connection": true, "scim_token": true,
+	"scim_connection": true, "scim_token": true, "install_status": true,
 }
 
 // families are the groups that go by prefix, so a new Guard, Access,
