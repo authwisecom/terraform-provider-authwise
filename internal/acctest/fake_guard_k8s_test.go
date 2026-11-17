@@ -313,6 +313,18 @@ func (f *fakeGuardServer) checkIssuerKeysLocked(t *guardpb.TrustedIssuer) error 
 	return nil
 }
 
+// checkIssuerNameLocked holds guard-control's display name rule: unique in
+// the network among every issuer, a revoked one included, so a
+// replacement that keeps the name is refused.
+func (f *fakeGuardServer) checkIssuerNameLocked(network, name, displayName string) error {
+	for _, t := range children(f.k8s.issuers, network+trustedIssuersSeg) {
+		if t.GetName() != name && t.GetDisplayName() == displayName {
+			return status.Errorf(codes.AlreadyExists, "displayName: a trusted issuer named %q already exists in this network", displayName)
+		}
+	}
+	return nil
+}
+
 // checkKeySourceLocked holds TI7's rules for key_source_node.
 func (f *fakeGuardServer) checkKeySourceLocked(t *guardpb.TrustedIssuer) error {
 	src := t.GetKeySourceNode()
@@ -367,6 +379,9 @@ func (f *fakeGuardServer) CreateTrustedIssuer(ctx context.Context, in *guardpb.C
 	if t.GetDisplayName() == "" || t.GetIssuer() == "" {
 		return nil, status.Error(codes.InvalidArgument, "display_name and issuer are required")
 	}
+	if err := f.checkIssuerNameLocked(in.GetParent(), "", t.GetDisplayName()); err != nil {
+		return nil, err
+	}
 	if err := f.checkKeySourceLocked(t); err != nil {
 		return nil, err
 	}
@@ -418,6 +433,10 @@ func (f *fakeGuardServer) UpdateTrustedIssuer(ctx context.Context, in *guardpb.U
 		switch p {
 		case "display_name":
 			next.DisplayName = src.GetDisplayName()
+			network := strings.SplitN(t.GetName(), trustedIssuersSeg, 2)[0]
+			if err := f.checkIssuerNameLocked(network, t.GetName(), next.GetDisplayName()); err != nil {
+				return nil, err
+			}
 		case "description":
 			next.Description = src.GetDescription()
 		case "discover", "jwks":

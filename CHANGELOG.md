@@ -217,7 +217,10 @@ FEATURES:
   come from the issuer's discovery document (`discover = true`) or an
   uploaded `jwks` (an issuer guard-control cannot reach); uploading again
   renews rotated keys. `issuer` never changes. Destroy revokes the issuer,
-  and an issuer revoked out of band drops out of state.
+  and an issuer revoked out of band drops out of state. A revoked issuer
+  keeps holding its `display_name` in the network, so a change that
+  replaces the issuer, or registering it again after a revocation, needs
+  a new `display_name`: the plan warns on a replacement that keeps it.
 
   A third key source, `key_source_node` (TI7, guard-control v0.32.0): a
   node of the network reads the issuer's keys where it runs and reports
@@ -225,7 +228,9 @@ FEATURES:
   upload. It is exclusive with `discover` and `jwks` here, since the
   node's reports are the keys; the issuer may start with none. A report
   that would remove every key is held: `held_key_ids` and `keys_held_at`
-  are read only, adopted in the console or with awctl. Against an earlier
+  are read only, adopted in the console or with awctl. Removing
+  `key_source_node` needs no other source: the issuer keeps the keys last
+  reported, and a held report is dropped. Against an earlier
   guard-control, a write that sets it is refused by name.
 
 * **New resource: `authwise_guard_trusted_issuer_rule`**. Lets the holder

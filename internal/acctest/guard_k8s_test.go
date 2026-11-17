@@ -8,6 +8,7 @@ package acctest_test
 import (
 	"fmt"
 	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
@@ -128,6 +129,11 @@ func TestAccGuardK8s_GroupsIssuerKey(t *testing.T) {
 	var keyName, secret, issuerName, issuerID string
 	var joined []string
 	discover := h.guardK8sConfig("discover = true", "")
+	// A revoked issuer keeps holding its display name in the network, so
+	// one registered again after a revocation takes a new name.
+	renamed := func(config string) string {
+		return strings.Replace(config, `display_name = "gfk-nonprod-uc1"`, `display_name = "gfk-nonprod-uc1-b"`, 1)
+	}
 
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: protoFactories(),
@@ -211,9 +217,10 @@ func TestAccGuardK8s_GroupsIssuerKey(t *testing.T) {
 			},
 			{
 				// The trust is revoked in the console: Terraform registers
-				// the cluster again, and the rule follows its new trust.
+				// the cluster again, under a new name (the revoked one keeps
+				// the old), and the rule follows its new trust.
 				PreConfig: func() { h.guard.revokeIssuer(issuerName) },
-				Config:    h.guardK8sConfig("jwks = "+fmt.Sprintf("%q", gkJWKS), "max_nodes = 20"),
+				Config:    renamed(h.guardK8sConfig("jwks = "+fmt.Sprintf("%q", gkJWKS), "max_nodes = 20")),
 				ConfigPlanChecks: resource.ConfigPlanChecks{
 					PreApply: []plancheck.PlanCheck{
 						plancheck.ExpectResourceAction(gkIssuerAddr, plancheck.ResourceActionCreate),
@@ -227,34 +234,34 @@ func TestAccGuardK8s_GroupsIssuerKey(t *testing.T) {
 				ImportState:       true,
 				ImportStateKind:   resource.ImportBlockWithID,
 				ImportStateIdFunc: importByName(gkPodsAddr),
-				Config:            h.guardK8sConfig("jwks = "+fmt.Sprintf("%q", gkJWKS), "max_nodes = 20"),
+				Config:            renamed(h.guardK8sConfig("jwks = "+fmt.Sprintf("%q", gkJWKS), "max_nodes = 20")),
 			},
 			{
 				ResourceName:      gkRuleAddr,
 				ImportState:       true,
 				ImportStateKind:   resource.ImportBlockWithID,
 				ImportStateIdFunc: importByName(gkRuleAddr),
-				Config:            h.guardK8sConfig("jwks = "+fmt.Sprintf("%q", gkJWKS), "max_nodes = 20"),
+				Config:            renamed(h.guardK8sConfig("jwks = "+fmt.Sprintf("%q", gkJWKS), "max_nodes = 20")),
 			},
 			{
 				// A discovering trust imports with nothing to change. (An
 				// uploaded one would plan its jwks again, which is never
 				// read back.)
-				Config: discover,
+				Config: renamed(discover),
 			},
 			{
 				ResourceName:      gkIssuerAddr,
 				ImportState:       true,
 				ImportStateKind:   resource.ImportBlockWithID,
 				ImportStateIdFunc: importByName(gkIssuerAddr),
-				Config:            discover,
+				Config:            renamed(discover),
 			},
 			{
 				ResourceName:      gkMembersAddr,
 				ImportState:       true,
 				ImportStateKind:   resource.ImportBlockWithID,
 				ImportStateIdFunc: importByName(gkAdminsAddr),
-				Config:            discover,
+				Config:            renamed(discover),
 			},
 			{
 				// Joined nodes stay when their key or trust goes; an
@@ -263,7 +270,7 @@ func TestAccGuardK8s_GroupsIssuerKey(t *testing.T) {
 				// The key that expired in step 5 left state unrevoked; it no
 				// longer holds the group, so the destroy below deletes it.
 				PreConfig: func() { h.guard.dropNodes(joined...) },
-				Config:    discover,
+				Config:    renamed(discover),
 			},
 		},
 		CheckDestroy: func(_ *terraform.State) error {

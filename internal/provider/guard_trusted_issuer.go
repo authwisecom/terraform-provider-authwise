@@ -41,6 +41,10 @@ const (
 	// attributes of those names.
 	attrName        = "name"
 	attrDescription = "description"
+
+	keysMissingSummary = "the issuer needs its keys"
+	keysMissingDetail  = "Give discover = true to read the issuer's keys, jwks to upload them, or key_source_node to have a node report them (an issuer guard-control cannot reach). " +
+		"Only removing a key_source_node may leave none: the issuer keeps the keys last reported."
 )
 
 var (
@@ -63,7 +67,10 @@ var (
 // Hand-written because its keys are a oneof (discover, or an uploaded
 // JWKS), which tfinfra does not generate. An issuer is never deleted, only
 // revoked: destroy revokes, and a revoked issuer drops out of state at
-// refresh, so the next apply registers it afresh.
+// refresh, so the next apply registers it afresh. A revoked issuer keeps
+// holding its display name (guard-control v0.32.0), so a replacement or a
+// new registration needs a new one: the plan warns on a replacement, and
+// the create error says so.
 type guardTrustedIssuerResource struct {
 	client guardpb.GuardTrustedIssuerServiceClient
 }
@@ -135,7 +142,7 @@ func (r *guardTrustedIssuerResource) Schema(_ context.Context, _ resource.Schema
 			},
 			settingsDisplayNameAttribute: schema.StringAttribute{
 				Required:            true,
-				MarkdownDescription: "Unique in the network, at most 64 characters.",
+				MarkdownDescription: "Unique in the network, at most 64 characters. A revoked issuer keeps holding its name, so a change that replaces the issuer (`issuer`, `network_id`, `tenant_id`, or a move from `discover` to `key_source_node`) needs a new `display_name` in the same change; the plan warns when it is kept.",
 			},
 			attrDescription: schema.StringAttribute{
 				Optional: true,
@@ -174,7 +181,7 @@ func (r *guardTrustedIssuerResource) Schema(_ context.Context, _ resource.Schema
 				Optional: true,
 				MarkdownDescription: "A node of the network that reports the issuer's keys, by full name (`authwise_guard_node.<name>.name`), for an issuer guard-control cannot reach: the node reads the keys where it runs and sends them on its own connection, so they stay current with no upload. " +
 					"The node must be persistent and must not have joined by a rule of this issuer. Give this, `discover` or `jwks`: they are exclusive here, because with a key source **the keys come from that node's reports**, and an uploaded `jwks` would replace them on every change. " +
-					"Without other keys the issuer starts empty, and the node's first report supplies them. Changing it is made in place; removing it stops the reports and keeps the keys last reported. " +
+					"Without other keys the issuer starts empty, and the node's first report supplies them. Changing it is made in place; removing it stops the reports and keeps the keys last reported, with no other key source needed, and drops a held report. " +
 					"An issuer that discovers its keys cannot take a key source: moving from `discover` to `key_source_node` replaces the issuer. " +
 					"A report that would remove every key the issuer holds is held (`held_key_ids`) for an administrator to adopt in the console or with awctl. Needs guard-control v0.32.0 or later.",
 			},
@@ -260,35 +267,88 @@ func keysConflict(discover types.Bool, jwks, source types.String) (at, summary, 
 	case !discover.IsNull() && !discover.ValueBool():
 		return attrDiscover, "discover = false is not a choice",
 			"Leave discover out and give jwks to upload the issuer's keys.", true
-	case discover.IsNull() && jwks.IsNull():
-		return attrDiscover, "the issuer needs its keys",
-			"Give discover = true to read the issuer's keys, jwks to upload them, or key_source_node to have a node report them (an issuer guard-control cannot reach).", true
 	}
+	// None of the three is the plan's to judge: a new issuer needs its keys,
+	// an issuer whose key source is removed keeps those last reported.
 	return "", "", "", false
 }
 
-// ModifyPlan plans key_ids unknown when the keys change: an upload, or a
-// move between discovery and an upload. Otherwise they keep their state.
+// keysMissing is a plan that gives none of discover = true, jwks and
+// key_source_node where the issuer could not keep keys of its own: a new
+// issuer, or one that discovered or uploaded them. Removing a key source
+// keeps the keys last reported, and an issuer already without a source in
+// state (one whose source was removed, or an import) has nothing to drop.
+func keysMissing(plan, state *guardTrustedIssuerModel) bool {
+	// An unknown value is not null: it may yet give the keys.
+	if !plan.Discover.IsNull() || !plan.JWKS.IsNull() || !plan.KeySourceNode.IsNull() {
+		return false
+	}
+	if state == nil {
+		return true
+	}
+	return state.KeySourceNode.IsNull() && (state.Discover.ValueBool() || !state.JWKS.IsNull())
+}
+
+// replacesKeepingName is a replacement that keeps the display name: the
+// revoked issuer keeps holding it, so guard-control refuses the new one.
+func replacesKeepingName(plan, state *guardTrustedIssuerModel) bool {
+	replaced := !plan.Issuer.Equal(state.Issuer) || !plan.NetworkID.Equal(state.NetworkID) ||
+		!plan.TenantID.Equal(state.TenantID) || discoverToSource(plan, state)
+	return replaced && plan.DisplayName.Equal(state.DisplayName)
+}
+
+// ModifyPlan refuses a new issuer with no keys and judges an update's keys
+// (planKeys). It runs at plan, not validation, because whether an issuer
+// may give none depends on its state.
 func (r *guardTrustedIssuerResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
 
-	if req.State.Raw.IsNull() || req.Plan.Raw.IsNull() {
+	if req.Plan.Raw.IsNull() {
 		return
 	}
 
-	var plan, state guardTrustedIssuerModel
+	var plan guardTrustedIssuerModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	if req.State.Raw.IsNull() {
+		if keysMissing(&plan, nil) {
+			resp.Diagnostics.AddAttributeError(path.Root(attrDiscover), keysMissingSummary, keysMissingDetail)
+		}
+		return
+	}
+
+	var state guardTrustedIssuerModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
+		return
+	}
+	planKeys(ctx, &plan, &state, resp)
+}
+
+// planKeys judges an update's keys: none where the issuer cannot keep
+// its own, a replacement whose name the revoked issuer still holds, a move
+// from discovery to a key source (a new issuer), and key_ids unknown when
+// the keys change.
+func planKeys(ctx context.Context, plan, state *guardTrustedIssuerModel, resp *resource.ModifyPlanResponse) {
+
+	if keysMissing(plan, state) {
+		resp.Diagnostics.AddAttributeError(path.Root(attrDiscover), keysMissingSummary, keysMissingDetail)
 		return
 	}
 
 	// guard-control stops discovering only on an upload, so a move from
 	// discover to a key source is a new issuer.
-	if discoverToSource(&plan, &state) {
+	if discoverToSource(plan, state) {
 		resp.RequiresReplace = append(resp.RequiresReplace, path.Root(attrKeySourceNode))
 	}
+	if replacesKeepingName(plan, state) {
+		resp.Diagnostics.AddAttributeWarning(path.Root(settingsDisplayNameAttribute), "the replacement keeps the display name",
+			"This change replaces the issuer: the old one is revoked and a new one registered. A revoked issuer keeps holding its display_name in the network, "+
+				"so guard-control refuses the new issuer with AlreadyExists. Give the issuer a new display_name in the same change.")
+	}
 
-	if !keysChange(&plan, &state) {
+	if !keysChange(plan, state) {
 		return
 	}
 	resp.Diagnostics.Append(resp.Plan.SetAttribute(ctx, path.Root("key_ids"), types.ListUnknown(types.StringType))...)
@@ -395,7 +455,7 @@ func (r *guardTrustedIssuerResource) Create(ctx context.Context, req resource.Cr
 
 	out, err := r.client.CreateTrustedIssuer(ctx, &guardpb.CreateTrustedIssuerRequest{Parent: parent, TrustedIssuer: plan.toProto()})
 	if err != nil {
-		resp.Diagnostics.AddError("registering the trusted issuer failed", keySourceError(err, !plan.KeySourceNode.IsNull()))
+		resp.Diagnostics.AddError("registering the trusted issuer failed", nameTakenHint(err, keySourceError(err, !plan.KeySourceNode.IsNull())))
 		return
 	}
 
@@ -465,6 +525,16 @@ func keySourceError(err error, setsSource bool) string {
 			"Leave key_source_node out, or upgrade guard-control. (" + err.Error() + ")"
 	}
 	return err.Error()
+}
+
+// nameTakenHint adds to guard-control's AlreadyExists that a revoked
+// issuer keeps its display name: the usual cause after a replacement or a
+// revocation in the console.
+func nameTakenHint(err error, msg string) string {
+	if status.Code(err) != codes.AlreadyExists {
+		return msg
+	}
+	return msg + "\n\nA revoked issuer keeps holding its display_name in the network. If this issuer replaces one, or registers again after a revocation, give it a new display_name."
 }
 
 func (r *guardTrustedIssuerResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
