@@ -19,6 +19,13 @@ NOTES:
   source needs kit 1.94.0 or later (registration results from 1.95.0);
   kit lists no feature for it, so an earlier kit is known by its
   `Unimplemented` answer. Nothing else changes.
+* **`authwise_access_binding` docs: a person's Guard administrative
+  role.** In the tenant's administration audience, kit refuses a person's
+  `guardcontrol.tenantAdmin` or `guardcontrol.networkAdmin` binding without
+  the step-up condition (`condition_id`) and its anchor
+  (`guardcontrol.tenant` or `guardcontrol.network`). A service account's
+  binding still carries no condition. `authwise_guard_enrolment_grant`
+  writes both for people.
 
 ## 0.35.1 (November 17, 2026)
 

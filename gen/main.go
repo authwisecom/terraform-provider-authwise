@@ -492,7 +492,12 @@ func main() {
 				withDescription("A binding that grants a subject a role in an audience's Access catalog.\n\n"+
 					"**Guard's administrative roles** (`guardcontrol.tenantAdmin`, `guardcontrol.networkAdmin`, `guardcontrol.viewer`) are bound in the tenant's administration audience, which needs home administration on the tenant (`authwise_tenant_home_administration`). "+
 					"One of them in the tenant's Guard audience is refused at plan with the reason, and by kit; the Guard audience keeps `guardcontrol.user` and devices only. "+
-					"The tenant's central administrators (its owner and `tenant.admin` seats) get Guard's tenant administrator role from kit, from their seat, not from a binding (kit#940, tf#72)."), access,
+					"The tenant's central administrators (its owner and `tenant.admin` seats) get Guard's tenant administrator role from kit, from their seat, not from a binding (kit#940, tf#72).\n\n"+
+					"**A person's Guard administrative role.** In the tenant's administration audience, kit refuses a person's binding of `guardcontrol.tenantAdmin` or `guardcontrol.networkAdmin` unless it carries the audience's step-up condition (`condition_id`, `administration.stepUp`) and its anchor: "+
+					"`resource_type = \"guardcontrol.tenant\"` with the tenant's id (`t-…`) for `guardcontrol.tenantAdmin`, `resource_type = \"guardcontrol.network\"` with the network's id (`n-…`) for `guardcontrol.networkAdmin`. "+
+					"`guardcontrol.viewer` takes either anchor, with or without the condition. "+
+					"A service account's binding (`subject_type = \"client\"`) carries no `condition_id`: the condition tests a person's sign-in, which an application never has. "+
+					"For people, `authwise_guard_enrolment_grant` is the simpler way: guard-control writes the condition and the anchor itself."), access,
 				withCollection("access-bindings"),
 				withRequired("subject_type", "subject_id", "role_name"),
 				withComputed("created_by"),
