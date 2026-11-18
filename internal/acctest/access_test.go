@@ -10,8 +10,10 @@ import (
 
 	corepb "git.authwise.com/authwise/apis/authwise/types/core/v1alpha1"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/knownvalue"
 	"github.com/hashicorp/terraform-plugin-testing/plancheck"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
+	"github.com/hashicorp/terraform-plugin-testing/tfjsonpath"
 )
 
 const accessPrefix = "tenants/t-1/issuers/i-1/audiences/a-1"
@@ -264,18 +266,15 @@ func TestAccAccessBinding_GuardAdministrativeShape(t *testing.T) {
 	}
 	h.access.mu.Unlock()
 
-	// Each step names its binding afresh, so every case is a create: a
-	// condition_id removed from config is kept from state (Optional and
-	// Computed), which is not what this test is about.
-	step := 0
+	// One binding throughout: each accepted step changes it in place, a
+	// removed condition_id or anchor included (tf#79).
 	binding := func(subjectType, role, anchor, condition string) string {
-		step++
 		cfg := h.providerConfig() + fmt.Sprintf(`
-resource "authwise_access_binding" "b%d" {
+resource "authwise_access_binding" "b" {
   subject_type = %q
   subject_id   = "s-01"
   role_name    = %q
-`, step, subjectType, role)
+`, subjectType, role)
 		if anchor != "" {
 			typ, id, _ := strings.Cut(anchor, "/")
 			cfg += fmt.Sprintf("  resource_type = %q\n  resource_id   = %q\n", typ, id)
@@ -286,10 +285,16 @@ resource "authwise_access_binding" "b%d" {
 		return cfg + "}\n"
 	}
 	accepted := func(subjectType, role, anchor, condition string) resource.TestStep {
-		config := binding(subjectType, role, anchor, condition)
 		return resource.TestStep{
-			Config: config,
-			Check:  resource.TestCheckResourceAttr(fmt.Sprintf("authwise_access_binding.b%d", step), "role_name", role),
+			Config: binding(subjectType, role, anchor, condition),
+			Check: func(*terraform.State) error {
+				b := h.access.onlyBinding()
+				if b.GetSubjectType() != subjectType || b.GetRoleName() != role || b.GetConditionId() != condition {
+					return fmt.Errorf("kit holds %s %s condition %q, want %s %s condition %q",
+						b.GetSubjectType(), b.GetRoleName(), b.GetConditionId(), subjectType, role, condition)
+				}
+				return nil
+			},
 		}
 	}
 	refused := func(subjectType, role, anchor, condition, reason string) resource.TestStep {
@@ -322,6 +327,95 @@ resource "authwise_access_binding" "b%d" {
 			accepted("client", "guardcontrol.networkAdmin", network, ""),
 			// A service account carries no condition.
 			refused("client", "guardcontrol.tenantAdmin", tenant, stepUp, `(?s)a\s+client\s+bound\s+guardcontrol\.tenantAdmin\s+carries\s+no\s+condition`),
+		},
+	})
+}
+
+// TestAccAccessBinding_ClearInPlace (tf#79): condition_id, the anchor and
+// expires_at taken out of the configuration are cleared by an in-place
+// update, and the next plan is empty. They were Optional+Computed, so the
+// plan kept the state value and nothing could clear them short of a
+// replacement.
+func TestAccAccessBinding_ClearInPlace(t *testing.T) {
+
+	h := newHarness(t)
+	h.access.mu.Lock()
+	name := accessPrefix + "/access-roles/guardcontrol.viewer"
+	h.access.roles[name] = &corepb.AccessRole{Name: name}
+	h.access.mu.Unlock()
+
+	const addr = "authwise_access_binding.b"
+	config := func(extra string) string {
+		return h.providerConfig() + `
+resource "authwise_access_binding" "b" {
+  subject_type = "user"
+  subject_id   = "u-01"
+  role_name    = "guardcontrol.viewer"
+` + extra + `}
+`
+	}
+	full := config(`  resource_type = "guardcontrol.tenant"
+  resource_id   = "t-1"
+  condition_id  = "axc-step"
+  expires_at    = "2099-01-01T00:00:00Z"
+`)
+	bare := config("")
+
+	var id string
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: protoFactories(),
+		Steps: []resource.TestStep{
+			{
+				Config: full,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr(addr, "condition_id", "axc-step"),
+					resource.TestCheckResourceAttr(addr, "expires_at", "2099-01-01T00:00:00Z"),
+					func(s *terraform.State) error {
+						id = s.RootModule().Resources[addr].Primary.ID
+						return nil
+					},
+				),
+			},
+			{
+				Config: bare,
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{
+						plancheck.ExpectResourceAction(addr, plancheck.ResourceActionUpdate),
+						plancheck.ExpectKnownValue(addr, tfjsonpath.New("condition_id"), knownvalue.Null()),
+						plancheck.ExpectKnownValue(addr, tfjsonpath.New("resource_type"), knownvalue.Null()),
+						plancheck.ExpectKnownValue(addr, tfjsonpath.New("resource_id"), knownvalue.Null()),
+						plancheck.ExpectKnownValue(addr, tfjsonpath.New("expires_at"), knownvalue.Null()),
+					},
+				},
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckNoResourceAttr(addr, "condition_id"),
+					resource.TestCheckNoResourceAttr(addr, "expires_at"),
+					func(s *terraform.State) error {
+						if got := s.RootModule().Resources[addr].Primary.ID; got != id {
+							return fmt.Errorf("the binding was replaced (%s, was %s); it should be updated in place", got, id)
+						}
+						b := h.access.onlyBinding()
+						if b.GetConditionId() != "" || b.GetResourceType() != "" || b.GetResourceId() != "" || b.GetExpiresAt() != nil {
+							return fmt.Errorf("kit still holds condition %q, anchor %s/%s, expiry %v", b.GetConditionId(), b.GetResourceType(), b.GetResourceId(), b.GetExpiresAt())
+						}
+						return nil
+					},
+				),
+			},
+			{
+				Config: bare,
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{plancheck.ExpectEmptyPlan()},
+				},
+			},
+			{
+				// Set again, in place.
+				Config: full,
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{plancheck.ExpectResourceAction(addr, plancheck.ResourceActionUpdate)},
+				},
+				Check: resource.TestCheckResourceAttr(addr, "condition_id", "axc-step"),
+			},
 		},
 	})
 }

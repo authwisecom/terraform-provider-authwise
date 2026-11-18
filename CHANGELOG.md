@@ -18,12 +18,26 @@ FEATURES:
   The license itself is kit configuration the operator sets, so there is
   no resource.
 
+BUG FIXES:
+
+* **`authwise_access_binding`: removing `condition_id`, `resource_type`,
+  `resource_id` or `expires_at` clears it in place (tf#79).** These were
+  optional and computed, so a value taken out of the configuration stayed
+  in the plan from state, and the binding kept it. That mattered most for
+  turning a person's binding into a service account's, which kit refuses
+  while it carries a condition. They are now plain optional: removing one
+  plans null, and the update clears it on kit. A binding that never set
+  them plans no change.
+
 NOTES:
 
 * **apis v0.81.0** (from v0.80.0): kit's `GetInstallStatus`. The data
   source needs kit 1.94.0 or later (registration results from 1.95.0);
   kit lists no feature for it, so an earlier kit is known by its
   `Unimplemented` answer. Nothing else changes.
+* **tfinfra v0.0.26-0.20261118220831-ec9f24021eb1** (from v0.0.25): the
+  generator's `Clearable` behavior, used for tf#79. Nothing else changes in
+  the generated code.
 * **`authwise_access_binding` docs: a person's Guard administrative
   role.** In the tenant's administration audience, kit refuses a
   `guardcontrol.tenantAdmin` or `guardcontrol.networkAdmin` binding of a
@@ -31,8 +45,6 @@ NOTES:
   anchor (`guardcontrol.tenant` or `guardcontrol.network`). A service
   account's binding still carries no condition.
   `authwise_guard_enrolment_grant` writes both for users and groups.
-  Removing `condition_id` from the configuration keeps the condition (the
-  attribute is computed); to drop it, replace the binding.
 
 ## 0.35.1 (November 17, 2026)
 

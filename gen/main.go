@@ -223,6 +223,13 @@ func withInputOnly(fields ...string) func(r *gentf.Resource) {
 	return func(r *gentf.Resource) { r.InputOnly = fields }
 }
 
+// withClearable declares the entity's optional fields kit stores as sent
+// and never fills itself: Optional alone, so removing one from the
+// configuration clears it (tf#79).
+func withClearable(fields ...string) func(r *gentf.Resource) {
+	return func(r *gentf.Resource) { r.Clearable = fields }
+}
+
 // withReferences declares the entity's fields that hold another row's id.
 func withReferences(refs map[string]gentf.Reference) func(r *gentf.Resource) {
 	return func(r *gentf.Resource) { r.References = refs }
@@ -497,12 +504,11 @@ func main() {
 					"`resource_type = \"guardcontrol.tenant\"` with the tenant's id (`t-…`) for `guardcontrol.tenantAdmin`, `resource_type = \"guardcontrol.network\"` with the network's id (`n-…`) for `guardcontrol.networkAdmin`. "+
 					"`guardcontrol.viewer` takes either anchor, with or without the condition. "+
 					"A service account's binding (`subject_type = \"client\"`) carries no `condition_id`: the condition tests a person's sign-in, which an application never has. "+
-					"For users and groups, `authwise_guard_enrolment_grant` is the simpler way: guard-control writes the condition and the anchor itself.\n\n"+
-					"**Removing `condition_id`.** A `condition_id` taken out of the configuration keeps the binding's condition: the attribute is computed, so the plan keeps the value in state. "+
-					"To drop a condition, replace the binding (`terraform apply -replace=authwise_access_binding.<name>`)."), access,
+					"For users and groups, `authwise_guard_enrolment_grant` is the simpler way: guard-control writes the condition and the anchor itself."), access,
 				withCollection("access-bindings"),
 				withRequired("subject_type", "subject_id", "role_name"),
 				withComputed("created_by"),
+				withClearable("resource_type", "resource_id", "condition_id", "expires_at"),
 				withReferences(map[string]gentf.Reference{"condition_id": refAccessCondition})),
 
 			// Guard (guard-control, #32). Its rows are keyed by kit's tenant

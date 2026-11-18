@@ -41,20 +41,16 @@ func AccessBindingResourceSchema() schema.Schema {
 				Validators:          []validator.String{tf.ReferenceID("a", "audience", "authwise_audience.<name>.audience_id")},
 			},
 			"condition_id": schema.StringAttribute{
-				Computed:      true,
-				Optional:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
-				Validators:    []validator.String{tf.ReferenceID("axc", "access_condition", "authwise_access_condition.<name>.access_condition_id")},
+				Optional:   true,
+				Validators: []validator.String{tf.ReferenceID("axc", "access_condition", "authwise_access_condition.<name>.access_condition_id")},
 			},
 			"created_by": schema.StringAttribute{
 				Computed:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"expires_at": schema.StringAttribute{
-				Computed:            true,
 				MarkdownDescription: "`expires_at` as an RFC 3339 timestamp.",
 				Optional:            true,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"issuer_id": schema.StringAttribute{
 				Computed:            true,
@@ -68,19 +64,11 @@ func AccessBindingResourceSchema() schema.Schema {
 				MarkdownDescription: "Full resource name; serves as the Terraform ID.",
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
-			"resource_id": schema.StringAttribute{
-				Computed:      true,
-				Optional:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
-			},
-			"resource_type": schema.StringAttribute{
-				Computed:      true,
-				Optional:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
-			},
-			"role_name":    schema.StringAttribute{Required: true},
-			"subject_id":   schema.StringAttribute{Required: true},
-			"subject_type": schema.StringAttribute{Required: true},
+			"resource_id":   schema.StringAttribute{Optional: true},
+			"resource_type": schema.StringAttribute{Optional: true},
+			"role_name":     schema.StringAttribute{Required: true},
+			"subject_id":    schema.StringAttribute{Required: true},
+			"subject_type":  schema.StringAttribute{Required: true},
 			"tenant_id": schema.StringAttribute{
 				Computed:            true,
 				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default, and reads back from the name. Changing a configured one replaces the resource.",
@@ -89,7 +77,7 @@ func AccessBindingResourceSchema() schema.Schema {
 				Validators:          []validator.String{tf.ReferenceID("t", "tenant", "")},
 			},
 		},
-		MarkdownDescription: "A binding that grants a subject a role in an audience's Access catalog.\n\n**Guard's administrative roles** (`guardcontrol.tenantAdmin`, `guardcontrol.networkAdmin`, `guardcontrol.viewer`) are bound in the tenant's administration audience, which needs home administration on the tenant (`authwise_tenant_home_administration`). One of them in the tenant's Guard audience is refused at plan with the reason, and by kit; the Guard audience keeps `guardcontrol.user` and devices only. The tenant's central administrators (its owner and `tenant.admin` seats) get Guard's tenant administrator role from kit, from their seat, not from a binding (kit#940, tf#72).\n\n**A person's Guard administrative role.** In the tenant's administration audience, kit refuses a binding of `guardcontrol.tenantAdmin` or `guardcontrol.networkAdmin` to a user or a group unless it carries the audience's step-up condition (`condition_id`, `authwise_tenant_home_administration.<name>.step_up_condition_id`) and its anchor: `resource_type = \"guardcontrol.tenant\"` with the tenant's id (`t-…`) for `guardcontrol.tenantAdmin`, `resource_type = \"guardcontrol.network\"` with the network's id (`n-…`) for `guardcontrol.networkAdmin`. `guardcontrol.viewer` takes either anchor, with or without the condition. A service account's binding (`subject_type = \"client\"`) carries no `condition_id`: the condition tests a person's sign-in, which an application never has. For users and groups, `authwise_guard_enrolment_grant` is the simpler way: guard-control writes the condition and the anchor itself.\n\n**Removing `condition_id`.** A `condition_id` taken out of the configuration keeps the binding's condition: the attribute is computed, so the plan keeps the value in state. To drop a condition, replace the binding (`terraform apply -replace=authwise_access_binding.<name>`).",
+		MarkdownDescription: "A binding that grants a subject a role in an audience's Access catalog.\n\n**Guard's administrative roles** (`guardcontrol.tenantAdmin`, `guardcontrol.networkAdmin`, `guardcontrol.viewer`) are bound in the tenant's administration audience, which needs home administration on the tenant (`authwise_tenant_home_administration`). One of them in the tenant's Guard audience is refused at plan with the reason, and by kit; the Guard audience keeps `guardcontrol.user` and devices only. The tenant's central administrators (its owner and `tenant.admin` seats) get Guard's tenant administrator role from kit, from their seat, not from a binding (kit#940, tf#72).\n\n**A person's Guard administrative role.** In the tenant's administration audience, kit refuses a binding of `guardcontrol.tenantAdmin` or `guardcontrol.networkAdmin` to a user or a group unless it carries the audience's step-up condition (`condition_id`, `authwise_tenant_home_administration.<name>.step_up_condition_id`) and its anchor: `resource_type = \"guardcontrol.tenant\"` with the tenant's id (`t-…`) for `guardcontrol.tenantAdmin`, `resource_type = \"guardcontrol.network\"` with the network's id (`n-…`) for `guardcontrol.networkAdmin`. `guardcontrol.viewer` takes either anchor, with or without the condition. A service account's binding (`subject_type = \"client\"`) carries no `condition_id`: the condition tests a person's sign-in, which an application never has. For users and groups, `authwise_guard_enrolment_grant` is the simpler way: guard-control writes the condition and the anchor itself.",
 	}
 }
 
@@ -373,7 +361,7 @@ func AccessBindingDataSourceSchema() schema1.Schema {
 			"subject_type":  schema1.StringAttribute{Computed: true},
 			"tenant_id":     schema1.StringAttribute{Computed: true},
 		},
-		MarkdownDescription: "A binding that grants a subject a role in an audience's Access catalog.\n\n**Guard's administrative roles** (`guardcontrol.tenantAdmin`, `guardcontrol.networkAdmin`, `guardcontrol.viewer`) are bound in the tenant's administration audience, which needs home administration on the tenant (`authwise_tenant_home_administration`). One of them in the tenant's Guard audience is refused at plan with the reason, and by kit; the Guard audience keeps `guardcontrol.user` and devices only. The tenant's central administrators (its owner and `tenant.admin` seats) get Guard's tenant administrator role from kit, from their seat, not from a binding (kit#940, tf#72).\n\n**A person's Guard administrative role.** In the tenant's administration audience, kit refuses a binding of `guardcontrol.tenantAdmin` or `guardcontrol.networkAdmin` to a user or a group unless it carries the audience's step-up condition (`condition_id`, `authwise_tenant_home_administration.<name>.step_up_condition_id`) and its anchor: `resource_type = \"guardcontrol.tenant\"` with the tenant's id (`t-…`) for `guardcontrol.tenantAdmin`, `resource_type = \"guardcontrol.network\"` with the network's id (`n-…`) for `guardcontrol.networkAdmin`. `guardcontrol.viewer` takes either anchor, with or without the condition. A service account's binding (`subject_type = \"client\"`) carries no `condition_id`: the condition tests a person's sign-in, which an application never has. For users and groups, `authwise_guard_enrolment_grant` is the simpler way: guard-control writes the condition and the anchor itself.\n\n**Removing `condition_id`.** A `condition_id` taken out of the configuration keeps the binding's condition: the attribute is computed, so the plan keeps the value in state. To drop a condition, replace the binding (`terraform apply -replace=authwise_access_binding.<name>`). This data source reads one by its full resource name.",
+		MarkdownDescription: "A binding that grants a subject a role in an audience's Access catalog.\n\n**Guard's administrative roles** (`guardcontrol.tenantAdmin`, `guardcontrol.networkAdmin`, `guardcontrol.viewer`) are bound in the tenant's administration audience, which needs home administration on the tenant (`authwise_tenant_home_administration`). One of them in the tenant's Guard audience is refused at plan with the reason, and by kit; the Guard audience keeps `guardcontrol.user` and devices only. The tenant's central administrators (its owner and `tenant.admin` seats) get Guard's tenant administrator role from kit, from their seat, not from a binding (kit#940, tf#72).\n\n**A person's Guard administrative role.** In the tenant's administration audience, kit refuses a binding of `guardcontrol.tenantAdmin` or `guardcontrol.networkAdmin` to a user or a group unless it carries the audience's step-up condition (`condition_id`, `authwise_tenant_home_administration.<name>.step_up_condition_id`) and its anchor: `resource_type = \"guardcontrol.tenant\"` with the tenant's id (`t-…`) for `guardcontrol.tenantAdmin`, `resource_type = \"guardcontrol.network\"` with the network's id (`n-…`) for `guardcontrol.networkAdmin`. `guardcontrol.viewer` takes either anchor, with or without the condition. A service account's binding (`subject_type = \"client\"`) carries no `condition_id`: the condition tests a person's sign-in, which an application never has. For users and groups, `authwise_guard_enrolment_grant` is the simpler way: guard-control writes the condition and the anchor itself. This data source reads one by its full resource name.",
 	}
 }
 
@@ -485,7 +473,7 @@ func AccessBindingListDataSourceSchema() schema1.Schema {
 				Validators:          []validator.String{tf.ReferenceID("t", "tenant", "")},
 			},
 		},
-		MarkdownDescription: "A binding that grants a subject a role in an audience's Access catalog.\n\n**Guard's administrative roles** (`guardcontrol.tenantAdmin`, `guardcontrol.networkAdmin`, `guardcontrol.viewer`) are bound in the tenant's administration audience, which needs home administration on the tenant (`authwise_tenant_home_administration`). One of them in the tenant's Guard audience is refused at plan with the reason, and by kit; the Guard audience keeps `guardcontrol.user` and devices only. The tenant's central administrators (its owner and `tenant.admin` seats) get Guard's tenant administrator role from kit, from their seat, not from a binding (kit#940, tf#72).\n\n**A person's Guard administrative role.** In the tenant's administration audience, kit refuses a binding of `guardcontrol.tenantAdmin` or `guardcontrol.networkAdmin` to a user or a group unless it carries the audience's step-up condition (`condition_id`, `authwise_tenant_home_administration.<name>.step_up_condition_id`) and its anchor: `resource_type = \"guardcontrol.tenant\"` with the tenant's id (`t-…`) for `guardcontrol.tenantAdmin`, `resource_type = \"guardcontrol.network\"` with the network's id (`n-…`) for `guardcontrol.networkAdmin`. `guardcontrol.viewer` takes either anchor, with or without the condition. A service account's binding (`subject_type = \"client\"`) carries no `condition_id`: the condition tests a person's sign-in, which an application never has. For users and groups, `authwise_guard_enrolment_grant` is the simpler way: guard-control writes the condition and the anchor itself.\n\n**Removing `condition_id`.** A `condition_id` taken out of the configuration keeps the binding's condition: the attribute is computed, so the plan keeps the value in state. To drop a condition, replace the binding (`terraform apply -replace=authwise_access_binding.<name>`). This data source lists every one under a parent.",
+		MarkdownDescription: "A binding that grants a subject a role in an audience's Access catalog.\n\n**Guard's administrative roles** (`guardcontrol.tenantAdmin`, `guardcontrol.networkAdmin`, `guardcontrol.viewer`) are bound in the tenant's administration audience, which needs home administration on the tenant (`authwise_tenant_home_administration`). One of them in the tenant's Guard audience is refused at plan with the reason, and by kit; the Guard audience keeps `guardcontrol.user` and devices only. The tenant's central administrators (its owner and `tenant.admin` seats) get Guard's tenant administrator role from kit, from their seat, not from a binding (kit#940, tf#72).\n\n**A person's Guard administrative role.** In the tenant's administration audience, kit refuses a binding of `guardcontrol.tenantAdmin` or `guardcontrol.networkAdmin` to a user or a group unless it carries the audience's step-up condition (`condition_id`, `authwise_tenant_home_administration.<name>.step_up_condition_id`) and its anchor: `resource_type = \"guardcontrol.tenant\"` with the tenant's id (`t-…`) for `guardcontrol.tenantAdmin`, `resource_type = \"guardcontrol.network\"` with the network's id (`n-…`) for `guardcontrol.networkAdmin`. `guardcontrol.viewer` takes either anchor, with or without the condition. A service account's binding (`subject_type = \"client\"`) carries no `condition_id`: the condition tests a person's sign-in, which an application never has. For users and groups, `authwise_guard_enrolment_grant` is the simpler way: guard-control writes the condition and the anchor itself. This data source lists every one under a parent.",
 	}
 }
 
