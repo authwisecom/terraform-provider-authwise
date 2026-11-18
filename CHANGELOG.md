@@ -35,7 +35,7 @@ NOTES:
   source needs kit 1.94.0 or later (registration results from 1.95.0);
   kit lists no feature for it, so an earlier kit is known by its
   `Unimplemented` answer. Nothing else changes.
-* **tfinfra v0.0.26-0.20261118220831-ec9f24021eb1** (from v0.0.25): the
+* **tfinfra v0.0.26** (from v0.0.25): the
   generator's `Clearable` behavior, used for tf#79. Nothing else changes in
   the generated code.
 * **`authwise_access_binding` docs: a person's Guard administrative
