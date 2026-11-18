@@ -35,6 +35,7 @@ const (
 	administrationAttribute = "administration"
 	audienceIDAttribute     = "audience_id"
 	consoleClientIDAttr     = "console_client_id"
+	stepUpConditionIDAttr   = "step_up_condition_id"
 )
 
 var administrationAttrTypes = map[string]attr.Type{
@@ -82,11 +83,12 @@ type tenantHomeAdministrationResource struct {
 }
 
 type tenantHomeAdministrationModel struct {
-	Name            types.String `tfsdk:"name"`
-	TenantID        types.String `tfsdk:"tenant_id"`
-	IssuerID        types.String `tfsdk:"issuer_id"`
-	AudienceID      types.String `tfsdk:"audience_id"`
-	ConsoleClientID types.String `tfsdk:"console_client_id"`
+	Name              types.String `tfsdk:"name"`
+	TenantID          types.String `tfsdk:"tenant_id"`
+	IssuerID          types.String `tfsdk:"issuer_id"`
+	AudienceID        types.String `tfsdk:"audience_id"`
+	ConsoleClientID   types.String `tfsdk:"console_client_id"`
+	StepUpConditionID types.String `tfsdk:"step_up_condition_id"`
 }
 
 func newTenantHomeAdministrationResource() resource.Resource {
@@ -137,6 +139,13 @@ func (r *tenantHomeAdministrationResource) Schema(_ context.Context, _ resource.
 				Computed:            true,
 				MarkdownDescription: "The console's public client (`c-…`) on the issuer.",
 				PlanModifiers:       keep,
+			},
+			stepUpConditionIDAttr: schema.StringAttribute{
+				Computed: true,
+				MarkdownDescription: "The administration audience's step-up condition (`axc-…`), which kit requires on a user's or a group's binding of " +
+					"`guardcontrol.tenantAdmin` or `guardcontrol.networkAdmin` there: the `condition_id` of such an `authwise_access_binding`. " +
+					"Null when the tenant has none; kit then refuses such a binding and says how to create it.",
+				PlanModifiers: keep,
 			},
 		},
 	}
@@ -214,6 +223,10 @@ func (m *tenantHomeAdministrationModel) fromTenant(t *corepb.Tenant, _ *diag.Dia
 	m.IssuerID = types.StringValue(e.GetIssuerId())
 	m.AudienceID = types.StringValue(e.GetAudienceId())
 	m.ConsoleClientID = types.StringValue(e.GetConsoleClientId())
+	m.StepUpConditionID = types.StringNull()
+	if id := e.GetStepUpConditionId(); id != "" {
+		m.StepUpConditionID = types.StringValue(id)
+	}
 	return true
 }
 

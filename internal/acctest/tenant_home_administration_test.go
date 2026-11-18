@@ -145,6 +145,68 @@ resource "authwise_issuer" "home" {
 	})
 }
 
+// TestAccTenantHomeAdministration_StepUpCondition: step_up_condition_id is
+// the administration audience's step-up condition, which a user's binding
+// of a Guard administrative role there carries (kit's guardadmin rule, which
+// the fake keeps); a tenant without one reads null.
+func TestAccTenantHomeAdministration_StepUpCondition(t *testing.T) {
+	h := newHarness(t)
+
+	const addr = "authwise_tenant_home_administration.this"
+	config := homeAdministrationConfig(h, false) + `
+resource "authwise_access_role" "tenant_admin" {
+  issuer_id      = authwise_tenant_home_administration.this.issuer_id
+  audience_id    = authwise_tenant_home_administration.this.audience_id
+  access_role_id = "guardcontrol.tenantAdmin"
+}
+
+resource "authwise_access_binding" "ada" {
+  issuer_id     = authwise_tenant_home_administration.this.issuer_id
+  audience_id   = authwise_tenant_home_administration.this.audience_id
+  subject_type  = "user"
+  subject_id    = "u-01"
+  role_name     = authwise_access_role.tenant_admin.access_role_id
+  resource_type = "guardcontrol.tenant"
+  resource_id   = "t-1"
+  condition_id  = authwise_tenant_home_administration.this.step_up_condition_id
+}
+`
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: protoFactories(),
+		Steps: []resource.TestStep{
+			{
+				Config: config,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestMatchResourceAttr(addr, "step_up_condition_id", regexp.MustCompile(`^axc-`)),
+					resource.TestCheckResourceAttrPair("authwise_access_binding.ada", "condition_id", addr, "step_up_condition_id"),
+					func(*terraform.State) error {
+						want := h.tenancy.tenant("tenants/t-1").GetProducts()["administration"].GetStepUpConditionId()
+						if got := h.access.onlyBinding().GetConditionId(); got != want {
+							return fmt.Errorf("binding carries condition %q, want the step-up condition %q", got, want)
+						}
+						return nil
+					},
+				),
+			},
+			{
+				Config: config,
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{plancheck.ExpectEmptyPlan()},
+				},
+			},
+			{
+				// A tenant enabled before kit minted the condition has none.
+				PreConfig: func() {
+					h.tenancy.editTenant("tenants/t-1", func(t *corepb.Tenant) { t.GetProducts()["administration"].StepUpConditionId = "" })
+				},
+				Config: homeAdministrationConfig(h, false),
+				Check:  resource.TestCheckNoResourceAttr(addr, "step_up_condition_id"),
+			},
+		},
+	})
+}
+
 // TestAccTenantHomeAdministration_NotOwner: a caller without the owner's
 // permission is refused, and told why.
 func TestAccTenantHomeAdministration_NotOwner(t *testing.T) {

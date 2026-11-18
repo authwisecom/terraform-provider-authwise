@@ -19,3 +19,18 @@ resource "authwise_tenant_home_administration" "this" {
 
   depends_on = [authwise_issuer_domain_binding.home]
 }
+
+# A person administers the tenant's Guard. In the administration audience,
+# kit requires a user's or a group's binding of guardcontrol.tenantAdmin or
+# guardcontrol.networkAdmin to carry the step-up condition and its anchor.
+# authwise_guard_enrolment_grant writes the same binding with less to say.
+resource "authwise_access_binding" "ada_guard_admin" {
+  issuer_id     = authwise_tenant_home_administration.this.issuer_id
+  audience_id   = authwise_tenant_home_administration.this.audience_id
+  subject_type  = "user"
+  subject_id    = "u-01"
+  role_name     = "guardcontrol.tenantAdmin"
+  resource_type = "guardcontrol.tenant"
+  resource_id   = authwise_tenant_home_administration.this.tenant_id
+  condition_id  = authwise_tenant_home_administration.this.step_up_condition_id
+}

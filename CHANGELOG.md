@@ -2,6 +2,11 @@
 
 FEATURES:
 
+* **`authwise_tenant_home_administration.step_up_condition_id`**: the
+  administration audience's step-up condition (`axc-…`), read from the
+  tenant's administration entry. It is the `condition_id` a user's or a
+  group's `guardcontrol.tenantAdmin` or `guardcontrol.networkAdmin`
+  binding there carries. Null for a tenant that has none.
 * **New data source: `authwise_install_status`** (tf#77, kit#657). This is the
   install's license state (`absent`, `valid`, `grace`, `expired`, `revoked`
   or `invalid`, with its id, organization, plan, expiry and the key set it
@@ -26,6 +31,8 @@ NOTES:
   anchor (`guardcontrol.tenant` or `guardcontrol.network`). A service
   account's binding still carries no condition.
   `authwise_guard_enrolment_grant` writes both for users and groups.
+  Removing `condition_id` from the configuration keeps the condition (the
+  attribute is computed); to drop it, replace the binding.
 
 ## 0.35.1 (November 17, 2026)
 
