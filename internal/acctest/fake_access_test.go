@@ -32,6 +32,7 @@ type fakeAccessServer struct {
 	roles       map[string]*corepb.AccessRole
 	rolePerms   map[string]map[string]bool
 	bindings    map[string]*corepb.AccessBinding
+	conditions  map[string]*corepb.AccessCondition
 	seq         int
 
 	// administration names the tenant and step-up condition of an
@@ -49,6 +50,7 @@ func newFakeAccessServer() *fakeAccessServer {
 		roles:       map[string]*corepb.AccessRole{},
 		rolePerms:   map[string]map[string]bool{},
 		bindings:    map[string]*corepb.AccessBinding{},
+		conditions:  map[string]*corepb.AccessCondition{},
 	}
 }
 
@@ -312,6 +314,8 @@ func (f *fakeAccessServer) PatchAccessRole(_ context.Context, in *accesspb.Patch
 		switch path {
 		case "description":
 			existing.Description = in.GetAccessRole().GetDescription()
+		case "display_name":
+			existing.DisplayName = in.GetAccessRole().GetDisplayName()
 		default:
 			return nil, status.Errorf(codes.InvalidArgument, "unsupported update_mask path %q", path)
 		}
@@ -606,4 +610,87 @@ func (f *fakeAccessServer) onlyBinding() *corepb.AccessBinding {
 		return proto.Clone(b).(*corepb.AccessBinding)
 	}
 	return nil
+}
+
+// --- AccessCondition (AWID-keyed) ---
+//
+// kit requires display_name and expression on every write
+// (model/validations.go) and stores description as sent.
+
+func checkAccessCondition(c *corepb.AccessCondition) error {
+	if c.GetDisplayName() == "" || c.GetExpression() == "" {
+		return status.Error(codes.InvalidArgument, "display_name and expression are required")
+	}
+	return nil
+}
+
+func (f *fakeAccessServer) GetAccessCondition(_ context.Context, in *accesspb.GetAccessConditionRequest) (*corepb.AccessCondition, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	c, ok := f.conditions[in.GetName()]
+	if !ok {
+		return nil, status.Errorf(codes.NotFound, "access condition %q not found", in.GetName())
+	}
+	return proto.Clone(c).(*corepb.AccessCondition), nil
+}
+
+func (f *fakeAccessServer) ListAccessConditions(_ context.Context, in *accesspb.ListAccessConditionsRequest) (*accesspb.ListAccessConditionsResponse, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	out := &accesspb.ListAccessConditionsResponse{}
+	for _, name := range keys(f.conditions) {
+		if strings.HasPrefix(name, in.GetParent()+"/access-conditions/") {
+			out.AccessConditions = append(out.AccessConditions, proto.Clone(f.conditions[name]).(*corepb.AccessCondition))
+		}
+	}
+	return out, nil
+}
+
+func (f *fakeAccessServer) CreateAccessCondition(_ context.Context, in *accesspb.CreateAccessConditionRequest) (*corepb.AccessCondition, error) {
+	if err := checkAccessCondition(in.GetAccessCondition()); err != nil {
+		return nil, err
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	c := proto.Clone(in.GetAccessCondition()).(*corepb.AccessCondition)
+	c.Name = in.GetParent() + "/access-conditions/" + f.nextID("axc")
+	f.conditions[c.GetName()] = c
+	return proto.Clone(c).(*corepb.AccessCondition), nil
+}
+
+func (f *fakeAccessServer) PatchAccessCondition(_ context.Context, in *accesspb.PatchAccessConditionRequest) (*corepb.AccessCondition, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	stored, ok := f.conditions[in.GetName()]
+	if !ok {
+		return nil, status.Errorf(codes.NotFound, "access condition %q not found", in.GetName())
+	}
+	next := proto.Clone(stored).(*corepb.AccessCondition)
+	for _, path := range in.GetUpdateMask().GetPaths() {
+		switch path {
+		case "display_name":
+			next.DisplayName = in.GetAccessCondition().GetDisplayName()
+		case "description":
+			next.Description = in.GetAccessCondition().GetDescription()
+		case "expression":
+			next.Expression = in.GetAccessCondition().GetExpression()
+		default:
+			return nil, status.Errorf(codes.InvalidArgument, "unsupported update_mask path %q", path)
+		}
+	}
+	if err := checkAccessCondition(next); err != nil {
+		return nil, err
+	}
+	f.conditions[in.GetName()] = next
+	return proto.Clone(next).(*corepb.AccessCondition), nil
+}
+
+func (f *fakeAccessServer) DeleteAccessCondition(_ context.Context, in *accesspb.DeleteAccessConditionRequest) (*emptypb.Empty, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if _, ok := f.conditions[in.GetName()]; !ok {
+		return nil, status.Errorf(codes.NotFound, "access condition %q not found", in.GetName())
+	}
+	delete(f.conditions, in.GetName())
+	return &emptypb.Empty{}, nil
 }

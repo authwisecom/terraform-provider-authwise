@@ -39,11 +39,7 @@ func TrustedIssuerRuleResourceSchema() schema.Schema {
 				Computed:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
-			"description": schema.StringAttribute{
-				Computed:      true,
-				Optional:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
-			},
+			"description": schema.StringAttribute{Optional: true},
 			"ephemeral": schema.BoolAttribute{
 				Computed:      true,
 				Optional:      true,
@@ -71,17 +67,9 @@ func TrustedIssuerRuleResourceSchema() schema.Schema {
 				PlanModifiers:       []planmodifier.String{tf.RequiresReplaceIfConfigured(), stringplanmodifier.UseStateForUnknown()},
 				Validators:          []validator.String{tf.ReferenceID("n", "guard_network", "authwise_guard_network.<name>.guard_network_id")},
 			},
-			"node_count": schema.Int64Attribute{Computed: true},
-			"node_group": schema.StringAttribute{
-				Computed:      true,
-				Optional:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
-			},
-			"node_name_prefix": schema.StringAttribute{
-				Computed:      true,
-				Optional:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
-			},
+			"node_count":       schema.Int64Attribute{Computed: true},
+			"node_group":       schema.StringAttribute{Optional: true},
+			"node_name_prefix": schema.StringAttribute{Optional: true},
 			"subject": schema.StringAttribute{
 				PlanModifiers: []planmodifier.String{stringplanmodifier.RequiresReplace()},
 				Required:      true,

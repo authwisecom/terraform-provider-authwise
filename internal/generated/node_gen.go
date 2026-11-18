@@ -129,11 +129,7 @@ func NodeResourceSchema() schema.Schema {
 				Optional:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
-			"region": schema.StringAttribute{
-				Computed:      true,
-				Optional:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
-			},
+			"region": schema.StringAttribute{Optional: true},
 			"roles": schema.ListAttribute{
 				Computed:      true,
 				ElementType:   types.StringType,

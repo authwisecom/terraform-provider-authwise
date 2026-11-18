@@ -43,10 +43,8 @@ func ApplicationSecretResourceSchema() schema.Schema {
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"expires_at": schema.StringAttribute{
-				Computed:            true,
 				MarkdownDescription: "`expires_at` as an RFC 3339 timestamp.",
 				Optional:            true,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"hash_enabled": schema.BoolAttribute{
 				Computed:      true,

@@ -39,11 +39,7 @@ func ApplicationResourceSchema() schema.Schema {
 				MarkdownDescription: "Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.",
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
-			"application_url": schema.StringAttribute{
-				Computed:      true,
-				Optional:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
-			},
+			"application_url": schema.StringAttribute{Optional: true},
 			"audience_id": schema.StringAttribute{
 				Computed:      true,
 				Optional:      true,
@@ -63,10 +59,8 @@ func ApplicationResourceSchema() schema.Schema {
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"expires_at": schema.StringAttribute{
-				Computed:            true,
 				MarkdownDescription: "`expires_at` as an RFC 3339 timestamp.",
 				Optional:            true,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"grant_types": schema.ListAttribute{
 				Computed:      true,
@@ -93,11 +87,7 @@ func ApplicationResourceSchema() schema.Schema {
 				Optional:      true,
 				PlanModifiers: []planmodifier.Map{mapplanmodifier.UseStateForUnknown()},
 			},
-			"login_url": schema.StringAttribute{
-				Computed:      true,
-				Optional:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
-			},
+			"login_url": schema.StringAttribute{Optional: true},
 			"name": schema.StringAttribute{
 				Computed:            true,
 				MarkdownDescription: "Full resource name; serves as the Terraform ID.",
@@ -127,10 +117,8 @@ func ApplicationResourceSchema() schema.Schema {
 				Validators:          []validator.String{tf.ReferenceID("t", "tenant", "")},
 			},
 			"theme_variant_id": schema.StringAttribute{
-				Computed:      true,
-				Optional:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
-				Validators:    []validator.String{tf.ReferenceID("ap", "theme_variant", "authwise_theme_variant.<name>.theme_variant_id")},
+				Optional:   true,
+				Validators: []validator.String{tf.ReferenceID("ap", "theme_variant", "authwise_theme_variant.<name>.theme_variant_id")},
 			},
 			"token_endpoint_auth_method": schema.StringAttribute{
 				Computed:      true,

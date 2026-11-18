@@ -37,11 +37,7 @@ func NodeGroupResourceSchema() schema.Schema {
 				Computed:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
-			"description": schema.StringAttribute{
-				Computed:      true,
-				Optional:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
-			},
+			"description":  schema.StringAttribute{Optional: true},
 			"display_name": schema.StringAttribute{Required: true},
 			"guard_node_group_id": schema.StringAttribute{
 				Computed:            true,

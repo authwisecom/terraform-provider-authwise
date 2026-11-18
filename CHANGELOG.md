@@ -20,16 +20,57 @@ FEATURES:
 
 BUG FIXES:
 
-* **`authwise_access_binding`: removing `condition_id`, `resource_type`,
-  `resource_id` or `expires_at` clears it in place (tf#79).** These were
-  optional and computed, so a value taken out of the configuration stayed
-  in the plan from state, and the binding kept it. That mattered most for
-  turning a person's binding into a service account's, which kit refuses
-  while it carries a condition. They are now plain optional: removing one
-  plans null, and the update clears it on kit. A binding that never set
-  them plans no change.
+* **Removing an optional value from the configuration clears it in place
+  (tf#79).** The attributes listed in the upgrade note under NOTES were optional and
+  computed, so a value taken out of the configuration stayed in the plan
+  from state and on the server: it could only be removed by replacing the
+  resource. The case that found it was `authwise_access_binding`: turning a
+  person's binding into a service account's kept its `condition_id`, which
+  kit refuses. They are now plain optional: removing one plans null, and
+  the update clears it on kit or guard-control.
 
 NOTES:
+
+* **Upgrade: an optional value removed from the configuration is now
+  cleared (tf#79). Run `terraform plan` before the first apply on 0.36.0.** The
+  attributes below used to keep their last value when the configuration
+  left them out, so a value set in the console, with awctl or by another
+  tool stayed in place. They now follow the configuration: **a value set
+  outside Terraform and absent from the configuration is removed at the
+  next apply**, as an in-place update that sets it to null. To keep such a
+  value, write it into the configuration first. A resource whose
+  configuration never set them, and whose live value is empty, plans no
+  change.
+  - `authwise_access_binding`: `condition_id`, `resource_type`,
+    `resource_id`, `expires_at`
+  - `authwise_access_condition`: `description`
+  - `authwise_access_permission`: `description`, `resource_type`
+  - `authwise_access_resource_type`: `description`, `endpoint_name`,
+    `expansion_mode`, `parent_type`
+  - `authwise_access_role`: `description`, `display_name`
+  - `authwise_application`: `application_url`, `login_url`,
+    `theme_variant_id`, `expires_at`
+  - `authwise_application_secret`: `expires_at`
+  - `authwise_audience`: `theme_variant_id`
+  - `authwise_realm`: `display_name`
+  - `authwise_scim_connection`: `provider_id`
+  - `authwise_theme`: `content_schema`, `stylesheet`,
+    `stylesheet_attributes_schema`
+  - `authwise_guard_network`: `display_name`
+  - `authwise_guard_node`: `region`
+  - `authwise_guard_node_group`: `description`
+  - `authwise_guard_relay`: `display_name`, `region`, `ca_cert_pem`
+  - `authwise_guard_relay_pool`: `display_name`, `region`
+  - `authwise_guard_pool_relay`: `display_name`, `region`, `ca_cert_pem`
+  - `authwise_guard_resource`: `display_name`
+  - `authwise_guard_trusted_issuer_rule`: `description`, `node_group`,
+    `node_name_prefix`
+
+  Unchanged: every value the server fills or defaults when it is left out
+  (statuses, `authwise_application.kind`, `authwise_guard_network.relay_pool`
+  and the like); values people, SCIM or node enrollment write
+  (`authwise_user` profile fields, `authwise_guard_node.display_name`); and,
+  for now, `authwise_guard_network.slug` and `authwise_guard_node.endpoint`.
 
 * **apis v0.81.0** (from v0.80.0): kit's `GetInstallStatus`. The data
   source needs kit 1.94.0 or later (registration results from 1.95.0);

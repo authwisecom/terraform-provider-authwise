@@ -77,10 +77,8 @@ func AudienceResourceSchema() schema.Schema {
 				Validators:          []validator.String{tf.ReferenceID("t", "tenant", "")},
 			},
 			"theme_variant_id": schema.StringAttribute{
-				Computed:      true,
-				Optional:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
-				Validators:    []validator.String{tf.ReferenceID("ap", "theme_variant", "authwise_theme_variant.<name>.theme_variant_id")},
+				Optional:   true,
+				Validators: []validator.String{tf.ReferenceID("ap", "theme_variant", "authwise_theme_variant.<name>.theme_variant_id")},
 			},
 		},
 		MarkdownDescription: "An API an issuer issues access tokens for, and the audience its Access catalog hangs off.\n\n`status` is `active` (the default) or `disabled`: no token is issued for a disabled audience, refresh grants included. Changing it is made in place and keeps everything under it; kit 1.91.0 or later (the `identity.object-status` feature), and the administration tenant's own objects cannot be turned off.",

@@ -57,10 +57,8 @@ func ScimConnectionResourceSchema() schema.Schema {
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"provider_id": schema.StringAttribute{
-				Computed:      true,
-				Optional:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
-				Validators:    []validator.String{tf.ReferenceID("p", "provider", "authwise_provider.<name>.provider_id")},
+				Optional:   true,
+				Validators: []validator.String{tf.ReferenceID("p", "provider", "authwise_provider.<name>.provider_id")},
 			},
 			"realm_id": schema.StringAttribute{
 				Computed:            true,

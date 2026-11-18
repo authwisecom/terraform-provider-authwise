@@ -692,6 +692,12 @@ func (f *fakeIdentityServer) PatchApplication(ctx context.Context, in *identityp
 			existing.Status = in.GetApplication().GetStatus()
 		case "expires_at":
 			existing.ExpiresAt = in.GetApplication().GetExpiresAt()
+		case "application_url":
+			existing.ApplicationUrl = in.GetApplication().GetApplicationUrl()
+		case "login_url":
+			existing.LoginUrl = in.GetApplication().GetLoginUrl()
+		case "theme_variant_id":
+			existing.ThemeVariantId = in.GetApplication().GetThemeVariantId()
 		case "config":
 			existing.Config = in.GetApplication().GetConfig()
 		case "labels":
