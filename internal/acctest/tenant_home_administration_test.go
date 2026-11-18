@@ -51,7 +51,7 @@ func (f *fakeTenancyServer) EnableHomeAdministration(_ context.Context, in *tena
 	if t.Products == nil {
 		t.Products = map[string]*corepb.TenantProduct{}
 	}
-	t.Products["administration"] = &corepb.TenantProduct{IssuerId: in.GetIssuerId(), AudienceId: f.nextID("a"), ConsoleClientId: f.nextID("c")}
+	t.Products["administration"] = &corepb.TenantProduct{IssuerId: in.GetIssuerId(), AudienceId: f.nextID("a"), ConsoleClientId: f.nextID("c"), StepUpConditionId: f.nextID("axc")}
 	return proto.Clone(t).(*corepb.Tenant), nil
 }
 

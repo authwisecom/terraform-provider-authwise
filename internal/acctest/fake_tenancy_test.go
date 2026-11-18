@@ -51,7 +51,30 @@ func newFakeTenancyServer(access *fakeAccessServer, identity *fakeIdentityServer
 	}
 	identity.brandHolding = f.brandHolding
 	identity.tenancy = f
+	access.administration = f.administrationOf
 	return f
+}
+
+// administrationOf names the tenant and step-up condition when audience
+// (tenants/<t>/issuers/<i>/audiences/<a>) is that tenant's administration
+// audience.
+func (f *fakeTenancyServer) administrationOf(audience string) (tenantID, stepUp string, ok bool) {
+
+	parts := strings.Split(audience, "/")
+	if len(parts) != 6 || parts[0] != "tenants" || parts[4] != "audiences" {
+		return "", "", false
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	t, known := f.tenants["tenants/"+parts[1]]
+	if !known {
+		return "", "", false
+	}
+	adm, enabled := t.GetProducts()["administration"]
+	if !enabled || adm.GetAudienceId() != parts[5] {
+		return "", "", false
+	}
+	return parts[1], adm.GetStepUpConditionId(), true
 }
 
 var tenancyParent = regexp.MustCompile(`^tenants/[^/]+$`)

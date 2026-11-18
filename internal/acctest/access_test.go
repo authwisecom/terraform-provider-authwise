@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"regexp"
 	"sort"
+	"strings"
 	"testing"
 	"time"
 
@@ -191,16 +192,18 @@ resource "authwise_access_binding" "typo" {
 // TestAccAccessBinding_GuardAdministrativeRoleInGuardAudience: Guard's
 // administrative roles live in the tenant's administration audience
 // (kit#940, tf#72). One bound in the Guard audience is refused at plan with
-// the reason, never rewritten, and the same role elsewhere applies.
+// the reason, never rewritten, and the same role in the administration
+// audience applies, in the shape kit accepts there: a person's carries the
+// step-up condition and the tenant anchor.
 func TestAccAccessBinding_GuardAdministrativeRoleInGuardAudience(t *testing.T) {
 
 	h := newHarness(t)
-	setProducts := func(guard string) {
+	setProducts := func(guard, administration string) {
 		h.tenancy.mu.Lock()
 		defer h.tenancy.mu.Unlock()
 		h.tenancy.tenants["tenants/t-1"].Products = map[string]*corepb.TenantProduct{
 			"guard":          {AudienceId: guard},
-			"administration": {AudienceId: "a-adm"},
+			"administration": {AudienceId: administration, StepUpConditionId: "axc-step"},
 		}
 	}
 
@@ -210,9 +213,12 @@ resource "authwise_access_role" "tenant_admin" {
 }
 
 resource "authwise_access_binding" "admin" {
-  subject_type = "user"
-  subject_id   = "u-01"
-  role_name    = authwise_access_role.tenant_admin.access_role_id
+  subject_type  = "user"
+  subject_id    = "u-01"
+  role_name     = authwise_access_role.tenant_admin.access_role_id
+  resource_type = "guardcontrol.tenant"
+  resource_id   = "t-1"
+  condition_id  = "axc-step"
 }
 `
 
@@ -221,16 +227,101 @@ resource "authwise_access_binding" "admin" {
 		Steps: []resource.TestStep{
 			{
 				// a-1, the provider's default audience, is the Guard audience.
-				PreConfig:   func() { setProducts("a-1") },
+				PreConfig:   func() { setProducts("a-1", "a-adm") },
 				Config:      config,
 				ExpectError: regexp.MustCompile(`(?s)Guard administrative role bound in the Guard audience.*administration\s+audience\s+\(a-adm\)`),
 			},
 			{
-				// a-1 is not the Guard audience: nothing to refuse.
-				PreConfig: func() { setProducts("a-guard") },
+				// a-1 is the administration audience: the binding applies.
+				PreConfig: func() { setProducts("a-guard", "a-1") },
 				Config:    config,
-				Check:     resource.TestCheckResourceAttr("authwise_access_binding.admin", "role_name", "guardcontrol.tenantAdmin"),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("authwise_access_binding.admin", "role_name", "guardcontrol.tenantAdmin"),
+					resource.TestCheckResourceAttr("authwise_access_binding.admin", "condition_id", "axc-step"),
+				),
 			},
+		},
+	})
+}
+
+// TestAccAccessBinding_GuardAdministrativeShape is kit's write-time rule
+// (pkg/lib/guardadmin CheckShape) in the tenant's administration audience,
+// as the fake keeps it: a person (user or group) bound tenantAdmin or
+// networkAdmin carries the step-up condition and the role's anchor; a
+// viewer may carry it or not; a service account (client) carries none.
+func TestAccAccessBinding_GuardAdministrativeShape(t *testing.T) {
+
+	h := newHarness(t)
+	h.tenancy.mu.Lock()
+	h.tenancy.tenants["tenants/t-1"].Products = map[string]*corepb.TenantProduct{
+		"administration": {AudienceId: "a-1", StepUpConditionId: "axc-step"},
+	}
+	h.tenancy.mu.Unlock()
+	h.access.mu.Lock()
+	for _, role := range []string{"guardcontrol.tenantAdmin", "guardcontrol.networkAdmin", "guardcontrol.viewer"} {
+		name := accessPrefix + "/access-roles/" + role
+		h.access.roles[name] = &corepb.AccessRole{Name: name}
+	}
+	h.access.mu.Unlock()
+
+	// Each step names its binding afresh, so every case is a create: a
+	// condition_id removed from config is kept from state (Optional and
+	// Computed), which is not what this test is about.
+	step := 0
+	binding := func(subjectType, role, anchor, condition string) string {
+		step++
+		cfg := h.providerConfig() + fmt.Sprintf(`
+resource "authwise_access_binding" "b%d" {
+  subject_type = %q
+  subject_id   = "s-01"
+  role_name    = %q
+`, step, subjectType, role)
+		if anchor != "" {
+			typ, id, _ := strings.Cut(anchor, "/")
+			cfg += fmt.Sprintf("  resource_type = %q\n  resource_id   = %q\n", typ, id)
+		}
+		if condition != "" {
+			cfg += fmt.Sprintf("  condition_id  = %q\n", condition)
+		}
+		return cfg + "}\n"
+	}
+	accepted := func(subjectType, role, anchor, condition string) resource.TestStep {
+		config := binding(subjectType, role, anchor, condition)
+		return resource.TestStep{
+			Config: config,
+			Check:  resource.TestCheckResourceAttr(fmt.Sprintf("authwise_access_binding.b%d", step), "role_name", role),
+		}
+	}
+	refused := func(subjectType, role, anchor, condition, reason string) resource.TestStep {
+		return resource.TestStep{Config: binding(subjectType, role, anchor, condition), ExpectError: regexp.MustCompile(reason)}
+	}
+
+	const (
+		tenant  = "guardcontrol.tenant/t-1"
+		network = "guardcontrol.network/n-01"
+		stepUp  = "axc-step"
+		missing = `(?s)a\s+person\s+bound\s+guardcontrol\.\w+\s+must\s+carry.*step-up\s+condition\s+axc-step`
+	)
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: protoFactories(),
+		Steps: []resource.TestStep{
+			// A bare person binding of tenantAdmin or networkAdmin is refused.
+			refused("user", "guardcontrol.tenantAdmin", "", "", `(?s)guardcontrol\.tenantAdmin\s+is\s+bound\s+at\s+guardcontrol\.tenant/t-1,\s+not\s+at\s+the\s+root`),
+			refused("user", "guardcontrol.tenantAdmin", tenant, "", missing),
+			refused("group", "guardcontrol.tenantAdmin", tenant, "", missing),
+			refused("user", "guardcontrol.networkAdmin", network, "", missing),
+			refused("group", "guardcontrol.networkAdmin", network, "", missing),
+			refused("user", "guardcontrol.networkAdmin", tenant, stepUp, `(?s)guardcontrol\.networkAdmin\s+is\s+bound\s+at\s+a\s+guardcontrol\.network`),
+			// The accepted shapes.
+			accepted("user", "guardcontrol.tenantAdmin", tenant, stepUp),
+			accepted("group", "guardcontrol.networkAdmin", network, stepUp),
+			accepted("user", "guardcontrol.viewer", tenant, ""),
+			accepted("group", "guardcontrol.viewer", network, stepUp),
+			accepted("client", "guardcontrol.tenantAdmin", tenant, ""),
+			accepted("client", "guardcontrol.networkAdmin", network, ""),
+			// A service account carries no condition.
+			refused("client", "guardcontrol.tenantAdmin", tenant, stepUp, `(?s)a\s+client\s+bound\s+guardcontrol\.tenantAdmin\s+carries\s+no\s+condition`),
 		},
 	})
 }

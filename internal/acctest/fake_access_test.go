@@ -33,6 +33,13 @@ type fakeAccessServer struct {
 	rolePerms   map[string]map[string]bool
 	bindings    map[string]*corepb.AccessBinding
 	seq         int
+
+	// administration names the tenant and step-up condition of an
+	// audience that is a tenant's administration audience (the fake
+	// tenancy server's products), so a binding there keeps kit's Guard
+	// administrative shape (checkGuardAdminShape). Called without f.mu
+	// held: the tenancy server takes its own lock, then this one.
+	administration func(audience string) (tenantID, stepUp string, ok bool)
 }
 
 func newFakeAccessServer() *fakeAccessServer {
@@ -438,6 +445,10 @@ func (f *fakeAccessServer) grantHolderLocked(audience, self string, b *corepb.Ac
 // expiry.
 func (f *fakeAccessServer) CreateAccessBinding(_ context.Context, in *accesspb.CreateAccessBindingRequest) (*corepb.AccessBinding, error) {
 
+	if err := f.checkGuardAdminShape(in.GetParent(), in.GetAccessBinding()); err != nil {
+		return nil, err
+	}
+
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
@@ -488,6 +499,12 @@ func (f *fakeAccessServer) PatchAccessBinding(_ context.Context, in *accesspb.Pa
 	}
 
 	audience, _, _ := strings.Cut(in.GetName(), "/access-bindings/")
+	f.mu.Unlock()
+	err := f.checkGuardAdminShape(audience, existing)
+	f.mu.Lock()
+	if err != nil {
+		return nil, err
+	}
 	if holder := f.grantHolderLocked(audience, in.GetName(), existing); holder != "" {
 		return nil, status.Errorf(codes.AlreadyExists, "access binding %s already grants this", holder)
 	}
@@ -504,6 +521,81 @@ func (f *fakeAccessServer) DeleteAccessBinding(_ context.Context, in *accesspb.D
 	}
 	delete(f.bindings, in.GetName())
 	return &emptypb.Empty{}, nil
+}
+
+// guardAdminShapes is kit's table (pkg/lib/guardadmin/shape.go): each
+// Guard administrative role's anchors, and whether a person bound it
+// carries the administration audience's step-up condition.
+var guardAdminShapes = map[string]struct {
+	anchors []string
+	stepUp  bool
+}{
+	"guardcontrol.tenantAdmin":  {anchors: []string{"guardcontrol.tenant"}, stepUp: true},
+	"guardcontrol.networkAdmin": {anchors: []string{"guardcontrol.network"}, stepUp: true},
+	"guardcontrol.viewer":       {anchors: []string{"guardcontrol.tenant", "guardcontrol.network"}},
+}
+
+// checkGuardAdminShape is kit's write-time rule for a Guard administrative
+// binding in a tenant's administration audience: tenantAdmin at
+// guardcontrol.tenant/<the tenant>, networkAdmin at one
+// guardcontrol.network, viewer at either; a person (user or group) bound
+// tenantAdmin or networkAdmin carries the step-up condition, a person
+// bound viewer carries none or it, and a client carries none.
+func (f *fakeAccessServer) checkGuardAdminShape(audience string, b *corepb.AccessBinding) error {
+
+	s, ok := guardAdminShapes[b.GetRoleName()]
+	if !ok || f.administration == nil {
+		return nil
+	}
+	tenantID, stepUp, ok := f.administration(audience)
+	if !ok {
+		return nil
+	}
+
+	refuse := func(format string, args ...any) error {
+		return status.Errorf(codes.InvalidArgument, format, args...)
+	}
+	if !slices.Contains(s.anchors, b.GetResourceType()) {
+		var allowed []string
+		for _, a := range s.anchors {
+			if a == "guardcontrol.tenant" {
+				allowed = append(allowed, a+"/"+tenantID)
+			} else {
+				allowed = append(allowed, "a "+a)
+			}
+		}
+		at := "the root"
+		if b.GetResourceType() != "" {
+			at = b.GetResourceType() + "/" + b.GetResourceId()
+		}
+		return refuse("%s is bound at %s, not at %s", b.GetRoleName(), strings.Join(allowed, " or "), at)
+	}
+	if b.GetResourceType() == "guardcontrol.tenant" && b.GetResourceId() != tenantID {
+		return refuse("%s is bound at guardcontrol.tenant/%s, this tenant's Guard, not at guardcontrol.tenant/%s", b.GetRoleName(), tenantID, b.GetResourceId())
+	}
+	if b.GetResourceType() == "guardcontrol.network" && b.GetResourceId() == "" {
+		return refuse("%s is bound at one guardcontrol.network: name the network", b.GetRoleName())
+	}
+
+	condition := b.GetConditionId()
+	switch {
+	case b.GetSubjectType() == "client":
+		if condition != "" {
+			return refuse("a client bound %s carries no condition: its bearer has no acr to step up (remove condition %s)", b.GetRoleName(), condition)
+		}
+	case s.stepUp:
+		if stepUp == "" {
+			return refuse("a person bound %s must carry this tenant's step-up condition, and the tenant has none; enable home administration again to create it", b.GetRoleName())
+		}
+		if condition != stepUp {
+			return refuse("a person bound %s must carry the administration audience's step-up condition %s", b.GetRoleName(), stepUp)
+		}
+	default:
+		if condition != "" && condition != stepUp {
+			return refuse("a person bound %s carries no condition or the administration audience's step-up condition %s, not %s", b.GetRoleName(), stepUp, condition)
+		}
+	}
+	return nil
 }
 
 // onlyBinding returns the single binding on the fake server.
