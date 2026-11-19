@@ -134,3 +134,53 @@ resource "authwise_guard_tenant_settings" "other" {
 		}},
 	})
 }
+
+// TestAccGuardTenantSettings_LabelsKeptAtAdoption: the resource adopts an
+// existing tenant, so a configuration that never mentions labels leaves the
+// labels set elsewhere alone, at adoption and after. An explicit
+// `labels = {}` clears them (plan's ruling on audit T1, 2026-11-19).
+func TestAccGuardTenantSettings_LabelsKeptAtAdoption(t *testing.T) {
+
+	h := newHarness(t)
+	func() {
+		h.guard.mu.Lock()
+		defer h.guard.mu.Unlock()
+		h.guard.tenants["tenants/t-1"].Labels = map[string]string{"owner": "elsewhere"}
+	}()
+
+	config := func(body string) string {
+		return h.providerConfig() + `
+resource "authwise_guard_tenant_settings" "acme" {
+  tenant_id = "t-1"
+` + body + `}
+`
+	}
+
+	labels := func(want int) resource.TestCheckFunc {
+		return checkServer(func() error {
+			h.guard.mu.Lock()
+			defer h.guard.mu.Unlock()
+			if got := h.guard.tenants["tenants/t-1"].GetLabels(); len(got) != want {
+				return fmt.Errorf("guard-control holds labels %v, want %d", got, want)
+			}
+			return nil
+		})
+	}
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: protoFactories(),
+		Steps: []resource.TestStep{
+			{Config: config(""), Check: labels(1)},
+			{
+				Config:           config(""),
+				ConfigPlanChecks: resource.ConfigPlanChecks{PreApply: []plancheck.PlanCheck{plancheck.ExpectEmptyPlan()}},
+				Check:            labels(1),
+			},
+			{Config: config("  labels = {}\n"), Check: labels(0)},
+			{
+				Config:           config("  labels = {}\n"),
+				ConfigPlanChecks: resource.ConfigPlanChecks{PreApply: []plancheck.PlanCheck{plancheck.ExpectEmptyPlan()}},
+			},
+		},
+	})
+}

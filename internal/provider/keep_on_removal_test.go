@@ -43,6 +43,7 @@ var keepOnRemoval = map[string]string{
 	"authwise_guard_tenant_settings.config.deprovisioning.enabled": reasonFailsClosed,
 	"authwise_guard_tenant_settings.config.users":                  reasonFailsClosed,
 	"authwise_guard_tenant_settings.config.users.realms":           reasonFailsClosed,
+	"authwise_guard_tenant_settings.labels":                        reasonAdoptsExisting,
 	"authwise_guard_trusted_issuer_rule.ephemeral":                 reasonFailsClosed,
 	"authwise_guard_trusted_issuer_rule.max_nodes":                 reasonFailsClosed,
 	"authwise_issuer.domain_id":                                    reasonReplaces,
@@ -96,6 +97,11 @@ const (
 	// reasonRolesLeftAlone: unset leaves the service account's roles alone,
 	// by design, so roles set with awctl stay (ruled 2026-11-18).
 	reasonRolesLeftAlone = "unset leaves the roles alone, by design"
+	// reasonAdoptsExisting: the resource adopts an existing object, so a
+	// configuration that never mentioned the attribute must not clear what
+	// was set elsewhere at adoption; an explicit empty value clears it
+	// (plan's ruling, 2026-11-19).
+	reasonAdoptsExisting = "the resource adopts an existing tenant; a configuration that never mentioned labels must not clear labels set elsewhere at adoption"
 	// reasonHeldTF80: held for tf#80's ruling.
 	reasonHeldTF80 = "held for tf#80"
 	// reasonGuardIgnoresConfig: guard-control's proto carries a config

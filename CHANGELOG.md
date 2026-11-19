@@ -159,9 +159,8 @@ NOTES:
   - `authwise_guard_trusted_issuer_rule`: `description`, `node_group`,
     `node_name_prefix`
   - and the security settings listed under SECURITY above
-  - `labels` on every resource that has it (cleared). On
-    `authwise_guard_tenant_settings`, which adopts an existing tenant,
-    leaving `labels` out clears the tenant's labels at creation too.
+  - `labels` on every resource that has it, except
+    `authwise_guard_tenant_settings` (cleared)
   - `config` on `authwise_application`, `authwise_audience`,
     `authwise_factor`, `authwise_issuer`, `authwise_provider` and
     `authwise_realm` (cleared). The realm's `authentication` key belongs
@@ -176,7 +175,7 @@ NOTES:
   - `authwise_guard_relay` and `authwise_guard_pool_relay`: `priority`
     (to `0`)
 
-  **67 optional attributes, nested ones included, on 26 resources still
+  **68 optional attributes, nested ones included, on 26 resources still
   keep their last value when removed from the configuration**, each for a
   stated reason, and none of them turns on trust, weakens TLS, links
   accounts, skips verification or grants access when kept:
@@ -193,6 +192,10 @@ NOTES:
     fields and `external_id`, `authwise_guard_node.display_name`);
   - `authwise_service_account.roles`: leaving it out leaves the roles
     alone, by design;
+  - `authwise_guard_tenant_settings.labels`: the resource adopts an
+    existing tenant, so a configuration that never mentioned labels must
+    not clear labels set elsewhere at adoption. Write `labels = {}` to
+    clear them;
   - clearing `authwise_guard_relay_pool.default` or
     `authwise_theme_variant.is_default` promotes nothing, so it would
     leave no default: set `false` to do that on purpose;
