@@ -17,12 +17,12 @@ import (
 	path "github.com/hashicorp/terraform-plugin-framework/path"
 	resource "github.com/hashicorp/terraform-plugin-framework/resource"
 	schema "github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	mapplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
 	planmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	stringplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	validator "github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
 	protojson "google.golang.org/protobuf/encoding/protojson"
+	proto "google.golang.org/protobuf/proto"
 	anypb "google.golang.org/protobuf/types/known/anypb"
 	fieldmaskpb "google.golang.org/protobuf/types/known/fieldmaskpb"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
@@ -40,23 +40,15 @@ func ApplicationResourceSchema() schema.Schema {
 			},
 			"application_url": schema.StringAttribute{Optional: true},
 			"audience_id": schema.StringAttribute{
-				Computed:      true,
-				Optional:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
-				Validators:    []validator.String{tf.ReferenceID("a", "audience", "authwise_audience.<name>.audience_id")},
+				Required:   true,
+				Validators: []validator.String{tf.ReferenceID("a", "audience", "authwise_audience.<name>.audience_id")},
 			},
 			"config": schema.StringAttribute{
-				Computed:            true,
 				CustomType:          jsontypes.NormalizedType{},
 				MarkdownDescription: "`config` as protojson-encoded google.protobuf.Any (JSON object with `@type`); reference a generated config data source's `any` output for the type-safe form.",
 				Optional:            true,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
-			"display_name": schema.StringAttribute{
-				Computed:      true,
-				Optional:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
-			},
+			"display_name": schema.StringAttribute{Required: true},
 			"expires_at": schema.StringAttribute{
 				MarkdownDescription: "`expires_at` as an RFC 3339 timestamp.",
 				Optional:            true,
@@ -79,10 +71,8 @@ func ApplicationResourceSchema() schema.Schema {
 				Validators:    []validator.String{stringvalidator.OneOf("APPLICATION_KIND_UNSPECIFIED", "APPLICATION_KIND_INTERACTIVE", "APPLICATION_KIND_SERVICE", "APPLICATION_KIND_AGENT")},
 			},
 			"labels": schema.MapAttribute{
-				Computed:      true,
-				ElementType:   types.StringType,
-				Optional:      true,
-				PlanModifiers: []planmodifier.Map{mapplanmodifier.UseStateForUnknown()},
+				ElementType: types.StringType,
+				Optional:    true,
 			},
 			"login_url": schema.StringAttribute{Optional: true},
 			"name": schema.StringAttribute{
@@ -230,16 +220,8 @@ func (m *ApplicationModel) FromProto(ctx context.Context, e *v1alpha1.Applicatio
 		diags.Append(d...)
 		m.Labels = v
 	}
-	if e.AudienceId == "" {
-		m.AudienceId = types.StringNull()
-	} else {
-		m.AudienceId = types.StringValue(e.AudienceId)
-	}
-	if e.DisplayName == "" {
-		m.DisplayName = types.StringNull()
-	} else {
-		m.DisplayName = types.StringValue(e.DisplayName)
-	}
+	m.AudienceId = types.StringValue(e.AudienceId)
+	m.DisplayName = types.StringValue(e.DisplayName)
 	if e.ApplicationUrl == "" {
 		m.ApplicationUrl = types.StringNull()
 	} else {
@@ -264,7 +246,7 @@ func (m *ApplicationModel) FromProto(ctx context.Context, e *v1alpha1.Applicatio
 	} else {
 		m.ThemeVariantId = types.StringValue(e.ThemeVariantId)
 	}
-	if e.Config == nil {
+	if (e.Config == nil || proto.Size(e.Config) == 0) && !tf.KeepEmptyJSON(m.Config) {
 		m.Config = jsontypes.NewNormalizedNull()
 	} else {
 		b, err := tf.ProtoJSON(e.Config)
@@ -679,16 +661,8 @@ func applicationItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Appli
 		diags.Append(d...)
 		item.Labels = v
 	}
-	if e.AudienceId == "" {
-		item.AudienceId = types.StringNull()
-	} else {
-		item.AudienceId = types.StringValue(e.AudienceId)
-	}
-	if e.DisplayName == "" {
-		item.DisplayName = types.StringNull()
-	} else {
-		item.DisplayName = types.StringValue(e.DisplayName)
-	}
+	item.AudienceId = types.StringValue(e.AudienceId)
+	item.DisplayName = types.StringValue(e.DisplayName)
 	if e.ApplicationUrl == "" {
 		item.ApplicationUrl = types.StringNull()
 	} else {
@@ -713,7 +687,7 @@ func applicationItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Appli
 	} else {
 		item.ThemeVariantId = types.StringValue(e.ThemeVariantId)
 	}
-	if e.Config == nil {
+	if (e.Config == nil || proto.Size(e.Config) == 0) && !tf.KeepEmptyJSON(item.Config) {
 		item.Config = jsontypes.NewNormalizedNull()
 	} else {
 		b, err := tf.ProtoJSON(e.Config)

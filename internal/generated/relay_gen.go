@@ -15,8 +15,7 @@ import (
 	path "github.com/hashicorp/terraform-plugin-framework/path"
 	resource "github.com/hashicorp/terraform-plugin-framework/resource"
 	schema "github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	int64planmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
-	mapplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
+	int64default "github.com/hashicorp/terraform-plugin-framework/resource/schema/int64default"
 	planmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	stringplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	validator "github.com/hashicorp/terraform-plugin-framework/schema/validator"
@@ -48,10 +47,8 @@ func RelayResourceSchema() schema.Schema {
 			},
 			"has_credential": schema.BoolAttribute{Computed: true},
 			"labels": schema.MapAttribute{
-				Computed:      true,
-				ElementType:   types.StringType,
-				Optional:      true,
-				PlanModifiers: []planmodifier.Map{mapplanmodifier.UseStateForUnknown()},
+				ElementType: types.StringType,
+				Optional:    true,
 			},
 			"last_report_at": schema.StringAttribute{
 				Computed:            true,
@@ -75,9 +72,9 @@ func RelayResourceSchema() schema.Schema {
 				Validators:          []validator.String{tf.ReferenceID("n", "guard_network", "authwise_guard_network.<name>.guard_network_id")},
 			},
 			"priority": schema.Int64Attribute{
-				Computed:      true,
-				Optional:      true,
-				PlanModifiers: []planmodifier.Int64{int64planmodifier.UseStateForUnknown()},
+				Computed: true,
+				Default:  int64default.StaticInt64(0),
+				Optional: true,
 			},
 			"region":           schema.StringAttribute{Optional: true},
 			"reported_version": schema.StringAttribute{Computed: true},

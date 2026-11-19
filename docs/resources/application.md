@@ -39,14 +39,14 @@ resource "authwise_application" "console" {
 
 ### Required
 
+- `audience_id` (String)
+- `display_name` (String)
 - `grant_types` (List of String)
 
 ### Optional
 
 - `application_url` (String)
-- `audience_id` (String)
 - `config` (String) `config` as protojson-encoded google.protobuf.Any (JSON object with `@type`); reference a generated config data source's `any` output for the type-safe form.
-- `display_name` (String)
 - `expires_at` (String) `expires_at` as an RFC 3339 timestamp.
 - `issuer_id` (String) Parent identifier `issuer_id`; overrides the provider default, and reads back from the name. Changing a configured one replaces the resource.
 - `kind` (String)

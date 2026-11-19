@@ -16,12 +16,12 @@ import (
 	path "github.com/hashicorp/terraform-plugin-framework/path"
 	resource "github.com/hashicorp/terraform-plugin-framework/resource"
 	schema "github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	mapplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
 	planmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	stringplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	validator "github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
 	protojson "google.golang.org/protobuf/encoding/protojson"
+	proto "google.golang.org/protobuf/proto"
 	fieldmaskpb "google.golang.org/protobuf/types/known/fieldmaskpb"
 	structpb "google.golang.org/protobuf/types/known/structpb"
 )
@@ -31,23 +31,15 @@ func ThemeResourceSchema() schema.Schema {
 	return schema.Schema{
 		Attributes: map[string]schema.Attribute{
 			"content": schema.StringAttribute{
-				Computed:            true,
 				CustomType:          jsontypes.NormalizedType{},
 				MarkdownDescription: "`content` as a JSON object.",
 				Optional:            true,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"content_schema": schema.StringAttribute{Optional: true},
-			"display_name": schema.StringAttribute{
-				Computed:      true,
-				Optional:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
-			},
+			"display_name":   schema.StringAttribute{Required: true},
 			"labels": schema.MapAttribute{
-				Computed:      true,
-				ElementType:   types.StringType,
-				Optional:      true,
-				PlanModifiers: []planmodifier.Map{mapplanmodifier.UseStateForUnknown()},
+				ElementType: types.StringType,
+				Optional:    true,
 			},
 			"layout": schema.StringAttribute{
 				Computed:      true,
@@ -60,26 +52,20 @@ func ThemeResourceSchema() schema.Schema {
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"placeholder_content": schema.StringAttribute{
-				Computed:            true,
 				CustomType:          jsontypes.NormalizedType{},
 				MarkdownDescription: "`placeholder_content` as a JSON object.",
 				Optional:            true,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"placeholder_stylesheet_attributes": schema.StringAttribute{
-				Computed:            true,
 				CustomType:          jsontypes.NormalizedType{},
 				MarkdownDescription: "`placeholder_stylesheet_attributes` as a JSON object.",
 				Optional:            true,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"stylesheet": schema.StringAttribute{Optional: true},
 			"stylesheet_attributes": schema.StringAttribute{
-				Computed:            true,
 				CustomType:          jsontypes.NormalizedType{},
 				MarkdownDescription: "`stylesheet_attributes` as a JSON object.",
 				Optional:            true,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"stylesheet_attributes_schema": schema.StringAttribute{Optional: true},
 			"tenant_id": schema.StringAttribute{
@@ -196,17 +182,13 @@ func (m *ThemeModel) FromProto(ctx context.Context, e *v1alpha1.Theme) diag.Diag
 		diags.Append(d...)
 		m.Labels = v
 	}
-	if e.DisplayName == "" {
-		m.DisplayName = types.StringNull()
-	} else {
-		m.DisplayName = types.StringValue(e.DisplayName)
-	}
+	m.DisplayName = types.StringValue(e.DisplayName)
 	if e.Stylesheet == "" {
 		m.Stylesheet = types.StringNull()
 	} else {
 		m.Stylesheet = types.StringValue(e.Stylesheet)
 	}
-	if e.StylesheetAttributes == nil {
+	if (e.StylesheetAttributes == nil || proto.Size(e.StylesheetAttributes) == 0) && !tf.KeepEmptyJSON(m.StylesheetAttributes) {
 		m.StylesheetAttributes = jsontypes.NewNormalizedNull()
 	} else {
 		b, err := tf.ProtoJSON(e.StylesheetAttributes)
@@ -221,7 +203,7 @@ func (m *ThemeModel) FromProto(ctx context.Context, e *v1alpha1.Theme) diag.Diag
 	} else {
 		m.ContentSchema = types.StringValue(e.ContentSchema)
 	}
-	if e.Content == nil {
+	if (e.Content == nil || proto.Size(e.Content) == 0) && !tf.KeepEmptyJSON(m.Content) {
 		m.Content = jsontypes.NewNormalizedNull()
 	} else {
 		b, err := tf.ProtoJSON(e.Content)
@@ -236,7 +218,7 @@ func (m *ThemeModel) FromProto(ctx context.Context, e *v1alpha1.Theme) diag.Diag
 	} else {
 		m.StylesheetAttributesSchema = types.StringValue(e.StylesheetAttributesSchema)
 	}
-	if e.PlaceholderStylesheetAttributes == nil {
+	if (e.PlaceholderStylesheetAttributes == nil || proto.Size(e.PlaceholderStylesheetAttributes) == 0) && !tf.KeepEmptyJSON(m.PlaceholderStylesheetAttributes) {
 		m.PlaceholderStylesheetAttributes = jsontypes.NewNormalizedNull()
 	} else {
 		b, err := tf.ProtoJSON(e.PlaceholderStylesheetAttributes)
@@ -246,7 +228,7 @@ func (m *ThemeModel) FromProto(ctx context.Context, e *v1alpha1.Theme) diag.Diag
 			m.PlaceholderStylesheetAttributes = jsontypes.NewNormalizedValue(string(b))
 		}
 	}
-	if e.PlaceholderContent == nil {
+	if (e.PlaceholderContent == nil || proto.Size(e.PlaceholderContent) == 0) && !tf.KeepEmptyJSON(m.PlaceholderContent) {
 		m.PlaceholderContent = jsontypes.NewNormalizedNull()
 	} else {
 		b, err := tf.ProtoJSON(e.PlaceholderContent)
@@ -617,17 +599,13 @@ func themeItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Theme, *The
 		diags.Append(d...)
 		item.Labels = v
 	}
-	if e.DisplayName == "" {
-		item.DisplayName = types.StringNull()
-	} else {
-		item.DisplayName = types.StringValue(e.DisplayName)
-	}
+	item.DisplayName = types.StringValue(e.DisplayName)
 	if e.Stylesheet == "" {
 		item.Stylesheet = types.StringNull()
 	} else {
 		item.Stylesheet = types.StringValue(e.Stylesheet)
 	}
-	if e.StylesheetAttributes == nil {
+	if (e.StylesheetAttributes == nil || proto.Size(e.StylesheetAttributes) == 0) && !tf.KeepEmptyJSON(item.StylesheetAttributes) {
 		item.StylesheetAttributes = jsontypes.NewNormalizedNull()
 	} else {
 		b, err := tf.ProtoJSON(e.StylesheetAttributes)
@@ -642,7 +620,7 @@ func themeItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Theme, *The
 	} else {
 		item.ContentSchema = types.StringValue(e.ContentSchema)
 	}
-	if e.Content == nil {
+	if (e.Content == nil || proto.Size(e.Content) == 0) && !tf.KeepEmptyJSON(item.Content) {
 		item.Content = jsontypes.NewNormalizedNull()
 	} else {
 		b, err := tf.ProtoJSON(e.Content)
@@ -657,7 +635,7 @@ func themeItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Theme, *The
 	} else {
 		item.StylesheetAttributesSchema = types.StringValue(e.StylesheetAttributesSchema)
 	}
-	if e.PlaceholderStylesheetAttributes == nil {
+	if (e.PlaceholderStylesheetAttributes == nil || proto.Size(e.PlaceholderStylesheetAttributes) == 0) && !tf.KeepEmptyJSON(item.PlaceholderStylesheetAttributes) {
 		item.PlaceholderStylesheetAttributes = jsontypes.NewNormalizedNull()
 	} else {
 		b, err := tf.ProtoJSON(e.PlaceholderStylesheetAttributes)
@@ -667,7 +645,7 @@ func themeItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Theme, *The
 			item.PlaceholderStylesheetAttributes = jsontypes.NewNormalizedValue(string(b))
 		}
 	}
-	if e.PlaceholderContent == nil {
+	if (e.PlaceholderContent == nil || proto.Size(e.PlaceholderContent) == 0) && !tf.KeepEmptyJSON(item.PlaceholderContent) {
 		item.PlaceholderContent = jsontypes.NewNormalizedNull()
 	} else {
 		b, err := tf.ProtoJSON(e.PlaceholderContent)

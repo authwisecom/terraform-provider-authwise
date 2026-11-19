@@ -18,6 +18,7 @@ A permission in an audience's Access catalog. The id is the permission's own nam
 ### Required
 
 - `access_permission_id` (String) Caller-assigned resource id — the last segment of `name`, which the server composes from the parent and this id. Changing it replaces the resource.
+- `service` (String)
 
 ### Optional
 
@@ -25,7 +26,6 @@ A permission in an audience's Access catalog. The id is the permission's own nam
 - `description` (String)
 - `issuer_id` (String) Parent identifier `issuer_id`; overrides the provider default, and reads back from the name. Changing a configured one replaces the resource.
 - `resource_type` (String)
-- `service` (String)
 - `tenant_id` (String) Parent identifier `tenant_id`; overrides the provider default, and reads back from the name. Changing a configured one replaces the resource.
 
 ### Read-Only

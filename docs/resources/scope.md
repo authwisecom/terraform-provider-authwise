@@ -17,6 +17,7 @@ An OAuth scope on an audience, and the access permissions it grants. The id is t
 
 ### Required
 
+- `kind` (String)
 - `scope_id` (String) Caller-assigned resource id — the last segment of `name`, which the server composes from the parent and this id. Changing it replaces the resource.
 
 ### Optional
@@ -24,7 +25,6 @@ An OAuth scope on an audience, and the access permissions it grants. The id is t
 - `audience_id` (String) Parent identifier `audience_id`; overrides the provider default, and reads back from the name. Changing a configured one replaces the resource.
 - `auto` (Boolean)
 - `issuer_id` (String) Parent identifier `issuer_id`; overrides the provider default, and reads back from the name. Changing a configured one replaces the resource.
-- `kind` (String)
 - `tenant_id` (String) Parent identifier `tenant_id`; overrides the provider default, and reads back from the name. Changing a configured one replaces the resource.
 
 ### Read-Only

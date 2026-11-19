@@ -55,6 +55,7 @@ The rule for references:
 resource "authwise_application" "web" {
   display_name = "web"
   audience_id  = authwise_audience.api.audience_id   # not .name
+  grant_types  = ["authorization_code", "refresh_token"]
 }
 ```
 

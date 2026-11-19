@@ -189,8 +189,10 @@ func withOps(ops gentf.Ops) func(r *gentf.Resource) {
 	return func(r *gentf.Resource) { r.Ops = ops }
 }
 
+// withRequired adds to the entity's required fields; called twice, it
+// keeps both lists.
 func withRequired(fields ...string) func(r *gentf.Resource) {
-	return func(r *gentf.Resource) { r.Required = fields }
+	return func(r *gentf.Resource) { r.Required = append(r.Required, fields...) }
 }
 
 func withJSON(fields ...string) func(r *gentf.Resource) {
@@ -225,9 +227,27 @@ func withInputOnly(fields ...string) func(r *gentf.Resource) {
 
 // withClearable declares the entity's optional fields kit stores as sent
 // and never fills itself: Optional alone, so removing one from the
-// configuration clears it (tf#79).
+// configuration clears it (tf#79). A bool or integer defaults to false or
+// 0 instead. Called twice, it keeps both lists.
 func withClearable(fields ...string) func(r *gentf.Resource) {
-	return func(r *gentf.Resource) { r.Clearable = fields }
+	return func(r *gentf.Resource) { r.Clearable = append(r.Clearable, fields...) }
+}
+
+// The two fields most entities share, named once.
+const (
+	fieldLabels = "labels"
+	fieldConfig = "config"
+)
+
+// withT1 is audit T1's remaining batch: the fields kit or guard-control
+// stores as sent become clearable, and the ones it refuses empty become
+// required, so no optional value outlives its line in the configuration
+// without a reason on keepOnRemoval (internal/provider).
+func withT1(clearable []string, required ...string) func(r *gentf.Resource) {
+	return func(r *gentf.Resource) {
+		r.Clearable = append(r.Clearable, clearable...)
+		r.Required = append(r.Required, required...)
+	}
 }
 
 // withReferences declares the entity's fields that hold another row's id.
@@ -330,6 +350,7 @@ func main() {
 			// hand-written in internal/provider (the custom host's waits);
 			// the data sources are these.
 			crud[corepb.Domain](scopeTenant,
+				withT1([]string{fieldLabels}),
 				withDescription("A hostname of the tenant: native, an Authwise host; custom (`custom`), a hostname of yours; or custom with `purpose = \"guard\"` or `\"console\"`, a hostname of yours serving the tenant's Guard address or its console. `product` is its predecessor, read out for one release (kit#942). Issuers answer at a domain through `authwise_issuer_domain_binding` (kit#911); `bindings` lists them."),
 				withRequired("hostname"), withImmutable("hostname", "issuer_id", "product", "purpose", "custom"),
 				withComputed("state", "dns_records", "failure", "certificate_expires_at", "activated_at", "claim_expires_at", "created_at", "traffic_target", "bindings"),
@@ -356,19 +377,23 @@ func main() {
 			// binding's host) change with binding resources in the same
 			// apply: volatile too.
 			crud[corepb.Issuer](scopeTenant,
+				withT1([]string{fieldLabels, fieldConfig}),
 				withDescription("An OAuth 2.0 / OpenID Connect issuer: the login a set of applications shares, with its token lifetimes and which realm or realms people sign in to (`config`). It answers at the hosts its `authwise_issuer_domain_binding`s name (kit#911). Its pages use its default theme variant (`authwise_theme_variant.is_default`), or the tenant's default theme when it has none.\n\n`status` is `active` (the default) or `disabled`: sign-in, token issue, discovery and every hosted page on a disabled issuer's hosts stop at once. Changing it is made in place and keeps everything under it; kit 1.91.0 or later (the `identity.object-status` feature), and the administration tenant's own objects cannot be turned off."), withJSON("config"),
 				withImmutable("domain_id", "path"), withComputed("account_client_id"), withVolatile("preferred_domain_id", "preferred_binding_id", "bindings", "domain_name"),
 				withReferences(map[string]gentf.Reference{"domain_id": refDomain})),
 			crud[corepb.Realm](scopeTenant,
+				withT1([]string{fieldLabels, fieldConfig}),
 				withClearable("display_name"),
 				withDescription("A realm: a population of users with its own providers, factors and authentication policy.\n\n`status` is `active` (the default) or `disabled`: a disabled realm's people cannot sign in, and their refresh grants are refused. Changing it is made in place and keeps everything under it; kit 1.91.0 or later (the `identity.object-status` feature), and the administration tenant's own objects cannot be turned off."), withJSON("config")),
 			crud[corepb.Theme](scopeTenant,
+				withT1([]string{fieldLabels, "content", "placeholder_content", "placeholder_stylesheet_attributes", "stylesheet_attributes"}, "display_name"),
 				withClearable("content_schema", "stylesheet", "stylesheet_attributes_schema"),
 				withDescription("A tenant theme: the stylesheet and content the hosted login pages render with. Start from a layout's starter (`GET {issuer}/api/v1/ui/layouts`): its stylesheet template, `stylesheet_attributes` and `content`, and its two schemas. `layout` is fixed at creation; kit refuses a change, so another layout is another theme. Colours in `stylesheet_attributes` are six hex digits without `#`. An asset is named in `content` by its served URL, `/assets` plus the asset's `path`."), withJSON(
 					"stylesheet_attributes", "content",
 					"placeholder_stylesheet_attributes", "placeholder_content",
 				)),
 			crud[corepb.Asset](scopeTenant,
+				withT1([]string{fieldLabels}, "display_name", "mime_type", "path"),
 				withDescription("A static asset the hosted pages serve, such as a logo. This is the asset's metadata; upload the file itself with `authwise_asset_content`.")),
 			// auth is a oneof of messages that each hold a SecretRef, which
 			// is deeper than a typed nested attribute goes; it takes the JSON
@@ -380,6 +405,7 @@ func main() {
 			// insecure, tls and auth weaken or carry trust: a removed line
 			// turns them off (audit T1).
 			crud[corepb.Endpoint](scopeTenant,
+				withT1([]string{fieldLabels, "timeout"}, "address", "display_name"),
 				withClearable("insecure", "tls", "auth"),
 				withDescription("A service kit calls out to: its transport and address, how kit verifies it (`tls`), how kit authenticates to it (`auth`), and the per-call deadline (`timeout`)."), withJSON("auth")),
 			// The SAML trust anchors (kit#487). certificate_pem is the
@@ -387,6 +413,7 @@ func main() {
 			// read-only; importing a partner's PEM is a separate input-only
 			// field on create, not an RPC of its own.
 			crud[corepb.Certificate](scopeTenant,
+				withT1([]string{fieldLabels}),
 				withDescription("A certificate and, when kit created it, its private key. The trust anchor SAML connections verify signatures against, and the client certificate an endpoint presents for mTLS."),
 				withRequired("display_name", "use"),
 				withComputed("key_id", "origin", "subject", "not_before", "not_after",
@@ -398,6 +425,7 @@ func main() {
 
 			// Realm-scoped.
 			crud[corepb.User](scopeRealm,
+				withT1([]string{fieldLabels}),
 				withDescription("A user in a realm."),
 				withJSON("metadata", "extra_fields"),
 				// origin is write-once and enrollment is derived and never
@@ -416,11 +444,13 @@ func main() {
 			// The four trust switches are stored as sent, default off: a
 			// removed line turns one off (audit T1).
 			crud[corepb.Provider](scopeRealm,
+				withT1([]string{fieldLabels, fieldConfig}, "display_name", "provider_type"),
 				withClearable("link_by_verified_email", "trust_upstream_email_verified", "trust_upstream_amr", "upstream_acr_map"),
 				withDescription("A way people sign in to a realm: username and password, a magic link, passkeys, a social or enterprise IdP, or SAML. `config` comes from the matching config data source."), withJSON("config")),
 			// A second step the realm offers (kit#544). config is the
 			// per-type Any; the factor_* config data sources below build it.
 			crud[corepb.Factor](scopeRealm,
+				withT1([]string{fieldLabels, fieldConfig}),
 				withDescription("A second step a realm offers, such as TOTP, WebAuthn or Duo. `config` comes from the matching config data source; disabling keeps enrolled authenticators, destroying does not."),
 				withRequired("display_name", "factor_type"),
 				withImmutable("factor_type"),
@@ -430,6 +460,7 @@ func main() {
 			// authwise_scim_token. identifier_attribute, on_delete and
 			// status default on the server.
 			crud[corepb.ScimConnection](scopeRealm,
+				withT1([]string{fieldLabels}),
 				withClearable("provider_id"),
 				withDescription("A connection an upstream directory (Entra ID, Okta, Google Workspace, OneLogin, JumpCloud) pushes a realm's users and groups through, over SCIM 2.0. "+
 					"Give the directory `base_url` and the secret of an `authwise_scim_token` for this connection. `base_url` is empty until the issuer has a host.\n\n"+
@@ -460,6 +491,7 @@ func main() {
 				withComputed("hostname", "url", "routable", "created_at"),
 				withReferences(map[string]gentf.Reference{"domain_id": refDomain})),
 			crud[corepb.Application](scopeIssuer,
+				withT1([]string{fieldLabels, fieldConfig}, "audience_id", "display_name"),
 				// post_logout_redirect_uris are allowed redirect targets: a
 				// removed list allows none (audit T1). kit requires
 				// grant_types, so it cannot be cleared: removing it is a plan
@@ -473,10 +505,12 @@ func main() {
 				withReferences(map[string]gentf.Reference{"audience_id": refAudience, "theme_variant_id": refThemeVariant})),
 			applicationSecret(),
 			crud[corepb.Audience](scopeIssuer,
+				withT1([]string{fieldLabels, fieldConfig}, "display_name"),
 				withClearable("theme_variant_id"),
 				withDescription("An API an issuer issues access tokens for, and the audience its Access catalog hangs off.\n\n`status` is `active` (the default) or `disabled`: no token is issued for a disabled audience, refresh grants included. Changing it is made in place and keeps everything under it; kit 1.91.0 or later (the `identity.object-status` feature), and the administration tenant's own objects cannot be turned off."), withJSON("config"),
 				withReferences(map[string]gentf.Reference{"theme_variant_id": refThemeVariant})),
 			crud[corepb.ThemeVariant](scopeIssuer,
+				withT1([]string{fieldLabels, "content", "stylesheet_attributes"}, "display_name", "theme_id"),
 				// is_default is the issuer's default variant (kit#680, apis
 				// v0.18.0). kit holds at most one default per issuer and moves
 				// it only through MakeDefaultThemeVariant; the wrapper in
@@ -492,6 +526,7 @@ func main() {
 			// auto puts the scope in every token unrequested: a removed
 			// line turns it off (audit T1).
 			crud[corepb.Scope](scopeAudience,
+				withT1(nil, "kind"),
 				withClearable("auto"),
 				withDescription("An OAuth scope on an audience, and the access permissions it grants. The id is the scope's own name."), callerNamed, associate[corepb.AccessPermission]()),
 
@@ -500,6 +535,7 @@ func main() {
 			// the deployer's to choose ("guardcontrol.tenants.get") — while
 			// AccessCondition and AccessBinding are AWID-keyed.
 			crud[corepb.AccessPermission](scopeAudience,
+				withT1(nil, "service"),
 				withClearable("description", "resource_type"),
 				withDescription("A permission in an audience's Access catalog. The id is the permission's own name, such as `guardcontrol.tenants.get`."), access, callerNamed,
 				withCollection("access-permissions")),
@@ -512,10 +548,12 @@ func main() {
 			// own, and where its parent edge comes from. Name-keyed, like a
 			// permission. Every field may change in place.
 			crud[corepb.AccessResourceType](scopeAudience,
+				withT1([]string{"materialize_lookup_resources"}),
 				withClearable("description", "endpoint_name", "expansion_mode", "parent_type"),
 				withDescription("A resource type declared in an audience's Access catalog, such as `guardcontrol.tenant`: its `parent_type` and where the parent edge comes from (`expansion_mode`: `NONE`, `PUSH`, `PULL` or `PATH`). A binding anchored at a parent reaches the resources linked under it. The id is the type's own name."), access, callerNamed,
 				withCollection("access-resource-types")),
 			crud[corepb.AccessCondition](scopeAudience,
+				withT1(nil, "display_name", "expression"),
 				withClearable("description"),
 				withDescription("A condition in an audience's Access catalog, which a binding can require."), access,
 				withCollection("access-conditions")),
@@ -546,6 +584,7 @@ func main() {
 			// pool_fallback widens which relays carry the network's
 			// traffic: a removed line turns it off (audit T1).
 			crud[guardpb.Network](scopeTenant,
+				withT1([]string{fieldLabels}),
 				withClearable("display_name", "pool_fallback"),
 				withDescription("A Guard network: a WireGuard mesh in a tenant. `cidr` is its address space inside 100.64.0.0/10, the whole of it when unset; changing it replaces the network."),
 				guard("network"), guardList("networks"),
@@ -560,6 +599,7 @@ func main() {
 			// kept, since a second issue rotates. has_credential and the
 			// report fields move with the relay, not with a write.
 			crud[guardpb.Relay](scopeGuardNetwork,
+				withT1([]string{fieldLabels, "priority"}),
 				withClearable("ca_cert_pem", "display_name", "region"),
 				withDescription("A relay a Guard network's nodes connect through when no direct path exists. guard-control serves a network's relays to its nodes, lowest `priority` first."),
 				guard("relay"), guardList("relays"),
@@ -574,11 +614,13 @@ func main() {
 			// pool relay is a flat collection naming its pool; moving it is
 			// an update of pool.
 			crud[guardpb.RelayPool](tf.ScopeNone,
+				withT1([]string{fieldLabels}, "slug"),
 				withClearable("display_name", "region"),
 				withDescription("An estate relay pool: a named set of relays shared across networks and tenants. Operators only. `select` orders the pool's relays for a node, `served-order` (priority, then display name; the default) or `nearest` (by the node's `region`). `default` makes it the estate default pool: every tenant may use it, and it is the default of a tenant without its own (`authwise_guard_relay_pool_access.default_pool`). Setting it on one pool clears it on the previous default. A pool in use is not deleted (`RELAY_POOL_IN_USE`): remove it from networks and from tenants' access first."),
 				guard("relay_pool"), guardList("relay_pools"), withCollection("relay-pools"),
 				withComputed("relay_count"), withVolatile("relay_count"), withJSON("config")),
 			crud[guardpb.PoolRelay](tf.ScopeNone,
+				withT1([]string{fieldLabels, "priority"}),
 				withClearable("ca_cert_pem", "display_name", "region"),
 				withDescription("A relay of an estate relay pool. Operators only. Changing `pool` moves the relay; it learns the move on its next report."),
 				guard("pool_relay"), guardList("pool_relays"), withCollection("pool-relays"),
@@ -601,6 +643,7 @@ func main() {
 			// serving_node_ids, owned by an association resource
 			// (authwise_guard_resource_node_groups) and read-only here.
 			crud[guardpb.Resource](scopeGuardNetwork,
+				withT1([]string{fieldLabels}),
 				withClearable("display_name"),
 				withDescription("A routed target in a Guard network that is not a node: a subnet, a host or an application. The nodes that serve it are managed by `authwise_guard_resource_nodes`, the node groups by `authwise_guard_resource_node_groups`.\n\n"+
 					"An application may be **translated**: clients are served `published_name` at `virtual_address`, an address of the network's own, and the serving node resolves `address` itself and forwards to what it found. "+
@@ -621,6 +664,7 @@ func main() {
 			// are not modelled, and a person's node (owner_id set) is never
 			// terraform's.
 			crud[guardpb.Node](scopeGuardNetwork,
+				withT1([]string{fieldLabels}),
 				withClearable("region"), // not endpoint: held for a ruling (tf#80)
 				withDescription("A server's node in a Guard network, registered ahead of time. Created without a `public_key`, it is `PENDING` and its one-time `auth_code` enrolls the server; created with one, it is `ACTIVE` at once. The auth code is shown once, so it is kept in state: treat the state as sensitive. People's nodes join when they sign in and are not managed here."),
 				guard("node"), guardList("nodes"),

@@ -16,12 +16,12 @@ import (
 	path "github.com/hashicorp/terraform-plugin-framework/path"
 	resource "github.com/hashicorp/terraform-plugin-framework/resource"
 	schema "github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	mapplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
 	planmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	stringplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	validator "github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
 	protojson "google.golang.org/protobuf/encoding/protojson"
+	proto "google.golang.org/protobuf/proto"
 	anypb "google.golang.org/protobuf/types/known/anypb"
 	fieldmaskpb "google.golang.org/protobuf/types/known/fieldmaskpb"
 )
@@ -31,11 +31,9 @@ func FactorResourceSchema() schema.Schema {
 	return schema.Schema{
 		Attributes: map[string]schema.Attribute{
 			"config": schema.StringAttribute{
-				Computed:            true,
 				CustomType:          jsontypes.NormalizedType{},
 				MarkdownDescription: "`config` as protojson-encoded google.protobuf.Any (JSON object with `@type`); reference a generated config data source's `any` output for the type-safe form.",
 				Optional:            true,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"display_name": schema.StringAttribute{Required: true},
 			"factor_id": schema.StringAttribute{
@@ -48,10 +46,8 @@ func FactorResourceSchema() schema.Schema {
 				Required:      true,
 			},
 			"labels": schema.MapAttribute{
-				Computed:      true,
-				ElementType:   types.StringType,
-				Optional:      true,
-				PlanModifiers: []planmodifier.Map{mapplanmodifier.UseStateForUnknown()},
+				ElementType: types.StringType,
+				Optional:    true,
 			},
 			"name": schema.StringAttribute{
 				Computed:            true,
@@ -147,7 +143,7 @@ func (m *FactorModel) FromProto(ctx context.Context, e *v1alpha1.Factor) diag.Di
 	}
 	m.DisplayName = types.StringValue(e.DisplayName)
 	m.FactorType = types.StringValue(e.FactorType)
-	if e.Config == nil {
+	if (e.Config == nil || proto.Size(e.Config) == 0) && !tf.KeepEmptyJSON(m.Config) {
 		m.Config = jsontypes.NewNormalizedNull()
 	} else {
 		b, err := tf.ProtoJSON(e.Config)
@@ -471,7 +467,7 @@ func factorItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Factor, *F
 	}
 	item.DisplayName = types.StringValue(e.DisplayName)
 	item.FactorType = types.StringValue(e.FactorType)
-	if e.Config == nil {
+	if (e.Config == nil || proto.Size(e.Config) == 0) && !tf.KeepEmptyJSON(item.Config) {
 		item.Config = jsontypes.NewNormalizedNull()
 	} else {
 		b, err := tf.ProtoJSON(e.Config)

@@ -652,9 +652,12 @@ func (f *fakeIdentityServer) CreateApplication(ctx context.Context, in *identity
 // admitAudience is kit#620's scope admission for Application.audience_id: an
 // audience of the client's own issuer, by bare id. A full name, a missing
 // audience and one under another issuer get the same refusal, as in kit.
-// Unset passes; the fake does not model kit's required-field check.
+// Unset passes; the fake does not model kit's required-field check (the
+// schema has audience_id Required since audit T1). a-1 under i-1, the
+// provider block's default audience, stands for an audience a test has no
+// need to create.
 func (f *fakeIdentityServer) admitAudience(issuer, id string) error {
-	if id == "" {
+	if id == "" || (issuer == "tenants/t-1/issuers/i-1" && id == "a-1") {
 		return nil
 	}
 	if _, ok := f.audiences[issuer+"/audiences/"+id]; !ok || strings.Contains(id, "/") {

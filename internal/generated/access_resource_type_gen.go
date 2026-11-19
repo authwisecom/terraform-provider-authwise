@@ -14,7 +14,7 @@ import (
 	diag "github.com/hashicorp/terraform-plugin-framework/diag"
 	resource "github.com/hashicorp/terraform-plugin-framework/resource"
 	schema "github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	boolplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
+	booldefault "github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	planmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	stringplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	validator "github.com/hashicorp/terraform-plugin-framework/schema/validator"
@@ -49,9 +49,9 @@ func AccessResourceTypeResourceSchema() schema.Schema {
 				Validators:          []validator.String{tf.ReferenceID("i", "issuer", "authwise_issuer.<name>.issuer_id")},
 			},
 			"materialize_lookup_resources": schema.BoolAttribute{
-				Computed:      true,
-				Optional:      true,
-				PlanModifiers: []planmodifier.Bool{boolplanmodifier.UseStateForUnknown()},
+				Computed: true,
+				Default:  booldefault.StaticBool(false),
+				Optional: true,
 			},
 			"name": schema.StringAttribute{
 				Computed:            true,

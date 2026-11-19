@@ -23,6 +23,7 @@ func TestAccApplicationSecret_CreateKeepRotate(t *testing.T) {
 	config := func(expires, rotation string) string {
 		return h.providerConfig() + fmt.Sprintf(`
 resource "authwise_application" "ci" {
+  audience_id = "a-1"
   display_name = "CI"
   grant_types  = ["client_credentials"]
 }
@@ -156,6 +157,7 @@ func TestAccApplicationSecret_PastExpiryRefused(t *testing.T) {
 			{
 				Config: h.providerConfig() + `
 resource "authwise_application" "ci" {
+  audience_id = "a-1"
   display_name = "CI"
   grant_types  = ["client_credentials"]
 }

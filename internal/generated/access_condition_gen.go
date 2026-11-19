@@ -37,17 +37,9 @@ func AccessConditionResourceSchema() schema.Schema {
 				PlanModifiers:       []planmodifier.String{tf.RequiresReplaceIfConfigured(), stringplanmodifier.UseStateForUnknown()},
 				Validators:          []validator.String{tf.ReferenceID("a", "audience", "authwise_audience.<name>.audience_id")},
 			},
-			"description": schema.StringAttribute{Optional: true},
-			"display_name": schema.StringAttribute{
-				Computed:      true,
-				Optional:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
-			},
-			"expression": schema.StringAttribute{
-				Computed:      true,
-				Optional:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
-			},
+			"description":  schema.StringAttribute{Optional: true},
+			"display_name": schema.StringAttribute{Required: true},
+			"expression":   schema.StringAttribute{Required: true},
 			"issuer_id": schema.StringAttribute{
 				Computed:            true,
 				MarkdownDescription: "Parent identifier `issuer_id`; overrides the provider default, and reads back from the name. Changing a configured one replaces the resource.",
@@ -113,16 +105,8 @@ func (m *AccessConditionModel) ToProto(ctx context.Context) (*v1alpha1.AccessCon
 func (m *AccessConditionModel) FromProto(ctx context.Context, e *v1alpha1.AccessCondition) diag.Diagnostics {
 	var diags diag.Diagnostics
 	m.Name = types.StringValue(e.Name)
-	if e.DisplayName == "" {
-		m.DisplayName = types.StringNull()
-	} else {
-		m.DisplayName = types.StringValue(e.DisplayName)
-	}
-	if e.Expression == "" {
-		m.Expression = types.StringNull()
-	} else {
-		m.Expression = types.StringValue(e.Expression)
-	}
+	m.DisplayName = types.StringValue(e.DisplayName)
+	m.Expression = types.StringValue(e.Expression)
 	if e.Description == "" {
 		m.Description = types.StringNull()
 	} else {
@@ -406,16 +390,8 @@ func accessConditionItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.A
 	var diags diag.Diagnostics
 	var item AccessConditionItemModel
 	item.Name = types.StringValue(e.Name)
-	if e.DisplayName == "" {
-		item.DisplayName = types.StringNull()
-	} else {
-		item.DisplayName = types.StringValue(e.DisplayName)
-	}
-	if e.Expression == "" {
-		item.Expression = types.StringNull()
-	} else {
-		item.Expression = types.StringValue(e.Expression)
-	}
+	item.DisplayName = types.StringValue(e.DisplayName)
+	item.Expression = types.StringValue(e.Expression)
 	if e.Description == "" {
 		item.Description = types.StringNull()
 	} else {

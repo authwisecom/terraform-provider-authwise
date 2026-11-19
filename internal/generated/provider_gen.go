@@ -17,12 +17,12 @@ import (
 	resource "github.com/hashicorp/terraform-plugin-framework/resource"
 	schema "github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	booldefault "github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
-	mapplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
 	planmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	stringplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	validator "github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
 	protojson "google.golang.org/protobuf/encoding/protojson"
+	proto "google.golang.org/protobuf/proto"
 	anypb "google.golang.org/protobuf/types/known/anypb"
 	fieldmaskpb "google.golang.org/protobuf/types/known/fieldmaskpb"
 )
@@ -32,22 +32,14 @@ func ProviderResourceSchema() schema.Schema {
 	return schema.Schema{
 		Attributes: map[string]schema.Attribute{
 			"config": schema.StringAttribute{
-				Computed:            true,
 				CustomType:          jsontypes.NormalizedType{},
 				MarkdownDescription: "`config` as protojson-encoded google.protobuf.Any (JSON object with `@type`); reference a generated config data source's `any` output for the type-safe form.",
 				Optional:            true,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
-			"display_name": schema.StringAttribute{
-				Computed:      true,
-				Optional:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
-			},
+			"display_name": schema.StringAttribute{Required: true},
 			"labels": schema.MapAttribute{
-				Computed:      true,
-				ElementType:   types.StringType,
-				Optional:      true,
-				PlanModifiers: []planmodifier.Map{mapplanmodifier.UseStateForUnknown()},
+				ElementType: types.StringType,
+				Optional:    true,
 			},
 			"link_by_verified_email": schema.BoolAttribute{
 				Computed: true,
@@ -64,11 +56,7 @@ func ProviderResourceSchema() schema.Schema {
 				MarkdownDescription: "Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.",
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
-			"provider_type": schema.StringAttribute{
-				Computed:      true,
-				Optional:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
-			},
+			"provider_type": schema.StringAttribute{Required: true},
 			"realm_id": schema.StringAttribute{
 				Computed:            true,
 				MarkdownDescription: "Parent identifier `realm_id`; overrides the provider default, and reads back from the name. Changing a configured one replaces the resource.",
@@ -184,17 +172,9 @@ func (m *ProviderModel) FromProto(ctx context.Context, e *v1alpha1.Provider) dia
 		diags.Append(d...)
 		m.Labels = v
 	}
-	if e.DisplayName == "" {
-		m.DisplayName = types.StringNull()
-	} else {
-		m.DisplayName = types.StringValue(e.DisplayName)
-	}
-	if e.ProviderType == "" {
-		m.ProviderType = types.StringNull()
-	} else {
-		m.ProviderType = types.StringValue(e.ProviderType)
-	}
-	if e.Config == nil {
+	m.DisplayName = types.StringValue(e.DisplayName)
+	m.ProviderType = types.StringValue(e.ProviderType)
+	if (e.Config == nil || proto.Size(e.Config) == 0) && !tf.KeepEmptyJSON(m.Config) {
 		m.Config = jsontypes.NewNormalizedNull()
 	} else {
 		b, err := tf.ProtoJSON(e.Config)
@@ -562,17 +542,9 @@ func providerItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Provider
 		diags.Append(d...)
 		item.Labels = v
 	}
-	if e.DisplayName == "" {
-		item.DisplayName = types.StringNull()
-	} else {
-		item.DisplayName = types.StringValue(e.DisplayName)
-	}
-	if e.ProviderType == "" {
-		item.ProviderType = types.StringNull()
-	} else {
-		item.ProviderType = types.StringValue(e.ProviderType)
-	}
-	if e.Config == nil {
+	item.DisplayName = types.StringValue(e.DisplayName)
+	item.ProviderType = types.StringValue(e.ProviderType)
+	if (e.Config == nil || proto.Size(e.Config) == 0) && !tf.KeepEmptyJSON(item.Config) {
 		item.Config = jsontypes.NewNormalizedNull()
 	} else {
 		b, err := tf.ProtoJSON(e.Config)

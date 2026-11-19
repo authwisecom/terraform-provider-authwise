@@ -45,11 +45,7 @@ func ScopeResourceSchema() schema.Schema {
 				PlanModifiers:       []planmodifier.String{tf.RequiresReplaceIfConfigured(), stringplanmodifier.UseStateForUnknown()},
 				Validators:          []validator.String{tf.ReferenceID("i", "issuer", "authwise_issuer.<name>.issuer_id")},
 			},
-			"kind": schema.StringAttribute{
-				Computed:      true,
-				Optional:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
-			},
+			"kind": schema.StringAttribute{Required: true},
 			"name": schema.StringAttribute{
 				Computed:            true,
 				MarkdownDescription: "Full resource name; serves as the Terraform ID.",
@@ -110,11 +106,7 @@ func (m *ScopeModel) ToProto(ctx context.Context) (*v1alpha1.Scope, diag.Diagnos
 func (m *ScopeModel) FromProto(ctx context.Context, e *v1alpha1.Scope) diag.Diagnostics {
 	var diags diag.Diagnostics
 	m.Name = types.StringValue(e.Name)
-	if e.Kind == "" {
-		m.Kind = types.StringNull()
-	} else {
-		m.Kind = types.StringValue(e.Kind)
-	}
+	m.Kind = types.StringValue(e.Kind)
 	m.Auto = types.BoolValue(e.Auto)
 	return diags
 }
@@ -388,11 +380,7 @@ func scopeItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Scope, *Sco
 	var diags diag.Diagnostics
 	var item ScopeItemModel
 	item.Name = types.StringValue(e.Name)
-	if e.Kind == "" {
-		item.Kind = types.StringNull()
-	} else {
-		item.Kind = types.StringValue(e.Kind)
-	}
+	item.Kind = types.StringValue(e.Kind)
 	item.Auto = types.BoolValue(e.Auto)
 	id, err := crud.IDFromName(e.Name)
 	if err != nil {

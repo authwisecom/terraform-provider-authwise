@@ -25,6 +25,7 @@ resource "authwise_realm" "partner" {
 }
 
 resource "authwise_provider" "partner_saml" {
+  display_name = "Sign in"
   realm_id      = authwise_realm.partner.realm_id
   provider_type = "saml"
 }

@@ -51,11 +51,7 @@ func AccessPermissionResourceSchema() schema.Schema {
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"resource_type": schema.StringAttribute{Optional: true},
-			"service": schema.StringAttribute{
-				Computed:      true,
-				Optional:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
-			},
+			"service":       schema.StringAttribute{Required: true},
 			"tenant_id": schema.StringAttribute{
 				Computed:            true,
 				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default, and reads back from the name. Changing a configured one replaces the resource.",
@@ -109,11 +105,7 @@ func (m *AccessPermissionModel) ToProto(ctx context.Context) (*v1alpha1.AccessPe
 func (m *AccessPermissionModel) FromProto(ctx context.Context, e *v1alpha1.AccessPermission) diag.Diagnostics {
 	var diags diag.Diagnostics
 	m.Name = types.StringValue(e.Name)
-	if e.Service == "" {
-		m.Service = types.StringNull()
-	} else {
-		m.Service = types.StringValue(e.Service)
-	}
+	m.Service = types.StringValue(e.Service)
 	if e.ResourceType == "" {
 		m.ResourceType = types.StringNull()
 	} else {
@@ -403,11 +395,7 @@ func accessPermissionItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.
 	var diags diag.Diagnostics
 	var item AccessPermissionItemModel
 	item.Name = types.StringValue(e.Name)
-	if e.Service == "" {
-		item.Service = types.StringNull()
-	} else {
-		item.Service = types.StringValue(e.Service)
-	}
+	item.Service = types.StringValue(e.Service)
 	if e.ResourceType == "" {
 		item.ResourceType = types.StringNull()
 	} else {

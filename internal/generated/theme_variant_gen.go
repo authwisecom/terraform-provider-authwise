@@ -17,12 +17,12 @@ import (
 	resource "github.com/hashicorp/terraform-plugin-framework/resource"
 	schema "github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	boolplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
-	mapplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
 	planmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	stringplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	validator "github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
 	protojson "google.golang.org/protobuf/encoding/protojson"
+	proto "google.golang.org/protobuf/proto"
 	fieldmaskpb "google.golang.org/protobuf/types/known/fieldmaskpb"
 	structpb "google.golang.org/protobuf/types/known/structpb"
 )
@@ -32,17 +32,11 @@ func ThemeVariantResourceSchema() schema.Schema {
 	return schema.Schema{
 		Attributes: map[string]schema.Attribute{
 			"content": schema.StringAttribute{
-				Computed:            true,
 				CustomType:          jsontypes.NormalizedType{},
 				MarkdownDescription: "`content` as a JSON object.",
 				Optional:            true,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
-			"display_name": schema.StringAttribute{
-				Computed:      true,
-				Optional:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
-			},
+			"display_name": schema.StringAttribute{Required: true},
 			"is_default": schema.BoolAttribute{
 				Computed:      true,
 				Optional:      true,
@@ -56,10 +50,8 @@ func ThemeVariantResourceSchema() schema.Schema {
 				Validators:          []validator.String{tf.ReferenceID("i", "issuer", "authwise_issuer.<name>.issuer_id")},
 			},
 			"labels": schema.MapAttribute{
-				Computed:      true,
-				ElementType:   types.StringType,
-				Optional:      true,
-				PlanModifiers: []planmodifier.Map{mapplanmodifier.UseStateForUnknown()},
+				ElementType: types.StringType,
+				Optional:    true,
 			},
 			"name": schema.StringAttribute{
 				Computed:            true,
@@ -67,11 +59,9 @@ func ThemeVariantResourceSchema() schema.Schema {
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"stylesheet_attributes": schema.StringAttribute{
-				Computed:            true,
 				CustomType:          jsontypes.NormalizedType{},
 				MarkdownDescription: "`stylesheet_attributes` as a JSON object.",
 				Optional:            true,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"tenant_id": schema.StringAttribute{
 				Computed:            true,
@@ -81,10 +71,8 @@ func ThemeVariantResourceSchema() schema.Schema {
 				Validators:          []validator.String{tf.ReferenceID("t", "tenant", "")},
 			},
 			"theme_id": schema.StringAttribute{
-				Computed:      true,
-				Optional:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
-				Validators:    []validator.String{tf.ReferenceID("th", "theme", "authwise_theme.<name>.theme_id")},
+				Required:   true,
+				Validators: []validator.String{tf.ReferenceID("th", "theme", "authwise_theme.<name>.theme_id")},
 			},
 			"theme_variant_id": schema.StringAttribute{
 				Computed:            true,
@@ -169,17 +157,9 @@ func (m *ThemeVariantModel) FromProto(ctx context.Context, e *v1alpha1.ThemeVari
 		diags.Append(d...)
 		m.Labels = v
 	}
-	if e.DisplayName == "" {
-		m.DisplayName = types.StringNull()
-	} else {
-		m.DisplayName = types.StringValue(e.DisplayName)
-	}
-	if e.ThemeId == "" {
-		m.ThemeId = types.StringNull()
-	} else {
-		m.ThemeId = types.StringValue(e.ThemeId)
-	}
-	if e.StylesheetAttributes == nil {
+	m.DisplayName = types.StringValue(e.DisplayName)
+	m.ThemeId = types.StringValue(e.ThemeId)
+	if (e.StylesheetAttributes == nil || proto.Size(e.StylesheetAttributes) == 0) && !tf.KeepEmptyJSON(m.StylesheetAttributes) {
 		m.StylesheetAttributes = jsontypes.NewNormalizedNull()
 	} else {
 		b, err := tf.ProtoJSON(e.StylesheetAttributes)
@@ -189,7 +169,7 @@ func (m *ThemeVariantModel) FromProto(ctx context.Context, e *v1alpha1.ThemeVari
 			m.StylesheetAttributes = jsontypes.NewNormalizedValue(string(b))
 		}
 	}
-	if e.Content == nil {
+	if (e.Content == nil || proto.Size(e.Content) == 0) && !tf.KeepEmptyJSON(m.Content) {
 		m.Content = jsontypes.NewNormalizedNull()
 	} else {
 		b, err := tf.ProtoJSON(e.Content)
@@ -522,17 +502,9 @@ func themeVariantItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Them
 		diags.Append(d...)
 		item.Labels = v
 	}
-	if e.DisplayName == "" {
-		item.DisplayName = types.StringNull()
-	} else {
-		item.DisplayName = types.StringValue(e.DisplayName)
-	}
-	if e.ThemeId == "" {
-		item.ThemeId = types.StringNull()
-	} else {
-		item.ThemeId = types.StringValue(e.ThemeId)
-	}
-	if e.StylesheetAttributes == nil {
+	item.DisplayName = types.StringValue(e.DisplayName)
+	item.ThemeId = types.StringValue(e.ThemeId)
+	if (e.StylesheetAttributes == nil || proto.Size(e.StylesheetAttributes) == 0) && !tf.KeepEmptyJSON(item.StylesheetAttributes) {
 		item.StylesheetAttributes = jsontypes.NewNormalizedNull()
 	} else {
 		b, err := tf.ProtoJSON(e.StylesheetAttributes)
@@ -542,7 +514,7 @@ func themeVariantItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Them
 			item.StylesheetAttributes = jsontypes.NewNormalizedValue(string(b))
 		}
 	}
-	if e.Content == nil {
+	if (e.Content == nil || proto.Size(e.Content) == 0) && !tf.KeepEmptyJSON(item.Content) {
 		item.Content = jsontypes.NewNormalizedNull()
 	} else {
 		b, err := tf.ProtoJSON(e.Content)

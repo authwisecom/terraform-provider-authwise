@@ -22,6 +22,9 @@ SECURITY:
   - `authwise_application`: `post_logout_redirect_uris` (cleared)
   - `authwise_guard_network`: `pool_fallback` (to `false`), which serves
     the estate pool's relays after the network's own
+  - `config` on `authwise_application` (its allowed redirect URIs among
+    it), `authwise_provider` and `authwise_factor` (cleared), with the rest
+    of the batch under NOTES
 
   **Before the first apply on 0.36.0, run `terraform plan`**: a setting
   turned on outside Terraform (in the console, with awctl) on a resource
@@ -33,6 +36,22 @@ SECURITY:
   for one) stayed. A configuration without `grant_types` now fails at
   plan with `The argument "grant_types" is required`. Write the grants the
   application has, as `terraform state show` lists them.
+* **Arguments kit refuses empty are now required**, so removing one fails
+  at plan instead of leaving the old value in place. A configuration that
+  kit accepted already has them; one that leaves one out now fails at plan
+  with `The argument "<name>" is required`:
+  - `authwise_access_condition`: `display_name`, `expression`
+  - `authwise_access_permission`: `service`
+  - `authwise_application`: `audience_id`, `display_name`
+  - `authwise_asset`: `display_name`, `path`, `mime_type`
+  - `authwise_audience`: `display_name`
+  - `authwise_endpoint`: `display_name`, `address`
+  - `authwise_provider`: `display_name`, `provider_type`
+  - `authwise_scope`: `kind`
+  - `authwise_secret`: `display_name`
+  - `authwise_theme`: `display_name`
+  - `authwise_theme_variant`: `display_name`, `theme_id`
+  - `authwise_guard_relay_pool`: `slug`
 * **An `http://` `token_url` is refused unless `insecure = true`.** It sent
   the client secret unencrypted. With `insecure = true` it is allowed and
   warned about for any host that is not loopback.
@@ -68,8 +87,8 @@ BUG FIXES:
   from state and on the server: it could only be removed by replacing the
   resource. The case that found it was `authwise_access_binding`: turning a
   person's binding into a service account's kept its `condition_id`, which
-  kit refuses. They are now plain optional: removing one plans null, and
-  the update clears it on kit or guard-control.
+  kit refuses. Removing one now plans null (`false` for a bool, `0` for
+  an integer), and the update clears it on kit or guard-control.
 
 NOTES:
 
@@ -79,7 +98,8 @@ NOTES:
   left them out, so a value set in the console, with awctl or by another
   tool stayed in place. They now follow the configuration: **a value set
   outside Terraform and absent from the configuration is removed at the
-  next apply**, as an in-place update that sets it to null. To keep such a
+  next apply**, as an in-place update that sets it to null (`false` for a
+  bool, `0` for an integer). To keep such a
   value, write it into the configuration first. A resource whose
   configuration never set them, and whose live value is empty, plans no
   change.
@@ -108,34 +128,61 @@ NOTES:
   - `authwise_guard_trusted_issuer_rule`: `description`, `node_group`,
     `node_name_prefix`
   - and the security settings listed under SECURITY above
+  - `labels` on every resource that has it except
+    `authwise_guard_tenant_settings` (cleared)
+  - `config` on `authwise_application`, `authwise_audience`,
+    `authwise_factor`, `authwise_issuer`, `authwise_provider` and
+    `authwise_realm` (cleared). The realm's `authentication` key belongs
+    to `authwise_realm_authentication_policy` and is never touched.
+  - `authwise_theme`: `content`, `placeholder_content`,
+    `placeholder_stylesheet_attributes`, `stylesheet_attributes`;
+    `authwise_theme_variant`: `content`, `stylesheet_attributes` (cleared)
+  - `authwise_secret`: `description` (cleared)
+  - `authwise_endpoint`: `timeout` (cleared: kit's default deadline)
+  - `authwise_access_resource_type`: `materialize_lookup_resources` (to
+    `false`)
+  - `authwise_guard_relay` and `authwise_guard_pool_relay`: `priority`
+    (to `0`)
 
-  **Every other optional attribute still keeps its last value when it is
-  removed from the configuration**: removing the line plans no change, and
-  kit or guard-control keeps the value. That is 125 attributes, nested ones
-  included, on 32 resources, and none of them turns on trust, weakens TLS,
-  links accounts, skips verification or grants access when kept. They are:
-  values the server fills or defaults when left out (statuses,
-  `authwise_application.kind`, `authwise_guard_network.relay_pool`);
-  values kit or guard-control refuses empty (display names,
-  `authwise_access_condition.expression`); values that replace the
-  resource when changed; values that only narrow or limit, so keeping them
-  fails closed (`authwise_guard_tenant_settings` `config.users.realms`,
-  `authwise_guard_trusted_issuer_rule.max_nodes`); values people, SCIM or
-  node enrollment write (`authwise_user` profile fields,
-  `authwise_guard_node.display_name`); `authwise_service_account.roles`,
-  where leaving the line out leaves the roles alone by design;
-  `authwise_guard_network.slug` and `authwise_guard_node.endpoint`
-  (tf#80); and the rest, `labels` and whole-attribute JSON `config` among
-  them, still to be decided. To clear one of those, set its empty value
-  (`""`, `{}`, `[]`) in the configuration.
+  **68 optional attributes, nested ones included, on 26 resources still
+  keep their last value when removed from the configuration**, each for a
+  stated reason, and none of them turns on trust, weakens TLS, links
+  accounts, skips verification or grants access when kept:
+  - the server fills or defaults it when it is left out (statuses,
+    `authwise_application.kind` and `token_endpoint_auth_method`,
+    `authwise_guard_network.relay_pool`, `authwise_scim_connection`
+    `identifier_attribute` and `on_delete`, and the like);
+  - changing it replaces the resource (`authwise_issuer.path`,
+    `authwise_guard_network.cidr`, and the like);
+  - kept, it only narrows or limits (`authwise_guard_tenant_settings`
+    `config`, `authwise_guard_trusted_issuer_rule` `max_nodes` and
+    `ephemeral`);
+  - people, SCIM or node enrollment write it (`authwise_user` profile
+    fields and `external_id`, `authwise_guard_node.display_name`);
+  - `authwise_service_account.roles`: leaving it out leaves the roles
+    alone, by design;
+  - clearing `authwise_guard_relay_pool.default` or
+    `authwise_theme_variant.is_default` promotes nothing, so it would
+    leave no default: set `false` to do that on purpose;
+  - guard-control never stores the `config` of a network, node, relay,
+    pool, pool relay or resource;
+  - `authwise_guard_tenant_settings.labels`, until it is checked that
+    guard-control keeps them;
+  - `authwise_guard_network.slug` and `authwise_guard_node.endpoint`, held
+    for tf#80.
+
+  A test fails when a new optional attribute is neither clearable nor on
+  that list with its reason.
 
 * **apis v0.81.0** (from v0.80.0): kit's `GetInstallStatus`. The data
   source needs kit 1.94.0 or later (registration results from 1.95.0);
   kit lists no feature for it, so an earlier kit is known by its
   `Unimplemented` answer. Nothing else changes.
-* **tfinfra v0.0.27** (from v0.0.25): the generator's `Clearable`
-  behavior, used for tf#79 (v0.0.26) and extended to bools, lists, maps,
-  JSON documents and nested blocks for the security fixes above (v0.0.27).
+* **tfinfra v0.0.28** (from v0.0.25): the generator's `Clearable`
+  behavior, used for tf#79 (v0.0.26), extended to bools, lists, maps,
+  JSON documents and nested blocks for the security fixes above (v0.0.27),
+  and to durations and integers, with an empty JSON document read back as
+  null, for the rest (v0.0.28).
   Nothing else changes in the generated code.
 * **`authwise_access_binding` docs: a person's Guard administrative
   role.** In the tenant's administration audience, kit refuses a

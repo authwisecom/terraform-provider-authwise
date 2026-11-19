@@ -239,6 +239,7 @@ data "authwise_provider_google" "this" {
 }
 
 resource "authwise_provider" "google" {
+  display_name = "Sign in"
   realm_id      = local.realm_id
   provider_type = "google"
   config        = data.authwise_provider_google.this.any
@@ -322,6 +323,7 @@ data "authwise_provider_google" "this" {
 }
 
 resource "authwise_provider" "google" {
+  display_name = "Sign in"
   realm_id      = local.realm_id
   provider_type = "google"
   config        = data.authwise_provider_google.this.any
@@ -403,6 +405,7 @@ data "authwise_provider_google" "c" {
 }
 
 resource "authwise_provider" "p" {
+  display_name = "Sign in"
   realm_id      = "r-1"
   provider_type = "google"
   config        = data.authwise_provider_google.c.any
@@ -417,6 +420,7 @@ data "authwise_provider_oauth" "c" {
 }
 
 resource "authwise_provider" "p" {
+  display_name = "Sign in"
   realm_id      = "r-1"
   provider_type = "oauth"
   config        = data.authwise_provider_oauth.c.any
@@ -430,6 +434,7 @@ data "authwise_provider_github" "c" {
 }
 
 resource "authwise_provider" "p" {
+  display_name = "Sign in"
   realm_id      = "r-1"
   provider_type = "google"
   config        = data.authwise_provider_github.c.any
@@ -441,6 +446,7 @@ resource "authwise_provider" "p" {
 data "authwise_provider_magic_link" "c" {}
 
 resource "authwise_provider" "p" {
+  display_name = "Sign in"
   realm_id               = "r-1"
   provider_type          = "magicLink"
   config                 = data.authwise_provider_magic_link.c.any
@@ -453,6 +459,7 @@ resource "authwise_provider" "p" {
 data "authwise_provider_magic_link" "c" {}
 
 resource "authwise_provider" "p" {
+  display_name = "Sign in"
   realm_id                      = "r-1"
   provider_type                 = "magicLink"
   config                        = data.authwise_provider_magic_link.c.any

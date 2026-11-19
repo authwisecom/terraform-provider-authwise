@@ -16,12 +16,12 @@ import (
 	path "github.com/hashicorp/terraform-plugin-framework/path"
 	resource "github.com/hashicorp/terraform-plugin-framework/resource"
 	schema "github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	mapplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
 	planmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	stringplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	validator "github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
 	protojson "google.golang.org/protobuf/encoding/protojson"
+	proto "google.golang.org/protobuf/proto"
 	fieldmaskpb "google.golang.org/protobuf/types/known/fieldmaskpb"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	"time"
@@ -73,11 +73,9 @@ func IssuerResourceSchema() schema.Schema {
 				}},
 			},
 			"config": schema.StringAttribute{
-				Computed:            true,
 				CustomType:          jsontypes.NormalizedType{},
 				MarkdownDescription: "`config` as the protojson encoding of IssuerConfig.",
 				Optional:            true,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"domain_id": schema.StringAttribute{
 				Computed:      true,
@@ -92,10 +90,8 @@ func IssuerResourceSchema() schema.Schema {
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"labels": schema.MapAttribute{
-				Computed:      true,
-				ElementType:   types.StringType,
-				Optional:      true,
-				PlanModifiers: []planmodifier.Map{mapplanmodifier.UseStateForUnknown()},
+				ElementType: types.StringType,
+				Optional:    true,
 			},
 			"name": schema.StringAttribute{
 				Computed:            true,
@@ -260,7 +256,7 @@ func (m *IssuerModel) FromProto(ctx context.Context, e *v1alpha1.Issuer) diag.Di
 	} else {
 		m.Path = types.StringValue(e.Path)
 	}
-	if e.Config == nil {
+	if (e.Config == nil || proto.Size(e.Config) == 0) && !tf.KeepEmptyJSON(m.Config) {
 		m.Config = jsontypes.NewNormalizedNull()
 	} else {
 		b, err := tf.ProtoJSON(e.Config)
@@ -699,7 +695,7 @@ func issuerItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Issuer, *I
 	} else {
 		item.Path = types.StringValue(e.Path)
 	}
-	if e.Config == nil {
+	if (e.Config == nil || proto.Size(e.Config) == 0) && !tf.KeepEmptyJSON(item.Config) {
 		item.Config = jsontypes.NewNormalizedNull()
 	} else {
 		b, err := tf.ProtoJSON(e.Config)

@@ -17,6 +17,7 @@ A role in an audience's Access catalog. The id is the role's own name; its permi
 # permissions it grants are an authoritative set.
 resource "authwise_access_permission" "tenants_get" {
   access_permission_id = "guardcontrol.tenants.get"
+  service              = "guardcontrol"
 }
 
 resource "authwise_access_role" "admin" {

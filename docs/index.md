@@ -239,6 +239,7 @@ data "authwise_provider_google" "this" {
 
 resource "authwise_provider" "google" {
   realm_id      = "r-01"
+  display_name  = "Google"
   provider_type = "google"
   config        = data.authwise_provider_google.this.any
 }

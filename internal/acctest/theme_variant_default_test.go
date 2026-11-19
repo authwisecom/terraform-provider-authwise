@@ -21,6 +21,7 @@ func profileBlock(key, displayName string, def bool) string {
 	}
 	return fmt.Sprintf(`
 resource "authwise_theme_variant" %q {
+  theme_id = "th-1"
   display_name = %q%s
 }
 `, key, displayName, isDefault)
@@ -90,6 +91,7 @@ func TestAccThemeVariant_Default(t *testing.T) {
 				// B's. Its plan must not promise a stale true.
 				Config: cfg(`
 resource "authwise_theme_variant" "a" {
+  theme_id = "th-1"
   display_name = "A renamed"
   labels       = { after = authwise_theme_variant.b.name }
 }
@@ -145,6 +147,7 @@ func TestAccThemeVariant_DefaultFalseRefused(t *testing.T) {
 		Steps: []resource.TestStep{{
 			Config: h.providerConfig() + `
 resource "authwise_theme_variant" "a" {
+  theme_id = "th-1"
   display_name = "A"
   is_default   = false
 }

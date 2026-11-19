@@ -18,7 +18,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
@@ -522,11 +521,11 @@ func domainSchema(ctx context.Context) schema.Schema {
 				PlanModifiers: []planmodifier.String{tfruntime.RequiresReplaceIfConfigured(), stringplanmodifier.UseStateForUnknown()},
 				Validators:    []validator.String{stringvalidator.OneOf(purposeIssuer, purposeGuard, purposeConsole)},
 			},
+			// kit stores labels as sent: a removed line clears them
+			// (audit T1).
 			labelsAttribute: schema.MapAttribute{
-				Optional:      true,
-				Computed:      true,
-				ElementType:   types.StringType,
-				PlanModifiers: []planmodifier.Map{mapplanmodifier.UseStateForUnknown()},
+				Optional:    true,
+				ElementType: types.StringType,
 			},
 			"dns_records": schema.ListNestedAttribute{
 				Computed: true,
@@ -867,9 +866,15 @@ func (m *domainModel) fromDomain(d *domain) diag.Diagnostics {
 	for k, v := range d.Labels {
 		labels[k] = types.StringValue(v)
 	}
+	// None reads as null, as a removed line plans, unless the
+	// configuration wrote {}.
 	var dd diag.Diagnostics
-	m.Labels, dd = types.MapValue(types.StringType, labels)
-	diags.Append(dd...)
+	if len(labels) > 0 || tfruntime.KeepEmpty(m.Labels) {
+		m.Labels, dd = types.MapValue(types.StringType, labels)
+		diags.Append(dd...)
+	} else {
+		m.Labels = types.MapNull(types.StringType)
+	}
 	m.State = types.StringValue(d.State)
 	m.TrafficTarget = types.StringValue(d.TrafficTarget)
 	m.FailureCode = types.StringValue(d.FailureCode)

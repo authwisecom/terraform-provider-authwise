@@ -18,13 +18,13 @@ import (
 	resource "github.com/hashicorp/terraform-plugin-framework/resource"
 	schema "github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	booldefault "github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
-	mapplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
 	planmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	stringplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	validator "github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
 	basetypes "github.com/hashicorp/terraform-plugin-framework/types/basetypes"
 	protojson "google.golang.org/protobuf/encoding/protojson"
+	proto "google.golang.org/protobuf/proto"
 	fieldmaskpb "google.golang.org/protobuf/types/known/fieldmaskpb"
 )
 
@@ -32,21 +32,13 @@ import (
 func EndpointResourceSchema() schema.Schema {
 	return schema.Schema{
 		Attributes: map[string]schema.Attribute{
-			"address": schema.StringAttribute{
-				Computed:      true,
-				Optional:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
-			},
+			"address": schema.StringAttribute{Required: true},
 			"auth": schema.StringAttribute{
 				CustomType:          jsontypes.NormalizedType{},
 				MarkdownDescription: "`auth` as the protojson encoding of EndpointAuth.",
 				Optional:            true,
 			},
-			"display_name": schema.StringAttribute{
-				Computed:      true,
-				Optional:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
-			},
+			"display_name": schema.StringAttribute{Required: true},
 			"endpoint_id": schema.StringAttribute{
 				Computed:            true,
 				MarkdownDescription: "Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.",
@@ -64,10 +56,8 @@ func EndpointResourceSchema() schema.Schema {
 				Optional: true,
 			},
 			"labels": schema.MapAttribute{
-				Computed:      true,
-				ElementType:   types.StringType,
-				Optional:      true,
-				PlanModifiers: []planmodifier.Map{mapplanmodifier.UseStateForUnknown()},
+				ElementType: types.StringType,
+				Optional:    true,
 			},
 			"name": schema.StringAttribute{
 				Computed:            true,
@@ -82,10 +72,8 @@ func EndpointResourceSchema() schema.Schema {
 				Validators:          []validator.String{tf.ReferenceID("t", "tenant", "")},
 			},
 			"timeout": schema.StringAttribute{
-				Computed:            true,
 				MarkdownDescription: "`timeout` as a duration: `\"5s\"`, `\"1.5s\"`, `\"500ms\"`, `\"1m30s\"`.",
 				Optional:            true,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"tls": schema.SingleNestedAttribute{
 				Attributes: map[string]schema.Attribute{
@@ -211,19 +199,11 @@ func (m *EndpointModel) FromProto(ctx context.Context, e *v1alpha1.Endpoint) dia
 		diags.Append(d...)
 		m.Labels = v
 	}
-	if e.DisplayName == "" {
-		m.DisplayName = types.StringNull()
-	} else {
-		m.DisplayName = types.StringValue(e.DisplayName)
-	}
+	m.DisplayName = types.StringValue(e.DisplayName)
 	m.EndpointType = tf.EnumValue(m.EndpointType, int32(e.EndpointType), e.EndpointType.String())
-	if e.Address == "" {
-		m.Address = types.StringNull()
-	} else {
-		m.Address = types.StringValue(e.Address)
-	}
+	m.Address = types.StringValue(e.Address)
 	m.Insecure = types.BoolValue(e.Insecure)
-	if e.Auth == nil {
+	if (e.Auth == nil || proto.Size(e.Auth) == 0) && !tf.KeepEmptyJSON(m.Auth) {
 		m.Auth = jsontypes.NewNormalizedNull()
 	} else {
 		b, err := tf.ProtoJSON(e.Auth)
@@ -595,19 +575,11 @@ func endpointItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Endpoint
 		diags.Append(d...)
 		item.Labels = v
 	}
-	if e.DisplayName == "" {
-		item.DisplayName = types.StringNull()
-	} else {
-		item.DisplayName = types.StringValue(e.DisplayName)
-	}
+	item.DisplayName = types.StringValue(e.DisplayName)
 	item.EndpointType = tf.EnumValue(item.EndpointType, int32(e.EndpointType), e.EndpointType.String())
-	if e.Address == "" {
-		item.Address = types.StringNull()
-	} else {
-		item.Address = types.StringValue(e.Address)
-	}
+	item.Address = types.StringValue(e.Address)
 	item.Insecure = types.BoolValue(e.Insecure)
-	if e.Auth == nil {
+	if (e.Auth == nil || proto.Size(e.Auth) == 0) && !tf.KeepEmptyJSON(item.Auth) {
 		item.Auth = jsontypes.NewNormalizedNull()
 	} else {
 		b, err := tf.ProtoJSON(e.Auth)

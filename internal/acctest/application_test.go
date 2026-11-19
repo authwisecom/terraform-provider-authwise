@@ -22,6 +22,7 @@ func TestAccApplication_FactsDefaultAndUpdate(t *testing.T) {
 	config := func(extra string) string {
 		return h.providerConfig() + fmt.Sprintf(`
 resource "authwise_application" "app" {
+  audience_id = "a-1"
   display_name = "App"
   grant_types  = ["authorization_code", "refresh_token"]
 %s
@@ -78,6 +79,7 @@ func TestAccApplication_ServiceDefaults(t *testing.T) {
 		Steps: []resource.TestStep{{
 			Config: h.providerConfig() + `
 resource "authwise_application" "app" {
+  audience_id = "a-1"
   display_name = "CI"
   grant_types  = ["client_credentials"]
 }
@@ -134,6 +136,7 @@ func TestAccApplication_Refusals(t *testing.T) {
 				Steps: []resource.TestStep{{
 					Config: h.providerConfig() + fmt.Sprintf(`
 resource "authwise_application" "app" {
+  audience_id = "a-1"
   display_name = "App"
   %s
 }
@@ -155,6 +158,7 @@ func TestAccApplication_PublicHoldsNoSecret(t *testing.T) {
 		Steps: []resource.TestStep{{
 			Config: h.providerConfig() + `
 resource "authwise_application" "app" {
+  audience_id = "a-1"
   display_name = "SPA"
   grant_types  = ["authorization_code"]
 }
@@ -184,6 +188,7 @@ data "authwise_interactive_client_config" "c" {
 }
 
 resource "authwise_application" "app" {
+  audience_id = "a-1"
   display_name = "App"
   grant_types  = ["authorization_code"]
   config       = data.authwise_interactive_client_config.c.any

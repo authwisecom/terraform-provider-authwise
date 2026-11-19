@@ -167,6 +167,7 @@ resource "authwise_access_permission" "users_list" {
 }
 
 resource "authwise_scope" "read" {
+  kind = "access"
   scope_id = "users.read"
 }
 
@@ -223,6 +224,7 @@ func TestAccThemeVariant_IssuerScoped(t *testing.T) {
 	profile := func(displayName string) string {
 		return h.providerConfig() + fmt.Sprintf(`
 resource "authwise_theme_variant" "brand" {
+  theme_id = "th-1"
   display_name = %q
   content      = jsonencode({ headline = "Welcome back" })
 }

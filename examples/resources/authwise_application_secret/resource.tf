@@ -1,7 +1,12 @@
 # Application-scoped: a secret for a machine application. kit creates it and returns it
 # once; Terraform keeps it in state and hands it on from there.
+resource "authwise_audience" "api" {
+  display_name = "API"
+}
+
 resource "authwise_application" "ci" {
   display_name = "CI"
+  audience_id  = authwise_audience.api.audience_id
   grant_types  = ["client_credentials"]
 }
 

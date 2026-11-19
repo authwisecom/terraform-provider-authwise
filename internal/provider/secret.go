@@ -16,7 +16,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/objectplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
@@ -86,15 +85,6 @@ func (r *secretResource) Metadata(_ context.Context, req resource.MetadataReques
 
 func (r *secretResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 
-	optionalComputedString := func(desc string) schema.StringAttribute {
-		return schema.StringAttribute{
-			Optional:            true,
-			Computed:            true,
-			MarkdownDescription: desc,
-			PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
-		}
-	}
-
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "A tenant secret: a credential other objects name by reference (`client_secret_ref`, an endpoint's `auth`) instead of holding it.\n\n" +
 			"**Where the material lives.** An inline secret's material goes in through `payload_wo`, a write-only argument (Terraform 1.11 or later): " +
@@ -114,13 +104,14 @@ func (r *secretResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.RequiresReplace()},
 				Validators:          []validator.String{tfruntime.ReferenceID("t", "tenant", "")},
 			},
-			"display_name": optionalComputedString(""),
-			"description":  optionalComputedString(""),
+			// kit refuses a secret without a display name; description and
+			// labels are stored as sent, so a removed line clears them
+			// (audit T1).
+			"display_name": schema.StringAttribute{Required: true},
+			"description":  schema.StringAttribute{Optional: true},
 			"labels": schema.MapAttribute{
-				Optional:      true,
-				Computed:      true,
-				ElementType:   types.StringType,
-				PlanModifiers: []planmodifier.Map{mapplanmodifier.UseStateForUnknown()},
+				Optional:    true,
+				ElementType: types.StringType,
 			},
 			"external": schema.SingleNestedAttribute{
 				Optional: true,

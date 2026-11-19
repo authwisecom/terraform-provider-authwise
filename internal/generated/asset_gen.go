@@ -14,7 +14,6 @@ import (
 	diag "github.com/hashicorp/terraform-plugin-framework/diag"
 	resource "github.com/hashicorp/terraform-plugin-framework/resource"
 	schema "github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	mapplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
 	planmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	stringplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	validator "github.com/hashicorp/terraform-plugin-framework/schema/validator"
@@ -31,32 +30,18 @@ func AssetResourceSchema() schema.Schema {
 				MarkdownDescription: "Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.",
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
-			"display_name": schema.StringAttribute{
-				Computed:      true,
-				Optional:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
-			},
+			"display_name": schema.StringAttribute{Required: true},
 			"labels": schema.MapAttribute{
-				Computed:      true,
-				ElementType:   types.StringType,
-				Optional:      true,
-				PlanModifiers: []planmodifier.Map{mapplanmodifier.UseStateForUnknown()},
+				ElementType: types.StringType,
+				Optional:    true,
 			},
-			"mime_type": schema.StringAttribute{
-				Computed:      true,
-				Optional:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
-			},
+			"mime_type": schema.StringAttribute{Required: true},
 			"name": schema.StringAttribute{
 				Computed:            true,
 				MarkdownDescription: "Full resource name; serves as the Terraform ID.",
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
-			"path": schema.StringAttribute{
-				Computed:      true,
-				Optional:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
-			},
+			"path": schema.StringAttribute{Required: true},
 			"tenant_id": schema.StringAttribute{
 				Computed:            true,
 				MarkdownDescription: "Parent identifier `tenant_id`; overrides the provider default, and reads back from the name. Changing a configured one replaces the resource.",
@@ -120,21 +105,9 @@ func (m *AssetModel) FromProto(ctx context.Context, e *v1alpha1.Asset) diag.Diag
 		diags.Append(d...)
 		m.Labels = v
 	}
-	if e.DisplayName == "" {
-		m.DisplayName = types.StringNull()
-	} else {
-		m.DisplayName = types.StringValue(e.DisplayName)
-	}
-	if e.Path == "" {
-		m.Path = types.StringNull()
-	} else {
-		m.Path = types.StringValue(e.Path)
-	}
-	if e.MimeType == "" {
-		m.MimeType = types.StringNull()
-	} else {
-		m.MimeType = types.StringValue(e.MimeType)
-	}
+	m.DisplayName = types.StringValue(e.DisplayName)
+	m.Path = types.StringValue(e.Path)
+	m.MimeType = types.StringValue(e.MimeType)
 	return diags
 }
 
@@ -417,21 +390,9 @@ func assetItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Asset, *Ass
 		diags.Append(d...)
 		item.Labels = v
 	}
-	if e.DisplayName == "" {
-		item.DisplayName = types.StringNull()
-	} else {
-		item.DisplayName = types.StringValue(e.DisplayName)
-	}
-	if e.Path == "" {
-		item.Path = types.StringNull()
-	} else {
-		item.Path = types.StringValue(e.Path)
-	}
-	if e.MimeType == "" {
-		item.MimeType = types.StringNull()
-	} else {
-		item.MimeType = types.StringValue(e.MimeType)
-	}
+	item.DisplayName = types.StringValue(e.DisplayName)
+	item.Path = types.StringValue(e.Path)
+	item.MimeType = types.StringValue(e.MimeType)
 	id, err := crud.IDFromName(e.Name)
 	if err != nil {
 		diags.AddError("unexpected asset name", err.Error())

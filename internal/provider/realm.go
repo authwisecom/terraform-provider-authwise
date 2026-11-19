@@ -7,6 +7,7 @@ import (
 
 	identitypb "git.authwise.com/authwise/apis/authwise/identity/v1alpha1"
 	"git.authwise.com/authwise/terraform-provider-authwise/internal/generated"
+	tfruntime "github.com/activatedio/tfinfra/pkg/tf"
 	"github.com/hashicorp/terraform-plugin-framework-jsontypes/jsontypes"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
@@ -93,13 +94,15 @@ func (r *realmResource) ValidateConfig(ctx context.Context, req resource.Validat
 func (r *realmResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	ctx, w := withWarnings(ctx)
 	defer w.report(&resp.Diagnostics)
+	prior := realmConfigOf(ctx, req.Plan.GetAttribute, &resp.Diagnostics)
 	r.inner.Create(ctx, req, resp)
-	stripAuthentication(ctx, &resp.State, &resp.Diagnostics)
+	stripAuthentication(ctx, &resp.State, prior, &resp.Diagnostics)
 }
 
 func (r *realmResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
+	prior := realmConfigOf(ctx, req.State.GetAttribute, &resp.Diagnostics)
 	r.inner.Read(ctx, req, resp)
-	stripAuthentication(ctx, &resp.State, &resp.Diagnostics)
+	stripAuthentication(ctx, &resp.State, prior, &resp.Diagnostics)
 }
 
 // Update writes the server's current policy back into both sides of the
@@ -112,6 +115,9 @@ func (r *realmResource) Update(ctx context.Context, req resource.UpdateRequest, 
 
 	ctx, w := withWarnings(ctx)
 	defer w.report(&resp.Diagnostics)
+
+	// What the practitioner planned, before the policy goes in.
+	prior := realmConfigOf(ctx, req.Plan.GetAttribute, &resp.Diagnostics)
 
 	if r.client != nil {
 
@@ -142,7 +148,7 @@ func (r *realmResource) Update(ctx context.Context, req resource.UpdateRequest, 
 	}
 
 	r.inner.Update(ctx, req, resp)
-	stripAuthentication(ctx, &resp.State, &resp.Diagnostics)
+	stripAuthentication(ctx, &resp.State, prior, &resp.Diagnostics)
 }
 
 func (r *realmResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
@@ -155,11 +161,19 @@ func (r *realmResource) ImportState(ctx context.Context, req resource.ImportStat
 	}
 }
 
+// realmConfigOf reads config from a plan or state.
+func realmConfigOf(ctx context.Context, get func(context.Context, path.Path, any) diag.Diagnostics, diags *diag.Diagnostics) jsontypes.Normalized {
+	var config jsontypes.Normalized
+	diags.Append(get(ctx, realmConfigPath, &config)...)
+	return config
+}
+
 // stripAuthentication removes the policy from the config in state. A config
-// that held nothing else reads as "{}" rather than null: a practitioner who
-// wrote `config = jsonencode({})` planned exactly that, and null would be an
-// inconsistent result after apply.
-func stripAuthentication(ctx context.Context, state *tfsdk.State, diags *diag.Diagnostics) {
+// that held nothing else reads as null, as a configuration that leaves
+// config out plans it (config is clearable, audit T1), unless prior, the
+// planned or prior config, wrote `jsonencode({})`: that reads as "{}", since
+// null would then be an inconsistent result after apply.
+func stripAuthentication(ctx context.Context, state *tfsdk.State, prior jsontypes.Normalized, diags *diag.Diagnostics) {
 
 	if diags.HasError() || state.Raw.IsNull() {
 		return
@@ -180,13 +194,25 @@ func stripAuthentication(ctx context.Context, state *tfsdk.State, diags *diag.Di
 	}
 	delete(doc, authenticationKey)
 
-	b, err := json.Marshal(doc)
+	stripped, err := strippedConfig(doc, prior)
 	if err != nil {
 		diags.AddError("cannot encode the realm config", err.Error())
 		return
 	}
+	diags.Append(state.SetAttribute(ctx, realmConfigPath, stripped)...)
+}
 
-	diags.Append(state.SetAttribute(ctx, realmConfigPath, jsontypes.NewNormalizedValue(string(b)))...)
+// strippedConfig is the realm's config without its policy: null when nothing
+// else is left, unless prior wrote it empty.
+func strippedConfig(doc map[string]json.RawMessage, prior jsontypes.Normalized) (jsontypes.Normalized, error) {
+	if len(doc) == 0 && !tfruntime.KeepEmptyJSON(prior) {
+		return jsontypes.NewNormalizedNull(), nil
+	}
+	b, err := json.Marshal(doc)
+	if err != nil {
+		return jsontypes.Normalized{}, err
+	}
+	return jsontypes.NewNormalizedValue(string(b)), nil
 }
 
 // withAuthentication returns config with the policy set under

@@ -441,6 +441,7 @@ func TestAccEndpoint_ExplicitREST(t *testing.T) {
 	endpoint := func(endpointType string) string {
 		return h.providerConfig() + `
 resource "authwise_endpoint" "rest" {
+  display_name = "Service"
   address = "https://risk.example.com"
   ` + endpointType + `
 }
@@ -458,6 +459,7 @@ resource "authwise_endpoint" "rest" {
 				// Switching to gRPC and back is two real updates.
 				Config: h.providerConfig() + `
 resource "authwise_endpoint" "rest" {
+  display_name = "Service"
   endpoint_type = "GRPC"
   address       = "risk.example.com:443"
 }
@@ -479,6 +481,7 @@ resource "authwise_endpoint" "rest" {
 			{
 				Config: h2.providerConfig() + `
 resource "authwise_endpoint" "rest" {
+  display_name = "Service"
   address = "https://risk.example.com"
 }
 `,
@@ -537,7 +540,7 @@ func TestAccEndpoint_KitRefusals(t *testing.T) {
 				ProtoV6ProviderFactories: protoFactories(),
 				Steps: []resource.TestStep{
 					{
-						Config:      h.providerConfig() + "resource \"authwise_endpoint\" \"e\" {" + v.body + "\n}\n",
+						Config:      h.providerConfig() + "resource \"authwise_endpoint\" \"e\" {\n  display_name = \"Risk\"" + v.body + "\n}\n",
 						ExpectError: v.want,
 					},
 				},
@@ -655,6 +658,7 @@ variable "material" {
 }
 
 resource "authwise_secret" "s" {
+  display_name = "Secret"
   payload_wo         = var.material
   payload_wo_version = ` + version + `
 }
@@ -701,6 +705,7 @@ func TestAccSecret_ExternalRefusesPayload(t *testing.T) {
 
 	config := h.providerConfig() + `
 resource "authwise_secret" "s" {
+  display_name = "Secret"
   external = {
     store = "vault"
     key   = "upstream"
@@ -729,6 +734,7 @@ func TestAccSecret_ReferencedDeleteRefused(t *testing.T) {
 
 	withSecret := h.providerConfig() + `
 resource "authwise_secret" "s" {
+  display_name = "Secret"
   payload_wo = "material"
 }
 `

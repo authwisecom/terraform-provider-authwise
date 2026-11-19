@@ -148,6 +148,7 @@ data "authwise_provider_magic_link" "ml" {
 }
 
 resource "authwise_provider" "ml" {
+  display_name = "Sign in"
   realm_id      = "r-1"
   provider_type = "magicLink"
   config        = data.authwise_provider_magic_link.ml.any

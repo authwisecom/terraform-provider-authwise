@@ -16,7 +16,6 @@ import (
 	resource "github.com/hashicorp/terraform-plugin-framework/resource"
 	schema "github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	boolplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
-	mapplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
 	planmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	stringplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
@@ -48,10 +47,8 @@ func RelayPoolResourceSchema() schema.Schema {
 				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"labels": schema.MapAttribute{
-				Computed:      true,
-				ElementType:   types.StringType,
-				Optional:      true,
-				PlanModifiers: []planmodifier.Map{mapplanmodifier.UseStateForUnknown()},
+				ElementType: types.StringType,
+				Optional:    true,
 			},
 			"name": schema.StringAttribute{
 				Computed:            true,
@@ -65,11 +62,7 @@ func RelayPoolResourceSchema() schema.Schema {
 				Optional:      true,
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
-			"slug": schema.StringAttribute{
-				Computed:      true,
-				Optional:      true,
-				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
-			},
+			"slug": schema.StringAttribute{Required: true},
 		},
 		MarkdownDescription: "An estate relay pool: a named set of relays shared across networks and tenants. Operators only. `select` orders the pool's relays for a node, `served-order` (priority, then display name; the default) or `nearest` (by the node's `region`). `default` makes it the estate default pool: every tenant may use it, and it is the default of a tenant without its own (`authwise_guard_relay_pool_access.default_pool`). Setting it on one pool clears it on the previous default. A pool in use is not deleted (`RELAY_POOL_IN_USE`): remove it from networks and from tenants' access first.",
 	}
@@ -148,11 +141,7 @@ func (m *RelayPoolModel) FromProto(ctx context.Context, e *v1alpha1.RelayPool) d
 	} else {
 		m.DisplayName = types.StringValue(e.DisplayName)
 	}
-	if e.Slug == "" {
-		m.Slug = types.StringNull()
-	} else {
-		m.Slug = types.StringValue(e.Slug)
-	}
+	m.Slug = types.StringValue(e.Slug)
 	if e.Region == "" {
 		m.Region = types.StringNull()
 	} else {
@@ -485,11 +474,7 @@ func relayPoolItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.RelayPo
 	} else {
 		item.DisplayName = types.StringValue(e.DisplayName)
 	}
-	if e.Slug == "" {
-		item.Slug = types.StringNull()
-	} else {
-		item.Slug = types.StringValue(e.Slug)
-	}
+	item.Slug = types.StringValue(e.Slug)
 	if e.Region == "" {
 		item.Region = types.StringNull()
 	} else {

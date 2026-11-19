@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -30,7 +31,8 @@ type clearCase struct {
 	// base is the resource's other arguments, one per line.
 	base string
 	// clear maps each clearable attribute to the HCL value it is set to.
-	// A bool is set true: removed, it plans and reads false, not null.
+	// A bool is set true and an integer to a number: removed, they plan
+	// and read false and 0, not null.
 	clear map[string]string
 }
 
@@ -58,10 +60,14 @@ func (c clearCase) attrs() []string {
 }
 
 // removed is what a clearable attribute plans and reads once its line is
-// gone: false for a bool, which proto3 cannot leave unset, null otherwise.
+// gone: false for a bool and 0 for an integer, which proto3 cannot leave
+// unset, null otherwise.
 func (c clearCase) removed(attr string) knownvalue.Check {
 	if c.clear[attr] == "true" {
 		return knownvalue.Bool(false)
+	}
+	if _, err := strconv.ParseInt(c.clear[attr], 10, 64); err == nil {
+		return knownvalue.Int64Exact(0)
 	}
 	return knownvalue.Null()
 }
@@ -165,10 +171,11 @@ var clearCases = map[string]clearCase{
 		typ:  "access_resource_type",
 		base: `  access_resource_type_id = "tf79.thing"`,
 		clear: map[string]string{
-			"description":    `"A thing"`,
-			"endpoint_name":  `"things"`,
-			"expansion_mode": `"PUSH"`,
-			"parent_type":    `"tenant"`,
+			"materialize_lookup_resources": "true",
+			"description":                  `"A thing"`,
+			"endpoint_name":                `"things"`,
+			"expansion_mode":               `"PUSH"`,
+			"parent_type":                  `"tenant"`,
 		},
 	},
 	"access_role": {
@@ -177,9 +184,16 @@ var clearCases = map[string]clearCase{
 		clear: map[string]string{"description": `"Reads things"`, "display_name": `"Thing viewer"`},
 	},
 	"application": {
-		typ:  "application",
-		base: `  display_name = "App"` + "\n" + `  grant_types  = ["authorization_code", "refresh_token"]`,
+		typ: "application",
+		prereq: `
+data "authwise_interactive_client_config" "c" {
+  allowed_redirect_uris = ["https://app.example.com/cb"]
+}
+`,
+		base: `  display_name = "App"` + "\n" + `  audience_id  = "a-1"` + "\n" + `  grant_types  = ["authorization_code", "refresh_token"]`,
 		clear: map[string]string{
+			"labels":           `{ team = "identity" }`,
+			"config":           "data.authwise_interactive_client_config.c.any",
 			"application_url":  `"https://app.example.com"`,
 			"login_url":        `"https://app.example.com/login"`,
 			"theme_variant_id": `"ap-01"`,
@@ -192,6 +206,7 @@ var clearCases = map[string]clearCase{
 		typ: "application_secret",
 		prereq: `
 resource "authwise_application" "app" {
+  audience_id = "a-1"
   display_name = "CI"
   grant_types  = ["client_credentials"]
 }
@@ -200,27 +215,43 @@ resource "authwise_application" "app" {
 		clear: map[string]string{"expires_at": `"2099-01-01T00:00:00Z"`},
 	},
 	"audience": {
-		typ:   "audience",
-		base:  `  display_name = "API"`,
-		clear: map[string]string{"theme_variant_id": `"ap-01"`},
+		typ:  "audience",
+		base: `  display_name = "API"`,
+		clear: map[string]string{
+			"config":           `jsonencode({ accessTokenClaimScopes = ["email"] })`,
+			"theme_variant_id": `"ap-01"`,
+			"labels":           `{ team = "identity" }`,
+		},
 	},
 	"realm": {
-		typ:   "realm",
-		clear: map[string]string{"display_name": `"Employees"`},
+		typ: "realm",
+		clear: map[string]string{
+			"config":       `jsonencode({ defaultLocale = "de" })`,
+			"display_name": `"Employees"`,
+			"labels":       `{ team = "identity" }`,
+		},
 	},
 	"scim_connection": {
 		typ:    "scim_connection",
 		prereq: realmForFactors,
 		base:   `  realm_id     = local.realm_id` + "\n" + `  display_name = "Entra ID"` + "\n" + `  issuer_id    = "i-1"`,
-		clear:  map[string]string{"provider_id": `"p-1"`},
+		clear: map[string]string{
+			"provider_id": `"p-1"`,
+			"labels":      `{ team = "identity" }`,
+		},
 	},
 	"theme": {
 		typ:  "theme",
 		base: `  display_name = "Northwind"`,
 		clear: map[string]string{
-			"content_schema":               `"{}"`,
-			"stylesheet":                   `"body { color: navy; }"`,
-			"stylesheet_attributes_schema": `"{}"`,
+			"content":                           `jsonencode({ headline = "Hello" })`,
+			"placeholder_content":               `jsonencode({ headline = "Hi" })`,
+			"placeholder_stylesheet_attributes": `jsonencode({ accent = "navy" })`,
+			"stylesheet_attributes":             `jsonencode({ accent = "navy" })`,
+			"labels":                            `{ team = "identity" }`,
+			"content_schema":                    `"{}"`,
+			"stylesheet":                        `"body { color: navy; }"`,
+			"stylesheet_attributes_schema":      `"{}"`,
 		},
 	},
 	// The trust switches and the map c reads (audit T1).
@@ -231,8 +262,10 @@ data "authwise_provider_google" "this" {
   client_id = "123.apps.googleusercontent.com"
 }
 `,
-		base: `  realm_id      = local.realm_id` + "\n" + `  provider_type = "google"` + "\n" + `  config        = data.authwise_provider_google.this.any`,
+		base: `  realm_id      = local.realm_id` + "\n" + `  display_name  = "Google"` + "\n" + `  provider_type = "google"`,
 		clear: map[string]string{
+			"config":                        "data.authwise_provider_google.this.any",
+			"labels":                        `{ team = "identity" }`,
 			"link_by_verified_email":        "true",
 			"trust_upstream_email_verified": "true",
 			"trust_upstream_amr":            "true",
@@ -253,6 +286,7 @@ resource "authwise_issuer" "internal" {
 `,
 		base: `  display_name  = "Ledger"` + "\n" + `  endpoint_type = "GRPC"` + "\n" + `  address       = "ledger.example.com:443"`,
 		clear: map[string]string{
+			"labels":   `{ team = "identity" }`,
 			"insecure": "true",
 			"auth":     `jsonencode({ kitToken = { issuer = authwise_issuer.internal.name, audience = "https://ledger.example.com" } })`,
 		},
@@ -271,11 +305,78 @@ resource "authwise_issuer" "internal" {
 		base:  `  scope_id = "tf79.read"` + "\n" + `  kind     = "access"`,
 		clear: map[string]string{"auto": "true"},
 	},
+	// Audit T1's remaining batch: labels, the configs and the rest.
+	"issuer": {
+		typ: "issuer",
+		clear: map[string]string{
+			"labels": `{ team = "identity" }`,
+			"config": `jsonencode({ accessTokenExpireSeconds = 900 })`,
+		},
+	},
+	"factor": {
+		typ: "factor",
+		prereq: realmForFactors + `
+data "authwise_factor_totp" "totp" {
+  digits = 8
+}
+`,
+		base: `  realm_id     = local.realm_id` + "\n" + `  display_name = "Authenticator app"` + "\n" + `  factor_type  = "totp"`,
+		clear: map[string]string{
+			"labels": `{ team = "identity" }`,
+			"config": "data.authwise_factor_totp.totp.any",
+		},
+	},
+	"user": {
+		typ:    "user",
+		prereq: realmForFactors,
+		base:   `  realm_id = local.realm_id`,
+		clear:  map[string]string{"labels": `{ team = "identity" }`},
+	},
+	"asset": {
+		typ:   "asset",
+		base:  `  display_name = "Logo"` + "\n" + `  path         = "/logo.svg"` + "\n" + `  mime_type    = "image/svg+xml"`,
+		clear: map[string]string{"labels": `{ team = "brand" }`},
+	},
+	"certificate": {
+		typ:   "certificate",
+		base:  `  display_name        = "Signing"` + "\n" + `  use                 = "CERTIFICATE_USE_SIGNING"` + "\n" + `  subject_common_name = "sp.example.com"`,
+		clear: map[string]string{"labels": `{ team = "identity" }`},
+	},
+	"domain": {
+		typ:   "domain",
+		base:  `  hostname = "login.example.com"`,
+		clear: map[string]string{"labels": `{ team = "identity" }`},
+	},
+	"secret": {
+		typ:  "secret",
+		base: `  display_name = "Token"` + "\n" + `  payload_wo   = "token-material"`,
+		clear: map[string]string{
+			"labels":      `{ team = "identity" }`,
+			"description": `"The ledger's token"`,
+		},
+	},
+	"theme_variant": {
+		typ:  "theme_variant",
+		base: `  display_name = "Brand"` + "\n" + `  theme_id     = "th-1"`,
+		clear: map[string]string{
+			"labels":                `{ team = "brand" }`,
+			"content":               `jsonencode({ headline = "Welcome back" })`,
+			"stylesheet_attributes": `jsonencode({ accent = "navy" })`,
+		},
+	},
+	"endpoint_timeout": {
+		typ:   "endpoint",
+		base:  `  display_name = "Risk"` + "\n" + `  address      = "https://risk.example.com/v1"`,
+		clear: map[string]string{"timeout": `"5s"`},
+	},
 	"guard_network": {
 		typ:    "guard_network",
 		prereq: guardTenantHCL,
 		base:   `  tenant_id = local.guard_tenant_id`,
-		clear:  map[string]string{"display_name": `"Office"`},
+		clear: map[string]string{
+			"display_name": `"Office"`,
+			"labels":       `{ team = "identity" }`,
+		},
 	},
 	"guard_node": {
 		typ:    "guard_node",
@@ -284,7 +385,10 @@ resource "authwise_issuer" "internal" {
   network_id   = authwise_guard_network.office.guard_network_id
   display_name = "db"
   public_key   = "ZGItcHVibGljLWtleQ=="`,
-		clear: map[string]string{"region": `"us-west1"`},
+		clear: map[string]string{
+			"region": `"us-west1"`,
+			"labels": `{ team = "identity" }`,
+		},
 	},
 	"guard_node_group": {
 		typ:    "guard_node_group",
@@ -292,7 +396,9 @@ resource "authwise_issuer" "internal" {
 		base: `  tenant_id    = local.guard_tenant_id
   network_id   = authwise_guard_network.office.guard_network_id
   display_name = "pods"`,
-		clear: map[string]string{"description": `"Pods of the cluster"`},
+		clear: map[string]string{
+			"description": `"Pods of the cluster"`,
+		},
 	},
 	"guard_relay": {
 		typ:    "guard_relay",
@@ -300,12 +406,19 @@ resource "authwise_issuer" "internal" {
 		base: `  tenant_id  = local.guard_tenant_id
   network_id = authwise_guard_network.office.guard_network_id
   url        = "wss://relay.example.com:8443/v1/transport"`,
-		clear: map[string]string{"display_name": `"us-west"`, "region": `"us-west1"`, "ca_cert_pem": clearPEM},
+		clear: map[string]string{
+			"priority":     "2",
+			"display_name": `"us-west"`, "region": `"us-west1"`, "ca_cert_pem": clearPEM,
+			"labels": `{ team = "identity" }`,
+		},
 	},
 	"guard_relay_pool": {
-		typ:   "guard_relay_pool",
-		base:  `  slug = "us-central"`,
-		clear: map[string]string{"display_name": `"US central"`, "region": `"us-central1"`},
+		typ:  "guard_relay_pool",
+		base: `  slug = "us-central"`,
+		clear: map[string]string{
+			"display_name": `"US central"`, "region": `"us-central1"`,
+			"labels": `{ team = "identity" }`,
+		},
 	},
 	"guard_pool_relay": {
 		typ: "guard_pool_relay",
@@ -314,8 +427,12 @@ resource "authwise_guard_relay_pool" "central" {
   slug = "us-central"
 }
 `,
-		base:  `  pool = authwise_guard_relay_pool.central.name` + "\n" + `  url  = "wss://c1.relay.example.com/v1/transport"`,
-		clear: map[string]string{"display_name": `"c1"`, "region": `"us-central1"`, "ca_cert_pem": clearPEM},
+		base: `  pool = authwise_guard_relay_pool.central.name` + "\n" + `  url  = "wss://c1.relay.example.com/v1/transport"`,
+		clear: map[string]string{
+			"priority":     "2",
+			"display_name": `"c1"`, "region": `"us-central1"`, "ca_cert_pem": clearPEM,
+			"labels": `{ team = "identity" }`,
+		},
 	},
 	"guard_resource": {
 		typ:    "guard_resource",
@@ -324,7 +441,10 @@ resource "authwise_guard_relay_pool" "central" {
   network_id = authwise_guard_network.office.guard_network_id
   kind       = "host"
   address    = "10.0.0.5"`,
-		clear: map[string]string{"display_name": `"wiki"`},
+		clear: map[string]string{
+			"display_name": `"wiki"`,
+			"labels":       `{ team = "identity" }`,
+		},
 	},
 	"guard_trusted_issuer_rule": {
 		typ: "guard_trusted_issuer_rule",

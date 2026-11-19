@@ -76,6 +76,7 @@ resource "authwise_issuer" "internal" {
 }
 
 resource "authwise_endpoint" "up" {
+  display_name = "Service"
   endpoint_type = "GRPC"
   address       = %q
   insecure      = true
@@ -85,6 +86,7 @@ resource "authwise_endpoint" "up" {
 }
 
 resource "authwise_endpoint" "down" {
+  display_name = "Service"
   endpoint_type = "GRPC"
   address       = %q
   insecure      = true
@@ -136,6 +138,7 @@ func TestAccEndpoint_ReferenceOrdersDestroy(t *testing.T) {
 
 	config := h.providerConfig() + `
 resource "authwise_endpoint" "flow" {
+  display_name = "Service"
   address = "https://flow.example.com"
 }
 
@@ -185,6 +188,7 @@ func TestAccEndpoint_DeleteRefusedWhileNamed(t *testing.T) {
 
 	endpoint := h.providerConfig() + `
 resource "authwise_endpoint" "flow" {
+  display_name = "Service"
   address = "https://flow.example.com"
 }
 `
