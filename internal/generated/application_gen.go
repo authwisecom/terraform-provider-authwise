@@ -17,7 +17,6 @@ import (
 	path "github.com/hashicorp/terraform-plugin-framework/path"
 	resource "github.com/hashicorp/terraform-plugin-framework/resource"
 	schema "github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	listplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	mapplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
 	planmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	stringplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
@@ -63,10 +62,8 @@ func ApplicationResourceSchema() schema.Schema {
 				Optional:            true,
 			},
 			"grant_types": schema.ListAttribute{
-				Computed:      true,
-				ElementType:   types.StringType,
-				Optional:      true,
-				PlanModifiers: []planmodifier.List{listplanmodifier.UseStateForUnknown()},
+				ElementType: types.StringType,
+				Required:    true,
 			},
 			"issuer_id": schema.StringAttribute{
 				Computed:            true,
@@ -98,10 +95,8 @@ func ApplicationResourceSchema() schema.Schema {
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"post_logout_redirect_uris": schema.ListAttribute{
-				Computed:      true,
-				ElementType:   types.StringType,
-				Optional:      true,
-				PlanModifiers: []planmodifier.List{listplanmodifier.UseStateForUnknown()},
+				ElementType: types.StringType,
+				Optional:    true,
 			},
 			"status": schema.StringAttribute{
 				Computed:      true,

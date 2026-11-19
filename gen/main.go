@@ -377,7 +377,10 @@ func main() {
 			// singular message and takes the typed nested lane; timeout is
 			// the provider's first Duration, a string ("5s", "500ms") that
 			// keeps the spelling written (kit#603, apis v0.9.0).
+			// insecure, tls and auth weaken or carry trust: a removed line
+			// turns them off (audit T1).
 			crud[corepb.Endpoint](scopeTenant,
+				withClearable("insecure", "tls", "auth"),
 				withDescription("A service kit calls out to: its transport and address, how kit verifies it (`tls`), how kit authenticates to it (`auth`), and the per-call deadline (`timeout`)."), withJSON("auth")),
 			// The SAML trust anchors (kit#487). certificate_pem is the
 			// public certificate of any row, created or imported, and is
@@ -410,7 +413,10 @@ func main() {
 					"email", "email_verified", "phone_number", "phone_number_verified",
 					"credentials_changed_at"),
 			),
+			// The four trust switches are stored as sent, default off: a
+			// removed line turns one off (audit T1).
 			crud[corepb.Provider](scopeRealm,
+				withClearable("link_by_verified_email", "trust_upstream_email_verified", "trust_upstream_amr", "upstream_acr_map"),
 				withDescription("A way people sign in to a realm: username and password, a magic link, passkeys, a social or enterprise IdP, or SAML. `config` comes from the matching config data source."), withJSON("config")),
 			// A second step the realm offers (kit#544). config is the
 			// per-type Any; the factor_* config data sources below build it.
@@ -454,7 +460,12 @@ func main() {
 				withComputed("hostname", "url", "routable", "created_at"),
 				withReferences(map[string]gentf.Reference{"domain_id": refDomain})),
 			crud[corepb.Application](scopeIssuer,
-				withClearable("application_url", "login_url", "theme_variant_id", "expires_at"),
+				// post_logout_redirect_uris are allowed redirect targets: a
+				// removed list allows none (audit T1). kit requires
+				// grant_types, so it cannot be cleared: removing it is a plan
+				// error rather than a grant kept silently.
+				withClearable("application_url", "login_url", "theme_variant_id", "expires_at", "post_logout_redirect_uris"),
+				withRequired("grant_types"),
 				withDescription("An application of an issuer: something that signs people in or calls an API. On the wire it is an OAuth 2.0 client, and its identifier (`c-…`) is its `client_id`.\n\nFormerly `authwise_client` (kit#968): a `moved` block from `authwise_client` carries the state across, with `client_id` read as `application_id`."), withJSON("config"),
 				// owning_tenant_id marks a service account (kit#756): kit
 				// sets it on CreateServiceAccount and refuses it here.
@@ -478,7 +489,10 @@ func main() {
 			// Audience-scoped. The identity Role and Permission surface is
 			// gone (apis v0.6.0): roles and permissions live in the Access
 			// catalog, and a scope grants access permissions.
+			// auto puts the scope in every token unrequested: a removed
+			// line turns it off (audit T1).
 			crud[corepb.Scope](scopeAudience,
+				withClearable("auto"),
 				withDescription("An OAuth scope on an audience, and the access permissions it grants. The id is the scope's own name."), callerNamed, associate[corepb.AccessPermission]()),
 
 			// Access service (audience-scoped). AccessPermission and
@@ -529,8 +543,10 @@ func main() {
 			// network is the only way to move it. mesh_domain (apis v0.48.0)
 			// is derived from the network's and its tenant's slugs, so a
 			// slug change moves it.
+			// pool_fallback widens which relays carry the network's
+			// traffic: a removed line turns it off (audit T1).
 			crud[guardpb.Network](scopeTenant,
-				withClearable("display_name"),
+				withClearable("display_name", "pool_fallback"),
 				withDescription("A Guard network: a WireGuard mesh in a tenant. `cidr` is its address space inside 100.64.0.0/10, the whole of it when unset; changing it replaces the network."),
 				guard("network"), guardList("networks"),
 				withImmutable("cidr"),

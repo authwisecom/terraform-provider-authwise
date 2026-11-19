@@ -5,7 +5,7 @@ go 1.26.0
 require (
 	git.authwise.com/authwise/api-client-support v0.4.1
 	git.authwise.com/authwise/apis v0.81.0
-	github.com/activatedio/tfinfra v0.0.26
+	github.com/activatedio/tfinfra v0.0.27
 	github.com/hashicorp/terraform-plugin-framework v1.19.0
 	github.com/hashicorp/terraform-plugin-framework-jsontypes v0.2.0
 	github.com/hashicorp/terraform-plugin-framework-timeouts v0.5.0

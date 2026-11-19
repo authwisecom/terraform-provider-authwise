@@ -285,8 +285,8 @@ and zero values must be left out rather than written.
 - `client_secret` (String, Sensitive) OAuth2 client secret. Falls back to `AUTHWISE_CLIENT_SECRET`.
 - `endpoint` (String) gRPC API endpoint, e.g. `api.example.authwise.io:443`. Falls back to `AUTHWISE_ENDPOINT`.
 - `guard_endpoint` (String) guard-control's gRPC endpoint, e.g. `guard.example.authwise.io:443`, for the `authwise_guard_*` resources and data sources. Falls back to `AUTHWISE_GUARD_ENDPOINT`. It takes the same credentials as `endpoint`. Unset, a Guard resource fails at plan.
-- `insecure` (Boolean) Use plaintext gRPC (development only).
+- `insecure` (Boolean) Use plaintext gRPC (development only). The bearer token then travels unencrypted on every call, so the provider warns for any `endpoint` or `guard_endpoint` that is not loopback. It is also what allows an `http://` `token_url`, which is otherwise refused.
 - `issuer_id` (String) Default issuer identifier; per-resource `issuer_id` attributes override it.
 - `realm_id` (String) Default realm identifier; per-resource `realm_id` attributes override it.
 - `tenant_id` (String) Default tenant identifier used to compose AIP parents; per-resource `tenant_id` attributes override it.
-- `token_url` (String) OAuth2 token endpoint for the client_credentials grant, e.g. `https://auth.example.authwise.io/oauth/token`. Falls back to `AUTHWISE_TOKEN_URL`. When unset (with `client_id`), the provider uses the local awctl credential store instead.
+- `token_url` (String) OAuth2 token endpoint for the client_credentials grant, e.g. `https://auth.example.authwise.io/oauth/token`. Falls back to `AUTHWISE_TOKEN_URL`. It must be `https://`: plain `http://` would send the client secret unencrypted, and is refused unless `insecure = true`. When unset (with `client_id`), the provider uses the local awctl credential store instead.

@@ -1,5 +1,46 @@
 ## 0.36.0 (Unreleased)
 
+SECURITY:
+
+* **Removing a trust or transport setting from the configuration now turns
+  it off (audit T1).** Before, deleting the line planned no change and kit
+  or guard-control kept the setting on: deleting
+  `link_by_verified_email = true` left the provider linking accounts by
+  e-mail, and deleting `insecure = true` left an endpoint on plaintext.
+  Every release from 0.1.0 to 0.35.1 has this; each attribute is affected
+  from the release that added it. Removing the line now plans an in-place
+  update that turns the setting off (`false`) or clears it (null):
+  - `authwise_provider`: `link_by_verified_email`,
+    `trust_upstream_email_verified`, `trust_upstream_amr` (to `false`) and
+    `upstream_acr_map` (cleared)
+  - `authwise_endpoint`: `insecure` (to `false`); `tls` and `auth`
+    (cleared). Inside a `tls` block that stays, a removed
+    `insecure_skip_verify` turns to `false` and a removed `ca_pem`,
+    `server_name` or `client_certificate` is cleared.
+  - `authwise_scope`: `auto` (to `false`), which put the scope in every
+    token unrequested
+  - `authwise_application`: `post_logout_redirect_uris` (cleared)
+  - `authwise_guard_network`: `pool_fallback` (to `false`), which serves
+    the estate pool's relays after the network's own
+
+  **Before the first apply on 0.36.0, run `terraform plan`**: a setting
+  turned on outside Terraform (in the console, with awctl) on a resource
+  whose configuration omits it is turned off at that apply. To keep it,
+  write it into the configuration first.
+* **`authwise_application.grant_types` is required.** kit refuses an
+  application without grants, so the line could never be removed, but
+  removing it planned no change and the old grants (`client_credentials`,
+  for one) stayed. A configuration without `grant_types` now fails at
+  plan with `The argument "grant_types" is required`. Write the grants the
+  application has, as `terraform state show` lists them.
+* **An `http://` `token_url` is refused unless `insecure = true`.** It sent
+  the client secret unencrypted. With `insecure = true` it is allowed and
+  warned about for any host that is not loopback.
+* **`insecure = true` warns** for an `endpoint` or `guard_endpoint` that is
+  not loopback: every call carries the bearer token over plaintext gRPC.
+  It is still allowed, for an in-cluster caller dialing a cluster's own
+  service address.
+
 FEATURES:
 
 * **`authwise_tenant_home_administration.step_up_condition_id`**: the
@@ -66,30 +107,36 @@ NOTES:
   - `authwise_guard_resource`: `display_name`
   - `authwise_guard_trusted_issuer_rule`: `description`, `node_group`,
     `node_name_prefix`
+  - and the security settings listed under SECURITY above
 
   **Every other optional attribute still keeps its last value when it is
   removed from the configuration**: removing the line plans no change, and
-  kit or guard-control keeps the value. That is 130 attributes on 31
-  resources, of every kind: booleans, maps (`labels` on every resource that
-  has it), lists, JSON `config`, nested blocks such as
-  `authwise_endpoint.tls`, and strings. Among them are values the server
-  fills or defaults when left out (statuses, `authwise_application.kind`,
-  `authwise_guard_network.relay_pool`), values people, SCIM or node
-  enrollment write (`authwise_user` profile fields,
-  `authwise_guard_node.display_name`), `authwise_guard_network.slug` and
-  `authwise_guard_node.endpoint` (tf#80), **and security settings such as
-  `authwise_provider.link_by_verified_email`,
-  `trust_upstream_email_verified` and `authwise_endpoint.insecure`**. To
-  turn one of those off, set it to its off value (`false`, `{}`, `[]`) in
-  the configuration; deleting the line leaves it on.
+  kit or guard-control keeps the value. That is 125 attributes, nested ones
+  included, on 32 resources, and none of them turns on trust, weakens TLS,
+  links accounts, skips verification or grants access when kept. They are:
+  values the server fills or defaults when left out (statuses,
+  `authwise_application.kind`, `authwise_guard_network.relay_pool`);
+  values kit or guard-control refuses empty (display names,
+  `authwise_access_condition.expression`); values that replace the
+  resource when changed; values that only narrow or limit, so keeping them
+  fails closed (`authwise_guard_tenant_settings` `config.users.realms`,
+  `authwise_guard_trusted_issuer_rule.max_nodes`); values people, SCIM or
+  node enrollment write (`authwise_user` profile fields,
+  `authwise_guard_node.display_name`); `authwise_service_account.roles`,
+  where leaving the line out leaves the roles alone by design;
+  `authwise_guard_network.slug` and `authwise_guard_node.endpoint`
+  (tf#80); and the rest, `labels` and whole-attribute JSON `config` among
+  them, still to be decided. To clear one of those, set its empty value
+  (`""`, `{}`, `[]`) in the configuration.
 
 * **apis v0.81.0** (from v0.80.0): kit's `GetInstallStatus`. The data
   source needs kit 1.94.0 or later (registration results from 1.95.0);
   kit lists no feature for it, so an earlier kit is known by its
   `Unimplemented` answer. Nothing else changes.
-* **tfinfra v0.0.26** (from v0.0.25): the
-  generator's `Clearable` behavior, used for tf#79. Nothing else changes in
-  the generated code.
+* **tfinfra v0.0.27** (from v0.0.25): the generator's `Clearable`
+  behavior, used for tf#79 (v0.0.26) and extended to bools, lists, maps,
+  JSON documents and nested blocks for the security fixes above (v0.0.27).
+  Nothing else changes in the generated code.
 * **`authwise_access_binding` docs: a person's Guard administrative
   role.** In the tenant's administration audience, kit refuses a
   `guardcontrol.tenantAdmin` or `guardcontrol.networkAdmin` binding of a

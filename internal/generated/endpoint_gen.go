@@ -17,9 +17,8 @@ import (
 	path "github.com/hashicorp/terraform-plugin-framework/path"
 	resource "github.com/hashicorp/terraform-plugin-framework/resource"
 	schema "github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	boolplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
+	booldefault "github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	mapplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
-	objectplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/objectplanmodifier"
 	planmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	stringplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	validator "github.com/hashicorp/terraform-plugin-framework/schema/validator"
@@ -39,11 +38,9 @@ func EndpointResourceSchema() schema.Schema {
 				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"auth": schema.StringAttribute{
-				Computed:            true,
 				CustomType:          jsontypes.NormalizedType{},
 				MarkdownDescription: "`auth` as the protojson encoding of EndpointAuth.",
 				Optional:            true,
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
 			},
 			"display_name": schema.StringAttribute{
 				Computed:      true,
@@ -62,9 +59,9 @@ func EndpointResourceSchema() schema.Schema {
 				Validators:    []validator.String{stringvalidator.OneOf("REST", "GRPC")},
 			},
 			"insecure": schema.BoolAttribute{
-				Computed:      true,
-				Optional:      true,
-				PlanModifiers: []planmodifier.Bool{boolplanmodifier.UseStateForUnknown()},
+				Computed: true,
+				Default:  booldefault.StaticBool(false),
+				Optional: true,
 			},
 			"labels": schema.MapAttribute{
 				Computed:      true,
@@ -92,26 +89,16 @@ func EndpointResourceSchema() schema.Schema {
 			},
 			"tls": schema.SingleNestedAttribute{
 				Attributes: map[string]schema.Attribute{
-					"ca_pem": schema.StringAttribute{
-						Computed: true,
-						Optional: true,
-					},
-					"client_certificate": schema.StringAttribute{
-						Computed: true,
-						Optional: true,
-					},
+					"ca_pem":             schema.StringAttribute{Optional: true},
+					"client_certificate": schema.StringAttribute{Optional: true},
 					"insecure_skip_verify": schema.BoolAttribute{
 						Computed: true,
+						Default:  booldefault.StaticBool(false),
 						Optional: true,
 					},
-					"server_name": schema.StringAttribute{
-						Computed: true,
-						Optional: true,
-					},
+					"server_name": schema.StringAttribute{Optional: true},
 				},
-				Computed:      true,
-				Optional:      true,
-				PlanModifiers: []planmodifier.Object{objectplanmodifier.UseStateForUnknown()},
+				Optional: true,
 			},
 		},
 		MarkdownDescription: "A service kit calls out to: its transport and address, how kit verifies it (`tls`), how kit authenticates to it (`auth`), and the per-call deadline (`timeout`).",

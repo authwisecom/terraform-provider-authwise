@@ -20,6 +20,7 @@ import (
 	"git.authwise.com/authwise/terraform-provider-authwise/internal/guardadapt"
 	tfruntime "github.com/activatedio/tfinfra/pkg/tf"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/function"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/provider"
@@ -102,7 +103,7 @@ func (p *AuthwiseProvider) Schema(_ context.Context, _ provider.SchemaRequest, r
 			},
 			"token_url": schema.StringAttribute{
 				Optional:            true,
-				MarkdownDescription: "OAuth2 token endpoint for the client_credentials grant, e.g. `https://auth.example.authwise.io/oauth/token`. Falls back to `AUTHWISE_TOKEN_URL`. When unset (with `client_id`), the provider uses the local awctl credential store instead.",
+				MarkdownDescription: "OAuth2 token endpoint for the client_credentials grant, e.g. `https://auth.example.authwise.io/oauth/token`. Falls back to `AUTHWISE_TOKEN_URL`. It must be `https://`: plain `http://` would send the client secret unencrypted, and is refused unless `insecure = true`. When unset (with `client_id`), the provider uses the local awctl credential store instead.",
 			},
 			"client_id": schema.StringAttribute{
 				Optional:            true,
@@ -119,7 +120,7 @@ func (p *AuthwiseProvider) Schema(_ context.Context, _ provider.SchemaRequest, r
 			},
 			"insecure": schema.BoolAttribute{
 				Optional:            true,
-				MarkdownDescription: "Use plaintext gRPC (development only).",
+				MarkdownDescription: "Use plaintext gRPC (development only). The bearer token then travels unencrypted on every call, so the provider warns for any `endpoint` or `guard_endpoint` that is not loopback. It is also what allows an `http://` `token_url`, which is otherwise refused.",
 			},
 			// The defaults are ids, validated like the per-resource
 			// attributes they stand in for.
@@ -175,6 +176,24 @@ func stringOr(v types.String, env string) string {
 	return os.Getenv(env)
 }
 
+// transportFor is the gRPC transport: TLS, or plaintext with insecure. It
+// first reports where the credentials would travel unencrypted, and is not
+// ok when that is refused.
+func transportFor(config authwiseProviderModel, endpoint string, diags *diag.Diagnostics) (credentials.TransportCredentials, bool) {
+
+	checkPlaintext(config.Insecure.ValueBool(), stringOr(config.TokenURL, "AUTHWISE_TOKEN_URL"), map[string]string{
+		"endpoint":       endpoint,
+		"guard_endpoint": stringOr(config.GuardEndpoint, "AUTHWISE_GUARD_ENDPOINT"),
+	}, diags)
+	if diags.HasError() {
+		return nil, false
+	}
+	if config.Insecure.ValueBool() {
+		return insecure.NewCredentials(), true
+	}
+	return credentials.NewTLS(&tls.Config{MinVersion: tls.VersionTLS12}), true
+}
+
 // Configure implements provider.Provider: it builds the authenticated gRPC
 // client and hands tf.ProviderData to every generated resource and data
 // source.
@@ -194,16 +213,16 @@ func (p *AuthwiseProvider) Configure(ctx context.Context, req provider.Configure
 		return
 	}
 
+	transport, ok := transportFor(config, endpoint, &resp.Diagnostics)
+	if !ok {
+		return
+	}
+
 	bearerService, err := bearerServiceFor(config)
 	if err != nil {
 		resp.Diagnostics.AddAttributeError(path.Root("client_id"),
 			"incomplete client_credentials configuration", err.Error())
 		return
-	}
-
-	transport := credentials.NewTLS(&tls.Config{MinVersion: tls.VersionTLS12})
-	if config.Insecure.ValueBool() {
-		transport = insecure.NewCredentials()
 	}
 
 	dial := func(target string, opts ...grpc.DialOption) (*grpc.ClientConn, error) {

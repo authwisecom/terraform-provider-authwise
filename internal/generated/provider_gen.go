@@ -16,7 +16,7 @@ import (
 	path "github.com/hashicorp/terraform-plugin-framework/path"
 	resource "github.com/hashicorp/terraform-plugin-framework/resource"
 	schema "github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	boolplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
+	booldefault "github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	mapplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
 	planmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	stringplanmodifier "github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
@@ -50,9 +50,9 @@ func ProviderResourceSchema() schema.Schema {
 				PlanModifiers: []planmodifier.Map{mapplanmodifier.UseStateForUnknown()},
 			},
 			"link_by_verified_email": schema.BoolAttribute{
-				Computed:      true,
-				Optional:      true,
-				PlanModifiers: []planmodifier.Bool{boolplanmodifier.UseStateForUnknown()},
+				Computed: true,
+				Default:  booldefault.StaticBool(false),
+				Optional: true,
 			},
 			"name": schema.StringAttribute{
 				Computed:            true,
@@ -89,20 +89,18 @@ func ProviderResourceSchema() schema.Schema {
 				Validators:          []validator.String{tf.ReferenceID("t", "tenant", "")},
 			},
 			"trust_upstream_amr": schema.BoolAttribute{
-				Computed:      true,
-				Optional:      true,
-				PlanModifiers: []planmodifier.Bool{boolplanmodifier.UseStateForUnknown()},
+				Computed: true,
+				Default:  booldefault.StaticBool(false),
+				Optional: true,
 			},
 			"trust_upstream_email_verified": schema.BoolAttribute{
-				Computed:      true,
-				Optional:      true,
-				PlanModifiers: []planmodifier.Bool{boolplanmodifier.UseStateForUnknown()},
+				Computed: true,
+				Default:  booldefault.StaticBool(false),
+				Optional: true,
 			},
 			"upstream_acr_map": schema.MapAttribute{
-				Computed:      true,
-				ElementType:   types.StringType,
-				Optional:      true,
-				PlanModifiers: []planmodifier.Map{mapplanmodifier.UseStateForUnknown()},
+				ElementType: types.StringType,
+				Optional:    true,
 			},
 		},
 		MarkdownDescription: "A way people sign in to a realm: username and password, a magic link, passkeys, a social or enterprise IdP, or SAML. `config` comes from the matching config data source.",

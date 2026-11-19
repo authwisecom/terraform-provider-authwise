@@ -10,7 +10,10 @@ import (
 
 	corepb "git.authwise.com/authwise/apis/authwise/types/core/v1alpha1"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/knownvalue"
+	"github.com/hashicorp/terraform-plugin-testing/plancheck"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
+	"github.com/hashicorp/terraform-plugin-testing/tfjsonpath"
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
@@ -219,24 +222,28 @@ data "authwise_provider_oauth" "c" {
 // oauth provider's identifier must come from the userinfo document.
 // TestAccProvider_LinkByVerifiedEmail is the per-provider opt-in to the
 // login-time link by verified email (kit#633, apis v0.13.0): set on create,
-// cleared in place, and reaching kit's row each time.
+// turned off in place, and reaching kit's row each time. Removing the line
+// turns it off too: a trust switch that outlives its line in the
+// configuration keeps linking accounts nobody asked to link (audit T1).
 func TestAccProvider_LinkByVerifiedEmail(t *testing.T) {
 
 	h := newHarness(t)
 
-	config := func(link bool) string {
-		return h.providerConfig() + realmForFactors + fmt.Sprintf(`
+	config := func(link string) string {
+		if link != "" {
+			link = "  link_by_verified_email = " + link + "\n"
+		}
+		return h.providerConfig() + realmForFactors + `
 data "authwise_provider_google" "this" {
   client_id = "123.apps.googleusercontent.com"
 }
 
 resource "authwise_provider" "google" {
-  realm_id               = local.realm_id
-  provider_type          = "google"
-  config                 = data.authwise_provider_google.this.any
-  link_by_verified_email = %t
-}
-`, link)
+  realm_id      = local.realm_id
+  provider_type = "google"
+  config        = data.authwise_provider_google.this.any
+` + link + `}
+`
 	}
 
 	serverHas := func(want bool) resource.TestCheckFunc {
@@ -256,18 +263,41 @@ resource "authwise_provider" "google" {
 		ProtoV6ProviderFactories: protoFactories(),
 		Steps: []resource.TestStep{
 			{
-				Config: config(true),
+				Config: config("true"),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("authwise_provider.google", "link_by_verified_email", "true"),
 					serverHas(true),
 				),
 			},
 			{
-				Config: config(false),
+				Config: config("false"),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("authwise_provider.google", "link_by_verified_email", "false"),
 					serverHas(false),
 				),
+			},
+			{
+				Config: config("true"),
+				Check:  serverHas(true),
+			},
+			{
+				// Removed from the configuration: an in-place update that
+				// turns it off on kit's row.
+				Config: config(""),
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{
+						plancheck.ExpectResourceAction("authwise_provider.google", plancheck.ResourceActionUpdate),
+						plancheck.ExpectKnownValue("authwise_provider.google", tfjsonpath.New("link_by_verified_email"), knownvalue.Bool(false)),
+					},
+				},
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("authwise_provider.google", "link_by_verified_email", "false"),
+					serverHas(false),
+				),
+			},
+			{
+				Config:           config(""),
+				ConfigPlanChecks: resource.ConfigPlanChecks{PreApply: []plancheck.PlanCheck{plancheck.ExpectEmptyPlan()}},
 			},
 		},
 		CheckDestroy: noneLeft(h),
@@ -276,25 +306,27 @@ resource "authwise_provider" "google" {
 
 // TestAccProvider_TrustUpstreamEmailVerified is the per-provider opt-in to
 // counting the upstream's verified address as kit's own proof (kit#663,
-// apis v0.16.0): set on create, cleared in place, and reaching kit's row
-// each time.
+// apis v0.16.0): set on create, turned off in place, and reaching kit's row
+// each time. Removing the line turns it off too (audit T1).
 func TestAccProvider_TrustUpstreamEmailVerified(t *testing.T) {
 
 	h := newHarness(t)
 
-	config := func(trust bool) string {
-		return h.providerConfig() + realmForFactors + fmt.Sprintf(`
+	config := func(trust string) string {
+		if trust != "" {
+			trust = "  trust_upstream_email_verified = " + trust + "\n"
+		}
+		return h.providerConfig() + realmForFactors + `
 data "authwise_provider_google" "this" {
   client_id = "123.apps.googleusercontent.com"
 }
 
 resource "authwise_provider" "google" {
-  realm_id                      = local.realm_id
-  provider_type                 = "google"
-  config                        = data.authwise_provider_google.this.any
-  trust_upstream_email_verified = %t
-}
-`, trust)
+  realm_id      = local.realm_id
+  provider_type = "google"
+  config        = data.authwise_provider_google.this.any
+` + trust + `}
+`
 	}
 
 	serverHas := func(want bool) resource.TestCheckFunc {
@@ -314,18 +346,41 @@ resource "authwise_provider" "google" {
 		ProtoV6ProviderFactories: protoFactories(),
 		Steps: []resource.TestStep{
 			{
-				Config: config(true),
+				Config: config("true"),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("authwise_provider.google", "trust_upstream_email_verified", "true"),
 					serverHas(true),
 				),
 			},
 			{
-				Config: config(false),
+				Config: config("false"),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("authwise_provider.google", "trust_upstream_email_verified", "false"),
 					serverHas(false),
 				),
+			},
+			{
+				Config: config("true"),
+				Check:  serverHas(true),
+			},
+			{
+				// Removed from the configuration: an in-place update that
+				// turns it off on kit's row.
+				Config: config(""),
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{
+						plancheck.ExpectResourceAction("authwise_provider.google", plancheck.ResourceActionUpdate),
+						plancheck.ExpectKnownValue("authwise_provider.google", tfjsonpath.New("trust_upstream_email_verified"), knownvalue.Bool(false)),
+					},
+				},
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("authwise_provider.google", "trust_upstream_email_verified", "false"),
+					serverHas(false),
+				),
+			},
+			{
+				Config:           config(""),
+				ConfigPlanChecks: resource.ConfigPlanChecks{PreApply: []plancheck.PlanCheck{plancheck.ExpectEmptyPlan()}},
 			},
 		},
 		CheckDestroy: noneLeft(h),

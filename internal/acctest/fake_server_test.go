@@ -698,6 +698,8 @@ func (f *fakeIdentityServer) PatchApplication(ctx context.Context, in *identityp
 			existing.LoginUrl = in.GetApplication().GetLoginUrl()
 		case "theme_variant_id":
 			existing.ThemeVariantId = in.GetApplication().GetThemeVariantId()
+		case "post_logout_redirect_uris":
+			existing.PostLogoutRedirectUris = in.GetApplication().GetPostLogoutRedirectUris()
 		case "config":
 			existing.Config = in.GetApplication().GetConfig()
 		case "labels":
@@ -875,6 +877,10 @@ func (f *fakeIdentityServer) PatchProvider(ctx context.Context, in *identitypb.P
 			existing.LinkByVerifiedEmail = in.GetProvider().GetLinkByVerifiedEmail()
 		case "trust_upstream_email_verified":
 			existing.TrustUpstreamEmailVerified = in.GetProvider().GetTrustUpstreamEmailVerified()
+		case "trust_upstream_amr":
+			existing.TrustUpstreamAmr = in.GetProvider().GetTrustUpstreamAmr()
+		case "upstream_acr_map":
+			existing.UpstreamAcrMap = in.GetProvider().GetUpstreamAcrMap()
 		default:
 			return nil, status.Errorf(codes.InvalidArgument, "unsupported update_mask path %q", path)
 		}

@@ -15,6 +15,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/knownvalue"
 	"github.com/hashicorp/terraform-plugin-testing/plancheck"
+	"github.com/hashicorp/terraform-plugin-testing/statecheck"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
 	"github.com/hashicorp/terraform-plugin-testing/tfjsonpath"
 )
@@ -29,6 +30,7 @@ type clearCase struct {
 	// base is the resource's other arguments, one per line.
 	base string
 	// clear maps each clearable attribute to the HCL value it is set to.
+	// A bool is set true: removed, it plans and reads false, not null.
 	clear map[string]string
 }
 
@@ -55,9 +57,18 @@ func (c clearCase) attrs() []string {
 	return out
 }
 
+// removed is what a clearable attribute plans and reads once its line is
+// gone: false for a bool, which proto3 cannot leave unset, null otherwise.
+func (c clearCase) removed(attr string) knownvalue.Check {
+	if c.clear[attr] == "true" {
+		return knownvalue.Bool(false)
+	}
+	return knownvalue.Null()
+}
+
 // clearInPlace sets every clearable attribute, removes them all, and expects
-// an in-place update to null that the server applies, then an empty plan,
-// then setting them again in place.
+// an in-place update to null (false for a bool) that the server applies,
+// then an empty plan, then setting them again in place.
 func clearInPlace(t *testing.T, c clearCase) {
 
 	h := newHarness(t)
@@ -65,13 +76,18 @@ func clearInPlace(t *testing.T, c clearCase) {
 	full, bare := c.config(h, true), c.config(h, false)
 
 	attrs := c.attrs()
-	nulls := make([]plancheck.PlanCheck, 0, len(attrs))
-	set := make([]resource.TestCheckFunc, 0, len(attrs))
-	gone := make([]resource.TestCheckFunc, 0, len(attrs))
+	planned := make([]plancheck.PlanCheck, 0, len(attrs))
+	set := make([]statecheck.StateCheck, 0, len(attrs))
+	gone := make([]statecheck.StateCheck, 0, len(attrs))
 	for _, attr := range attrs {
-		nulls = append(nulls, plancheck.ExpectKnownValue(addr, tfjsonpath.New(attr), knownvalue.Null()))
-		set = append(set, resource.TestCheckResourceAttrSet(addr, attr))
-		gone = append(gone, resource.TestCheckNoResourceAttr(addr, attr))
+		path := tfjsonpath.New(attr)
+		planned = append(planned, plancheck.ExpectKnownValue(addr, path, c.removed(attr)))
+		var on knownvalue.Check = knownvalue.NotNull()
+		if c.clear[attr] == "true" {
+			on = knownvalue.Bool(true)
+		}
+		set = append(set, statecheck.ExpectKnownValue(addr, path, on))
+		gone = append(gone, statecheck.ExpectKnownValue(addr, path, c.removed(attr)))
 	}
 
 	var id string
@@ -90,17 +106,19 @@ func clearInPlace(t *testing.T, c clearCase) {
 		ProtoV6ProviderFactories: protoFactories(),
 		Steps: []resource.TestStep{
 			{
-				Config: full,
-				Check:  resource.ComposeAggregateTestCheckFunc(append(slices.Clone(set), keepID)...),
+				Config:            full,
+				ConfigStateChecks: set,
+				Check:             keepID,
 			},
 			{
-				// Removed: an in-place update to null, which the read
-				// confirms, so the server cleared them.
+				// Removed: an in-place update to null or false, which the
+				// read confirms, so the server cleared them.
 				Config: bare,
 				ConfigPlanChecks: resource.ConfigPlanChecks{
-					PreApply: append([]plancheck.PlanCheck{plancheck.ExpectResourceAction(addr, plancheck.ResourceActionUpdate)}, nulls...),
+					PreApply: append([]plancheck.PlanCheck{plancheck.ExpectResourceAction(addr, plancheck.ResourceActionUpdate)}, planned...),
 				},
-				Check: resource.ComposeAggregateTestCheckFunc(append(slices.Clone(gone), sameID)...),
+				ConfigStateChecks: gone,
+				Check:             sameID,
 			},
 			{
 				Config:           bare,
@@ -112,7 +130,8 @@ func clearInPlace(t *testing.T, c clearCase) {
 				ConfigPlanChecks: resource.ConfigPlanChecks{
 					PreApply: []plancheck.PlanCheck{plancheck.ExpectResourceAction(addr, plancheck.ResourceActionUpdate)},
 				},
-				Check: resource.ComposeAggregateTestCheckFunc(append(slices.Clone(set), sameID)...),
+				ConfigStateChecks: slices.Clone(set),
+				Check:             sameID,
 			},
 		},
 	})
@@ -165,6 +184,8 @@ var clearCases = map[string]clearCase{
 			"login_url":        `"https://app.example.com/login"`,
 			"theme_variant_id": `"ap-01"`,
 			"expires_at":       `"2099-01-01T00:00:00Z"`,
+			// Allowed redirect targets after logout (audit T1).
+			"post_logout_redirect_uris": `["https://app.example.com/bye"]`,
 		},
 	},
 	"application_secret": {
@@ -201,6 +222,54 @@ resource "authwise_application" "app" {
 			"stylesheet":                   `"body { color: navy; }"`,
 			"stylesheet_attributes_schema": `"{}"`,
 		},
+	},
+	// The trust switches and the map c reads (audit T1).
+	"provider": {
+		typ: "provider",
+		prereq: realmForFactors + `
+data "authwise_provider_google" "this" {
+  client_id = "123.apps.googleusercontent.com"
+}
+`,
+		base: `  realm_id      = local.realm_id` + "\n" + `  provider_type = "google"` + "\n" + `  config        = data.authwise_provider_google.this.any`,
+		clear: map[string]string{
+			"link_by_verified_email":        "true",
+			"trust_upstream_email_verified": "true",
+			"trust_upstream_amr":            "true",
+			"upstream_acr_map":              `{ "urn:partner:mfa" = "mfa" }`,
+		},
+	},
+	// Plaintext, and the credential kit presents (audit T1).
+	"endpoint": {
+		typ: "endpoint",
+		prereq: `
+resource "authwise_domain" "internal" {
+  hostname = "auth.example.com"
+}
+
+resource "authwise_issuer" "internal" {
+  domain_id = authwise_domain.internal.domain_id
+}
+`,
+		base: `  display_name  = "Ledger"` + "\n" + `  endpoint_type = "GRPC"` + "\n" + `  address       = "ledger.example.com:443"`,
+		clear: map[string]string{
+			"insecure": "true",
+			"auth":     `jsonencode({ kitToken = { issuer = authwise_issuer.internal.name, audience = "https://ledger.example.com" } })`,
+		},
+	},
+	// How kit verifies the endpoint, as a whole block (audit T1).
+	"endpoint_tls": {
+		typ:  "endpoint",
+		base: `  display_name  = "Ledger"` + "\n" + `  endpoint_type = "GRPC"` + "\n" + `  address       = "ledger.example.com:443"`,
+		clear: map[string]string{
+			"tls": `{ ca_pem = "-----BEGIN CERTIFICATE-----\nMIIBszCCAVmgAwIBAgIUCAm8fQe8b2ZbXH0oN6Hc0qY8jXcwCgYIKoZIzj0EAwIw\n-----END CERTIFICATE-----\n", server_name = "ledger.internal", insecure_skip_verify = true }`,
+		},
+	},
+	// Granted in every token unrequested (audit T1).
+	"scope": {
+		typ:   "scope",
+		base:  `  scope_id = "tf79.read"` + "\n" + `  kind     = "access"`,
+		clear: map[string]string{"auto": "true"},
 	},
 	"guard_network": {
 		typ:    "guard_network",

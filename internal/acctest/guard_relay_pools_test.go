@@ -9,8 +9,10 @@ import (
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/knownvalue"
 	"github.com/hashicorp/terraform-plugin-testing/plancheck"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
+	"github.com/hashicorp/terraform-plugin-testing/tfjsonpath"
 )
 
 const (
@@ -319,4 +321,70 @@ resource "authwise_guard_relay_pool" "p" {
 			})
 		})
 	}
+}
+
+// TestAccGuardNetwork_PoolFallbackRemoved: pool_fallback serves the estate
+// pool's relays after the network's own, so it widens which relays carry
+// the network's traffic. Removing the line turns it off on guard-control's
+// row (audit T1).
+func TestAccGuardNetwork_PoolFallbackRemoved(t *testing.T) {
+
+	h := newHarness(t)
+	const addr = "authwise_guard_network.n"
+
+	config := func(fallback string) string {
+		return h.providerConfig() + `
+resource "authwise_guard_relay_pool" "central" {
+  slug    = "us-central"
+  default = true
+}
+
+resource "authwise_guard_network" "n" {
+  tenant_id    = "t-1"
+  display_name = "n"
+` + fallback + `  depends_on   = [authwise_guard_relay_pool.central]
+}
+
+resource "authwise_guard_relay" "own" {
+  tenant_id  = "t-1"
+  network_id = authwise_guard_network.n.guard_network_id
+  url        = "wss://own.example.com/v1/transport"
+}
+`
+	}
+
+	serverHas := func(want bool) resource.TestCheckFunc {
+		return checkServer(func() error {
+			h.guard.mu.Lock()
+			defer h.guard.mu.Unlock()
+			for _, n := range h.guard.networks {
+				if n.GetPoolFallback() != want {
+					return fmt.Errorf("pool_fallback = %t on guard-control's row, want %t", n.GetPoolFallback(), want)
+				}
+			}
+			return nil
+		})
+	}
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: protoFactories(),
+		Steps: []resource.TestStep{
+			{Config: config(""), Check: serverHas(false)},
+			{Config: config("  pool_fallback = true\n"), Check: serverHas(true)},
+			{
+				Config: config(""),
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{
+						plancheck.ExpectResourceAction(addr, plancheck.ResourceActionUpdate),
+						plancheck.ExpectKnownValue(addr, tfjsonpath.New("pool_fallback"), knownvalue.Bool(false)),
+					},
+				},
+				Check: serverHas(false),
+			},
+			{
+				Config:           config(""),
+				ConfigPlanChecks: resource.ConfigPlanChecks{PreApply: []plancheck.PlanCheck{plancheck.ExpectEmptyPlan()}},
+			},
+		},
+	})
 }

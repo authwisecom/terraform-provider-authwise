@@ -115,9 +115,12 @@ func TestAccApplication_Refusals(t *testing.T) {
   token_endpoint_auth_method = "private_key_jwt"`,
 			want: regexp.MustCompile(`(?s)private_key_jwt\s+is\s+not\s+supported\s+yet`),
 		},
-		"no grants and no kind": {
+		// kit requires grant_types; the schema says so, so a configuration
+		// without it fails at plan, and removing it never keeps the old
+		// grants silently (audit T1).
+		"no grants": {
 			config: ``,
-			want:   regexp.MustCompile(`(?s)kind:\s+""\s+is\s+not`),
+			want:   regexp.MustCompile(`(?s)The argument "grant_types" is required`),
 		},
 	}
 

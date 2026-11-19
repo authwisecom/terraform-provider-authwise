@@ -12,8 +12,10 @@ import (
 
 	corepb "git.authwise.com/authwise/apis/authwise/types/core/v1alpha1"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/knownvalue"
 	"github.com/hashicorp/terraform-plugin-testing/plancheck"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
+	"github.com/hashicorp/terraform-plugin-testing/tfjsonpath"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -952,5 +954,70 @@ resource "authwise_realm" "r" {
 				ExpectError: regexp.MustCompile(`the authentication policy is managed separately`),
 			},
 		},
+	})
+}
+
+// TestAccEndpoint_TLSChildRemoved: a line removed inside a kept tls block is
+// cleared on kit's row too. insecure_skip_verify plans false and ca_pem null,
+// so neither the skipped verification nor the extra trust anchor outlives
+// its line (audit T1).
+func TestAccEndpoint_TLSChildRemoved(t *testing.T) {
+
+	h := newHarness(t)
+	const addr = "authwise_endpoint.ledger"
+
+	config := func(extra string) string {
+		return h.providerConfig() + `
+resource "authwise_endpoint" "ledger" {
+  display_name  = "Ledger"
+  endpoint_type = "GRPC"
+  address       = "ledger.example.com:443"
+  tls = {
+    server_name = "ledger.internal"
+` + extra + `  }
+}
+`
+	}
+
+	serverTLS := func(skip bool, ca string) resource.TestCheckFunc {
+		return checkServer(func() error {
+			h.fake.mu.Lock()
+			defer h.fake.mu.Unlock()
+			for _, e := range h.fake.endpoints {
+				tls := e.GetTls()
+				if tls.GetInsecureSkipVerify() != skip || tls.GetCaPem() != ca || tls.GetServerName() != "ledger.internal" {
+					return fmt.Errorf("kit's row has tls %v, want insecure_skip_verify %t, ca_pem %q", tls, skip, ca)
+				}
+			}
+			return nil
+		})
+	}
+
+	const pem = "-----BEGIN CERTIFICATE-----\nMIIBszCCAVmgAwIBAgIUCAm8fQe8b2ZbXH0oN6Hc0qY8jXcwCgYIKoZIzj0EAwIw\n-----END CERTIFICATE-----\n"
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: protoFactories(),
+		Steps: []resource.TestStep{
+			{
+				Config: config("    insecure_skip_verify = true\n    ca_pem = " + fmt.Sprintf("%q", pem) + "\n"),
+				Check:  serverTLS(true, pem),
+			},
+			{
+				Config: config(""),
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{
+						plancheck.ExpectResourceAction(addr, plancheck.ResourceActionUpdate),
+						plancheck.ExpectKnownValue(addr, tfjsonpath.New("tls").AtMapKey("insecure_skip_verify"), knownvalue.Bool(false)),
+						plancheck.ExpectKnownValue(addr, tfjsonpath.New("tls").AtMapKey("ca_pem"), knownvalue.Null()),
+					},
+				},
+				Check: serverTLS(false, ""),
+			},
+			{
+				Config:           config(""),
+				ConfigPlanChecks: resource.ConfigPlanChecks{PreApply: []plancheck.PlanCheck{plancheck.ExpectEmptyPlan()}},
+			},
+		},
+		CheckDestroy: noneLeft(h),
 	})
 }
