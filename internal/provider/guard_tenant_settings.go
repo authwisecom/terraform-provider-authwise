@@ -15,7 +15,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/mapplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/objectplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
@@ -142,10 +141,8 @@ func (r *guardTenantSettingsResource) Schema(_ context.Context, _ resource.Schem
 			},
 			labelsAttribute: schema.MapAttribute{
 				Optional:            true,
-				Computed:            true,
 				ElementType:         types.StringType,
-				MarkdownDescription: "Guard's labels on the tenant. Written whole when it changes.",
-				PlanModifiers:       []planmodifier.Map{mapplanmodifier.UseStateForUnknown()},
+				MarkdownDescription: "Guard's labels on the tenant. Written whole when it changes; left out, the tenant has none.",
 			},
 			configAttribute: schema.SingleNestedAttribute{
 				Optional:            true,
@@ -324,7 +321,7 @@ func guardTenantPatch(ctx context.Context, plan, prior *guardTenantSettingsModel
 	heldRealms, heldEnabled := settingsLeaves(ctx, held.Config, diags)
 	realms, enabled := settingsLeaves(ctx, plan.Config, diags)
 
-	if changed(plan.Labels, held.Labels) {
+	if labelsChanged(plan.Labels, prior, held.Labels) {
 		diags.Append(plan.Labels.ElementsAs(ctx, &tenant.Labels, false)...)
 		paths = append(paths, maskLabels)
 	}
@@ -337,6 +334,22 @@ func guardTenantPatch(ctx context.Context, plan, prior *guardTenantSettingsModel
 		paths = append(paths, maskDeprovisioningEnabled)
 	}
 	return tenant, paths
+}
+
+// labelsChanged reports labels to write: a planned value the tenant does not
+// hold, or none planned while it holds some. labels are clearable (audit
+// T1): left out of the configuration they are cleared, at adoption (prior
+// nil) too, since a read of the tenant's labels would otherwise disagree
+// with the null the plan holds. A null plan writes an empty map.
+func labelsChanged(planned types.Map, prior *guardTenantSettingsModel, held types.Map) bool {
+	switch {
+	case planned.IsUnknown():
+		return false
+	case planned.IsNull():
+		return prior == nil || len(held.Elements()) > 0
+	default:
+		return prior == nil || !planned.Equal(held)
+	}
 }
 
 // settingsLeaves is config's realms and enabled, unknown where config, or
@@ -376,9 +389,15 @@ func fillGuardTenantSettings(ctx context.Context, m *guardTenantSettingsModel, t
 	m.Audience = types.StringValue(t.GetAudience())
 	m.ConsoleClientID = types.StringValue(t.GetConsoleClientId())
 
-	labels, d := types.MapValueFrom(ctx, types.StringType, nonNilMap(t.GetLabels()))
-	diags.Append(d...)
-	m.Labels = labels
+	// None reads as null, as a removed line plans, unless the configuration
+	// wrote {}.
+	if len(t.GetLabels()) > 0 || tfruntime.KeepEmpty(m.Labels) {
+		labels, d := types.MapValueFrom(ctx, types.StringType, nonNilMap(t.GetLabels()))
+		diags.Append(d...)
+		m.Labels = labels
+	} else {
+		m.Labels = types.MapNull(types.StringType)
+	}
 
 	realms, d := types.ListValueFrom(ctx, types.StringType, nonNilSlice(t.GetConfig().GetUsers().GetRealms()))
 	diags.Append(d...)

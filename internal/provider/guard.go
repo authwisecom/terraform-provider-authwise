@@ -131,6 +131,13 @@ func guardConnFor(config authwiseProviderModel, dial func(string, ...grpc.DialOp
 	return c, true, nil
 }
 
+// guardConfigAttribute is the generated Guard resources' config: a JSON
+// object guard-control drops.
+const (
+	guardConfigAttribute   = "config"
+	guardConfigDeprecation = "Has no effect: guard-control never stores or returns `config`, so a value written here is dropped. It will be removed in a future release; remove it from the configuration."
+)
+
 // guardWrap wraps every authwise_guard_* resource, generated or wrapped
 // already, in guardResource.
 func guardWrap(ctx context.Context, factories []func() resource.Resource) []func() resource.Resource {
@@ -169,6 +176,14 @@ func (r *guardResource) Metadata(ctx context.Context, req resource.MetadataReque
 // parent identifier is so that it can inherit the provider default.
 func (r *guardResource) Schema(ctx context.Context, req resource.SchemaRequest, resp *resource.SchemaResponse) {
 	r.inner.Schema(ctx, req, resp)
+	// guard-control's proto carries a config Struct on a network, node,
+	// relay, relay pool, pool relay and resource that it never stores or
+	// returns: the attribute has no effect (audit T1, plan's ruling).
+	if a, ok := resp.Schema.Attributes[guardConfigAttribute].(schema.StringAttribute); ok {
+		a.DeprecationMessage = guardConfigDeprecation
+		a.MarkdownDescription = guardConfigDeprecation
+		resp.Schema.Attributes[guardConfigAttribute] = a
+	}
 	if a, ok := resp.Schema.Attributes[tenantIDAttribute].(schema.StringAttribute); ok {
 		a.Required, a.Optional, a.Computed = true, false, false
 		a.MarkdownDescription = guardTenantIDDescription + " Changing it replaces the resource."

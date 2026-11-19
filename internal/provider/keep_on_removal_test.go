@@ -43,7 +43,6 @@ var keepOnRemoval = map[string]string{
 	"authwise_guard_tenant_settings.config.deprovisioning.enabled": reasonFailsClosed,
 	"authwise_guard_tenant_settings.config.users":                  reasonFailsClosed,
 	"authwise_guard_tenant_settings.config.users.realms":           reasonFailsClosed,
-	"authwise_guard_tenant_settings.labels":                        reasonTenantLabelsUnverified,
 	"authwise_guard_trusted_issuer_rule.ephemeral":                 reasonFailsClosed,
 	"authwise_guard_trusted_issuer_rule.max_nodes":                 reasonFailsClosed,
 	"authwise_issuer.domain_id":                                    reasonReplaces,
@@ -107,9 +106,4 @@ const (
 	// line would leave the issuer or the estate with no default at all. Set
 	// false explicitly to do that on purpose.
 	reasonLeavesNoDefault = "removing it would leave no default; set false explicitly"
-	// reasonTenantLabelsUnverified: written through guard-control's tenant
-	// update, which may not keep labels (tenant_config.go keeps no labels
-	// column); to be checked against guard-control before it is changed. No
-	// security effect.
-	reasonTenantLabelsUnverified = "guard-control may not store tenant labels; to verify"
 )

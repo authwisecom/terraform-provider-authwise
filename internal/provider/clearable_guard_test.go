@@ -114,3 +114,31 @@ func isScopeID(name string, a schema.Attribute) bool {
 	}
 	return false
 }
+
+// The six Guard config attributes guard-control never stores are deprecated
+// as having no effect (audit T1); nothing else is.
+func TestSchema_GuardConfigDeprecated(t *testing.T) {
+
+	ctx := context.Background()
+	p := provider.New("test")()
+
+	var deprecated []string
+	for _, f := range p.Resources(ctx) {
+		r := f()
+		meta := &resource.MetadataResponse{}
+		r.Metadata(ctx, resource.MetadataRequest{ProviderTypeName: "authwise"}, meta)
+		resp := &resource.SchemaResponse{}
+		r.Schema(ctx, resource.SchemaRequest{}, resp)
+		for name, a := range resp.Schema.Attributes {
+			if a.GetDeprecationMessage() != "" && name == "config" {
+				deprecated = append(deprecated, meta.TypeName)
+			}
+		}
+	}
+	sort.Strings(deprecated)
+
+	assert.Equal(t, []string{
+		"authwise_guard_network", "authwise_guard_node", "authwise_guard_pool_relay",
+		"authwise_guard_relay", "authwise_guard_relay_pool", "authwise_guard_resource",
+	}, deprecated)
+}

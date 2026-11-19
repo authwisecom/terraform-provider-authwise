@@ -39,7 +39,7 @@ resource "authwise_guard_resource" "office_lan" {
 
 ### Optional
 
-- `config` (String) `config` as a JSON object.
+- `config` (String, Deprecated) Has no effect: guard-control never stores or returns `config`, so a value written here is dropped. It will be removed in a future release; remove it from the configuration.
 - `display_name` (String)
 - `labels` (Map of String)
 - `published_name` (String)

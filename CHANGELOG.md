@@ -1,5 +1,54 @@
 ## 0.36.0 (Unreleased)
 
+UPGRADING FROM 0.35:
+
+* **Check each root before moving its pin to 0.36.0.** In a scratch
+  checkout of the root (so the lock file change is not committed), with
+  the version constraint allowing 0.36.0:
+
+  ```sh
+  terraform init -backend=false -upgrade && terraform validate
+  ```
+
+  `terraform validate` needs no credentials and reports every missing
+  required argument below in one run, modules included, one
+  `Missing required argument` error each. It does not see an argument
+  whose expression evaluates to null (a variable defaulting to null):
+  that one fails at `terraform plan`. Nor does it check `token_url`,
+  which the provider checks when it configures, at plan.
+* **Newly required arguments.** kit refused each of these empty, so a
+  configuration kit accepted already sets them; leaving one out used to
+  keep the last value silently, and now fails at plan with
+  `The argument "<name>" is required`:
+  - `authwise_access_condition`: `display_name`, `expression`
+  - `authwise_access_permission`: `service`
+  - `authwise_application`: `audience_id`, `display_name`, `grant_types`
+  - `authwise_asset`: `display_name`, `path`, `mime_type`
+  - `authwise_audience`: `display_name`
+  - `authwise_endpoint`: `display_name`, `address`
+  - `authwise_provider`: `display_name`, `provider_type`
+  - `authwise_scope`: `kind`
+  - `authwise_secret`: `display_name`
+  - `authwise_theme`: `display_name`
+  - `authwise_theme_variant`: `display_name`, `theme_id`
+  - `authwise_guard_relay_pool`: `slug`
+
+  Write the value the resource has, as `terraform state show` lists it.
+  For `grant_types`, that is the grants the application holds now
+  (`client_credentials`, for one).
+* **An `http://` `token_url` fails at plan** unless `insecure = true`;
+  use the `https://` URL.
+* **Then run `terraform plan` before the first apply**: optional values
+  removed from the configuration are now cleared (see SECURITY and the
+  upgrade note under NOTES). A value set outside Terraform on an argument
+  the configuration leaves out is cleared at that apply.
+* **Deprecated: `config` on `authwise_guard_network`, `authwise_guard_node`,
+  `authwise_guard_relay`, `authwise_guard_relay_pool`,
+  `authwise_guard_pool_relay` and `authwise_guard_resource`.** It has
+  never had an effect: guard-control does not store or return it, so a
+  value written there was dropped. Setting it now warns; it will be
+  removed in a later release. Remove it from the configuration.
+
 SECURITY:
 
 * **Removing a trust or transport setting from the configuration now turns
@@ -30,28 +79,10 @@ SECURITY:
   turned on outside Terraform (in the console, with awctl) on a resource
   whose configuration omits it is turned off at that apply. To keep it,
   write it into the configuration first.
-* **`authwise_application.grant_types` is required.** kit refuses an
-  application without grants, so the line could never be removed, but
-  removing it planned no change and the old grants (`client_credentials`,
-  for one) stayed. A configuration without `grant_types` now fails at
-  plan with `The argument "grant_types" is required`. Write the grants the
-  application has, as `terraform state show` lists them.
-* **Arguments kit refuses empty are now required**, so removing one fails
-  at plan instead of leaving the old value in place. A configuration that
-  kit accepted already has them; one that leaves one out now fails at plan
-  with `The argument "<name>" is required`:
-  - `authwise_access_condition`: `display_name`, `expression`
-  - `authwise_access_permission`: `service`
-  - `authwise_application`: `audience_id`, `display_name`
-  - `authwise_asset`: `display_name`, `path`, `mime_type`
-  - `authwise_audience`: `display_name`
-  - `authwise_endpoint`: `display_name`, `address`
-  - `authwise_provider`: `display_name`, `provider_type`
-  - `authwise_scope`: `kind`
-  - `authwise_secret`: `display_name`
-  - `authwise_theme`: `display_name`
-  - `authwise_theme_variant`: `display_name`, `theme_id`
-  - `authwise_guard_relay_pool`: `slug`
+* **Arguments kit requires are required in the schema**, `grant_types`
+  among them: removing `grant_types` planned no change and left the old
+  grants (`client_credentials`, for one) in place. The list is under
+  UPGRADING.
 * **An `http://` `token_url` is refused unless `insecure = true`.** It sent
   the client secret unencrypted. With `insecure = true` it is allowed and
   warned about for any host that is not loopback.
@@ -128,8 +159,9 @@ NOTES:
   - `authwise_guard_trusted_issuer_rule`: `description`, `node_group`,
     `node_name_prefix`
   - and the security settings listed under SECURITY above
-  - `labels` on every resource that has it except
-    `authwise_guard_tenant_settings` (cleared)
+  - `labels` on every resource that has it (cleared). On
+    `authwise_guard_tenant_settings`, which adopts an existing tenant,
+    leaving `labels` out clears the tenant's labels at creation too.
   - `config` on `authwise_application`, `authwise_audience`,
     `authwise_factor`, `authwise_issuer`, `authwise_provider` and
     `authwise_realm` (cleared). The realm's `authentication` key belongs
@@ -144,7 +176,7 @@ NOTES:
   - `authwise_guard_relay` and `authwise_guard_pool_relay`: `priority`
     (to `0`)
 
-  **68 optional attributes, nested ones included, on 26 resources still
+  **67 optional attributes, nested ones included, on 26 resources still
   keep their last value when removed from the configuration**, each for a
   stated reason, and none of them turns on trust, weakens TLS, links
   accounts, skips verification or grants access when kept:
@@ -165,9 +197,7 @@ NOTES:
     `authwise_theme_variant.is_default` promotes nothing, so it would
     leave no default: set `false` to do that on purpose;
   - guard-control never stores the `config` of a network, node, relay,
-    pool, pool relay or resource;
-  - `authwise_guard_tenant_settings.labels`, until it is checked that
-    guard-control keeps them;
+    pool, pool relay or resource, now deprecated (see UPGRADING);
   - `authwise_guard_network.slug` and `authwise_guard_node.endpoint`, held
     for tf#80.
 

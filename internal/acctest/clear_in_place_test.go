@@ -369,6 +369,12 @@ data "authwise_factor_totp" "totp" {
 		base:  `  display_name = "Risk"` + "\n" + `  address      = "https://risk.example.com/v1"`,
 		clear: map[string]string{"timeout": `"5s"`},
 	},
+	// guard-control keeps a tenant's labels (confirmed by guard-control).
+	"guard_tenant_settings": {
+		typ:   "guard_tenant_settings",
+		base:  `  tenant_id = "t-1"`,
+		clear: map[string]string{"labels": `{ env = "prod" }`},
+	},
 	"guard_network": {
 		typ:    "guard_network",
 		prereq: guardTenantHCL,

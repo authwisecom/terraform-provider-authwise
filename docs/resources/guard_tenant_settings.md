@@ -50,7 +50,7 @@ resource "authwise_guard_tenant_settings" "acme" {
 ### Optional
 
 - `config` (Attributes) Guard's settings for the tenant. (see [below for nested schema](#nestedatt--config))
-- `labels` (Map of String) Guard's labels on the tenant. Written whole when it changes.
+- `labels` (Map of String) Guard's labels on the tenant. Written whole when it changes; left out, the tenant has none.
 
 ### Read-Only
 

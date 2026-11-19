@@ -38,7 +38,7 @@ resource "authwise_guard_network" "office" {
 ### Optional
 
 - `cidr` (String)
-- `config` (String) `config` as a JSON object.
+- `config` (String, Deprecated) Has no effect: guard-control never stores or returns `config`, so a value written here is dropped. It will be removed in a future release; remove it from the configuration.
 - `display_name` (String)
 - `labels` (Map of String)
 - `pool_fallback` (Boolean) Serve the pool after the network's own relays. Default false. guard-control refuses true on a network with no relay of its own (`POOL_FALLBACK_WITHOUT_RELAY`).

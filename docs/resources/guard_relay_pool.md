@@ -32,7 +32,7 @@ resource "authwise_guard_relay_pool" "us_central" {
 
 ### Optional
 
-- `config` (String) `config` as a JSON object.
+- `config` (String, Deprecated) Has no effect: guard-control never stores or returns `config`, so a value written here is dropped. It will be removed in a future release; remove it from the configuration.
 - `default` (Boolean)
 - `display_name` (String)
 - `labels` (Map of String)
