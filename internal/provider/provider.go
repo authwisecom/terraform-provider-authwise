@@ -93,11 +93,11 @@ func (p *AuthwiseProvider) Schema(_ context.Context, _ provider.SchemaRequest, r
 	resp.Schema = schema.Schema{
 		MarkdownDescription: "Manages Authwise identity objects over the published gRPC API.",
 		Attributes: map[string]schema.Attribute{
-			"endpoint": schema.StringAttribute{
+			endpointAttr: schema.StringAttribute{
 				Optional:            true,
 				MarkdownDescription: "gRPC API endpoint, e.g. `api.example.authwise.io:443`. Falls back to `AUTHWISE_ENDPOINT`.",
 			},
-			"guard_endpoint": schema.StringAttribute{
+			guardEndpointAttr: schema.StringAttribute{
 				Optional:            true,
 				MarkdownDescription: "guard-control's gRPC endpoint, e.g. `guard.example.authwise.io:443`, for the `authwise_guard_*` resources and data sources. Falls back to `AUTHWISE_GUARD_ENDPOINT`. It takes the same credentials as `endpoint`. Unset, a Guard resource fails at plan.",
 			},
@@ -182,8 +182,8 @@ func stringOr(v types.String, env string) string {
 func transportFor(config authwiseProviderModel, endpoint string, diags *diag.Diagnostics) (credentials.TransportCredentials, bool) {
 
 	checkPlaintext(config.Insecure.ValueBool(), stringOr(config.TokenURL, "AUTHWISE_TOKEN_URL"), map[string]string{
-		"endpoint":       endpoint,
-		"guard_endpoint": stringOr(config.GuardEndpoint, "AUTHWISE_GUARD_ENDPOINT"),
+		endpointAttr:      endpoint,
+		guardEndpointAttr: stringOr(config.GuardEndpoint, "AUTHWISE_GUARD_ENDPOINT"),
 	}, diags)
 	if diags.HasError() {
 		return nil, false

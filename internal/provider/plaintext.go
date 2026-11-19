@@ -10,6 +10,12 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 )
 
+// The provider attributes naming the gRPC targets the bearer token goes to.
+const (
+	endpointAttr      = "endpoint"
+	guardEndpointAttr = "guard_endpoint"
+)
+
 // checkPlaintext reports where the provider's credentials would travel
 // unencrypted. insecure = true dials plaintext gRPC, and the bearer token
 // rides on every call: it is allowed, since an in-cluster caller may dial a
@@ -26,7 +32,7 @@ func checkPlaintext(insecure bool, tokenURL string, targets map[string]string, d
 // warnPlaintextTargets warns for each plaintext gRPC target that is not
 // loopback: the bearer token rides on every call to it.
 func warnPlaintextTargets(targets map[string]string, diags *diag.Diagnostics) {
-	for _, attr := range []string{"endpoint", "guard_endpoint"} {
+	for _, attr := range []string{endpointAttr, guardEndpointAttr} {
 		target := targets[attr]
 		if target == "" {
 			continue
