@@ -20,9 +20,10 @@ FEATURES:
 
 BUG FIXES:
 
-* **Removing an optional value from the configuration clears it in place
-  (tf#79).** The attributes listed in the upgrade note under NOTES were optional and
-  computed, so a value taken out of the configuration stayed in the plan
+* **Removing one of the attributes listed in the upgrade note under NOTES
+  from the configuration clears it in place (tf#79).** Only those: every
+  other optional attribute still keeps its last value when removed (see
+  the note). The listed attributes were optional and computed, so a value taken out of the configuration stayed in the plan
   from state and on the server: it could only be removed by replacing the
   resource. The case that found it was `authwise_access_binding`: turning a
   person's binding into a service account's kept its `condition_id`, which
@@ -31,9 +32,9 @@ BUG FIXES:
 
 NOTES:
 
-* **Upgrade: an optional value removed from the configuration is now
-  cleared (tf#79). Run `terraform plan` before the first apply on 0.36.0.** The
-  attributes below used to keep their last value when the configuration
+* **Upgrade: the optional values listed below, removed from the
+  configuration, are now cleared (tf#79). Run `terraform plan` before the
+  first apply on 0.36.0.** The attributes below used to keep their last value when the configuration
   left them out, so a value set in the console, with awctl or by another
   tool stayed in place. They now follow the configuration: **a value set
   outside Terraform and absent from the configuration is removed at the
@@ -66,11 +67,21 @@ NOTES:
   - `authwise_guard_trusted_issuer_rule`: `description`, `node_group`,
     `node_name_prefix`
 
-  Unchanged: every value the server fills or defaults when it is left out
-  (statuses, `authwise_application.kind`, `authwise_guard_network.relay_pool`
-  and the like); values people, SCIM or node enrollment write
-  (`authwise_user` profile fields, `authwise_guard_node.display_name`); and,
-  for now, `authwise_guard_network.slug` and `authwise_guard_node.endpoint`.
+  **Every other optional attribute still keeps its last value when it is
+  removed from the configuration**: removing the line plans no change, and
+  kit or guard-control keeps the value. That is 130 attributes on 31
+  resources, of every kind: booleans, maps (`labels` on every resource that
+  has it), lists, JSON `config`, nested blocks such as
+  `authwise_endpoint.tls`, and strings. Among them are values the server
+  fills or defaults when left out (statuses, `authwise_application.kind`,
+  `authwise_guard_network.relay_pool`), values people, SCIM or node
+  enrollment write (`authwise_user` profile fields,
+  `authwise_guard_node.display_name`), `authwise_guard_network.slug` and
+  `authwise_guard_node.endpoint` (tf#80), **and security settings such as
+  `authwise_provider.link_by_verified_email`,
+  `trust_upstream_email_verified` and `authwise_endpoint.insecure`**. To
+  turn one of those off, set it to its off value (`false`, `{}`, `[]`) in
+  the configuration; deleting the line leaves it on.
 
 * **apis v0.81.0** (from v0.80.0): kit's `GetInstallStatus`. The data
   source needs kit 1.94.0 or later (registration results from 1.95.0);
