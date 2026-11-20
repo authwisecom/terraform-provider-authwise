@@ -302,7 +302,7 @@ resource "authwise_issuer" "internal" {
 	// Granted in every token unrequested (audit T1).
 	"scope": {
 		typ:   "scope",
-		base:  `  scope_id = "tf79.read"` + "\n" + `  kind     = "access"`,
+		base:  `  scope_id = "tf79.read"` + "\n" + `  kind     = "authorization.permissions"`,
 		clear: map[string]string{"auto": "true"},
 	},
 	// Audit T1's remaining batch: labels, the configs and the rest.

@@ -167,7 +167,7 @@ resource "authwise_access_permission" "users_list" {
 }
 
 resource "authwise_scope" "read" {
-  kind = "access"
+  kind     = "authorization.permissions"
   scope_id = "users.read"
 }
 
@@ -212,6 +212,30 @@ resource "authwise_scope_access_permissions" "read" {
 				ImportStateIdFunc:                    importByName("authwise_scope.read"),
 				ImportStateVerify:                    true,
 				ImportStateVerifyIdentifierAttribute: "name",
+			},
+		},
+	})
+}
+
+// TestAccScope_UnknownKind: a kind kit does not know is refused at plan,
+// before kit stores it with no effect (or, from its next release, refuses
+// it on write).
+func TestAccScope_UnknownKind(t *testing.T) {
+
+	h := newHarness(t)
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: protoFactories(),
+		Steps: []resource.TestStep{
+			{
+				Config: h.providerConfig() + `
+resource "authwise_scope" "x" {
+  kind     = "access"
+  scope_id = "users.read"
+}
+`,
+				PlanOnly:    true,
+				ExpectError: regexp.MustCompile(`(?s)value must be one of:.*"authorization\.bindings"`),
 			},
 		},
 	})

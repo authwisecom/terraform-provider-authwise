@@ -324,6 +324,7 @@ func (p *AuthwiseProvider) Resources(ctx context.Context) []func() resource.Reso
 		domainTypeName:              newDomainResource,
 		issuerTypeName:              newIssuerResource,
 		issuerDomainBindingTypeName: newIssuerDomainBindingResource,
+		scopeTypeName:               newScopeResource,
 	}),
 		newSecretResource,
 		newRealmAuthenticationPolicyResource,

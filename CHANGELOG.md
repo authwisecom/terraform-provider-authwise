@@ -1,3 +1,17 @@
+## 0.37.0 (Unreleased)
+
+BREAKING CHANGES:
+
+* **`authwise_scope.kind` is checked at plan.** It must be one of the six
+  kinds kit knows: `openid`, `authorization.roles`,
+  `authorization.permissions`, `authorization.permissionGroups`,
+  `authorization.groups` or `authorization.bindings`. The resource's docs
+  now say what each one puts in the token. kit stored any other value
+  with no effect, so such a scope never did anything, and kit's next
+  release refuses it on write. A configuration with another kind now
+  fails `terraform plan`. Set the kind the scope was meant to have, or
+  remove the scope. A kind kit adds later needs a provider release.
+
 ## 0.36.0 (November 19, 2026)
 
 UPGRADING FROM 0.35:
