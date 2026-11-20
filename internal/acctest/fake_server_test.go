@@ -1053,7 +1053,7 @@ func newHarness(t *testing.T) *harness {
 	}
 	h.grpcAddr = lis.Addr().String()
 
-	s := grpc.NewServer(requireBearer()...)
+	s := grpc.NewServer(append(requireBearer(), refuseBadMasks())...)
 	identitypb.RegisterAuthwiseIdentityServiceServer(s, h.fake)
 	accesspb.RegisterAuthwiseAccessServiceServer(s, h.access)
 	tenancypb.RegisterAuthwiseTenancyServiceServer(s, h.tenancy)
