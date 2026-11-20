@@ -1,4 +1,13 @@
-## 0.37.0 (Unreleased)
+## 0.37.0 (November 20, 2026)
+
+UPGRADING:
+
+* **Role permission sets need kit 1.97.2 or later (kit#1002).**
+  `authwise_access_role_access_permissions` creates fine on an earlier kit,
+  but kit 1.97.1 and before list a role's permissions under the wrong
+  names. Every plan after the first apply then shows a change, and its
+  apply fails with `pattern not matched`. On kit 1.97.2 the next refresh
+  reads the right names, with no change to configuration or state.
 
 BREAKING CHANGES:
 
