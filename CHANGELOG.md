@@ -224,6 +224,10 @@ NOTES:
   anchor (`guardcontrol.tenant` or `guardcontrol.network`). A service
   account's binding still carries no condition.
   `authwise_guard_enrolment_grant` writes both for users and groups.
+* **Tests: kit's update masks.** The acceptance tests' kit refuses an
+  update with no field mask, an empty one, or a path that is not a field
+  of the object, as kit's next release does. Every resource passes; an
+  update with nothing to change reads the object instead.
 
 ## 0.35.1 (November 17, 2026)
 
