@@ -1,4 +1,4 @@
-## 0.36.0 (Unreleased)
+## 0.36.0 (November 19, 2026)
 
 UPGRADING FROM 0.35:
 
