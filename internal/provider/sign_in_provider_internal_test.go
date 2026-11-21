@@ -15,7 +15,7 @@ import (
 // both data sources, the list's nested attributes included.
 var signInProviderDescribed = []string{
 	"trust_upstream_email_verified", "trust_upstream_amr", "upstream_acr_map",
-	"link_by_verified_email", "status", "provider_type",
+	"link_by_verified_email", "status", "provider_type", "trusted_email_domains",
 }
 
 func TestSignInProviderResourceDescribesItsSettings(t *testing.T) {
@@ -33,7 +33,7 @@ func TestSignInProviderResourceDescribesItsSettings(t *testing.T) {
 	}
 	// A limit is appended to its description, not shown in its place.
 	got := resp.Schema.Attributes["trust_upstream_amr"].GetMarkdownDescription()
-	if !strings.HasPrefix(got, "Whether the sign-in methods") || !strings.HasSuffix(got, "(kit#1010).") {
+	if !strings.HasPrefix(got, "Whether the upstream's statement") || !strings.HasSuffix(got, signInProviderKitNotes["trust_upstream_amr"]) {
 		t.Errorf("trust_upstream_amr description = %q", got)
 	}
 }
@@ -60,11 +60,51 @@ func TestSignInProviderDataSourcesDescribeTheirSettings(t *testing.T) {
 	}
 }
 
-// Every limit belongs to a described setting, so none is silently dropped.
+// every kit note belongs to a described setting, so none is silently dropped.
 func TestSignInProviderLimitsNameDescribedSettings(t *testing.T) {
-	for name := range signInProviderLimits {
+	for name := range signInProviderKitNotes {
 		if signInProviderDescriptions[name] == "" {
 			t.Errorf("limit for %s, which has no description", name)
+		}
+	}
+}
+
+// kit's ParseUpstreamAcrKey forms (kit pkg/lib/model/upstream_acr.go).
+func TestUpstreamAcrKeyProblem(t *testing.T) {
+	for key, ok := range map[string]bool{
+		"urn:authwise:acr:2":         true,
+		"http://example.com/acr/mfa": true,
+		entraAcrKey:                  true,
+		"attribute:amr=mfa=x":        true, // the name runs to the first "="
+		"":                           false,
+		"attribute:":                 false,
+		"attribute:amr":              false,
+		"attribute:=mfa":             false,
+		"attribute:amr=":             false,
+	} {
+		if got := upstreamAcrKeyProblem(key) == ""; got != ok {
+			t.Errorf("%q: accepted = %v, want %v", key, got, ok)
+		}
+	}
+}
+
+// kit's trusted_email_domains entry form (kit pkg/lib/model/trusted_email_domains.go).
+func TestTrustedEmailDomainPattern(t *testing.T) {
+	for d, ok := range map[string]bool{
+		"contoso.com":      true,
+		"eu.contoso.co.uk": true,
+		"a-b.example":      true,
+		"contoso":          false,
+		"Contoso.com":      false,
+		"*.contoso.com":    false,
+		"user@contoso.com": false,
+		"contoso.com.":     false,
+		"-contoso.com":     false,
+		"contoso-.com":     false,
+		"con_toso.com":     false,
+	} {
+		if got := trustedEmailDomainPattern.MatchString(d); got != ok {
+			t.Errorf("%q: matched = %v, want %v", d, got, ok)
 		}
 	}
 }

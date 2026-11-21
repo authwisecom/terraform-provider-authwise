@@ -441,11 +441,12 @@ func main() {
 					"email", "email_verified", "phone_number", "phone_number_verified",
 					"credentials_changed_at"),
 			),
-			// The four trust switches are stored as sent, default off: a
-			// removed line turns one off (audit T1).
+			// The trust settings are stored as sent, default off: a
+			// removed line turns one off (audit T1). trusted_email_domains
+			// (kit#1011) is one of them.
 			crud[corepb.Provider](scopeRealm,
 				withT1([]string{fieldLabels, fieldConfig}, "display_name", "provider_type"),
-				withClearable("link_by_verified_email", "trust_upstream_email_verified", "trust_upstream_amr", "upstream_acr_map"),
+				withClearable("link_by_verified_email", "trust_upstream_email_verified", "trust_upstream_amr", "upstream_acr_map", "trusted_email_domains"),
 				withDescription("A way people sign in to a realm: username and password, a magic link, passkeys, a social or enterprise IdP, or SAML. `config` comes from the matching config data source."), withJSON("config")),
 			// A second step the realm offers (kit#544). config is the
 			// per-type Any; the factor_* config data sources below build it.

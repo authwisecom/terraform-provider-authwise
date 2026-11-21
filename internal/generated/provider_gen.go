@@ -86,6 +86,10 @@ func ProviderResourceSchema() schema.Schema {
 				Default:  booldefault.StaticBool(false),
 				Optional: true,
 			},
+			"trusted_email_domains": schema.ListAttribute{
+				ElementType: types.StringType,
+				Optional:    true,
+			},
 			"upstream_acr_map": schema.MapAttribute{
 				ElementType: types.StringType,
 				Optional:    true,
@@ -109,6 +113,7 @@ type ProviderModel struct {
 	UpstreamAcrMap             types.Map            `tfsdk:"upstream_acr_map"`
 	LinkByVerifiedEmail        types.Bool           `tfsdk:"link_by_verified_email"`
 	TrustUpstreamEmailVerified types.Bool           `tfsdk:"trust_upstream_email_verified"`
+	TrustedEmailDomains        types.List           `tfsdk:"trusted_email_domains"`
 	Status                     types.String         `tfsdk:"status"`
 }
 
@@ -127,6 +132,7 @@ func NewProviderModel() *ProviderModel {
 		TenantId:                   types.StringNull(),
 		TrustUpstreamAmr:           types.BoolNull(),
 		TrustUpstreamEmailVerified: types.BoolNull(),
+		TrustedEmailDomains:        types.ListNull(types.StringType),
 		UpstreamAcrMap:             types.MapNull(types.StringType),
 	}
 }
@@ -155,6 +161,9 @@ func (m *ProviderModel) ToProto(ctx context.Context) (*v1alpha1.Provider, diag.D
 	}
 	out.LinkByVerifiedEmail = m.LinkByVerifiedEmail.ValueBool()
 	out.TrustUpstreamEmailVerified = m.TrustUpstreamEmailVerified.ValueBool()
+	if !m.TrustedEmailDomains.IsNull() && !m.TrustedEmailDomains.IsUnknown() {
+		diags.Append(m.TrustedEmailDomains.ElementsAs(ctx, &out.TrustedEmailDomains, false)...)
+	}
 	out.Status = m.Status.ValueString()
 	return out, diags
 }
@@ -196,6 +205,15 @@ func (m *ProviderModel) FromProto(ctx context.Context, e *v1alpha1.Provider) dia
 	}
 	m.LinkByVerifiedEmail = types.BoolValue(e.LinkByVerifiedEmail)
 	m.TrustUpstreamEmailVerified = types.BoolValue(e.TrustUpstreamEmailVerified)
+	if len(e.TrustedEmailDomains) == 0 {
+		if !tf.KeepEmpty(m.TrustedEmailDomains) {
+			m.TrustedEmailDomains = types.ListNull(types.StringType)
+		}
+	} else {
+		v, d := types.ListValueFrom(ctx, types.StringType, e.TrustedEmailDomains)
+		diags.Append(d...)
+		m.TrustedEmailDomains = v
+	}
 	if e.Status == "" {
 		m.Status = types.StringNull()
 	} else {
@@ -245,6 +263,9 @@ func (m *ProviderModel) UpdateMask(ctx context.Context, prior *ProviderModel) []
 	}
 	if !m.TrustUpstreamEmailVerified.Equal(prior.TrustUpstreamEmailVerified) {
 		paths = append(paths, "trust_upstream_email_verified")
+	}
+	if !m.TrustedEmailDomains.Equal(prior.TrustedEmailDomains) {
+		paths = append(paths, "trusted_email_domains")
 	}
 	if !m.Status.Equal(prior.Status) {
 		paths = append(paths, "status")
@@ -401,6 +422,10 @@ func ProviderDataSourceSchema() schema1.Schema {
 			"tenant_id":                     schema1.StringAttribute{Computed: true},
 			"trust_upstream_amr":            schema1.BoolAttribute{Computed: true},
 			"trust_upstream_email_verified": schema1.BoolAttribute{Computed: true},
+			"trusted_email_domains": schema1.ListAttribute{
+				Computed:    true,
+				ElementType: types.StringType,
+			},
 			"upstream_acr_map": schema1.MapAttribute{
 				Computed:    true,
 				ElementType: types.StringType,
@@ -450,6 +475,7 @@ type ProviderItemModel struct {
 	UpstreamAcrMap             types.Map            `tfsdk:"upstream_acr_map"`
 	LinkByVerifiedEmail        types.Bool           `tfsdk:"link_by_verified_email"`
 	TrustUpstreamEmailVerified types.Bool           `tfsdk:"trust_upstream_email_verified"`
+	TrustedEmailDomains        types.List           `tfsdk:"trusted_email_domains"`
 	Status                     types.String         `tfsdk:"status"`
 }
 
@@ -466,6 +492,7 @@ func ProviderItemAttrTypes() map[string]attr.Type {
 		"status":                        types.StringType,
 		"trust_upstream_amr":            types.BoolType,
 		"trust_upstream_email_verified": types.BoolType,
+		"trusted_email_domains":         types.ListType{ElemType: types.StringType},
 		"upstream_acr_map":              types.MapType{ElemType: types.StringType},
 	}
 }
@@ -507,6 +534,10 @@ func ProviderListDataSourceSchema() schema1.Schema {
 					"status":                        schema1.StringAttribute{Computed: true},
 					"trust_upstream_amr":            schema1.BoolAttribute{Computed: true},
 					"trust_upstream_email_verified": schema1.BoolAttribute{Computed: true},
+					"trusted_email_domains": schema1.ListAttribute{
+						Computed:    true,
+						ElementType: types.StringType,
+					},
 					"upstream_acr_map": schema1.MapAttribute{
 						Computed:    true,
 						ElementType: types.StringType,
@@ -566,6 +597,15 @@ func providerItemFromProto(ctx context.Context, crud *tf.Crud[*v1alpha1.Provider
 	}
 	item.LinkByVerifiedEmail = types.BoolValue(e.LinkByVerifiedEmail)
 	item.TrustUpstreamEmailVerified = types.BoolValue(e.TrustUpstreamEmailVerified)
+	if len(e.TrustedEmailDomains) == 0 {
+		if !tf.KeepEmpty(item.TrustedEmailDomains) {
+			item.TrustedEmailDomains = types.ListNull(types.StringType)
+		}
+	} else {
+		v, d := types.ListValueFrom(ctx, types.StringType, e.TrustedEmailDomains)
+		diags.Append(d...)
+		item.TrustedEmailDomains = v
+	}
 	if e.Status == "" {
 		item.Status = types.StringNull()
 	} else {

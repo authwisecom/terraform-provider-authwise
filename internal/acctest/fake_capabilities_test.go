@@ -13,7 +13,7 @@ func (s *fakeIdentityServer) GetInstallCapabilities(_ context.Context, _ *identi
 		return s.capabilities()
 	}
 	return &identitypb.InstallCapabilities{
-		Features:   []string{"guard.tenant-collapse", "guard.trusted-issuers", "identity.object-status", "identity.scim", "identity.vocabulary"},
+		Features:   []string{"guard.tenant-collapse", "guard.trusted-issuers", "identity.object-status", "identity.provider-upstream-trust", "identity.scim", "identity.vocabulary"},
 		KitVersion: "1.91.0",
 	}, nil
 }

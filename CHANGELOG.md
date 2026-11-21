@@ -1,19 +1,64 @@
-## 0.37.1 (Unreleased)
+## 0.38.0 (Unreleased)
+
+UPGRADING:
+
+* **The SAML trust settings need kit 1.98.0 and a domain list (kit#1010,
+  kit#1011).** Through kit 1.97.x, `trust_upstream_email_verified`,
+  `link_by_verified_email` and `trust_upstream_amr` had no effect on a
+  `saml` provider, and `upstream_acr_map` had no effect on any type. From
+  kit 1.98.0 they all work. kit and this provider now refuse
+  `trust_upstream_email_verified` or `link_by_verified_email` on a `saml`
+  provider without `trusted_email_domains`. A stored SAML provider that
+  has either setting and no list keeps signing people in, stating no
+  address verified. kit refuses it on its next write, and a `terraform
+  apply` that changes the provider is that write. This provider refuses
+  such a configuration at plan. Either list the domains the directory is
+  the record for, or turn the setting off. On a kit before 1.98.0 the list
+  cannot be stored, so turn the setting off there: it had no effect.
+
+BREAKING CHANGES:
+
+* **`authwise_provider` checks its trust settings at plan.** On a `saml`
+  provider, `trust_upstream_email_verified = true` or
+  `link_by_verified_email = true` without `trusted_email_domains` fails
+  `terraform plan`. So does an `upstream_acr_map` key that is empty or a
+  malformed `attribute:` form, and an entry that names no level. kit
+  refuses each of these on write from 1.98.0.
+
+FEATURES:
+
+* **`authwise_provider`: `trusted_email_domains`** (apis v0.86.0,
+  kit#1011, kit 1.98.0 or later). These are the email domains the upstream
+  is the directory of record for. On a `saml` provider an address counts
+  as stated verified when its domain is listed. That is what
+  `trust_upstream_email_verified` and `link_by_verified_email` read there,
+  and each is refused without the list. On the other federated types the
+  list is optional and narrows which addresses the upstream's own
+  `email_verified` counts for. Entries are lowercase domain names, checked
+  at plan as kit checks them: no wildcard, `@`, upper case, trailing dot
+  or repeat. The list is refused on `usernamePassword`, `magicLink` and
+  `passkey`. Removing the line clears it. A write that sets it on a kit
+  without the `identity.provider-upstream-trust` install feature is
+  refused by name, rather than dropped.
+* **`authwise_provider`: `upstream_acr_map` key forms** (kit#1010, kit
+  1.98.0 or later). A key is a bare value, compared with the upstream's
+  `acr` or the SAML AuthnContextClassRef, or `attribute:<name>=<value>`,
+  matched against a SAML attribute or id_token claim. Both forms are
+  checked at plan. The docs give the Entra ID recipe, which maps
+  `attribute:http://schemas.microsoft.com/claims/authnmethodsreferences=http://schemas.microsoft.com/claims/multipleauthn`
+  to the realm's two-factor level.
 
 DOCUMENTATION:
 
-* **`authwise_provider`: its settings are described (tf#82).** The
+* **`authwise_provider`: its settings are described (tf#82, tf#83).** The
   resource and the `authwise_provider` and `authwise_providers` data
   sources had no description on `trust_upstream_email_verified`,
   `trust_upstream_amr`, `upstream_acr_map`, `link_by_verified_email`,
   `status` or `provider_type`. Each now says what it does, its default,
-  which provider types it applies to and, for the four trust settings,
-  what turning it on costs. `trust_upstream_email_verified` makes the
-  upstream's verified address a recovery route. They also state what
-  does not work yet. Through kit 1.97.x, `trust_upstream_email_verified`,
-  `link_by_verified_email` and `trust_upstream_amr` have no effect on a
-  `saml` provider. `upstream_acr_map` has no effect on any type (kit#1010,
-  kit#1011). Nothing else changes.
+  which provider types it applies to, and the kit release its behaviour
+  needs. For the trust settings, it also says what turning one on costs:
+  `trust_upstream_email_verified` makes the upstream's verified address a
+  recovery route.
 
 ## 0.37.0 (November 20, 2026)
 

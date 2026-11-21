@@ -74,9 +74,54 @@ var statusWrites = map[string]bool{
 // statusField is kit#972's field on Issuer, Realm and Audience.
 const statusField = "status"
 
-// setsStatus is whether a write names status: in its update mask, or as a
-// non-empty status on the object it carries.
-func setsStatus(req any) bool {
+// providerUpstreamTrust is kit#1010 and kit#1011 (apis v0.86.0): a kit
+// before it drops Provider.trusted_email_domains, so a write that sets the
+// list would look applied and read back empty. Such a write needs the
+// feature; every other provider write goes through.
+var providerUpstreamTrust = gatedFeature{
+	feature: "identity.provider-upstream-trust",
+	what:    "`trusted_email_domains` on authwise_provider",
+}
+
+// providerWrites are the writes providerUpstreamTrust gates, when they set
+// trusted_email_domains.
+var providerWrites = map[string]bool{
+	identitypb.AuthwiseIdentityService_CreateProvider_FullMethodName: true,
+	identitypb.AuthwiseIdentityService_UpdateProvider_FullMethodName: true,
+	identitypb.AuthwiseIdentityService_PatchProvider_FullMethodName:  true,
+}
+
+// trustedEmailDomainsField is kit#1011's field on Provider.
+const trustedEmailDomainsField = "trusted_email_domains"
+
+// fieldGates are the fields an earlier kit drops, each with the writes
+// that may set it and the install feature such a write needs.
+var fieldGates = []struct {
+	writes map[string]bool
+	field  string
+	gate   gatedFeature
+}{
+	{statusWrites, statusField, objectStatus},
+	{providerWrites, trustedEmailDomainsField, providerUpstreamTrust},
+}
+
+// fieldGateRefusal is the refusal of a write that sets a field the kit
+// would drop, or nil.
+func (k *kitCompat) fieldGateRefusal(method string, req any) error {
+	if !k.answered {
+		return nil
+	}
+	for _, fg := range fieldGates {
+		if fg.writes[method] && !slices.Contains(k.features, fg.gate.feature) && setsField(req, fg.field) {
+			return k.gatedRefusal(fg.gate)
+		}
+	}
+	return nil
+}
+
+// setsField is whether a write names the field: in its update mask, or as
+// a non-empty value on the object it carries.
+func setsField(req any, name string) bool {
 	m, ok := req.(proto.Message)
 	if !ok || m == nil {
 		return false
@@ -84,25 +129,31 @@ func setsStatus(req any) bool {
 	r := m.ProtoReflect()
 	fields := r.Descriptor().Fields()
 	for i := range fields.Len() {
-		if fieldSetsStatus(r, fields.Get(i)) {
+		if fieldSets(r, fields.Get(i), name) {
 			return true
 		}
 	}
 	return false
 }
 
-// fieldSetsStatus is whether one field of a write names status: the update
-// mask listing it, or the carried object holding a non-empty one.
-func fieldSetsStatus(r protoreflect.Message, fd protoreflect.FieldDescriptor) bool {
+// fieldSets is whether one field of a write names the field: the update
+// mask listing it, or the carried object holding a non-empty value.
+func fieldSets(r protoreflect.Message, fd protoreflect.FieldDescriptor, name string) bool {
 	if fd.Kind() != protoreflect.MessageKind || fd.IsList() || fd.IsMap() || !r.Has(fd) {
 		return false
 	}
 	sub := r.Get(fd).Message()
 	if fd.Name() == "update_mask" {
-		return maskNames(sub, statusField)
+		return maskNames(sub, name)
 	}
-	st := sub.Descriptor().Fields().ByName(statusField)
-	return st != nil && st.Kind() == protoreflect.StringKind && sub.Get(st).String() != ""
+	f := sub.Descriptor().Fields().ByName(protoreflect.Name(name))
+	if f == nil {
+		return false
+	}
+	if f.IsList() {
+		return sub.Get(f).List().Len() > 0
+	}
+	return f.Kind() == protoreflect.StringKind && sub.Get(f).String() != ""
 }
 
 // maskNames is whether a FieldMask lists path.
@@ -175,10 +226,7 @@ func (k *kitCompat) check(ctx context.Context, method string, req any, cc grpc.C
 	if g, ok := gatedFeatures[method]; ok && k.answered && !slices.Contains(k.features, g.feature) {
 		return k.gatedRefusal(g)
 	}
-	if statusWrites[method] && k.answered && !slices.Contains(k.features, objectStatus.feature) && setsStatus(req) {
-		return k.gatedRefusal(objectStatus)
-	}
-	return nil
+	return k.fieldGateRefusal(method, req)
 }
 
 // askLocked asks kit once per run and returns the vocabulary refusal, if

@@ -217,3 +217,33 @@ func TestKitCompat_StatusWrites(t *testing.T) {
 	})
 	assert.Equal(t, codes.Unimplemented, status.Code(err))
 }
+
+// TestKitCompat_ProviderUpstreamTrust: on a kit without
+// identity.provider-upstream-trust, a provider write that sets
+// trusted_email_domains, in its object or its mask, is refused by name; a
+// provider write without it reaches kit.
+func TestKitCompat_ProviderUpstreamTrust(t *testing.T) {
+	kit := &capabilitiesKit{features: []string{featureVocabulary}}
+	c := compatClient(t, kit, "t-1")
+	parent := "tenants/t-1/realms/r-1"
+	saml := &corepb.Provider{ProviderType: "saml", TrustedEmailDomains: []string{"contoso.com"}}
+
+	_, err := c.CreateProvider(t.Context(), &identitypb.CreateProviderRequest{Parent: parent, Provider: saml})
+	assert.Equal(t, codes.FailedPrecondition, status.Code(err))
+	assert.Contains(t, err.Error(), "identity.provider-upstream-trust")
+
+	_, err = c.PatchProvider(t.Context(), &identitypb.PatchProviderRequest{
+		Name: parent + "/providers/p-1", Provider: &corepb.Provider{},
+		UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{trustedEmailDomainsField}},
+	})
+	assert.Equal(t, codes.FailedPrecondition, status.Code(err))
+
+	// No list: kit is reached (this fake answers Unimplemented).
+	_, err = c.CreateProvider(t.Context(), &identitypb.CreateProviderRequest{Parent: parent, Provider: &corepb.Provider{ProviderType: "saml"}})
+	assert.Equal(t, codes.Unimplemented, status.Code(err))
+
+	kit = &capabilitiesKit{features: []string{featureVocabulary, providerUpstreamTrust.feature}}
+	c = compatClient(t, kit, "t-1")
+	_, err = c.CreateProvider(t.Context(), &identitypb.CreateProviderRequest{Parent: parent, Provider: saml})
+	assert.Equal(t, codes.Unimplemented, status.Code(err))
+}

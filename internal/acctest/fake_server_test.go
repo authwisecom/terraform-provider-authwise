@@ -773,6 +773,9 @@ func admitProvider(p *corepb.Provider) error {
 		return status.Errorf(codes.InvalidArgument,
 			"trust_upstream_email_verified is for a federated provider; %s is not one", p.GetProviderType())
 	}
+	if err := admitTrustedEmailDomains(p); err != nil {
+		return err
+	}
 
 	want := map[string]proto.Message{
 		"magicLink": &corepb.ProviderMagicLink{},
@@ -884,6 +887,8 @@ func (f *fakeIdentityServer) PatchProvider(ctx context.Context, in *identitypb.P
 			existing.TrustUpstreamAmr = in.GetProvider().GetTrustUpstreamAmr()
 		case "upstream_acr_map":
 			existing.UpstreamAcrMap = in.GetProvider().GetUpstreamAcrMap()
+		case "trusted_email_domains":
+			existing.TrustedEmailDomains = in.GetProvider().GetTrustedEmailDomains()
 		default:
 			return nil, status.Errorf(codes.InvalidArgument, "unsupported update_mask path %q", path)
 		}
@@ -1163,4 +1168,28 @@ func objectStatus(s string) (string, error) {
 		return s, nil
 	}
 	return "", status.Errorf(codes.InvalidArgument, "status: active or disabled, got %q", s)
+}
+
+// admitTrustedEmailDomains is kit's validateTrustedEmailDomains (kit#1011):
+// the list on a type with no upstream, a repeated entry, and either email
+// setting on a saml provider without the list. The entry form is checked
+// at plan, so the fake leaves it to the provider.
+func admitTrustedEmailDomains(p *corepb.Provider) error {
+	seen := map[string]bool{}
+	for _, d := range p.GetTrustedEmailDomains() {
+		if seen[d] {
+			return status.Errorf(codes.InvalidArgument, "trusted_email_domains lists %q twice", d)
+		}
+		seen[d] = true
+	}
+	if len(p.GetTrustedEmailDomains()) > 0 && notFederated[p.GetProviderType()] {
+		return status.Errorf(codes.InvalidArgument,
+			"trusted_email_domains is for a federated provider; %s is not one", p.GetProviderType())
+	}
+	if p.GetProviderType() == "saml" && len(p.GetTrustedEmailDomains()) == 0 &&
+		(p.GetTrustUpstreamEmailVerified() || p.GetLinkByVerifiedEmail()) {
+		return status.Errorf(codes.InvalidArgument,
+			"a SAML provider's email trust settings need trusted_email_domains")
+	}
+	return nil
 }
