@@ -1,3 +1,20 @@
+## 0.37.1 (Unreleased)
+
+DOCUMENTATION:
+
+* **`authwise_provider`: its settings are described (tf#82).** The
+  resource and the `authwise_provider` and `authwise_providers` data
+  sources had no description on `trust_upstream_email_verified`,
+  `trust_upstream_amr`, `upstream_acr_map`, `link_by_verified_email`,
+  `status` or `provider_type`. Each now says what it does, its default,
+  which provider types it applies to and, for the four trust settings,
+  what turning it on costs. `trust_upstream_email_verified` makes the
+  upstream's verified address a recovery route. They also state what
+  does not work yet. Through kit 1.97.x, `trust_upstream_email_verified`,
+  `link_by_verified_email` and `trust_upstream_amr` have no effect on a
+  `saml` provider. `upstream_acr_map` has no effect on any type (kit#1010,
+  kit#1011). Nothing else changes.
+
 ## 0.37.0 (November 20, 2026)
 
 UPGRADING:

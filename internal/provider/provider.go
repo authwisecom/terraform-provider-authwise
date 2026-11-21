@@ -325,6 +325,7 @@ func (p *AuthwiseProvider) Resources(ctx context.Context) []func() resource.Reso
 		issuerTypeName:              newIssuerResource,
 		issuerDomainBindingTypeName: newIssuerDomainBindingResource,
 		scopeTypeName:               newScopeResource,
+		signInProviderTypeName:      newSignInProviderResource,
 	}),
 		newSecretResource,
 		newRealmAuthenticationPolicyResource,
@@ -384,7 +385,7 @@ func newFactorResource() resource.Resource {
 // DataSources implements provider.Provider with the generated constructors
 // plus the hand-written ones.
 func (p *AuthwiseProvider) DataSources(ctx context.Context) []func() datasource.DataSource {
-	return guardDataSourceWrap(ctx, append(append(generated.DataSources(), newSecretDataSource, newRealmAuthenticationContextSchemaDataSource, newGuardAllowedRelayPoolsDataSource, newInstallStatusDataSource), configJSONDataSources()...))
+	return guardDataSourceWrap(ctx, append(append(describeSignInProviderDataSources(ctx, generated.DataSources()), newSecretDataSource, newRealmAuthenticationContextSchemaDataSource, newGuardAllowedRelayPoolsDataSource, newInstallStatusDataSource), configJSONDataSources()...))
 }
 
 // Functions implements provider.ProviderWithFunctions: the config data

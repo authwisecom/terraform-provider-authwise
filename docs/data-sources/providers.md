@@ -32,11 +32,33 @@ Read-Only:
 - `config` (String)
 - `display_name` (String)
 - `labels` (Map of String)
-- `link_by_verified_email` (Boolean)
+- `link_by_verified_email` (Boolean) Whether to offer to connect this provider to an existing account at sign-in. Default `false`.
+
+  With `true`, when a person signs in through this provider with no account connected to it yet, the upstream states their address verified, and exactly one active account in the realm holds that address proven and has a password, kit offers to connect the two. The person must first sign in to that account with its password; nothing is connected silently. Without it, such a sign-in goes the way the realm's settings for new federated users say: a new account, or a refusal.
+
+  The cost: it trusts this upstream's statement that the person controls the address. An upstream that marks addresses verified without proving them lets someone start the offer for an account that is not theirs, though they still need its password. The trust is in this provider alone, as with `trust_upstream_email_verified`.
+
+  Federated types only: kit refuses it on `usernamePassword`, `magicLink` and `passkey`.
+
+  **Through kit 1.97.x, it has no effect on a `saml` provider**, for the reason `trust_upstream_email_verified` has none: a SAML upstream never states an address verified (kit#1011).
 - `name` (String) Full resource name.
 - `provider_id` (String) Server-assigned resource id — the last segment of `name`, and what other resources' `*_id` attributes take.
-- `provider_type` (String)
-- `status` (String)
-- `trust_upstream_amr` (Boolean)
-- `trust_upstream_email_verified` (Boolean)
-- `upstream_acr_map` (Map of String)
+- `provider_type` (String) The kind of provider, which must match `config`'s type. kit 1.97 knows these: `usernamePassword`, `magicLink` and `passkey`, which sign people in with Authwise itself; and the federated types, which sign them in at an upstream identity provider: `google`, `microsoft`, `apple`, `facebook`, `github`, `linkedin`, `okta`, `auth0`, `authwise`, `oidc` (any OpenID Connect provider), `oauth` (OAuth 2.0 with no id_token) and `saml`.
+- `status` (String) `active` (the default) or `disabled`. A disabled provider still appears in lists but is offered nowhere: sign-in and routing skip it (a routing target that names it falls back to the realm's own choice), and nothing can be connected to it. The people who sign in through it keep their accounts and sign-in methods, and can use it again once it is `active`. kit refuses to disable the realm's last active provider. Changing it is made in place. Removing the line keeps the current status: set `active` to turn a provider back on.
+- `trust_upstream_amr` (Boolean) Whether the sign-in methods this upstream reports (`amr`) count toward the realm's authentication rule. Default `false`: a sign-in through a federated provider counts as one factor whatever the upstream says, because kit checked the upstream's signature, not its methods. The token's `amr` relays what the upstream said either way.
+
+  With `true`, the upstream's RFC 8176 values count: `mfa` as two factors, `hwk` and `swk` as phishing-resistant. A realm that requires two factors then does not ask for a second one after an upstream that already did MFA. The cost: kit cannot check the claim, so an upstream that says `mfa` without doing it satisfies the realm's rule. Set it for an upstream whose MFA you rely on. The trust is in this provider alone, not the realm's others.
+
+  Federated types; it has no effect on `usernamePassword`, `magicLink` and `passkey`.
+
+  **Through kit 1.97.x, it has no effect on a `saml` provider:** a SAML sign-in counts as one factor whether it is set or not (kit#1010).
+- `trust_upstream_email_verified` (Boolean) Whether an address this upstream states verified counts as proven by Authwise. Default `false`: the upstream's `email_verified` is kept on the person's link and read only by the sign-in link offer (`link_by_verified_email`). It never makes the address a recovery route.
+
+  With `true`, each sign-in through this provider that states the address verified records it as one of the person's proven addresses. **A proven address is a recovery route**: whoever controls that address at the upstream can recover the account, and sign in to it where the realm offers a magic link. Set it only for an identity provider that is the directory of record for its people's addresses, such as your workforce IdP. Do not set it for a social provider, or for a partner whose directory holds addresses that belong to someone else, such as guest accounts. The trust is in this provider alone, not the realm's others.
+
+  Federated types only: kit refuses it on `usernamePassword`, `magicLink` and `passkey`.
+
+  **Through kit 1.97.x, it has no effect on a `saml` provider.** A SAML assertion has no standard statement that an address is verified, so there is nothing to trust (kit#1011).
+- `upstream_acr_map` (Map of String) Maps an upstream `acr` value to the name of one of the realm's acr levels, for an upstream that states a context class rather than methods. It is meant to count only when `trust_upstream_amr` is `true`, since it is the same trust in what the upstream says. Default empty.
+
+  **Through kit 1.97.x, it has no effect on any provider type:** kit stores it and nothing reads it (kit#1010). A map set now takes effect, with no change here, on the kit release that reads it.
