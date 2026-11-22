@@ -1,4 +1,4 @@
-## 0.38.0 (Unreleased)
+## 0.38.0 (November 21, 2026)
 
 UPGRADING:
 
@@ -59,6 +59,16 @@ DOCUMENTATION:
   needs. For the trust settings, it also says what turning one on costs:
   `trust_upstream_email_verified` makes the upstream's verified address a
   recovery route.
+
+NOTES:
+
+* Pairs with kit 1.98.0 (apis v0.86.0), the first kit to list the
+  `identity.provider-upstream-trust` install feature. Checked against kit
+  1.98.0 on test01: a `saml` provider with `trusted_email_domains`, both
+  email settings and the Entra ID `upstream_acr_map` key applied and then
+  planned empty; the list cleared in place; and kit's own refusals come
+  through as written. On kit 1.97.x everything works as in 0.37.0, except
+  setting `trusted_email_domains`, which is refused by name.
 
 ## 0.37.0 (November 20, 2026)
 
