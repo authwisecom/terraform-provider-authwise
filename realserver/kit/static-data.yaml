@@ -1,4 +1,4 @@
-# The real-server tests' kit seed (tf#86): guard-control v0.35.2's
+# The real-server tests' kit seed (tf#86): guard-control v0.35.3's
 # dev/kit/static-data.yaml, which carries guard-control's permission catalog
 # for that release, with c-90 (the test client and guard-control's install
 # credential) also bound identity.viewer and tenancy.admin. Refresh it from
