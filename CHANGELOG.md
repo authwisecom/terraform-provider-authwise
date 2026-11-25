@@ -5,7 +5,7 @@ UPGRADING:
 * **`skip_if_device_trusted` is unset, `true` or `false`, and the provider
   now sends an explicit `false` (tf#87, kit#1026, apis v0.90.0).** On a
   realm's floor (`authwise_realm_authentication_policy.floor`) the three
-  mean different things from the kit release that carries kit#1026: unset
+  mean different things from kit v1.100.0, the first with kit#1026: unset
   is no opinion, and each rule's own setting applies; `false` forbids
   "Remember this device" for every rule; `true` lets a rule that asks for it
   skip its factor. Before, an explicit `false` never reached kit, and an
@@ -19,9 +19,9 @@ UPGRADING:
     upgrading, from null to `false`. On the floor, apply it if you mean the
     veto. That is the behaviour the realm had before kit#1026. Remove the
     line if you meant "no opinion".
-  * Against a kit without kit#1026, an explicit `false` is read back as
-    unset, so that update shows on every plan. Upgrade kit first, or leave
-    the attribute out until you do.
+  * **An explicit `false` needs kit v1.100.0 or later.** An earlier kit
+    reads it back as unset, so that update shows on every plan. Upgrade kit
+    first, or leave the attribute out until you do.
 
 NOTES:
 
