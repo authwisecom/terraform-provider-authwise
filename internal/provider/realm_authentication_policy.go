@@ -60,14 +60,13 @@ func (r *realmAuthenticationPolicyResource) Metadata(_ context.Context, req reso
 var authenticationPolicyDescriptions = func() map[string]string {
 
 	requirement := map[string]string{
-		"mode":                   "What must hold beyond the primary: `NONE`, `ANY_FACTOR`, `TYPES`, `PHISHING_RESISTANT` or `DENY` (never valid as the floor).",
-		"min_factors":            "Distinct factor classes required beyond the primary's own. 0 means the mode's default, which for `ANY_FACTOR` is 1.",
-		"allowed_factor_types":   "Factor types that may count. Empty means every factor enabled on the realm.",
-		"required_factor_types":  "Factor types that must all be present (mode `TYPES`).",
-		"reauth_after":           "A factor verified longer ago than this does not count. Unset falls back to `session.factor_reauth`.",
-		"skip_if_device_trusted": "Whether a trusted device satisfies the requirement without a factor. Never honoured for `PHISHING_RESISTANT` or `DENY`.",
-		"deny_reason":            "Mode `DENY` only. Recorded in the audit trail, never shown to the person.",
-		"hardware_bound":         "With `PHISHING_RESISTANT`: the authenticator must not be backup-eligible.",
+		"mode":                  "What must hold beyond the primary: `NONE`, `ANY_FACTOR`, `TYPES`, `PHISHING_RESISTANT` or `DENY` (never valid as the floor).",
+		"min_factors":           "Distinct factor classes required beyond the primary's own. 0 means the mode's default, which for `ANY_FACTOR` is 1.",
+		"allowed_factor_types":  "Factor types that may count. Empty means every factor enabled on the realm.",
+		"required_factor_types": "Factor types that must all be present (mode `TYPES`).",
+		"reauth_after":          "A factor verified longer ago than this does not count. Unset falls back to `session.factor_reauth`.",
+		"deny_reason":           "Mode `DENY` only. Recorded in the audit trail, never shown to the person.",
+		"hardware_bound":        "With `PHISHING_RESISTANT`: the authenticator must not be backup-eligible.",
 	}
 
 	d := map[string]string{
@@ -91,6 +90,20 @@ var authenticationPolicyDescriptions = func() map[string]string {
 		d["rules.require."+k] = v
 		d["acr_levels.require."+k] = v
 	}
+
+	// skip_if_device_trusted is unset, true or false since kit#1026 (apis
+	// v0.90.0), and the floor's three values mean different things from a
+	// rule's (tf#87).
+	d["floor.skip_if_device_trusted"] = "Whether the floor lets a rule skip its factor on a trusted device (\"Remember this device\"). " +
+		"Unset (omit it): no opinion; each rule's own `skip_if_device_trusted` applies. " +
+		"`false`: never, whatever a rule says. " +
+		"`true`: a rule that sets it may skip; it does not make a rule skip that does not ask. " +
+		"Never honoured for `PHISHING_RESISTANT` or `DENY`, or when the request demands a fresh factor. " +
+		"Before kit#1026 an unset floor vetoed every rule like `false`; omit it unless you mean the veto."
+	rule := "Whether a trusted device (\"Remember this device\") satisfies the requirement without a factor: `true` asks for it, `false` or unset does not. " +
+		"The floor can veto it (`floor.skip_if_device_trusted = false`). Never honoured for `PHISHING_RESISTANT` or `DENY`, or when the request demands a fresh factor."
+	d["rules.require.skip_if_device_trusted"] = rule
+	d["acr_levels.require.skip_if_device_trusted"] = rule
 
 	return d
 }()

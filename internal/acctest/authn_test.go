@@ -915,9 +915,11 @@ resource "authwise_realm_authentication_policy" "p" {
 				ImportStateVerify:                    true,
 				ImportStateVerifyIdentifierAttribute: "realm",
 				// Explicit zeros are indistinguishable from unset on the
-				// server, so an import reads them as null.
+				// server, so an import reads them as null. Not
+				// skip_if_device_trusted: it has presence since apis v0.90.0
+				// (kit#1026), and an imported false stays false (tf#87).
 				ImportStateVerifyIgnore: []string{
-					"floor.min_factors", "floor.skip_if_device_trusted", "enrollment.in_flow",
+					"floor.min_factors", "enrollment.in_flow",
 				},
 			},
 			{

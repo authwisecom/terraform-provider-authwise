@@ -31,7 +31,7 @@ func TestProtoattr_RoundTrip(t *testing.T) {
 		AllowedFactorTypes:  []string{"totp", "webauthn"},
 		RequiredFactorTypes: []string{"webauthn"},
 		ReauthAfter:         durationpb.New(90 * time.Second),
-		SkipIfDeviceTrusted: true,
+		SkipIfDeviceTrusted: proto.Bool(true),
 		DenyReason:          "audit only",
 		HardwareBound:       true,
 	}

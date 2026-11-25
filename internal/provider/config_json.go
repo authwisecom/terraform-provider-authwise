@@ -256,6 +256,8 @@ var configJSONSpecs = []configJSONSpec{
 			"multi_realm_provider_selector.default_target":               "Where an identifier that matches no rule goes. Required by kit.",
 			"multi_realm_provider_selector.default_target.realm_name":    "The realm, one of `realm_names`.",
 			"multi_realm_provider_selector.default_target.provider_name": "A provider in that realm. Unset, the realm's own selection applies.",
+			"multi_realm_provider_selector.served_realm_selection":       "Organization realms (kit#1021): a label selector (`authwise.com/organization-realm=true`) naming more realms of the issuer's own tenant that it serves beside `realm_names`, for recovery and invitation links, SCIM admission and seats. No rule or `default_target` may name a realm through it. kit 1.99.0 or later, which refuses it on any issuer outside the administration tenant.",
+			"multi_realm_provider_selector.route_endpoint_name":          "Organization realms (kit#1021): the endpoint (`tenants/{t}/endpoints/{e}`) kit asks, with the identifier's domain only, where an identifier that matches no rule goes, before `default_target`. Requires `served_realm_selection`. kit 1.99.0 or later refuses it outside the administration tenant, and no kit release routes by it yet.",
 			"external_provider_selector":                                 "An endpoint decides.",
 			"external_provider_selector.endpoint_name":                   "The endpoint's full resource name.",
 			"remember_identifiers":                                       "Whether the login page offers \"Continue as b***@acme.com\" after the session has ended, from a cookie on the issuer host holding a digest and a masked display form, never the identifier. Unset means on for an identifier-first issuer (`multi_realm_provider_selector`) and off otherwise; set it to say so either way. The cookie proves nothing: every continue runs the realm's whole plan.",
@@ -293,7 +295,10 @@ var configJSONSpecs = []configJSONSpec{
 			"signup":                   "What kit does around a person's own sign-up in this realm (kit#952). Whether sign-up is allowed at all stays `provisioning.self_signup`.",
 			"signup.welcome_message":   "Send the `welcome` catalog message once to a person whose account this realm created by their own action: sign-up by form (after the address is proven, when the realm requires that), first sign-in through a federated provider, or accepting an invitation. Never for an account an administrator or SCIM creates, and never twice: the send is recorded on the account. Default false. Takes effect on kit 1.87.0 or later.",
 		},
-		omit: map[string]bool{authenticationKey: true},
+		// email_domains is written only by kit's tenancy-admin listener
+		// (SetOrganizationRealmDomains, kit#1021); the admin API refuses it
+		// on every realm write, so it has no place in authwise_realm.config.
+		omit: map[string]bool{authenticationKey: true, "email_domains": true},
 		// kit's reserved ProvisioningPolicy fields
 		// (pkg/engine/provisioning/reserved.go), with its reasons.
 		reserved: map[string]string{

@@ -53,7 +53,7 @@ Optional:
 - `mode` (String) What must hold beyond the primary: `NONE`, `ANY_FACTOR`, `TYPES`, `PHISHING_RESISTANT` or `DENY` (never valid as the floor).
 - `reauth_after` (String) A factor verified longer ago than this does not count. Unset falls back to `session.factor_reauth`. A Go duration string, e.g. `90s`, `15m`, `12h`.
 - `required_factor_types` (List of String) Factor types that must all be present (mode `TYPES`).
-- `skip_if_device_trusted` (Boolean) Whether a trusted device satisfies the requirement without a factor. Never honoured for `PHISHING_RESISTANT` or `DENY`.
+- `skip_if_device_trusted` (Boolean) Whether a trusted device ("Remember this device") satisfies the requirement without a factor: `true` asks for it, `false` or unset does not. The floor can veto it (`floor.skip_if_device_trusted = false`). Never honoured for `PHISHING_RESISTANT` or `DENY`, or when the request demands a fresh factor.
 
 
 
@@ -80,7 +80,7 @@ Optional:
 - `mode` (String) What must hold beyond the primary: `NONE`, `ANY_FACTOR`, `TYPES`, `PHISHING_RESISTANT` or `DENY` (never valid as the floor).
 - `reauth_after` (String) A factor verified longer ago than this does not count. Unset falls back to `session.factor_reauth`. A Go duration string, e.g. `90s`, `15m`, `12h`.
 - `required_factor_types` (List of String) Factor types that must all be present (mode `TYPES`).
-- `skip_if_device_trusted` (Boolean) Whether a trusted device satisfies the requirement without a factor. Never honoured for `PHISHING_RESISTANT` or `DENY`.
+- `skip_if_device_trusted` (Boolean) Whether the floor lets a rule skip its factor on a trusted device ("Remember this device"). Unset (omit it): no opinion; each rule's own `skip_if_device_trusted` applies. `false`: never, whatever a rule says. `true`: a rule that sets it may skip; it does not make a rule skip that does not ask. Never honoured for `PHISHING_RESISTANT` or `DENY`, or when the request demands a fresh factor. Before kit#1026 an unset floor vetoed every rule like `false`; omit it unless you mean the veto.
 
 
 <a id="nestedatt--remember_device"></a>
@@ -131,7 +131,7 @@ Optional:
 - `mode` (String) What must hold beyond the primary: `NONE`, `ANY_FACTOR`, `TYPES`, `PHISHING_RESISTANT` or `DENY` (never valid as the floor).
 - `reauth_after` (String) A factor verified longer ago than this does not count. Unset falls back to `session.factor_reauth`. A Go duration string, e.g. `90s`, `15m`, `12h`.
 - `required_factor_types` (List of String) Factor types that must all be present (mode `TYPES`).
-- `skip_if_device_trusted` (Boolean) Whether a trusted device satisfies the requirement without a factor. Never honoured for `PHISHING_RESISTANT` or `DENY`.
+- `skip_if_device_trusted` (Boolean) Whether a trusted device ("Remember this device") satisfies the requirement without a factor: `true` asks for it, `false` or unset does not. The floor can veto it (`floor.skip_if_device_trusted = false`). Never honoured for `PHISHING_RESISTANT` or `DENY`, or when the request demands a fresh factor.
 
 
 

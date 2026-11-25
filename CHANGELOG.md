@@ -1,3 +1,39 @@
+## 0.39.0 (Unreleased)
+
+UPGRADING:
+
+* **`skip_if_device_trusted` is unset, `true` or `false`, and the provider
+  now sends an explicit `false` (tf#87, kit#1026, apis v0.90.0).** On a
+  realm's floor (`authwise_realm_authentication_policy.floor`) the three
+  mean different things from the kit release that carries kit#1026: unset
+  is no opinion, and each rule's own setting applies; `false` forbids
+  "Remember this device" for every rule; `true` lets a rule that asks for it
+  skip its factor. Before, an explicit `false` never reached kit, and an
+  unset floor vetoed every rule like `false`.
+  * A configuration that omits it plans clean: it is sent absent, as before.
+    kit#1026 itself changes what that means on the floor: rules that set
+    `skip_if_device_trusted = true` start offering "Remember this device"
+    under it.
+  * A configuration that writes `skip_if_device_trusted = false` (on the
+    floor or a rule) shows one in-place update at the first plan after
+    upgrading, from null to `false`. On the floor, apply it if you mean the
+    veto. That is the behaviour the realm had before kit#1026. Remove the
+    line if you meant "no opinion".
+  * Against a kit without kit#1026, an explicit `false` is read back as
+    unset, so that update shows on every plan. Upgrade kit first, or leave
+    the attribute out until you do.
+
+NOTES:
+
+* The descriptions of `skip_if_device_trusted` say what each value means on
+  the floor and on a rule.
+* apis v0.86.0 to v0.90.0 also bring kit 1.99.0's two organization-realm
+  fields on `authwise_issuer.config`'s
+  `multi_realm_provider_selector`: `served_realm_selection` and
+  `route_endpoint_name` (kit#1021), now described. kit refuses them outside
+  the administration tenant. The realm's `email_domains` is left out of
+  `authwise_realm.config`: kit's admin API refuses it on every realm write.
+
 ## 0.38.1 (November 24, 2026)
 
 NOTES:

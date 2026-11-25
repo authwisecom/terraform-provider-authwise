@@ -135,7 +135,9 @@ Optional:
 - `default_target` (Attributes) Where an identifier that matches no rule goes. Required by kit. (see [below for nested schema](#nestedatt--multi_realm_provider_selector--default_target))
 - `identifier` (Attributes) The identifier screen. (see [below for nested schema](#nestedatt--multi_realm_provider_selector--identifier))
 - `realm_names` (List of String) The realms this issuer serves, as full resource names. Every target must name one of them.
+- `route_endpoint_name` (String) Organization realms (kit#1021): the endpoint (`tenants/{t}/endpoints/{e}`) kit asks, with the identifier's domain only, where an identifier that matches no rule goes, before `default_target`. Requires `served_realm_selection`. kit 1.99.0 or later refuses it outside the administration tenant, and no kit release routes by it yet.
 - `rules` (Attributes List) Ordered; the first match wins. (see [below for nested schema](#nestedatt--multi_realm_provider_selector--rules))
+- `served_realm_selection` (String) Organization realms (kit#1021): a label selector (`authwise.com/organization-realm=true`) naming more realms of the issuer's own tenant that it serves beside `realm_names`, for recovery and invitation links, SCIM admission and seats. No rule or `default_target` may name a realm through it. kit 1.99.0 or later, which refuses it on any issuer outside the administration tenant.
 
 <a id="nestedatt--multi_realm_provider_selector--default_target"></a>
 ### Nested Schema for `multi_realm_provider_selector.default_target`

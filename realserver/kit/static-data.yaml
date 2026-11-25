@@ -1,7 +1,7 @@
 # The real-server tests' kit seed (tf#86): guard-control v0.35.3's
 # dev/kit/static-data.yaml, which carries guard-control's permission catalog
 # for that release, with c-90 (the test client and guard-control's install
-# credential) also bound identity.viewer and tenancy.admin. Refresh it from
+# credential) also bound identity.admin and tenancy.admin. Refresh it from
 # the new tag when GUARD_CONTROL_VERSION moves. Test-only values throughout.
 #
 # Static-data overlay for the dev kit install (seeded by the one-shot
@@ -334,7 +334,9 @@ tenants:
                     resource_id: ""
                   # guard-control's install credential too (tf#86): its
                   # boot check reads kit's install capabilities and tenant.
-                  - role_name: identity.viewer
+                  # identity.admin also lets the tests write realms and
+                  # their authentication policy (tf#87).
+                  - role_name: identity.admin
                     resource_type: ""
                     resource_id: ""
                   # The tests' setup turns Guard on for t-01 with kit's
