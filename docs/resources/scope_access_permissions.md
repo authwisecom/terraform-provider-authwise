@@ -3,12 +3,12 @@
 page_title: "authwise_scope_access_permissions Resource - Authwise"
 subcategory: "Identity"
 description: |-
-  Manages the full set of access permissions associated with one scope. The set is authoritative: members associated out of band are removed on the next apply.
+  Manages the full set of access permissions associated with one scope. The set is authoritative: members associated out of band are removed on the next apply. Has an effect only on a scope of kind authorization.permissionGroups: a client that requests that scope gets, in the permissions claim, the permissions the subject holds among those associated here. kit ignores the set on a scope of any other kind.
 ---
 
 # authwise_scope_access_permissions (Resource)
 
-Manages the full set of access permissions associated with one scope. The set is authoritative: members associated out of band are removed on the next apply.
+Manages the full set of access permissions associated with one scope. The set is authoritative: members associated out of band are removed on the next apply. Has an effect only on a scope of kind `authorization.permissionGroups`: a client that requests that scope gets, in the `permissions` claim, the permissions the subject holds among those associated here. kit ignores the set on a scope of any other kind.
 
 
 

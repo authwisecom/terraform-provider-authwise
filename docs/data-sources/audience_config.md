@@ -110,5 +110,5 @@ Optional:
 
 Optional:
 
-- `include_permissions` (Boolean)
-- `include_roles` (Boolean)
+- `include_permissions` (Boolean) Grant the audience automatic permission scopes, which turn on the `permissions` claim. The claim is scoped: it carries the permissions the subject holds and the request asked for, never every held permission. With this alone a token carries `permissions: []` until the client requests permission words or an `authorization.permissionGroups` scope; see `authwise_scope.kind`. No effect when the audience has an `authwise_scope` of kind `authorization.permissions` or `authorization.permissionGroups` of its own. Default false.
+- `include_roles` (Boolean) Grant the audience an automatic `roles` scope, so every token for it carries the `roles` claim with the subject's roles. No effect when the audience has an `authwise_scope` of kind `authorization.roles` of its own: that scope decides. Default false.

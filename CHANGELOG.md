@@ -1,3 +1,22 @@
+## 0.38.1 (Unreleased)
+
+NOTES:
+
+* **`authwise_scope`: what each kind gives a client (tf#84).** The
+  `permissions` claim is scoped: it carries the permissions the subject
+  holds and the request asked for, never every held permission. The
+  example used kind `authorization.permissions` with
+  `authwise_scope_access_permissions`, a shape that never fills the claim:
+  kit reads a scope's associated permissions only for kind
+  `authorization.permissionGroups`. The example now uses that kind. The
+  `kind` list says what each kind puts in the token and which scope name
+  takes effect, and `auto`, `authwise_scope_access_permissions`, and the
+  audience config's `scopes.authorization.include_roles` and
+  `include_permissions` are described. A configuration of the old example's
+  shape keeps applying as before; change its `kind` to
+  `authorization.permissionGroups` to get the claim. Documentation only: no
+  schema or behavior changes.
+
 ## 0.38.0 (November 21, 2026)
 
 UPGRADING:

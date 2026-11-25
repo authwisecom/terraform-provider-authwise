@@ -13,13 +13,16 @@ An OAuth scope on an audience, and the access permissions it grants. The id is t
 ## Example Usage
 
 ```terraform
-# A scope that puts the subject's permissions in the token when a client
-# asks for it. kind is one of the values listed under Schema.
+# A scope that puts permissions in the token when a client asks for it.
+# A client that requests "users.read" gets, in the `permissions` claim, the
+# permissions the subject holds among those associated below; never every
+# permission the subject holds. kind is one of the values listed under Schema.
 resource "authwise_scope" "users_read" {
   scope_id = "users.read"
-  kind     = "authorization.permissions"
+  kind     = "authorization.permissionGroups"
 }
 
+# kit reads this set only for a scope of kind authorization.permissionGroups.
 resource "authwise_scope_access_permissions" "users_read" {
   scope              = authwise_scope.users_read.name
   access_permissions = [authwise_access_permission.users_read.name]
@@ -33,9 +36,9 @@ resource "authwise_scope_access_permissions" "users_read" {
 
 - `kind` (String) What the scope grants. One of:
   - `openid`: OpenID Connect sign-in: the scope that makes the token response carry an `id_token`.
-  - `authorization.roles`: the subject's roles.
-  - `authorization.permissions`: the subject's permissions.
-  - `authorization.permissionGroups`: the subject's permission groups (bundles of permissions, not the groups a person is in).
+  - `authorization.roles`: the `roles` claim: the subject's roles. Only a scope named `roles` has an effect.
+  - `authorization.permissions`: the `permissions` claim in direct mode: the permissions the subject holds **and** the request names as scope words. Only a scope named `permissions` has an effect.
+  - `authorization.permissionGroups`: the `permissions` claim in groups mode: the permissions the subject holds among those associated to the requested scopes with `authwise_scope_access_permissions`.
   - `authorization.groups`: the `groups` claim: the groups the signed-in person belongs to. A client gets it only by asking for the scope.
   - `authorization.bindings`: the `authz` claim: the subject's effective Access bindings, resolved when the token is issued.
 
@@ -45,7 +48,7 @@ Any other value is refused at plan: kit stores an unknown kind with no effect, a
 ### Optional
 
 - `audience_id` (String) Parent identifier `audience_id`; overrides the provider default, and reads back from the name. Changing a configured one replaces the resource.
-- `auto` (Boolean)
+- `auto` (Boolean) Grant the scope on every token request for the audience, whether or not the client asks for it. Default false: a client gets the scope only by requesting it.
 - `issuer_id` (String) Parent identifier `issuer_id`; overrides the provider default, and reads back from the name. Changing a configured one replaces the resource.
 - `tenant_id` (String) Parent identifier `tenant_id`; overrides the provider default, and reads back from the name. Changing a configured one replaces the resource.
 
