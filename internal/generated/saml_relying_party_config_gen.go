@@ -16,6 +16,7 @@ import (
 	validator "github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
 	basetypes "github.com/hashicorp/terraform-plugin-framework/types/basetypes"
+	proto "google.golang.org/protobuf/proto"
 	anypb "google.golang.org/protobuf/types/known/anypb"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	"time"
@@ -73,7 +74,10 @@ func SamlRelyingPartyConfigDataSourceSchema() schema.Schema {
 				MarkdownDescription: "RelayState sent with an IdP-initiated Response, which is how a partner knows where to land the user.",
 				Optional:            true,
 			},
-			"encrypt_assertions": schema.BoolAttribute{Optional: true},
+			"encrypt_assertions": schema.BoolAttribute{
+				MarkdownDescription: "Encrypt each assertion to sp_encryption_certificate_id. Defaults false, read at face value; it never stands in for a signature.",
+				Optional:            true,
+			},
 			"name_id_format": schema.StringAttribute{
 				MarkdownDescription: "NameID Format we issue. Empty uses the unspecified format carrying the same subject an OIDC client would get.",
 				Optional:            true,
@@ -86,9 +90,12 @@ func SamlRelyingPartyConfigDataSourceSchema() schema.Schema {
 				MarkdownDescription: "SessionNotOnOrAfter on the AuthnStatement. Zero omits it, leaving the partner's own session policy in charge.",
 				Optional:            true,
 			},
-			"sign_assertions": schema.BoolAttribute{Optional: true},
+			"sign_assertions": schema.BoolAttribute{
+				MarkdownDescription: "Sign each assertion. Unset means `true`, whatever the other flags say. An explicit `false` is accepted while the Response is signed (`sign_response` unset or `true`). kit v1.100.0 or later (kit#1041); provider 0.38.x and earlier never sent an explicit `false`.",
+				Optional:            true,
+			},
 			"sign_response": schema.BoolAttribute{
-				MarkdownDescription: "Defaults true. At least one of sign_response, sign_assertions or encrypt_assertions must hold, which the library enforces.",
+				MarkdownDescription: "Sign the Response. Unset means `true`, whatever the other two flags say. Only an explicit `false` lowers it, and only beside `sign_assertions = true`, named: kit refuses it at apply otherwise. `encrypt_assertions` does not count, since anyone holding the partner's public certificate can make an encrypted assertion. kit v1.100.0 or later (kit#1041); provider 0.38.x and earlier never sent an explicit `false`.",
 				Optional:            true,
 			},
 			"signing_certificate_id": schema.StringAttribute{
@@ -217,8 +224,12 @@ func (m *SamlRelyingPartyConfigModel) ToProto(ctx context.Context) (*v1alpha1.Sa
 		}
 	}
 	out.SigningCertificateId = m.SigningCertificateId.ValueString()
-	out.SignResponse = m.SignResponse.ValueBool()
-	out.SignAssertions = m.SignAssertions.ValueBool()
+	if !m.SignResponse.IsNull() && !m.SignResponse.IsUnknown() {
+		out.SignResponse = proto.Bool(m.SignResponse.ValueBool())
+	}
+	if !m.SignAssertions.IsNull() && !m.SignAssertions.IsUnknown() {
+		out.SignAssertions = proto.Bool(m.SignAssertions.ValueBool())
+	}
 	out.EncryptAssertions = m.EncryptAssertions.ValueBool()
 	out.WantAuthnRequestsSigned = m.WantAuthnRequestsSigned.ValueBool()
 	out.AllowIdpInitiated = m.AllowIdpInitiated.ValueBool()

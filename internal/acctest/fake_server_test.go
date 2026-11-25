@@ -776,6 +776,9 @@ func admitProvider(p *corepb.Provider) error {
 	if err := admitTrustedEmailDomains(p); err != nil {
 		return err
 	}
+	if err := admitProviderSamlSigning(p.GetConfig()); err != nil {
+		return err
+	}
 
 	want := map[string]proto.Message{
 		"magicLink": &corepb.ProviderMagicLink{},

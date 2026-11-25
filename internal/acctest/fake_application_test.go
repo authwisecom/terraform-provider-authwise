@@ -84,5 +84,5 @@ func admitClient(c *corepb.Application) error {
 		return status.Errorf(codes.InvalidArgument, "token_endpoint_auth_method: %q is not client_secret_basic, client_secret_post or none", c.GetTokenEndpointAuthMethod())
 	}
 
-	return nil
+	return admitClientSamlSigning(c.GetConfig())
 }

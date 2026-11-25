@@ -1,5 +1,34 @@
 ## 0.39.0 (Unreleased)
 
+BREAKING CHANGES:
+
+* **The SAML signing switches send an explicit `false` (tf#89, K-34,
+  kit#1041, apis v0.91.0).** They are `want_assertions_signed` on
+  `authwise_provider_saml`, and `sign_response` and `sign_assertions` on
+  `authwise_saml_relying_party_config`.
+  * **With provider 0.38.x and earlier, an explicit `false` is silently not
+    sent.** kit receives the switch absent. kit v1.100.0 reads absent as
+    `true`, so the signature you turned off stays required.
+  * **From 0.39.0 an explicit `false` is sent, and kit v1.100.0 refuses it
+    unless the other signature is on.** `want_assertions_signed = false`
+    needs `want_response_signed = true`. `sign_response = false` needs
+    `sign_assertions = true`, written out; `encrypt_assertions` does not
+    count. `sign_assertions = false` is accepted while the Response is
+    signed. A configuration kit refuses fails at apply, and the error names
+    the switch.
+  * A configuration that omits them is sent and read back absent, as
+    before, which kit v1.100.0 reads as signed.
+  * kit v1.100.0's upgrade stores an explicit `false` where a requirement
+    was already off. A configuration that omits that switch then plans one
+    in-place update to `config`, removing the `false`. Applying it turns
+    the signature back on. To keep it off, write the `false` beside the
+    other signature.
+  * Refreshing a partner's metadata in kit can store an explicit `true`
+    that the configuration omits. That too shows as a change to `config`.
+    It means the same, and applying it is harmless.
+  * **An explicit `false` needs kit v1.100.0 or later.** An earlier kit
+    reads it back as absent, so the change shows on every plan.
+
 UPGRADING:
 
 * **`skip_if_device_trusted` is unset, `true` or `false`, and the provider

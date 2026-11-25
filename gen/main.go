@@ -774,7 +774,7 @@ func main() {
 							"signing_certificate_id":             "Certificate resource name kit signs AuthnRequests with, and decrypts encrypted assertions with.",
 							"sign_authn_requests":                "Sign every AuthnRequest with `signing_certificate_id`.",
 							"allow_create":                       "Sets AllowCreate on the requested NameIDPolicy: the IdP may create an identifier for a person it has none for.",
-							"want_assertions_signed":             "Require every assertion to be signed. kit requires it anyway unless `want_response_signed` is set: at least one of the two always holds, since an SP that verifies nothing accepts assertions from anyone.",
+							"want_assertions_signed":             "Require every assertion to be signed. Unset means `true`, whatever `want_response_signed` says. Only an explicit `false` lowers it, and only beside `want_response_signed = true`: an SP that verifies nothing accepts assertions from anyone, so kit refuses a lone `false` at apply. kit v1.100.0 or later (kit#1041); provider 0.38.x and earlier never sent an explicit `false`.",
 							"want_response_signed":               "Require the Response itself to be signed. See `want_assertions_signed`.",
 							"identifier_source":                  "Which part of the assertion becomes the user's identifier, as one of two paths: `assertion.name_id`, the Subject's NameID (the default), or `assertion.attributes.<name>`, the first value of the attribute `<name>`, e.g. `assertion.attributes.email`. A partner whose NameID is transient or opaque needs the second form: the identifier links a returning person to their user, so it must be stable across sign-ins.",
 							"identifier_hint":                    "How the identifier that routed the person to this partner (the address typed at an identifier-first login, or `login_hint` on /authorize) reaches it, so the partner need not ask for it again. Nothing is sent when no identifier was routed. One of `LOGIN_HINT_QUERY` (the default): a `login_hint` query parameter on the IdP's SSO URL, which is what Entra ID, Google Workspace and Okta document; `SUBJECT`: a `<saml:Subject>` in the AuthnRequest, for an IdP that reads one (Entra ID refuses the whole request with AADSTS900236); or `NONE`: send nothing, and the partner asks the person.",
@@ -793,6 +793,8 @@ func main() {
 						Values:   map[string]gentf.Values{"acs_binding": samlBindings},
 						Descriptions: map[string]string{
 							"acs_binding":             "How kit delivers the Response to the partner's AssertionConsumerService, as the SAML binding URN. Unset is HTTP-POST.",
+							"sign_response":           "Sign the Response. Unset means `true`, whatever the other two flags say. Only an explicit `false` lowers it, and only beside `sign_assertions = true`, named: kit refuses it at apply otherwise. `encrypt_assertions` does not count, since anyone holding the partner's public certificate can make an encrypted assertion. kit v1.100.0 or later (kit#1041); provider 0.38.x and earlier never sent an explicit `false`.",
+							"sign_assertions":         "Sign each assertion. Unset means `true`, whatever the other flags say. An explicit `false` is accepted while the Response is signed (`sign_response` unset or `true`). kit v1.100.0 or later (kit#1041); provider 0.38.x and earlier never sent an explicit `false`.",
 							"sp_metadata_imported_at": "When kit last imported the partner's metadata. kit sets it on import; leave it unset.",
 						},
 					},

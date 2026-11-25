@@ -34,7 +34,7 @@ Builds a ProviderSaml config and exposes its google.protobuf.Any encoding as `an
 - `requested_authn_context` (Attributes) The RequestedAuthnContext kit sends in the AuthnRequest. Unset requests nothing and leaves the partner to authenticate the person however its own policy says. That is the default because an exact `PasswordProtectedTransport` fails anyone who signs in to the partner without a password, such as an Entra ID user on passwordless or MFA (AADSTS75011). When set, `class_refs` must hold at least one non-blank URI. (see [below for nested schema](#nestedatt--requested_authn_context))
 - `sign_authn_requests` (Boolean) Sign every AuthnRequest with `signing_certificate_id`.
 - `signing_certificate_id` (String) Certificate resource name kit signs AuthnRequests with, and decrypts encrypted assertions with.
-- `want_assertions_signed` (Boolean) Require every assertion to be signed. kit requires it anyway unless `want_response_signed` is set: at least one of the two always holds, since an SP that verifies nothing accepts assertions from anyone.
+- `want_assertions_signed` (Boolean) Require every assertion to be signed. Unset means `true`, whatever `want_response_signed` says. Only an explicit `false` lowers it, and only beside `want_response_signed = true`: an SP that verifies nothing accepts assertions from anyone, so kit refuses a lone `false` at apply. kit v1.100.0 or later (kit#1041); provider 0.38.x and earlier never sent an explicit `false`.
 - `want_response_signed` (Boolean) Require the Response itself to be signed. See `want_assertions_signed`.
 
 ### Read-Only

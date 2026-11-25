@@ -16,6 +16,7 @@ import (
 	validator "github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	types "github.com/hashicorp/terraform-plugin-framework/types"
 	basetypes "github.com/hashicorp/terraform-plugin-framework/types/basetypes"
+	proto "google.golang.org/protobuf/proto"
 	anypb "google.golang.org/protobuf/types/known/anypb"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	"time"
@@ -129,7 +130,7 @@ func ProviderSamlDataSourceSchema() schema.Schema {
 				Optional:            true,
 			},
 			"want_assertions_signed": schema.BoolAttribute{
-				MarkdownDescription: "Require every assertion to be signed. kit requires it anyway unless `want_response_signed` is set: at least one of the two always holds, since an SP that verifies nothing accepts assertions from anyone.",
+				MarkdownDescription: "Require every assertion to be signed. Unset means `true`, whatever `want_response_signed` says. Only an explicit `false` lowers it, and only beside `want_response_signed = true`: an SP that verifies nothing accepts assertions from anyone, so kit refuses a lone `false` at apply. kit v1.100.0 or later (kit#1041); provider 0.38.x and earlier never sent an explicit `false`.",
 				Optional:            true,
 			},
 			"want_response_signed": schema.BoolAttribute{
@@ -248,7 +249,9 @@ func (m *ProviderSamlModel) ToProto(ctx context.Context) (*v1alpha1.ProviderSaml
 	out.SignAuthnRequests = m.SignAuthnRequests.ValueBool()
 	out.NameIdFormat = m.NameIdFormat.ValueString()
 	out.AllowCreate = m.AllowCreate.ValueBool()
-	out.WantAssertionsSigned = m.WantAssertionsSigned.ValueBool()
+	if !m.WantAssertionsSigned.IsNull() && !m.WantAssertionsSigned.IsUnknown() {
+		out.WantAssertionsSigned = proto.Bool(m.WantAssertionsSigned.ValueBool())
+	}
 	out.WantResponseSigned = m.WantResponseSigned.ValueBool()
 	out.AllowIdpInitiated = m.AllowIdpInitiated.ValueBool()
 	out.AcceptSha1 = m.AcceptSha1.ValueBool()

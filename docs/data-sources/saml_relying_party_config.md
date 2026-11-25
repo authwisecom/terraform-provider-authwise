@@ -23,12 +23,12 @@ Builds a SamlRelyingPartyConfig config and exposes its google.protobuf.Any encod
 - `assertion_lifetime_seconds` (Number) How long the assertion is good for. Defaults to 300.
 - `claim_map` (Attributes) Grant and user to AttributeStatement. Empty issues nothing but the NameID, which is what a partner asking only "who is this" needs. (see [below for nested schema](#nestedatt--claim_map))
 - `default_relay_state` (String) RelayState sent with an IdP-initiated Response, which is how a partner knows where to land the user.
-- `encrypt_assertions` (Boolean)
+- `encrypt_assertions` (Boolean) Encrypt each assertion to sp_encryption_certificate_id. Defaults false, read at face value; it never stands in for a signature.
 - `name_id_format` (String) NameID Format we issue. Empty uses the unspecified format carrying the same subject an OIDC client would get.
 - `name_id_source` (String) Which value becomes the NameID. Empty uses the default for the format.
 - `session_not_on_or_after_seconds` (Number) SessionNotOnOrAfter on the AuthnStatement. Zero omits it, leaving the partner's own session policy in charge.
-- `sign_assertions` (Boolean)
-- `sign_response` (Boolean) Defaults true. At least one of sign_response, sign_assertions or encrypt_assertions must hold, which the library enforces.
+- `sign_assertions` (Boolean) Sign each assertion. Unset means `true`, whatever the other flags say. An explicit `false` is accepted while the Response is signed (`sign_response` unset or `true`). kit v1.100.0 or later (kit#1041); provider 0.38.x and earlier never sent an explicit `false`.
+- `sign_response` (Boolean) Sign the Response. Unset means `true`, whatever the other two flags say. Only an explicit `false` lowers it, and only beside `sign_assertions = true`, named: kit refuses it at apply otherwise. `encrypt_assertions` does not count, since anyone holding the partner's public certificate can make an encrypted assertion. kit v1.100.0 or later (kit#1041); provider 0.38.x and earlier never sent an explicit `false`.
 - `signing_certificate_id` (String) Certificate resource name kit signs with. Required: an IdP that signs nothing issues assertions anyone can forge.
 - `sp_encryption_certificate_id` (String) Certificate resource name we encrypt assertions to. Required if encrypt_assertions.
 - `sp_entity_id` (String) Expected Issuer on their AuthnRequest, and the Audience our assertion is restricted to. An AuthnRequest from anyone else is refused.

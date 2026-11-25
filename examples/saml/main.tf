@@ -150,8 +150,8 @@ data "authwise_saml_relying_party_config" "app" {
   acs_binding               = "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST"
   sp_signing_certificate_id = authwise_certificate.relying_party_signing.certificate_id
 
-  # Ours. At least one of sign_response, sign_assertions or
-  # encrypt_assertions must hold.
+  # Ours. Both signatures default to on. Turning one off needs the other
+  # on (kit v1.100.0); encrypt_assertions is not a signature.
   signing_certificate_id = authwise_certificate.idp_signing.certificate_id
   sign_response          = true
   sign_assertions        = true
