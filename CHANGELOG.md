@@ -1,6 +1,9 @@
-## 0.38.1 (Unreleased)
+## 0.38.1 (November 24, 2026)
 
 NOTES:
+
+* **Pairs with kit 1.98.0 or later, as 0.38.0 does.** No new minimum: this
+  release changes documentation only.
 
 * **`authwise_scope`: what each kind gives a client (tf#84).** The
   `permissions` claim is scoped: it carries the permissions the subject
