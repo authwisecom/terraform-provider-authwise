@@ -1,0 +1,52 @@
+# kit for the real-server tests (tf#86). Test-only values: nothing here
+# is a secret, and the stack lives only for one test run.
+serverSecret: "1111111111111111111111111111111111111111111111111111111111111111"
+issuer:
+  scheme: http
+issuerKeys:
+  keyName: stub
+  activeDays: 120
+  visibleAfterActiveDays: 120
+cache:
+  type: redis
+  redis:
+    address: localhost:6379
+asset:
+  mode: None
+session:
+  clusterPrefix: local
+  sameSiteMode: none
+  unsigned: true
+  disableSecure: true
+openid:
+  insecureSkipVerify: true
+platform:
+  client:
+    hostname: localhost
+    port: 9989
+    tls: true
+    tlsCaPath: ${REALSERVER_CERTS}/ca.pem
+    tlsCertPath: ${REALSERVER_CERTS}/client.pem
+    tlsKeyPath: ${REALSERVER_CERTS}/client.key
+products:
+  guard:
+    # guard-control's install credential (kit#900): EnableProduct binds it
+    # in the tenant's Guard audience. The test client doubles as it.
+    controlClientId: c-90
+server:
+  http:
+    host: 0.0.0.0
+    port: 28444
+    tls: false
+repository:
+  primaryMode: gorm
+  metadataMode: gorm
+  gorm:
+    app: &db
+      dialect: postgres
+      host: localhost
+      port: 5432
+      username: kit
+      password: kit
+      name: kit
+    owner: *db

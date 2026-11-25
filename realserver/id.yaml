@@ -1,0 +1,7 @@
+# id (short AWIDs) for the real-server tests (tf#86). id does not expand
+# ${VAR} in its config, so its TLS paths come from GRPC_SERVER_TLS_*_PATH
+# and its database from DB_*, both in the environment.
+grpc:
+  server:
+    host: 0.0.0.0
+    port: 9988

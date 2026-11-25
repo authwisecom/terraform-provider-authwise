@@ -110,6 +110,58 @@ acceptance:
     - if: '$CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/'
     - if: '$CI_COMMIT_BRANCH'
 
+# The real-server tier (tf#86): the Guard association resources against a
+# released kit and guard-control (realserver/versions.env), as a customer
+# pulls them. The fake above builds names by the rule its tests assert, so
+# it can only confirm itself; guard-control#66 shipped through it. Each
+# test applies, plans clean, removes a member, and destroys, comparing
+# whole names. Released images only: a fix not yet released is checked on
+# test01 instead. Tests known to fail on the pinned versions run apart and
+# must fail (versions.env, KNOWN_FAILING_TESTS).
+#
+# The runner has no docker daemon, so realserver/run.sh extracts the
+# images' binaries with crane; postgres and valkey run as services on
+# localhost. It runs only when the project variable REALSERVER_REGISTRY
+# names the registry (registry.authwise.com), and pulls with this job's own
+# CI_JOB_TOKEN unless REALSERVER_REGISTRY_USER/_PASSWORD say otherwise:
+# nothing is stored. The job log is public; run.sh never prints its logs
+# whole.
+realserver:
+  stage: test
+  extends: .go-cache
+  services:
+    - name: postgres:17.0
+      variables:
+        POSTGRES_USER: kit
+        POSTGRES_PASSWORD: kit
+        POSTGRES_DB: kit
+    - name: valkey/valkey:9.0
+  variables:
+    TF_VERSION: "1.15.9"
+  script:
+    - mkdir -p .terraform-bin/${TF_VERSION}
+    - '[ -x ".terraform-bin/${TF_VERSION}/terraform" ] || go run github.com/hashicorp/hc-install/cmd/hc-install@v0.9.4 install -version "${TF_VERSION}" -path ".terraform-bin/${TF_VERSION}" terraform'
+    - export PATH="$CI_PROJECT_DIR/.terraform-bin/${TF_VERSION}:$PATH"
+    - export TF_ACC_TERRAFORM_PATH="$CI_PROJECT_DIR/.terraform-bin/${TF_VERSION}/terraform"
+    - export REALSERVER_REGISTRY_USER="${REALSERVER_REGISTRY_USER:-gitlab-ci-token}"
+    - export REALSERVER_REGISTRY_PASSWORD="${REALSERVER_REGISTRY_PASSWORD:-$CI_JOB_TOKEN}"
+    - realserver/ci.sh
+  cache:
+    - key:
+        files:
+          - go.sum
+      paths:
+        - .go
+        - .golangci-lint
+    - key: terraform-${TF_VERSION}
+      paths:
+        - .terraform-bin
+  rules:
+    - if: '$REALSERVER_REGISTRY == null || $REALSERVER_REGISTRY == ""'
+      when: never
+    - if: '$CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/'
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+
 # docs/ is generated (tfplugindocs over the schema, templates/ and
 # examples/): a schema change without `make docs` fails here.
 docs:

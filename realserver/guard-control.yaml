@@ -1,0 +1,40 @@
+# guard-control for the real-server tests (tf#86): authn against the
+# stack's kit issuer, authz by kit's Access evaluator (remote mode), as a
+# customer's install runs. It shares kit-engine's network namespace, so the
+# issuer is localhost:28443 here and for the tests alike.
+repository:
+  common:
+    primaryMode: gorm
+    metadataMode: gorm
+  gorm:
+    app:
+      dialect: sqlite
+      name: ${REALSERVER_DATA}/guard-control.db
+id:
+  grpc:
+    hostname: localhost
+    port: 9988
+    tls: true
+    tlsCaPath: ${REALSERVER_CERTS}/ca.pem
+    tlsCertPath: ${REALSERVER_CERTS}/client.pem
+    tlsKeyPath: ${REALSERVER_CERTS}/client.key
+api:
+  http:
+    host: 0.0.0.0
+    port: 28445
+auth:
+  issuer: http://localhost:28443
+  jwksUrl: http://localhost:28443/.well-known/jwks
+  allowHttpIssuers: true
+access:
+  mode: remote
+  endpoint: localhost:28444
+  plaintext: true
+estate:
+  domainSuffixes: [localhost]
+# guard-control's own calls to kit (guard-control#80): the stack's admin
+# API, with the test client's minted credential as the install's.
+kit:
+  adminApi: http://localhost:28444
+install:
+  credentialFile: ${REALSERVER_DIR}/.data/client.json

@@ -1,0 +1,344 @@
+# The real-server tests' kit seed (tf#86): guard-control v0.35.2's
+# dev/kit/static-data.yaml, which carries guard-control's permission catalog
+# for that release, with c-90 (the test client and guard-control's install
+# credential) also bound identity.viewer and tenancy.admin. Refresh it from
+# the new tag when GUARD_CONTROL_VERSION moves. Test-only values throughout.
+#
+# Static-data overlay for the dev kit install (seeded by the one-shot
+# migrate job via repository.static.*). Adapted from kit's
+# testing/main/local-ui-static-data.yaml: the admin issuer i-01 is
+# addressed as localhost:28443, and u-01 keeps kit's usual local-dev
+# password identifier (admin@localhost.localdomain).
+---
+tenants:
+  t-01:
+    classification: workplace
+    config:
+      cors:
+        # CorsConfig has allowed_origins (and allowed_origins_regexp) only;
+        # since kit v1.24.0 (kit#624) an unknown config key fails boot.
+        allowed_origins:
+          # login UI (layouts center app, https) and guard-admin dev servers.
+          - "https://localhost:5173"
+          - "http://localhost:5176"
+    themes:
+      th-01:
+        display_name: Default Theme
+        stylesheet_string_data: |
+          :root {
+          --primary-main: #{{ .primary_main }};
+          --secondary-main: #{{ .secondary_main }};
+          --text-primary: #{{ .text_primary }};
+          --text-secondary: #{{ .text_secondary }};
+          --background: #{{ .background }};
+          }
+          .class1 { display: 'block'; color: '{{ .color }}'; }
+        stylesheet_attributes:
+          color: red
+          primary_main: 330033
+          text_primary: ffffff
+          secondary_main: ccff00
+          text_secondary: ffffff
+          background: 330033
+        content:
+          main_logo: /logo.png
+    realms:
+      r-01:
+        users:
+          u-01:
+            display_name: Admin
+            family_name: Admin
+            given_name: Admin
+            operator: true
+            identifiers:
+              - provider_id: p-01
+                identifier: admin@localhost.localdomain
+                # Dev-only plaintext, hashed at load under the current
+                # policy (kit's testing/main seed does the same).
+                password: password
+                hash_enabled: true
+            issuers:
+              i-01:
+                audiences:
+                  a-01:
+                    access_bindings:
+                      - role_name: identity.admin
+                        resource_type: ""
+                        resource_id: ""
+                      - role_name: identity.auditor
+                        resource_type: ""
+                        resource_id: ""
+                      - role_name: access.admin
+                        resource_type: ""
+                        resource_id: ""
+                      - role_name: tenancy.admin
+                        resource_type: ""
+                        resource_id: ""
+                      - role_name: guardcontrol.admin
+                        resource_type: ""
+                        resource_id: ""
+    domains:
+      "localhost:28443": {}
+    issuers:
+      i-01:
+        domain: "localhost:28443"
+        appearance_profiles:
+          ap-01:
+            # kit v1.32.0: Issuer.appearance_profile_id is gone; the default
+            # profile says so itself.
+            is_default: true
+            display_name: Default
+            theme_id: th-01
+        config:
+          external_ui_url: "https://localhost:5173/"
+        audiences:
+          a-01:
+            # guard-control's permission catalog and admin role, seeded
+            # into the access-bearing admin audience. GENERATED from
+            # pkg/api/authorization.CatalogPermissions by
+            # pkg/lib/gen/devseed — run `make generate`, do not hand-edit
+            # between the markers.
+            # BEGIN generated: guardcontrol catalog
+            access_permissions:
+              guardcontrol.enrollmentKeys.create: { service: guardcontrol }
+              guardcontrol.enrollmentKeys.get: { service: guardcontrol }
+              guardcontrol.enrollmentKeys.list: { service: guardcontrol }
+              guardcontrol.enrollmentKeys.revoke: { service: guardcontrol }
+              guardcontrol.events.get: { service: guardcontrol }
+              guardcontrol.events.list: { service: guardcontrol }
+              guardcontrol.events.search: { service: guardcontrol }
+              guardcontrol.networks.create: { service: guardcontrol }
+              guardcontrol.networks.delete: { service: guardcontrol }
+              guardcontrol.networks.enroll: { service: guardcontrol }
+              guardcontrol.networks.get: { service: guardcontrol }
+              guardcontrol.networks.killPool: { service: guardcontrol }
+              guardcontrol.networks.list: { service: guardcontrol }
+              guardcontrol.networks.update: { service: guardcontrol }
+              guardcontrol.nodeGroups.associateGrants: { service: guardcontrol }
+              guardcontrol.nodeGroups.associateNodes: { service: guardcontrol }
+              guardcontrol.nodeGroups.create: { service: guardcontrol }
+              guardcontrol.nodeGroups.delete: { service: guardcontrol }
+              guardcontrol.nodeGroups.get: { service: guardcontrol }
+              guardcontrol.nodeGroups.list: { service: guardcontrol }
+              guardcontrol.nodeGroups.update: { service: guardcontrol }
+              guardcontrol.nodes.associateGrants: { service: guardcontrol }
+              guardcontrol.nodes.create: { service: guardcontrol }
+              guardcontrol.nodes.delete: { service: guardcontrol }
+              guardcontrol.nodes.get: { service: guardcontrol }
+              guardcontrol.nodes.issueAuthCode: { service: guardcontrol }
+              guardcontrol.nodes.list: { service: guardcontrol }
+              guardcontrol.nodes.update: { service: guardcontrol }
+              guardcontrol.poolRelays.create: { service: guardcontrol }
+              guardcontrol.poolRelays.delete: { service: guardcontrol }
+              guardcontrol.poolRelays.get: { service: guardcontrol }
+              guardcontrol.poolRelays.issueCredential: { service: guardcontrol }
+              guardcontrol.poolRelays.list: { service: guardcontrol }
+              guardcontrol.poolRelays.revokeCredential: { service: guardcontrol }
+              guardcontrol.poolRelays.update: { service: guardcontrol }
+              guardcontrol.relayPools.create: { service: guardcontrol }
+              guardcontrol.relayPools.delete: { service: guardcontrol }
+              guardcontrol.relayPools.get: { service: guardcontrol }
+              guardcontrol.relayPools.list: { service: guardcontrol }
+              guardcontrol.relayPools.listAllowed: { service: guardcontrol }
+              guardcontrol.relayPools.update: { service: guardcontrol }
+              guardcontrol.relays.create: { service: guardcontrol }
+              guardcontrol.relays.delete: { service: guardcontrol }
+              guardcontrol.relays.get: { service: guardcontrol }
+              guardcontrol.relays.list: { service: guardcontrol }
+              guardcontrol.relays.update: { service: guardcontrol }
+              guardcontrol.resources.associateNodes: { service: guardcontrol }
+              guardcontrol.resources.create: { service: guardcontrol }
+              guardcontrol.resources.delete: { service: guardcontrol }
+              guardcontrol.resources.get: { service: guardcontrol }
+              guardcontrol.resources.list: { service: guardcontrol }
+              guardcontrol.resources.update: { service: guardcontrol }
+              guardcontrol.self.enrollments.list: { service: guardcontrol }
+              guardcontrol.self.enrollments.revoke: { service: guardcontrol }
+              guardcontrol.self.nodes.delete: { service: guardcontrol }
+              guardcontrol.self.nodes.get: { service: guardcontrol }
+              guardcontrol.self.nodes.list: { service: guardcontrol }
+              guardcontrol.self.nodes.update: { service: guardcontrol }
+              guardcontrol.tenants.delete: { service: guardcontrol }
+              guardcontrol.tenants.get: { service: guardcontrol }
+              guardcontrol.tenants.grants.list: { service: guardcontrol }
+              guardcontrol.tenants.grants.write: { service: guardcontrol }
+              guardcontrol.tenants.people.list: { service: guardcontrol }
+              guardcontrol.tenants.update: { service: guardcontrol }
+              guardcontrol.traffic.read: { service: guardcontrol }
+              guardcontrol.trustedIssuerRules.create: { service: guardcontrol }
+              guardcontrol.trustedIssuerRules.delete: { service: guardcontrol }
+              guardcontrol.trustedIssuerRules.get: { service: guardcontrol }
+              guardcontrol.trustedIssuerRules.list: { service: guardcontrol }
+              guardcontrol.trustedIssuerRules.update: { service: guardcontrol }
+              guardcontrol.trustedIssuers.create: { service: guardcontrol }
+              guardcontrol.trustedIssuers.get: { service: guardcontrol }
+              guardcontrol.trustedIssuers.list: { service: guardcontrol }
+              guardcontrol.trustedIssuers.revoke: { service: guardcontrol }
+              guardcontrol.trustedIssuers.update: { service: guardcontrol }
+              guardcontrol.users.create: { service: guardcontrol }
+              guardcontrol.users.delete: { service: guardcontrol }
+              guardcontrol.users.get: { service: guardcontrol }
+              guardcontrol.users.list: { service: guardcontrol }
+              guardcontrol.users.update: { service: guardcontrol }
+            access_roles:
+              guardcontrol.admin:
+                description: "Full guard-control console administration."
+                permissions:
+                  - guardcontrol.enrollmentKeys.create
+                  - guardcontrol.enrollmentKeys.get
+                  - guardcontrol.enrollmentKeys.list
+                  - guardcontrol.enrollmentKeys.revoke
+                  - guardcontrol.events.get
+                  - guardcontrol.events.list
+                  - guardcontrol.events.search
+                  - guardcontrol.networks.create
+                  - guardcontrol.networks.delete
+                  - guardcontrol.networks.get
+                  - guardcontrol.networks.killPool
+                  - guardcontrol.networks.list
+                  - guardcontrol.networks.update
+                  - guardcontrol.nodeGroups.associateGrants
+                  - guardcontrol.nodeGroups.associateNodes
+                  - guardcontrol.nodeGroups.create
+                  - guardcontrol.nodeGroups.delete
+                  - guardcontrol.nodeGroups.get
+                  - guardcontrol.nodeGroups.list
+                  - guardcontrol.nodeGroups.update
+                  - guardcontrol.nodes.associateGrants
+                  - guardcontrol.nodes.create
+                  - guardcontrol.nodes.delete
+                  - guardcontrol.nodes.get
+                  - guardcontrol.nodes.issueAuthCode
+                  - guardcontrol.nodes.list
+                  - guardcontrol.nodes.update
+                  - guardcontrol.poolRelays.create
+                  - guardcontrol.poolRelays.delete
+                  - guardcontrol.poolRelays.get
+                  - guardcontrol.poolRelays.issueCredential
+                  - guardcontrol.poolRelays.list
+                  - guardcontrol.poolRelays.revokeCredential
+                  - guardcontrol.poolRelays.update
+                  - guardcontrol.relayPools.create
+                  - guardcontrol.relayPools.delete
+                  - guardcontrol.relayPools.get
+                  - guardcontrol.relayPools.list
+                  - guardcontrol.relayPools.listAllowed
+                  - guardcontrol.relayPools.update
+                  - guardcontrol.relays.create
+                  - guardcontrol.relays.delete
+                  - guardcontrol.relays.get
+                  - guardcontrol.relays.list
+                  - guardcontrol.relays.update
+                  - guardcontrol.resources.associateNodes
+                  - guardcontrol.resources.create
+                  - guardcontrol.resources.delete
+                  - guardcontrol.resources.get
+                  - guardcontrol.resources.list
+                  - guardcontrol.resources.update
+                  - guardcontrol.tenants.delete
+                  - guardcontrol.tenants.get
+                  - guardcontrol.tenants.grants.list
+                  - guardcontrol.tenants.grants.write
+                  - guardcontrol.tenants.people.list
+                  - guardcontrol.tenants.update
+                  - guardcontrol.traffic.read
+                  - guardcontrol.trustedIssuerRules.create
+                  - guardcontrol.trustedIssuerRules.delete
+                  - guardcontrol.trustedIssuerRules.get
+                  - guardcontrol.trustedIssuerRules.list
+                  - guardcontrol.trustedIssuerRules.update
+                  - guardcontrol.trustedIssuers.create
+                  - guardcontrol.trustedIssuers.get
+                  - guardcontrol.trustedIssuers.list
+                  - guardcontrol.trustedIssuers.revoke
+                  - guardcontrol.trustedIssuers.update
+                  - guardcontrol.users.create
+                  - guardcontrol.users.delete
+                  - guardcontrol.users.get
+                  - guardcontrol.users.list
+                  - guardcontrol.users.update
+            # END generated: guardcontrol catalog
+            # A Guard tenant in the estate catalog (guard-control#41): linked
+            # under its parent Authwise tenant by the tenancy listener when it
+            # is created, so a binding at tenant/<parent> reaches it. Declared
+            # once by the deployer (docs/AUTHORIZATION.md step 4).
+            access_resource_types:
+              guardcontrol.tenant:
+                name: guardcontrol.tenant
+                description: A Guard tenant, administered through its parent Authwise tenant
+                parent_type: tenant
+                expansion_mode: PUSH
+              # A Guard network under its Guard tenant: guard-control links
+              # guardcontrol.network/<n> under guardcontrol.tenant/<gt> when
+              # the network is created (guard-control#41 follow-up). Needs
+              # kit with kit#738 to land in a database install.
+              guardcontrol.network:
+                name: guardcontrol.network
+                description: A Guard network, administered through its Guard tenant
+                parent_type: guardcontrol.tenant
+                expansion_mode: PUSH
+          # Dev application audience for the guard-admin SPA OIDC client:
+          # its DisplayName becomes the token `aud`, which the kit admin
+          # API refuses but the runtime access evaluator accepts.
+          a-90:
+            display_name: https://guard.dev/api
+        clients:
+          # guard-admin SPA client (authorization_code + PKCE). The dev
+          # server is http://localhost:5176; redirect URI is the app
+          # root, exactly: kit refuses wildcard redirect URIs on a public
+          # client, so "http://*" made /authorize answer 400. Since kit
+          # v1.38.0 (kit#404) grant_types is a list and grant_type is
+          # refused at boot; an authorization_code-only client is an
+          # APPLICATION with token_endpoint_auth_method none (public PKCE),
+          # and no refresh token unless refresh_token is listed.
+          c-91:
+            display_name: guard-admin
+            audience_id: a-90
+            grant_types: [authorization_code]
+            config:
+              "@type": "type.googleapis.com/authwise.types.core.v1alpha1.InteractiveClientConfig"
+              allowed_redirect_uris:
+                - "http://localhost:5176/"
+          # guard CLI client (`guard up`, guard#19): public authorization_code
+          # + PKCE + state, as `awctl login` does. kit has no device-code
+          # grant. The CLI listens on 8991, one above awctl's 8990, and the
+          # redirect is exact, not a wildcard. Same audience as the console,
+          # so guard-control accepts its tokens unchanged; enrolling needs
+          # guardcontrol.networks.enroll.
+          c-92:
+            display_name: guard-cli
+            audience_id: a-90
+            grant_types: [authorization_code]
+            config:
+              "@type": "type.googleapis.com/authwise.types.core.v1alpha1.InteractiveClientConfig"
+              allowed_redirect_uris:
+                - "http://localhost:8991/return"
+          # guard-dev machine client for API-level testing. It lives in
+          # the admin audience because `engine admin client-credentials`
+          # (the only way to mint a secret) refuses clients elsewhere.
+          # No secret is seeded; the kit-mint-dev one-shot mints one into
+          # dev/.data/secrets/guard-dev-client.json.
+          c-90:
+            display_name: guard-dev
+            audience_id: a-01
+            grant_types: [client_credentials]
+            config: {}
+            # Operator membership is required by the mint command's
+            # inert-credential guard (mirrors c-02). Dev-only install.
+            operator: true
+            audiences:
+              a-01:
+                access_bindings:
+                  - role_name: guardcontrol.admin
+                    resource_type: ""
+                    resource_id: ""
+                  # guard-control's install credential too (tf#86): its
+                  # boot check reads kit's install capabilities and tenant.
+                  - role_name: identity.viewer
+                    resource_type: ""
+                    resource_id: ""
+                  # The tests' setup turns Guard on for t-01 with kit's
+                  # EnableProduct, gated by tenancy.tenants.update at root.
+                  - role_name: tenancy.admin
+                    resource_type: ""
+                    resource_id: ""
